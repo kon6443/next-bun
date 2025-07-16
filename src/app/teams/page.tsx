@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { DndContext, closestCenter, DragEndEvent } from '@dnd-kit/core';
-import { arrayMove, SortableContext } from '@dnd-kit/sortable';
+import { arrayMove } from '@dnd-kit/sortable';
 import { Column } from '../components/Column';
 
 const initialTasks = {
@@ -22,28 +22,50 @@ const TeamsPage = () => {
 
     if (!over) return;
 
-    const activeContainer = active.data.current?.sortable.containerId;
-    const overContainer = over.data.current?.sortable.containerId || over.id;
+    const activeContainer = active.data.current?.sortable
+      .containerId as keyof typeof tasks;
+    const overContainer = (over.data.current?.sortable.containerId ||
+      over.id) as keyof typeof tasks;
+
+    if (!activeContainer || !overContainer || !tasks[activeContainer] || !tasks[overContainer]) {
+      return;
+    }
 
     if (activeContainer === overContainer) {
-      setTasks((prev) => ({
-        ...prev,
-        [activeContainer]: arrayMove(prev[activeContainer], active.data.current?.sortable.index, over.data.current?.sortable.index || 0),
-      }));
-    } else {
-      const activeItems = tasks[activeContainer];
-      const overItems = tasks[overContainer];
       const activeIndex = active.data.current?.sortable.index;
-      const overIndex = over.data.current?.sortable.index || 0;
+      const overIndex = over.data.current?.sortable.index;
 
-      const [movedItem] = activeItems.splice(activeIndex, 1);
-      overItems.splice(overIndex, 0, movedItem);
+      if (activeIndex !== undefined && overIndex !== undefined && activeIndex !== overIndex) {
+        setTasks((prev) => {
+          const items = prev[activeContainer];
+          return {
+            ...prev,
+            [activeContainer]: arrayMove(items, activeIndex, overIndex),
+          };
+        });
+      }
+    } else {
+      const activeIndex = active.data.current?.sortable.index;
 
-      setTasks((prev) => ({
-        ...prev,
-        [activeContainer]: [...activeItems],
-        [overContainer]: [...overItems],
-      }));
+      if (activeIndex !== undefined) {
+        setTasks((prev) => {
+          const activeItems = prev[activeContainer];
+          const overItems = prev[overContainer];
+          const overIndex =
+            over.data.current?.sortable.index ?? overItems.length;
+
+          const newActiveItems = [...activeItems];
+          const [movedItem] = newActiveItems.splice(activeIndex, 1);
+          const newOverItems = [...overItems];
+          newOverItems.splice(overIndex, 0, movedItem);
+
+          return {
+            ...prev,
+            [activeContainer]: newActiveItems,
+            [overContainer]: newOverItems,
+          };
+        });
+      }
     }
   };
 

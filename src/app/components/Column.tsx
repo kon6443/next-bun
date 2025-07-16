@@ -1,4 +1,4 @@
-import { SortableContext, useSortable } from '@dnd-kit/sortable';
+import { SortableContext } from '@dnd-kit/sortable';
 import { useDroppable } from '@dnd-kit/core';
 import { TaskCard } from './TaskCard';
 
