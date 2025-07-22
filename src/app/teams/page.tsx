@@ -1,17 +1,17 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { DndContext, closestCenter, DragEndEvent } from '@dnd-kit/core';
-import { arrayMove } from '@dnd-kit/sortable';
-import { Column } from '../components/Column';
+import { useState } from "react";
+import { DndContext, closestCenter, DragEndEvent } from "@dnd-kit/core";
+import { arrayMove } from "@dnd-kit/sortable";
+import { Column } from "../components/Column";
 
 const initialTasks = {
   todo: [
-    { id: '1', title: 'Task 1' },
-    { id: '2', title: 'Task 2' },
+    { id: "1", title: "Task 1" },
+    { id: "2", title: "Task 2" },
   ],
-  inProgress: [{ id: '3', title: 'Task 3' }],
-  done: [{ id: '4', title: 'Task 4' }],
+  inProgress: [{ id: "3", title: "Task 3" }],
+  done: [{ id: "4", title: "Task 4" }],
 };
 
 const TeamsPage = () => {
@@ -27,7 +27,12 @@ const TeamsPage = () => {
     const overContainer = (over.data.current?.sortable.containerId ||
       over.id) as keyof typeof tasks;
 
-    if (!activeContainer || !overContainer || !tasks[activeContainer] || !tasks[overContainer]) {
+    if (
+      !activeContainer ||
+      !overContainer ||
+      !tasks[activeContainer] ||
+      !tasks[overContainer]
+    ) {
       return;
     }
 
@@ -35,7 +40,11 @@ const TeamsPage = () => {
       const activeIndex = active.data.current?.sortable.index;
       const overIndex = over.data.current?.sortable.index;
 
-      if (activeIndex !== undefined && overIndex !== undefined && activeIndex !== overIndex) {
+      if (
+        activeIndex !== undefined &&
+        overIndex !== undefined &&
+        activeIndex !== overIndex
+      ) {
         setTasks((prev) => {
           const items = prev[activeContainer];
           return {
