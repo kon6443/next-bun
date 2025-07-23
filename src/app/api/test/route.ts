@@ -3,8 +3,6 @@ import { NextResponse } from "next/server";
 export async function GET() {
   console.log("[/next-api/test] API Route가 서버에서 실행");
 
-  const buildEnvVar = process.env.NEXT_PUBLIC_TEST;
-
   // 서버 로그에 변수 값을 출력하여 OCI 인스턴스 터미널에서도 확인할 수 있습니다.
   console.log("TEST: ", process.env.TEST);
   console.log("test2:", process.env.TEST2);
