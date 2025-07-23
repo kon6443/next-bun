@@ -15,7 +15,7 @@ FROM base as builder
 WORKDIR /app
 COPY . .
 
-COPY .env.local .
+COPY .env.build .
 RUN bun run build
 
 # 3. Production image
