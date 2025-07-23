@@ -4,10 +4,18 @@ WORKDIR /app
 COPY package.json bun.lockb ./
 RUN bun install --frozen-lockfile
 
+# # 2. Builder image for building the application
+# FROM base as builder
+# WORKDIR /app
+# COPY . .
+# RUN bun run build
+
 # 2. Builder image for building the application
 FROM base as builder
 WORKDIR /app
 COPY . .
+
+COPY .env.local .
 RUN bun run build
 
 # 3. Production image
