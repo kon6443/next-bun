@@ -14,16 +14,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ▼▼▼▼▼ 이 단계를 새로 추가하세요 ▼▼▼▼▼
-      - name: Fetch .env file from OCI server
-        uses: appleboy/scp-action@v0.1.4
-        with:
-          host: ${{ secrets.DEPLOY_SERVER }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
-          source: "/home/ubuntu/desktop/deploy/sys/config/env/.env" # OCI 서버에 있는 .env 파일의 전체경로
-          target: ".env.local" # GitHub Actions 빌드 공간에 .env.local 이라는 이름으로 저장
-      # ▲▲▲▲▲ 여기까지 추가하세요 ▲▲▲▲▲
+      # ▼▼▼▼▼▼▼▼▼▼
+      # - name: Fetch .env file from OCI server
+      #   uses: appleboy/scp-action@v0.1.4
+      #   with:
+      #     host: ${{ secrets.DEPLOY_SERVER }}
+      #     username: ${{ secrets.DEPLOY_USER }}
+      #     key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
+      #     source: "/home/ubuntu/desktop/deploy/sys/config/env/.env" # OCI 서버에 있는 .env 파일의 전체경로
+      #     target: ".env.local" # GitHub Actions 빌드 공간에 .env.local 이라는 이름으로 저장
+      # ▲▲▲▲▲▲▲▲▲▲
 
       - name: Log in to Docker Registry
         run: echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ${{ secrets.REGISTRY_URL }} -u ${{ secrets.REGISTRY_USERNAME }} --password-stdin
