@@ -9,10 +9,10 @@ export async function postKakaoSignInUp({
   accessToken: string;
   refreshToken: string;
 }): Promise<{ message: string; userId: number }> {
-  const endPoint = "/api/auth/kakao";
+  const endPoint = "/api/v1/auth/kakao";
   //   console.log("url:", `${process.env.NEXT_PUBLIC_API}${endPoint}`);
   //   const response = await fetch(`${"http://127.0.0.1:3500"}${endPoint}`, {
-  //   console.log("api:", process.env.NEXT_PUBLIC_API);
+  console.log("api:", process.env.NEXT_PUBLIC_API);
   const response = await fetch(`${process.env.NEXT_PUBLIC_API}${endPoint}`, {
     method: "post",
     headers: {
