@@ -28,7 +28,7 @@ const handler = NextAuth({
           token.userId = userId;
           token.accessToken = account.access_token;
           token.refreshToken = account.refresh_token;
-        } catch (err: any) {
+        } catch (err) {
           console.error("Error during login/signup:", err);
           // throw new Error(err);
         }
