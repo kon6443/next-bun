@@ -14,7 +14,7 @@ const initialTasks = {
   done: [{ id: "4", title: "Task 4" }],
 };
 
-const TeamsPage = () => {
+export default function TeamsPage() {
   const [tasks, setTasks] = useState(initialTasks);
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -79,14 +79,16 @@ const TeamsPage = () => {
   };
 
   return (
-    <DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
-      <div className="flex space-x-4 p-4">
-        <Column id="todo" title="준비중" tasks={tasks.todo} />
-        <Column id="inProgress" title="작업중" tasks={tasks.inProgress} />
-        <Column id="done" title="완료" tasks={tasks.done} />
-      </div>
-    </DndContext>
+    <main className="flex min-h-screen flex-col items-center p-8 sm:p-24 bg-gray-900 text-white">
+      <h1 className="text-5xl font-bold mb-8">Teams</h1>
+      <DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
+        <div className="flex w-full max-w-6xl space-x-4">
+          <Column id="todo" title="준비중" tasks={tasks.todo} />
+          <Column id="inProgress" title="작업중" tasks={tasks.inProgress} />
+          <Column id="done" title="완료" tasks={tasks.done} />
+        </div>
+      </DndContext>
+    </main>
   );
-};
+}
 
-export default TeamsPage;
