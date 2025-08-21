@@ -1,0 +1,30 @@
+
+.battery {
+  width: 80px;
+  height: 150px;
+  border: 5px solid #ccc;
+  border-radius: 10px;
+  position: relative;
+  margin: 20px auto;
+  background-color: #f0f0f0;
+  display: flex;
+  flex-direction: column-reverse; /* Fill from bottom */
+}
+
+.battery::after {
+  content: '';
+  position: absolute;
+  top: -15px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30px;
+  height: 10px;
+  background-color: #ccc;
+  border-radius: 5px 5px 0 0;
+}
+
+.level {
+  width: 100%;
+  border-radius: 2px;
+  transition: height 1s linear, background-color 1s linear;
+}
