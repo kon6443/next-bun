@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession, signIn, signOut } from "next-auth/react";
-// import Image from "next/image";
+// import { getMypage } from "@/services/authService";
 
 export default function Mypage() {
   const { data: session, status } = useSession();
