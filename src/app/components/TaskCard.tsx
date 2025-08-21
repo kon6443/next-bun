@@ -10,7 +10,7 @@ export function TaskCard({ id, title }: { id: string; title: string }) {
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="p-4 bg-white rounded-md shadow-sm">
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="p-4 bg-gray-700 rounded-md">
       {title}
     </div>
   );
