@@ -34,7 +34,9 @@ function LeavingOfficePageContent() {
   const [isTimeToGoHome, setIsTimeToGoHome] = useState(false);
   const [progress, setProgress] = useState(0);
   const [animationType, setAnimationType] = useState<AnimationType>("sun");
-  const [startTime, setStartTime] = useState(getInitialTime("startTime", "09:00"));
+  const [startTime, setStartTime] = useState(
+    getInitialTime("startTime", "09:00")
+  );
   const [endTime, setEndTime] = useState(getInitialTime("endTime", "18:00"));
 
   useEffect(() => {
@@ -122,8 +124,6 @@ function LeavingOfficePageContent() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8 sm:p-24 bg-gray-900 text-white">
       <div className="text-center">
-        <h1 className="text-5xl font-bold mb-4">남은 시간</h1>
-
         <div className="my-8 h-52 flex items-center justify-center">
           {isTimeToGoHome ? (
             <div className="text-4xl text-green-400 font-bold">
@@ -177,7 +177,10 @@ function LeavingOfficePageContent() {
 
         <div className="flex justify-center items-center space-x-4 my-8">
           <div>
-            <label htmlFor="startTime" className="block text-sm font-medium text-gray-400 mb-1">
+            <label
+              htmlFor="startTime"
+              className="block text-sm font-medium text-gray-400 mb-1"
+            >
               시작 시간
             </label>
             <input
@@ -189,7 +192,10 @@ function LeavingOfficePageContent() {
             />
           </div>
           <div>
-            <label htmlFor="endTime" className="block text-sm font-medium text-gray-400 mb-1">
+            <label
+              htmlFor="endTime"
+              className="block text-sm font-medium text-gray-400 mb-1"
+            >
               종료 시간
             </label>
             <input
@@ -213,13 +219,13 @@ function LeavingOfficePageContent() {
             </div>
             <div className="grid grid-cols-2 gap-4 text-left">
               <div className="p-4 bg-gray-800 rounded-lg shadow-lg">
-                <p className="text-md text-gray-400">총 분</p>
+                <p className="text-md text-gray-400">남은 시간 (분)</p>
                 <p className="text-2xl font-mono">
                   {timeLeft.totalMinutes.toLocaleString()} 분
                 </p>
               </div>
               <div className="p-4 bg-gray-800 rounded-lg shadow-lg">
-                <p className="text-md text-gray-400">업무 진행률</p>
+                <p className="text-md text-gray-400">진행률</p>
                 <p className="text-2xl font-mono">{progress.toFixed(2)} %</p>
               </div>
             </div>
