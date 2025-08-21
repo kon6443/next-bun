@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import SunMoonAnimation from "./components/SunMoonAnimation";
 import HourglassAnimation from "./components/HourglassAnimation";
 import BatteryAnimation from "./components/BatteryAnimation";
@@ -17,24 +18,39 @@ interface TimeLeft {
 
 type AnimationType = "sun" | "hourglass" | "battery" | "window";
 
-export default function LeavingOfficePage() {
+function LeavingOfficePageContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const getInitialTime = (paramName: string, defaultValue: string) => {
+    const paramValue = searchParams.get(paramName);
+    return paramValue && /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(paramValue)
+      ? paramValue
+      : defaultValue;
+  };
+
   const [timeLeft, setTimeLeft] = useState<TimeLeft | null>(null);
   const [isTimeToGoHome, setIsTimeToGoHome] = useState(false);
   const [progress, setProgress] = useState(0);
   const [animationType, setAnimationType] = useState<AnimationType>("sun");
+  const [startTime, setStartTime] = useState(getInitialTime("startTime", "09:00"));
+  const [endTime, setEndTime] = useState(getInitialTime("endTime", "18:00"));
 
   useEffect(() => {
     const calculateTime = () => {
       const now = new Date();
 
-      const startTime = new Date();
-      startTime.setHours(9, 0, 0, 0);
+      const start = new Date();
+      const [startHours, startMinutes] = startTime.split(":").map(Number);
+      start.setHours(startHours, startMinutes, 0, 0);
 
-      const targetTime = new Date();
-      targetTime.setHours(18, 0, 0, 0);
+      const end = new Date();
+      const [endHours, endMinutes] = endTime.split(":").map(Number);
+      end.setHours(endHours, endMinutes, 0, 0);
 
-      const totalWorkSeconds = targetTime.getTime() - startTime.getTime();
-      const elapsedSeconds = now.getTime() - startTime.getTime();
+      const totalWorkSeconds = end.getTime() - start.getTime();
+      const elapsedSeconds = now.getTime() - start.getTime();
 
       let currentProgress = (elapsedSeconds / totalWorkSeconds) * 100;
       if (currentProgress < 0) currentProgress = 0;
@@ -42,7 +58,7 @@ export default function LeavingOfficePage() {
 
       setProgress(currentProgress);
 
-      if (now.getTime() >= targetTime.getTime()) {
+      if (now.getTime() >= end.getTime()) {
         setIsTimeToGoHome(true);
         setTimeLeft({
           totalSeconds: 0,
@@ -55,7 +71,7 @@ export default function LeavingOfficePage() {
       }
 
       setIsTimeToGoHome(false);
-      const difference = targetTime.getTime() - now.getTime();
+      const difference = end.getTime() - now.getTime();
       const totalSeconds = Math.floor(difference / 1000);
       const totalMinutes = Math.floor(difference / (1000 * 60));
       const hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
@@ -68,7 +84,19 @@ export default function LeavingOfficePage() {
     const intervalId = setInterval(calculateTime, 1000);
 
     return () => clearInterval(intervalId);
-  }, []);
+  }, [startTime, endTime]);
+
+  const handleTimeChange = (type: "start" | "end", value: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (type === "start") {
+      setStartTime(value);
+      params.set("startTime", value);
+    } else {
+      setEndTime(value);
+      params.set("endTime", value);
+    }
+    router.push(`${pathname}?${params.toString()}`);
+  };
 
   const formatTime = (num: number) => num.toString().padStart(2, "0");
 
@@ -147,6 +175,33 @@ export default function LeavingOfficePage() {
           </button>
         </div>
 
+        <div className="flex justify-center items-center space-x-4 my-8">
+          <div>
+            <label htmlFor="startTime" className="block text-sm font-medium text-gray-400 mb-1">
+              시작 시간
+            </label>
+            <input
+              type="time"
+              id="startTime"
+              value={startTime}
+              onChange={(e) => handleTimeChange("start", e.target.value)}
+              className="bg-gray-800 border border-gray-600 rounded-md p-2 text-white"
+            />
+          </div>
+          <div>
+            <label htmlFor="endTime" className="block text-sm font-medium text-gray-400 mb-1">
+              종료 시간
+            </label>
+            <input
+              type="time"
+              id="endTime"
+              value={endTime}
+              onChange={(e) => handleTimeChange("end", e.target.value)}
+              className="bg-gray-800 border border-gray-600 rounded-md p-2 text-white"
+            />
+          </div>
+        </div>
+
         {timeLeft && !isTimeToGoHome && (
           <div className="space-y-4">
             <div className="p-4 bg-gray-800 rounded-lg shadow-lg">
@@ -172,5 +227,13 @@ export default function LeavingOfficePage() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function LeavingOfficePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LeavingOfficePageContent />
+    </Suspense>
   );
 }
