@@ -2,10 +2,10 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import SunMoonAnimation from "./components/SunMoonAnimation";
-import HourglassAnimation from "./components/HourglassAnimation";
+// import SunMoonAnimation from "./components/SunMoonAnimation";
+// import HourglassAnimation from "./components/HourglassAnimation";
 import BatteryAnimation from "./components/BatteryAnimation";
-import WindowAnimation from "./components/WindowAnimation";
+// import WindowAnimation from "./components/WindowAnimation";
 
 // 남은 시간을 시, 분, 초 등 다양한 형식으로 저장하기 위한 인터페이스
 interface TimeLeft {
@@ -33,7 +33,7 @@ function LeavingOfficePageContent() {
   const [timeLeft, setTimeLeft] = useState<TimeLeft | null>(null);
   const [isTimeToGoHome, setIsTimeToGoHome] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [animationType, setAnimationType] = useState<AnimationType>("sun");
+  const [animationType, setAnimationType] = useState<AnimationType>("battery");
   const [startTime, setStartTime] = useState(
     getInitialTime("startTime", "09:00")
   );
@@ -103,18 +103,19 @@ function LeavingOfficePageContent() {
   const formatTime = (num: number) => num.toString().padStart(2, "0");
 
   const renderAnimation = () => {
-    switch (animationType) {
-      case "sun":
-        return <SunMoonAnimation progress={progress} />;
-      case "hourglass":
-        return <HourglassAnimation progress={progress} />;
-      case "battery":
-        return <BatteryAnimation progress={progress} />;
-      case "window":
-        return <WindowAnimation progress={progress} />;
-      default:
-        return null;
-    }
+    return <BatteryAnimation progress={progress} />;
+    // switch (animationType) {
+    //   case "sun":
+    //     return <SunMoonAnimation progress={progress} />;
+    //   case "hourglass":
+    //     return <HourglassAnimation progress={progress} />;
+    //   case "battery":
+    //     return <BatteryAnimation progress={progress} />;
+    //   case "window":
+    //     return <WindowAnimation progress={progress} />;
+    //   default:
+    //     return null;
+    // }
   };
 
   const buttonStyle = "px-4 py-2 rounded-lg transition-colors duration-200";
@@ -135,7 +136,7 @@ function LeavingOfficePageContent() {
         </div>
 
         <div className="flex justify-center space-x-2 mb-8">
-          <button
+          {/* <button
             onClick={() => setAnimationType("sun")}
             className={`${buttonStyle} ${
               animationType === "sun" ? activeButtonStyle : inactiveButtonStyle
@@ -152,7 +153,7 @@ function LeavingOfficePageContent() {
             }`}
           >
             모래시계
-          </button>
+          </button> */}
           <button
             onClick={() => setAnimationType("battery")}
             className={`${buttonStyle} ${
@@ -163,7 +164,7 @@ function LeavingOfficePageContent() {
           >
             배터리
           </button>
-          <button
+          {/* <button
             onClick={() => setAnimationType("window")}
             className={`${buttonStyle} ${
               animationType === "window"
@@ -172,7 +173,7 @@ function LeavingOfficePageContent() {
             }`}
           >
             창문
-          </button>
+          </button> */}
         </div>
 
         <div className="flex justify-center items-center space-x-4 my-8">
