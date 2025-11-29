@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSession, signIn } from "next-auth/react";
 
 type TeamSummary = {
-  id: string;
+  teamId: number;
   name: string;
   description: string;
   role: string;
@@ -13,21 +13,21 @@ type TeamSummary = {
 
 const MOCK_TEAMS: TeamSummary[] = [
   {
-    id: "101",
+    teamId: 101,
     name: "Design Lab",
     description: "프로덕트 경험과 브랜딩을 담당하는 디자이너 그룹",
     role: "디자인",
     memberCount: 8,
   },
   {
-    id: "205",
+    teamId: 205,
     name: "Planet Core",
     description: "서비스 핵심 로직과 API를 관리하는 백엔드 팀",
     role: "백엔드",
     memberCount: 12,
   },
   {
-    id: "318",
+    teamId: 318,
     name: "Momentum",
     description: "실험과 성장 지표를 담당하는 Growth 스쿼드",
     role: "Growth",
@@ -80,8 +80,8 @@ export default function TeamsPage() {
               <div className="grid gap-5 sm:grid-cols-2">
                 {teams.map((team) => (
                   <Link
-                    key={team.id}
-                    href={`/teams/${team.id}`}
+                    key={team.teamId}
+                    href={`/teams/${team.teamId}`}
                     className="group flex flex-col rounded-2xl border border-white/10 bg-slate-950/40 p-5 shadow-[0_20px_40px_rgba(2,6,23,0.55)] transition hover:border-white/30"
                   >
                     <div className="flex items-center justify-between">
