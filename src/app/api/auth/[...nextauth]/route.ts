@@ -19,15 +19,17 @@ const handler = NextAuth({
     async jwt({ token, user, account }) {
       if (user && account) {
         try {
-          const { userId } = await postKakaoSignInUp({
+          const { userId, loginType } = await postKakaoSignInUp({
             accessToken: account.access_token ?? "",
             refreshToken: account.refresh_token ?? "",
             kakaoNickname: user.name ?? "",
           });
 
           token.userId = userId;
-          token.accessToken = account.access_token;
-          token.refreshToken = account.refresh_token;
+          token.loginType = loginType;
+          // token.accessToken = account.access_token;
+          // token.refreshToken = account.refresh_token;
+          // console.log("token token:", token);
         } catch (err) {
           console.error("Error during login/signup:", err);
           // throw new Error(err);
@@ -36,11 +38,12 @@ const handler = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      // console.log("session session:", session);
       // session.user.userId = token.userId;
       // session.user.kakaoNickname = token.kakaoNickname;
       // session.user.kakaoId = token.kakaoId;
       session.user.userId = token.userId;
+      session.user.loginType = token.loginType;
+      // console.log("session session:", session);
       // console.log("session:", session);
       return session;
     },
