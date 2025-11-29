@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, type JSX } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import BatteryAnimation from "./components/BatteryAnimation";
 import OrbitAnimation from "./components/OrbitAnimation";
