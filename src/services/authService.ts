@@ -8,7 +8,7 @@ export async function postKakaoSignInUp({
   kakaoNickname: string;
   accessToken: string;
   refreshToken: string;
-}): Promise<{ message: string; userId: number }> {
+}): Promise<{ message: string; userId: number; loginType: "KAKAO" }> {
   const endPoint = "/api/v1/auth/kakao";
   //   console.log("url:", `${process.env.NEXT_PUBLIC_API}${endPoint}`);
   //   const response = await fetch(`${"http://127.0.0.1:3500"}${endPoint}`, {
