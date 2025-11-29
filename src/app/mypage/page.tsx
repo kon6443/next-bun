@@ -62,16 +62,18 @@ const containerStyle: CSSProperties = {
   justifyContent: "center",
   padding: "2rem",
   background:
-    "radial-gradient(circle at top, rgba(99,102,241,0.15), transparent 60%), radial-gradient(circle at bottom, rgba(59,130,246,0.15), transparent 60%), #0f172a",
+    "radial-gradient(circle at 20% 20%, rgba(59,130,246,0.28), transparent 55%), radial-gradient(circle at 80% 80%, rgba(14,165,233,0.2), transparent 60%), var(--background)",
 };
 
 const cardStyle: CSSProperties = {
-  width: "min(420px, 100%)",
-  backgroundColor: "#ffffff",
-  borderRadius: "24px",
-  padding: "2.5rem",
+  width: "min(430px, 100%)",
+  background:
+    "linear-gradient(145deg, rgba(15,23,42,0.95), rgba(15,23,42,0.75))",
+  border: "1px solid rgba(148,163,184,0.25)",
+  borderRadius: "28px",
+  padding: "2.75rem",
   boxShadow:
-    "0 25px 50px -12px rgba(15,23,42,0.25), inset 0 1px 0 rgba(255,255,255,0.4)",
+    "0 35px 65px rgba(2,6,23,0.75), inset 0 1px 0 rgba(255,255,255,0.05)",
   textAlign: "center",
 };
 
@@ -90,60 +92,62 @@ const avatarWrapStyle: CSSProperties = {
 const avatarStyle: CSSProperties = {
   fontSize: "2.25rem",
   fontWeight: 600,
-  color: "#1f2937",
+  color: "#f8fafc",
 };
 
 const eyebrowStyle: CSSProperties = {
   textTransform: "uppercase",
-  letterSpacing: "0.2em",
-  fontSize: "0.75rem",
+  letterSpacing: "0.35em",
+  fontSize: "0.72rem",
   fontWeight: 600,
   color: "#94a3b8",
   marginBottom: "0.5rem",
 };
 
 const titleStyle: CSSProperties = {
-  fontSize: "2rem",
+  fontSize: "2.15rem",
   fontWeight: 700,
-  color: "#111827",
+  color: "#e2e8f0",
   marginBottom: "0.75rem",
 };
 
 const descriptionStyle: CSSProperties = {
   fontSize: "1rem",
-  color: "#475569",
-  lineHeight: 1.5,
-  marginBottom: "1.75rem",
+  color: "#cbd5f5",
+  lineHeight: 1.6,
+  marginBottom: "1.85rem",
 };
 
 const baseButtonStyle: CSSProperties = {
   width: "100%",
   borderRadius: "9999px",
   border: "none",
-  padding: "0.9rem 1.25rem",
+  padding: "0.95rem 1.25rem",
   fontSize: "1rem",
   fontWeight: 600,
   cursor: "pointer",
-  transition: "transform 0.15s ease, box-shadow 0.15s ease",
+  transition:
+    "transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease",
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
   gap: "0.35rem",
+  color: "#0f172a",
 };
 
 const kakaoButtonStyle: CSSProperties = {
   ...baseButtonStyle,
   backgroundColor: "#FEE500",
   color: "#181600",
-  boxShadow: "0 10px 20px rgba(251,191,36,0.35)",
+  boxShadow: "0 18px 35px rgba(251,191,36,0.35)",
 };
 
 const secondaryButtonStyle: CSSProperties = {
   ...baseButtonStyle,
   background:
-    "linear-gradient(135deg, rgba(59,130,246,0.12), rgba(99,102,241,0.12))",
-  color: "#1d4ed8",
-  boxShadow: "0 10px 20px rgba(59,130,246,0.2)",
+    "linear-gradient(135deg, rgba(59,130,246,0.35), rgba(99,102,241,0.4))",
+  color: "#f8fafc",
+  boxShadow: "0 18px 35px rgba(59,130,246,0.35)",
 };
 
 // const AboutPage = () => {
