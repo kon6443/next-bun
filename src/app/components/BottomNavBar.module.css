@@ -1,18 +1,121 @@
 .nav {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 60px;
-  background-color: #fff;
-  border-top: 1px solid #eaeaea;
+  left: 50%;
+  bottom: 1.5rem;
+  transform: translateX(-50%);
+  width: min(520px, calc(100% - 1.5rem));
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 999px;
+  padding: 0.75rem 1.25rem;
+  box-shadow: 0 25px 50px rgba(15, 23, 42, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(18px);
+  z-index: 50;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
-  justify-content: space-around;
   align-items: center;
+  gap: 0.35rem;
+}
+
+.item {
+  flex: 1;
 }
 
 .link {
-  color: #333;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 0.55rem 0.35rem;
+  border-radius: 999px;
+  color: #cbd5f5;
+  font-size: 0.95rem;
+  font-weight: 600;
   text-decoration: none;
-  font-size: 16px;
+  letter-spacing: 0.01em;
+  transition: color 0.2s ease, transform 0.2s ease;
+  overflow: hidden;
+}
+
+.link:hover {
+  color: #f8fafc;
+  transform: translateY(-2px);
+}
+
+.icon,
+.label {
+  position: relative;
+  z-index: 1;
+}
+
+.icon {
+  font-size: 1.25rem;
+  line-height: 1;
+  transition: transform 0.2s ease;
+}
+
+.label {
+  font-size: 0.76rem;
+  color: #94a3b8;
+}
+
+.active {
+  color: #f8fafc;
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.28),
+    rgba(99, 102, 241, 0.32)
+  );
+  box-shadow: 0 15px 35px rgba(79, 70, 229, 0.35);
+  transform: translateY(-6px);
+}
+
+.active .icon {
+  transform: translateY(-2px) scale(1.05);
+}
+
+.active .label {
+  color: #e2e8f0;
+}
+
+.pill {
+  position: absolute;
+  inset: 4px;
+  border-radius: 999px;
+  background: radial-gradient(
+      circle at 20% 20%,
+      rgba(248, 250, 252, 0.65),
+      transparent 30%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(59, 130, 246, 0.5),
+      rgba(236, 72, 153, 0.35)
+    );
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  z-index: 0;
+}
+
+.active .pill {
+  opacity: 1;
+}
+
+@media (max-width: 520px) {
+  .nav {
+    bottom: 1rem;
+    padding: 0.6rem 0.9rem;
+  }
+
+  .label {
+    font-size: 0.7rem;
+  }
 }
