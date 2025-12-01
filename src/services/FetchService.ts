@@ -33,14 +33,17 @@ class FetchClient {
     return this.request(endpoint, options);
   }
 
+  // Server Side Rendering: 매번 백엔드 API 요청
   ssr(endpoint: string, options?: FetchClientOptions) {
     return this.request(endpoint, { cache: 'no-store', ...options });
   }
 
+  // Static Site Generation: 빌드 시 한번만 백엔드 API 요청
   ssg(endpoint: string, options?: FetchClientOptions) {
     return this.request(endpoint, { cache: 'force-cache', ...options });
   }
 
+  // Incremental Static Regeneration: SSG 기반에서 revalidate 시간이 지난 후 재요청
   isr(endpoint: string, time = 0, options?: FetchClientOptions) {
     const mergedNext = {
       ...(options?.next ?? {}),
