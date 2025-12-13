@@ -1,11 +1,9 @@
 export async function postKakaoSignInUp({
   kakaoNickname,
   accessToken,
-  refreshToken,
 }: {
   kakaoNickname: string;
   accessToken: string;
-  refreshToken?: string;
 }): Promise<{ message: string; userId: number; loginType: "KAKAO" }> {
   const endPoint = "/api/v1/auth/kakao";
   
