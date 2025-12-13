@@ -5,6 +5,7 @@ declare module "next-auth" {
     user: {
       userId?: number | null;
       kakaoNickname?: string | null;
+      loginType?: string | null;
     } & DefaultSession["user"];
   }
 }
@@ -13,5 +14,6 @@ declare module "next-auth/jwt" {
   interface JWT {
     userId?: number;
     kakaoNickname?: string;
+    loginType?: string;
   }
 }
