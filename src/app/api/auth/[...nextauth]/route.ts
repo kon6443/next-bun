@@ -21,19 +21,18 @@ const handler = NextAuth({
     signIn: "/auth/signin",
     error: "/auth/error",
   },
-  events: {
-    async signIn(_params) {
-      // 카카오 로그인 성공 시 로깅 (디버깅용, 필요시 주석 해제)
-      // const { user, account } = _params;
-      // if (account?.provider === "kakao") {
-      //   console.log("Kakao sign in successful", {
-      //     userId: user.id,
-      //     email: user.email,
-      //     name: user.name,
-      //   });
-      // }
-    },
-  },
+  // events: {
+  //   async signIn({ user, account }) {
+  //     // 카카오 로그인 성공 시 로깅 (디버깅용, 필요시 주석 해제)
+  //     // if (account?.provider === "kakao") {
+  //     //   console.log("Kakao sign in successful", {
+  //     //     userId: user.id,
+  //     //     email: user.email,
+  //     //     name: user.name,
+  //     //   });
+  //     // }
+  //   },
+  // },
   // debug: process.env.NODE_ENV === "development",
 
   callbacks: {
