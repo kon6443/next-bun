@@ -1,10 +1,11 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 
-export default function AuthErrorPage() {
+function AuthErrorContent() {
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
 
@@ -102,6 +103,20 @@ export default function AuthErrorPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+export default function AuthErrorPage() {
+  return (
+    <Suspense fallback={
+      <div style={containerStyle}>
+        <section style={cardStyle}>
+          <p style={{ color: "#6b7280" }}>로딩 중...</p>
+        </section>
+      </div>
+    }>
+      <AuthErrorContent />
+    </Suspense>
   );
 }
 
