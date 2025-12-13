@@ -66,7 +66,6 @@ const handler = NextAuth({
         try {
           const { userId, loginType } = await postKakaoSignInUp({
             accessToken: account.access_token,
-            refreshToken: account.refresh_token ?? "",
             kakaoNickname: user.name ?? "",
           });
 
