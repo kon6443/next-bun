@@ -5,7 +5,7 @@ export async function postKakaoSignInUp({
 }: {
   kakaoNickname: string;
   accessToken: string;
-  refreshToken: string;
+  refreshToken?: string;
 }): Promise<{ message: string; userId: number; loginType: "KAKAO" }> {
   const endPoint = "/api/v1/auth/kakao";
   
@@ -18,14 +18,20 @@ export async function postKakaoSignInUp({
     
     // 디버깅용 로그 (필요시 주석 해제)
     // console.log("Request URL:", url);
-    // console.log("Request body:", { kakaoNickname, accessToken: accessToken ? "***" : undefined, refreshToken: refreshToken ? "***" : undefined });
+    // console.log("Request body:", { kakaoNickname, accessToken: accessToken ? "***" : undefined });
+    
+    // 백엔드 DTO가 refreshToken을 허용하지 않으므로 제외
+    const requestBody: { kakaoNickname: string; accessToken: string } = {
+      kakaoNickname,
+      accessToken,
+    };
     
     const response = await fetch(url, {
       method: "post",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ kakaoNickname, accessToken, refreshToken }),
+      body: JSON.stringify(requestBody),
       signal: controller.signal,
     });
     
@@ -47,7 +53,12 @@ export async function postKakaoSignInUp({
         if (errorData) {
           try {
             const parsedError = JSON.parse(errorData);
-            errorMessage = parsedError.message || parsedError.error || errorMessage;
+            // NestJS validation 에러는 message가 배열일 수 있음
+            if (Array.isArray(parsedError.message)) {
+              errorMessage = parsedError.message.join(", ");
+            } else {
+              errorMessage = parsedError.message || parsedError.error || errorMessage;
+            }
           } catch {
             errorMessage = errorData || errorMessage;
           }
