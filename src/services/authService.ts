@@ -65,9 +65,8 @@ export async function postKakaoSignInUp({
     if (contentType && contentType.includes("application/json")) {
       data = await response.json();
     } else {
-      // JSON이 아닌 경우 텍스트로 읽기
-      const text = await response.text();
-      // console.warn("Response is not JSON, received text:", text);
+      // JSON이 아닌 경우 에러 발생
+      await response.text(); // 응답 본문 소비 (메모리 누수 방지)
       throw new Error("서버가 예상하지 못한 형식으로 응답했습니다.");
     }
     
