@@ -79,8 +79,17 @@ const handler = NextAuth({
           const errorMessage = err instanceof Error ? err.message : "로그인 처리 중 오류가 발생했습니다.";
           
           // 카카오 속도 제한 에러인 경우 명확한 메시지
-          if (errorMessage.includes("rate limit") || errorMessage.includes("속도") || errorMessage.includes("LOGIN FAILED")) {
+          if (errorMessage.includes("rate limit") || errorMessage.includes("속도")) {
             throw new Error("카카오 로그인 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.");
+          }
+          
+          // Validation 에러인 경우 원본 메시지 사용
+          if (errorMessage.includes("LOGIN FAILED") && errorMessage.includes("400")) {
+            // NestJS validation 에러 메시지 추출
+            const match = errorMessage.match(/LOGIN FAILED: 400 Bad Request - (.+)/);
+            if (match && match[1]) {
+              throw new Error(`로그인 처리 중 오류가 발생했습니다: ${match[1]}`);
+            }
           }
           
           throw new Error(errorMessage || "로그인 처리 중 오류가 발생했습니다.");
