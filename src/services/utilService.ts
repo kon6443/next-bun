@@ -28,7 +28,7 @@ export async function postKakaoSignInUp({
   return data;
 }
 
-export async function getMypage({}: {}) {
+export async function getMypage() {
   const endpoint = '/api/v2/mypage';
   await fetchServiceInstance.backendFetch({
     method: 'GET',

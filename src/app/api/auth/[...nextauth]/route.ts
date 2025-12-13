@@ -22,8 +22,9 @@ const handler = NextAuth({
     error: "/auth/error",
   },
   events: {
-    async signIn({ user, account, profile, isNewUser }) {
+    async signIn(_params) {
       // 카카오 로그인 성공 시 로깅 (디버깅용, 필요시 주석 해제)
+      // const { user, account } = _params;
       // if (account?.provider === "kakao") {
       //   console.log("Kakao sign in successful", {
       //     userId: user.id,
@@ -36,7 +37,7 @@ const handler = NextAuth({
   // debug: process.env.NODE_ENV === "development",
 
   callbacks: {
-    async signIn({ user, account, profile }) {
+    async signIn({ account }) {
       // 카카오 provider인 경우 account와 access_token 확인
       if (account?.provider === "kakao") {
         if (!account || !account.access_token) {
