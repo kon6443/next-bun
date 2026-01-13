@@ -100,6 +100,30 @@ export type UpdateTaskCommentResponse = {
   data: TaskCommentResponse;
 };
 
+export type CreateTaskRequest = {
+  taskName: string;
+  taskDescription: string;
+  startAt?: string | null;
+  endAt?: string | null;
+};
+
+export type CreateTaskResponse = {
+  message: string;
+  data: TeamTaskResponse;
+};
+
+export type UpdateTaskRequest = {
+  taskName: string;
+  taskDescription: string;
+  startAt?: string | null;
+  endAt?: string | null;
+};
+
+export type UpdateTaskResponse = {
+  message: string;
+  data: TeamTaskResponse;
+};
+
 /**
  * 내 팀 목록 조회
  */
@@ -144,6 +168,90 @@ export async function getTeamTasks(
     }
     const errorText = await response.text();
     throw new Error(`태스크 목록 조회 실패: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * 태스크 생성
+ */
+export async function createTask(
+  teamId: number,
+  request: CreateTaskRequest,
+  accessToken: string,
+): Promise<CreateTaskResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'POST',
+    endpoint: `/api/v1/teams/${teamId}/tasks`,
+    accessToken,
+    body: request,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
+    }
+    if (response.status === 403) {
+      throw new Error('팀 멤버만 태스크를 생성할 수 있습니다.');
+    }
+    if (response.status === 400) {
+      throw new Error('태스크 생성 요청이 올바르지 않습니다.');
+    }
+    const errorText = await response.text();
+    throw new Error(`태스크 생성 실패: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * 태스크 수정
+ */
+export async function updateTask(
+  teamId: number,
+  taskId: number,
+  request: UpdateTaskRequest,
+  accessToken: string,
+): Promise<UpdateTaskResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'PATCH',
+    endpoint: `/api/v1/teams/${teamId}/tasks/${taskId}`,
+    accessToken,
+    body: request,
+  });
+
+  if (!response.ok) {
+    let errorMessage = '';
+    try {
+      const errorText = await response.text();
+      if (errorText) {
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData?.message || errorData?.error || errorData?.detail || errorText;
+        } catch {
+          errorMessage = errorText;
+        }
+      }
+    } catch {
+      // 응답 본문 읽기 실패
+    }
+
+    if (response.status === 401) {
+      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
+    }
+    if (response.status === 403) {
+      throw new Error('태스크를 수정할 권한이 없습니다.');
+    }
+    if (response.status === 404) {
+      throw new Error(errorMessage || '태스크를 찾을 수 없습니다.');
+    }
+    if (response.status === 400) {
+      throw new Error(errorMessage || '태스크 수정 요청이 올바르지 않습니다.');
+    }
+    throw new Error(errorMessage || `태스크 수정 실패: ${response.status}`);
   }
 
   const data = await response.json();

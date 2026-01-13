@@ -8,6 +8,7 @@ import {
   createTaskComment,
   updateTaskComment,
   deleteTaskComment,
+  updateTask,
   type TaskDetailResponse,
 } from "@/services/teamService";
 import type { TaskComment } from "@/app/types/task";
@@ -48,6 +49,11 @@ export default function TaskDetailPage({
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
   const [editingContent, setEditingContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTaskName, setEditTaskName] = useState("");
+  const [editTaskDescription, setEditTaskDescription] = useState("");
+  const [editStartAt, setEditStartAt] = useState("");
+  const [editEndAt, setEditEndAt] = useState("");
 
   const fetchTaskDetail = useCallback(async (showLoading = true) => {
     if (!session?.user?.accessToken) {
@@ -108,6 +114,107 @@ export default function TaskDetailPage({
     fetchTaskDetail();
   }, [fetchTaskDetail]);
 
+  // taskDetail이 변경될 때 편집 필드 초기화 (수정 모드가 아닐 때만)
+  useEffect(() => {
+    if (taskDetail && !isEditing) {
+      setEditTaskName(taskDetail.taskName);
+      setEditTaskDescription(taskDetail.taskDescription || "");
+      setEditStartAt(
+        taskDetail.startAt
+          ? new Date(taskDetail.startAt).toISOString().split("T")[0]
+          : ""
+      );
+      setEditEndAt(
+        taskDetail.endAt
+          ? new Date(taskDetail.endAt).toISOString().split("T")[0]
+          : ""
+      );
+    }
+  }, [taskDetail, isEditing]);
+
+  // 수정 모드 시작
+  const handleStartEdit = () => {
+    if (!taskDetail) return;
+    setEditTaskName(taskDetail.taskName);
+    setEditTaskDescription(taskDetail.taskDescription || "");
+    setEditStartAt(
+      taskDetail.startAt
+        ? new Date(taskDetail.startAt).toISOString().split("T")[0]
+        : ""
+    );
+    setEditEndAt(
+      taskDetail.endAt
+        ? new Date(taskDetail.endAt).toISOString().split("T")[0]
+        : ""
+    );
+    setIsEditing(true);
+    setError(null);
+  };
+
+  // 수정 모드 취소
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setError(null);
+    if (taskDetail) {
+      setEditTaskName(taskDetail.taskName);
+      setEditTaskDescription(taskDetail.taskDescription || "");
+      setEditStartAt(
+        taskDetail.startAt
+          ? new Date(taskDetail.startAt).toISOString().split("T")[0]
+          : ""
+      );
+      setEditEndAt(
+        taskDetail.endAt
+          ? new Date(taskDetail.endAt).toISOString().split("T")[0]
+          : ""
+      );
+    }
+  };
+
+  // 태스크 수정
+  const handleUpdateTask = async () => {
+    if (!taskDetail || !session?.user?.accessToken) return;
+
+    if (!editTaskName.trim() || !editTaskDescription.trim()) {
+      setError("태스크 이름과 설명을 모두 입력해주세요.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const teamIdNum = parseInt(teamId, 10);
+      const taskIdNum = parseInt(taskId, 10);
+      if (isNaN(teamIdNum) || isNaN(taskIdNum)) {
+        throw new Error("유효하지 않은 팀 ID 또는 태스크 ID입니다.");
+      }
+
+      await updateTask(
+        teamIdNum,
+        taskIdNum,
+        {
+          taskName: editTaskName.trim(),
+          taskDescription: editTaskDescription.trim(),
+          startAt: editStartAt || null,
+          endAt: editEndAt || null,
+        },
+        session.user.accessToken,
+      );
+
+      setIsEditing(false);
+      // 태스크 상세 정보 재조회
+      await fetchTaskDetail(false);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "태스크 수정에 실패했습니다.";
+      setError(errorMessage);
+      console.error("Failed to update task:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleCreateComment = async () => {
     if (!newComment.trim() || !session?.user?.accessToken) return;
 
@@ -135,12 +242,12 @@ export default function TaskDetailPage({
     }
   };
 
-  const handleStartEdit = (comment: TaskComment) => {
+  const handleStartEditComment = (comment: TaskComment) => {
     setEditingCommentId(comment.commentId);
     setEditingContent(comment.commentContent);
   };
 
-  const handleCancelEdit = () => {
+  const handleCancelEditComment = () => {
     setEditingCommentId(null);
     setEditingContent("");
   };
@@ -323,62 +430,146 @@ export default function TaskDetailPage({
 
         {/* 태스크 상세 정보 */}
         <section className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
-          <div className="mb-6 flex items-center gap-4">
-            <span
-              className="h-12 w-12 rounded-2xl border border-white/20 shadow-inner"
-              style={{
-                background: taskStatusColors[taskDetail.taskStatus] || taskStatusColors[1],
-              }}
-              aria-hidden="true"
-            />
-            <div>
-              <p className="text-xs uppercase tracking-[0.4em] text-slate-400">
-                {taskStatusLabels[taskDetail.taskStatus] || "Unknown"}
-              </p>
-              <h1 className="mt-1 text-3xl font-bold text-white md:text-4xl">
-                {taskDetail.taskName}
-              </h1>
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <span
+                className="h-12 w-12 rounded-2xl border border-white/20 shadow-inner"
+                style={{
+                  background: taskStatusColors[taskDetail.taskStatus] || taskStatusColors[1],
+                }}
+                aria-hidden="true"
+              />
+              <div>
+                <p className="text-xs uppercase tracking-[0.4em] text-slate-400">
+                  {taskStatusLabels[taskDetail.taskStatus] || "Unknown"}
+                </p>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={editTaskName}
+                    onChange={(e) => setEditTaskName(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900/60 px-4 py-2 text-2xl font-bold text-white focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20 md:text-3xl"
+                    placeholder="태스크 이름"
+                    disabled={isSubmitting}
+                  />
+                ) : (
+                  <h1 className="mt-1 text-3xl font-bold text-white md:text-4xl">
+                    {taskDetail.taskName}
+                  </h1>
+                )}
+              </div>
             </div>
+            {!isEditing && currentUserId === taskDetail.crtdBy && (
+              <button
+                onClick={handleStartEdit}
+                disabled={isSubmitting}
+                className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40 disabled:opacity-50"
+              >
+                수정
+              </button>
+            )}
           </div>
 
-          {taskDetail.taskDescription && (
-            <div className="mb-6 rounded-2xl border border-white/10 bg-slate-950/30 p-6">
-              <p className="text-sm leading-relaxed text-slate-300">
-                {taskDetail.taskDescription}
-              </p>
+          {isEditing ? (
+            <div className="mb-6 space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-300">
+                  태스크 설명 <span className="text-red-400">*</span>
+                </label>
+                <textarea
+                  value={editTaskDescription}
+                  onChange={(e) => setEditTaskDescription(e.target.value)}
+                  placeholder="태스크에 대한 상세 설명을 입력하세요"
+                  rows={6}
+                  className="w-full resize-none rounded-xl border border-white/10 bg-slate-900/60 p-4 text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                  disabled={isSubmitting}
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-slate-300">
+                    시작일
+                  </label>
+                  <input
+                    type="date"
+                    value={editStartAt}
+                    onChange={(e) => setEditStartAt(e.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3 text-white focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                    disabled={isSubmitting}
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-slate-300">
+                    종료일
+                  </label>
+                  <input
+                    type="date"
+                    value={editEndAt}
+                    onChange={(e) => setEditEndAt(e.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3 text-white focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                    disabled={isSubmitting}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={handleCancelEdit}
+                  disabled={isSubmitting}
+                  className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40 disabled:opacity-50"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleUpdateTask}
+                  disabled={isSubmitting || !editTaskName.trim() || !editTaskDescription.trim()}
+                  className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmitting ? "수정 중..." : "수정 완료"}
+                </button>
+              </div>
             </div>
+          ) : (
+            <>
+              {taskDetail.taskDescription && (
+                <div className="mb-6 rounded-2xl border border-white/10 bg-slate-950/30 p-6">
+                  <p className="text-sm leading-relaxed text-slate-300">
+                    {taskDetail.taskDescription}
+                  </p>
+                </div>
+              )}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                {taskDetail.startAt && (
+                  <div key="startAt" className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+                    <p className="text-xs uppercase tracking-[0.5em] text-slate-500">
+                      시작일
+                    </p>
+                    <p className="mt-2 text-base text-white">
+                      {formatDate(taskDetail.startAt)}
+                    </p>
+                  </div>
+                )}
+                {taskDetail.endAt && (
+                  <div key="endAt" className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+                    <p className="text-xs uppercase tracking-[0.5em] text-slate-500">
+                      종료일
+                    </p>
+                    <p className="mt-2 text-base text-white">
+                      {formatDate(taskDetail.endAt)}
+                    </p>
+                  </div>
+                )}
+                <div key="crtdAt" className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+                  <p className="text-xs uppercase tracking-[0.5em] text-slate-500">
+                    생성일
+                  </p>
+                  <p className="mt-2 text-base text-white">
+                    {formatDate(taskDetail.crtdAt)}
+                  </p>
+                </div>
+              </div>
+            </>
           )}
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {taskDetail.startAt && (
-              <div key="startAt" className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-                <p className="text-xs uppercase tracking-[0.5em] text-slate-500">
-                  시작일
-                </p>
-                <p className="mt-2 text-base text-white">
-                  {formatDate(taskDetail.startAt)}
-                </p>
-              </div>
-            )}
-            {taskDetail.endAt && (
-              <div key="endAt" className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-                <p className="text-xs uppercase tracking-[0.5em] text-slate-500">
-                  종료일
-                </p>
-                <p className="mt-2 text-base text-white">
-                  {formatDate(taskDetail.endAt)}
-                </p>
-              </div>
-            )}
-            <div key="crtdAt" className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-              <p className="text-xs uppercase tracking-[0.5em] text-slate-500">
-                생성일
-              </p>
-              <p className="mt-2 text-base text-white">
-                {formatDate(taskDetail.crtdAt)}
-              </p>
-            </div>
-          </div>
         </section>
 
         {/* 에러 메시지 */}
@@ -434,7 +625,7 @@ export default function TaskDetailPage({
                       />
                       <div className="mt-4 flex justify-end gap-2">
                         <button
-                          onClick={handleCancelEdit}
+                          onClick={handleCancelEditComment}
                           disabled={isSubmitting}
                           className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40 disabled:opacity-50"
                         >
@@ -474,13 +665,13 @@ export default function TaskDetailPage({
                         </div>
                         {currentUserId === comment.userId && comment.status !== 0 && (
                           <div className="ml-4 flex gap-2">
-                            <button
-                              onClick={() => handleStartEdit(comment)}
-                              disabled={isSubmitting}
-                              className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:border-white/40 disabled:opacity-50"
-                            >
-                              수정
-                            </button>
+                        <button
+                          onClick={() => handleStartEditComment(comment)}
+                          disabled={isSubmitting}
+                          className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:border-white/40 disabled:opacity-50"
+                        >
+                          수정
+                        </button>
                             <button
                               onClick={() => handleDeleteComment(comment.commentId)}
                               disabled={isSubmitting}
