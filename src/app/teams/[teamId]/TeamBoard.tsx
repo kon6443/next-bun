@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 import {
   DndContext,
   closestCenter,
@@ -256,9 +257,12 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
               <button className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40">
                 회의 로그 공유
               </button>
-              <button className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110">
+              <Link
+                href={`/teams/${teamId}/tasks/new`}
+                className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110"
+              >
                 새 카드 작성
-              </button>
+              </Link>
             </div>
           </div>
 
