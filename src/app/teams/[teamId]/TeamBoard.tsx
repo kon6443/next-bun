@@ -15,7 +15,7 @@ import { arrayMove } from "@dnd-kit/sortable";
 
 import { Column } from "../../components/Column";
 import type { Task } from "../../types/task";
-import { getTeamTasks, updateTaskStatus } from "@/services/teamService";
+import { getTeamTasks, updateTaskStatus, getTeamUsers, type TeamUserResponse } from "@/services/teamService";
 
 type ColumnKey = "todo" | "inProgress" | "done";
 
@@ -62,6 +62,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     done: [],
   });
   const [teamName, setTeamName] = useState<string>("");
+  const [teamLeaderId, setTeamLeaderId] = useState<number | null>(null);
+  const [members, setMembers] = useState<TeamUserResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,6 +94,16 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
         const response = await getTeamTasks(teamIdNum, session.user.accessToken);
         setTeamName(response.data.team.teamName);
+        setTeamLeaderId(response.data.team.leaderId);
+
+        // 팀 멤버 목록 조회
+        try {
+          const membersResponse = await getTeamUsers(teamIdNum, session.user.accessToken);
+          setMembers(membersResponse.data);
+        } catch (memberErr) {
+          // 멤버 목록 조회 실패는 치명적이지 않으므로 에러만 로깅
+          console.error("Failed to fetch team members:", memberErr);
+        }
 
         // taskStatus에 따라 태스크를 컬럼별로 분류
         const classifiedTasks: Record<ColumnKey, Task[]> = {
@@ -282,6 +294,65 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
               </div>
             ))}
           </div>
+        </section>
+
+        {/* 팀 멤버 목록 */}
+        <section className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
+          <div className="mb-6">
+            <p className="text-xs uppercase tracking-[0.6em] text-slate-400">
+              Team Members
+            </p>
+            <h2 className="mt-4 text-2xl font-bold text-white md:text-3xl">
+              팀 멤버
+            </h2>
+          </div>
+
+          {members.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-white/20 px-6 py-10 text-center text-slate-400">
+              멤버 정보를 불러오는 중...
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {members.map((member) => {
+                const isLeader = teamLeaderId === member.userId;
+                const formatDate = (date: Date) => {
+                  return new Date(date).toLocaleDateString("ko-KR", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  });
+                };
+
+                return (
+                  <div
+                    key={member.userId}
+                    className="rounded-2xl border border-white/10 bg-slate-950/30 p-6"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-lg font-semibold text-white">
+                            {member.userName || `사용자 ${member.userId}`}
+                          </p>
+                          {isLeader && (
+                            <span className="rounded-full bg-gradient-to-r from-yellow-500/20 to-orange-500/20 px-2 py-0.5 text-xs font-semibold text-yellow-400 border border-yellow-500/30">
+                              리더
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-2 text-sm text-slate-400">
+                          {member.role}
+                        </p>
+                        <p className="mt-2 text-xs text-slate-500">
+                          가입일: {formatDate(member.joinedAt)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
 
         {error && (
