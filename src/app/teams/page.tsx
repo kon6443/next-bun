@@ -1,44 +1,53 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSession, signIn } from "next-auth/react";
+import { getMyTeams, type TeamMemberResponse } from "@/services/teamService";
 
 type TeamSummary = {
   teamId: number;
   name: string;
   description: string;
   role: string;
-  memberCount: number;
 };
-
-const MOCK_TEAMS: TeamSummary[] = [
-  {
-    teamId: 101,
-    name: "Design Lab",
-    description: "프로덕트 경험과 브랜딩을 담당하는 디자이너 그룹",
-    role: "디자인",
-    memberCount: 8,
-  },
-  {
-    teamId: 205,
-    name: "Planet Core",
-    description: "서비스 핵심 로직과 API를 관리하는 백엔드 팀",
-    role: "백엔드",
-    memberCount: 12,
-  },
-  {
-    teamId: 318,
-    name: "Momentum",
-    description: "실험과 성장 지표를 담당하는 Growth 스쿼드",
-    role: "Growth",
-    memberCount: 6,
-  },
-];
 
 export default function TeamsPage() {
   const { data: session, status } = useSession();
   const isAuthenticated = status === "authenticated";
-  const teams = isAuthenticated ? MOCK_TEAMS : [];
+  const [teams, setTeams] = useState<TeamSummary[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated || !session?.user?.accessToken) {
+      setTeams([]);
+      return;
+    }
+
+    const fetchTeams = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await getMyTeams(session.user.accessToken);
+        const teamSummaries: TeamSummary[] = response.data.map((team: TeamMemberResponse) => ({
+          teamId: team.teamId,
+          name: team.teamName,
+          description: team.teamDescription || "",
+          role: team.role,
+        }));
+        setTeams(teamSummaries);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "팀 목록을 불러오는데 실패했습니다.";
+        setError(errorMessage);
+        console.error("Failed to fetch teams:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTeams();
+  }, [isAuthenticated, session?.user?.accessToken]);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100">
@@ -76,7 +85,18 @@ export default function TeamsPage() {
 
         <section className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
           {isAuthenticated ? (
-            teams.length ? (
+            isLoading ? (
+              <div className="rounded-2xl border border-dashed border-white/20 px-6 py-14 text-center text-slate-400">
+                팀 목록을 불러오는 중...
+              </div>
+            ) : error ? (
+              <div className="rounded-2xl border border-dashed border-red-500/20 px-6 py-14 text-center">
+                <p className="text-base font-semibold text-red-400">
+                  오류가 발생했습니다
+                </p>
+                <p className="mt-2 text-sm text-slate-400">{error}</p>
+              </div>
+            ) : teams.length ? (
               <div className="grid gap-5 sm:grid-cols-2">
                 {teams.map((team) => (
                   <Link
@@ -88,9 +108,6 @@ export default function TeamsPage() {
                       <p className="text-xs uppercase tracking-[0.4em] text-slate-500">
                         {team.role}
                       </p>
-                      <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300">
-                        {team.memberCount}명
-                      </span>
                     </div>
                     <h2 className="mt-3 text-2xl font-semibold text-white">
                       {team.name}

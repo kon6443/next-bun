@@ -47,7 +47,7 @@ export function Column({
         </div>
       </div>
 
-      <SortableContext id={id} items={tasks.map((task) => task.id)}>
+      <SortableContext id={id} items={tasks.map((task) => String(task.taskId))}>
         <div
           className={`mt-6 flex-1 space-y-4 ${
             tasks.length === 0 ? "justify-center" : ""
@@ -58,7 +58,7 @@ export function Column({
               드래그해서 카드를 추가하세요
             </div>
           ) : (
-            tasks.map((task) => <TaskCard key={task.id} task={task} />)
+            tasks.map((task) => <TaskCard key={task.taskId} task={task} />)
           )}
         </div>
       </SortableContext>
