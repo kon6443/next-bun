@@ -6,6 +6,8 @@ declare module "next-auth" {
       userId?: number | null;
       kakaoNickname?: string | null;
       loginType?: string | null;
+      accessToken?: string | null;
+      tokenType?: string | null;
     } & DefaultSession["user"];
   }
 }
@@ -15,5 +17,7 @@ declare module "next-auth/jwt" {
     userId?: number;
     kakaoNickname?: string;
     loginType?: string;
+    accessToken?: string;
+    tokenType?: string;
   }
 }

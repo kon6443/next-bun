@@ -2,6 +2,8 @@ import NextAuth from "next-auth";
 import KakaoProvider from "next-auth/providers/kakao";
 import { postKakaoSignInUp } from "@/services/authService";
 
+const THIRTY_DAYS_IN_SECONDS = 30 * 24 * 60 * 60;
+
 const handler = NextAuth({
   providers: [
     KakaoProvider({
@@ -17,6 +19,14 @@ const handler = NextAuth({
     // }),
   ],
   secret: process.env.NEXTAUTH_SECRET,
+  session: {
+    strategy: "jwt",
+    // 로그인 유지시간(세션 쿠키 만료) = 백엔드 accessToken(JWT) 만료와 동일하게 맞춤
+    maxAge: THIRTY_DAYS_IN_SECONDS,
+  },
+  jwt: {
+    maxAge: THIRTY_DAYS_IN_SECONDS,
+  },
   pages: {
     signIn: "/auth/signin",
     error: "/auth/error",
@@ -64,13 +74,15 @@ const handler = NextAuth({
         }
 
         try {
-          const { userId, loginType } = await postKakaoSignInUp({
+          const { userId, loginType, accessToken, tokenType } = await postKakaoSignInUp({
             accessToken: account.access_token,
             kakaoNickname: user.name ?? "",
           });
 
           token.userId = userId;
           token.loginType = loginType;
+          token.accessToken = accessToken;
+          token.tokenType = tokenType;
           // 디버깅용 로그 (필요시 주석 해제)
           // console.log("token:", token);
         } catch (err) {
@@ -99,6 +111,8 @@ const handler = NextAuth({
     async session({ session, token }) {
       session.user.userId = token.userId;
       session.user.loginType = token.loginType;
+      session.user.accessToken = token.accessToken;
+      session.user.tokenType = token.tokenType;
       // 디버깅용 로그 (필요시 주석 해제)
       // console.log("session:", session);
       return session;
