@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   getTaskDetail,
@@ -10,7 +9,6 @@ import {
   updateTaskComment,
   deleteTaskComment,
   type TaskDetailResponse,
-  type TaskCommentResponse,
 } from "@/services/teamService";
 import type { TaskComment } from "@/app/types/task";
 
@@ -40,7 +38,6 @@ export default function TaskDetailPage({
   taskId,
 }: TaskDetailPageProps) {
   const { data: session } = useSession();
-  const router = useRouter();
   const [taskDetail, setTaskDetail] = useState<TaskDetailResponse | null>(
     null,
   );
@@ -118,7 +115,7 @@ export default function TaskDetailPage({
     try {
       const teamIdNum = parseInt(teamId, 10);
       const taskIdNum = parseInt(taskId, 10);
-      const response = await createTaskComment(
+      await createTaskComment(
         teamIdNum,
         taskIdNum,
         { commentContent: newComment.trim() },
@@ -155,7 +152,7 @@ export default function TaskDetailPage({
     try {
       const teamIdNum = parseInt(teamId, 10);
       const taskIdNum = parseInt(taskId, 10);
-      const response = await updateTaskComment(
+      await updateTaskComment(
         teamIdNum,
         taskIdNum,
         commentId,

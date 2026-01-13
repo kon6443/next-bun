@@ -251,10 +251,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
               <h1 className="text-4xl font-bold text-white md:text-5xl">
                 {isLoading ? "로딩 중..." : teamName || "팀"} 작업 현황판
               </h1>
-              <p className="mt-3 max-w-2xl text-base text-slate-400">
-                디자이너와 개발자가 함께 쓰는 보드입니다. 카드들을 끌어다 놓으면
-                실시간으로 순서가 정리돼요.
-              </p>
             </div>
             <div className="flex gap-4">
               <button className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40">
