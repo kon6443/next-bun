@@ -4,7 +4,13 @@ export async function postKakaoSignInUp({
 }: {
   kakaoNickname: string;
   accessToken: string;
-}): Promise<{ message: string; userId: number; loginType: "KAKAO" }> {
+}): Promise<{
+  message: string;
+  userId: number;
+  loginType: "KAKAO";
+  accessToken: string;
+  tokenType: string;
+}> {
   const endPoint = "/api/v1/auth/kakao";
   
   // AbortController를 사용하여 timeout 설정
@@ -83,7 +89,15 @@ export async function postKakaoSignInUp({
     // console.log("Response data:", { ...data, userId: data.userId, loginType: data.loginType });
     
     // 응답 데이터 검증
-    if (!data || typeof data.userId !== "number" || !data.loginType) {
+    if (
+      !data ||
+      typeof data.userId !== "number" ||
+      !data.loginType ||
+      typeof data.accessToken !== "string" ||
+      !data.accessToken ||
+      typeof data.tokenType !== "string" ||
+      !data.tokenType
+    ) {
       console.error("Invalid response data structure:", data);
       throw new Error("서버 응답 형식이 올바르지 않습니다.");
     }

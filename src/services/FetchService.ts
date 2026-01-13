@@ -13,6 +13,12 @@ type ExtendedRequestInit = RequestInit & {
 type FetchClientOptions = Omit<ExtendedRequestInit, 'headers'> & {
   headers?: Record<string, string>;
   cookies?: string | Record<string, string>;
+  /**
+   * 백엔드 Authorization 헤더에 붙일 토큰 (브라우저에서 Bearer 방식으로 백엔드 호출 시 사용)
+   * - accessToken만 주면 기본 tokenType은 Bearer로 처리
+   */
+  accessToken?: string;
+  tokenType?: string;
 };
 
 type BackendFetchArgs = FetchClientOptions & {
@@ -63,12 +69,19 @@ class FetchClient {
     });
   }
 
-  private request(endpoint: string, options?: FetchClientOptions) {
-    const { cookies, headers: customHeaders, body, credentials, ...rest } = options ?? {};
+  private async request(endpoint: string, options?: FetchClientOptions) {
+    const { cookies, headers: customHeaders, body, credentials, accessToken, tokenType, ...rest } =
+      options ?? {};
 
     const url = this.createUrl(endpoint);
     const headers = this.buildHeaders(customHeaders, body);
     const cookieHeader = this.serializeCookies(cookies);
+
+    if (accessToken && !headers['Authorization'] && !headers['authorization']) {
+      headers['Authorization'] = `${tokenType || 'Bearer'} ${accessToken}`;
+    }
+
+    const hasAuthHeader = Boolean(headers['Authorization'] || headers['authorization']);
 
     if (cookieHeader && typeof window === 'undefined') {
       headers['Cookie'] = cookieHeader;
@@ -81,7 +94,15 @@ class FetchClient {
       body,
     };
 
-    return fetch(url, init);
+    const response = await fetch(url, init);
+
+    // 브라우저에서 백엔드 인증 실패(401) 시: 전역 이벤트로 알려서 세션 정리/재로그인 유도
+    // (인증 헤더를 붙였던 요청에 대해서만 처리)
+    if (typeof window !== 'undefined' && response.status === 401 && hasAuthHeader) {
+      window.dispatchEvent(new CustomEvent('backend:unauthorized'));
+    }
+
+    return response;
   }
 
   private createUrl(endpoint: string) {
