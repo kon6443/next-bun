@@ -11,16 +11,14 @@ function DevBackendAccessTokenCookieSync() {
   const { data: session } = useSession();
 
   useEffect(() => {
-    // 로컬/개발 편의: 로그인 후 http://localhost:3500(Swagger 등)에서도
-    // 백엔드 JwtAuthGuard가 Cookie(access_token)로 인증할 수 있도록 동기화
-    if (process.env.NODE_ENV !== "development") {
-      return;
-    }
-
     const accessToken = session?.user?.accessToken ?? null;
     const expiresAt = session?.expires ? new Date(session.expires).getTime() : null;
     const maxAgeFromSession =
       expiresAt && Number.isFinite(expiresAt) ? Math.floor((expiresAt - Date.now()) / 1000) : null;
+    const isSecureContext = typeof window !== "undefined" && window.location.protocol === "https:";
+    const domain = process.env.NEXT_PUBLIC_COOKIE_DOMAIN;
+    const domainAttr = domain ? `; Domain=${domain}` : "";
+    const secureAttr = isSecureContext ? "; Secure" : "";
 
     if (accessToken) {
       // session.expires가 있으면 그 기준으로, 없으면 30일로 세팅
@@ -28,10 +26,10 @@ function DevBackendAccessTokenCookieSync() {
         typeof maxAgeFromSession === "number" && maxAgeFromSession > 0
           ? maxAgeFromSession
           : 30 * 24 * 60 * 60;
-      document.cookie = `access_token=${accessToken}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+      document.cookie = `access_token=${accessToken}; Path=/; Max-Age=${maxAge}; SameSite=Lax${secureAttr}${domainAttr}`;
     } else {
       // 로그아웃/세션 없음이면 쿠키 제거
-      document.cookie = `access_token=; Path=/; Max-Age=0; SameSite=Lax`;
+      document.cookie = `access_token=; Path=/; Max-Age=0; SameSite=Lax${secureAttr}${domainAttr}`;
     }
   }, [session?.user?.accessToken, session?.expires]);
 
