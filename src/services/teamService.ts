@@ -124,6 +124,18 @@ export type UpdateTaskResponse = {
   data: TeamTaskResponse;
 };
 
+export type TeamUserResponse = {
+  userId: number;
+  userName: string | null;
+  role: string;
+  joinedAt: Date;
+};
+
+export type GetTeamUsersResponse = {
+  message: string;
+  data: TeamUserResponse[];
+};
+
 /**
  * 내 팀 목록 조회
  */
@@ -143,6 +155,44 @@ export async function getMyTeams(accessToken: string): Promise<GetMyTeamsRespons
   }
 
   const data = await response.json();
+  return data;
+}
+
+/**
+ * 팀 멤버 목록 조회
+ */
+export async function getTeamUsers(
+  teamId: number,
+  accessToken: string,
+): Promise<GetTeamUsersResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'GET',
+    endpoint: `/api/v1/teams/${teamId}/users`,
+    accessToken,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
+    }
+    if (response.status === 403) {
+      throw new Error('팀 멤버만 접근할 수 있습니다.');
+    }
+    if (response.status === 404) {
+      throw new Error('팀을 찾을 수 없습니다.');
+    }
+    const errorText = await response.text();
+    throw new Error(`팀 멤버 목록 조회 실패: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  // 날짜 변환
+  if (data.data && Array.isArray(data.data)) {
+    data.data = data.data.map((user: any) => ({
+      ...user,
+      joinedAt: new Date(user.joinedAt),
+    }));
+  }
   return data;
 }
 
