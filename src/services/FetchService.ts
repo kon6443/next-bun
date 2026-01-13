@@ -21,7 +21,7 @@ type FetchClientOptions = Omit<ExtendedRequestInit, 'headers'> & {
   tokenType?: string;
 };
 
-type BackendFetchArgs = FetchClientOptions & {
+type BackendFetchArgs = Omit<FetchClientOptions, 'body'> & {
   method: HTTPMethodType;
   endpoint: string;
   query?: QueryParams;
@@ -65,7 +65,7 @@ class FetchClient {
       ...options,
       method,
       headers,
-      body: normalizedBody,
+      body: normalizedBody as BodyInit | null | undefined,
     });
   }
 
