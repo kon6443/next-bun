@@ -51,6 +51,55 @@ export type UpdateTaskStatusResponse = {
   data: TeamTaskResponse;
 };
 
+export type TaskCommentResponse = {
+  commentId: number;
+  teamId: number;
+  taskId: number;
+  userId: number;
+  userName: string | null;
+  commentContent: string;
+  status: number;
+  mdfdAt: Date | null;
+  crtdAt: Date;
+};
+
+export type TaskDetailResponse = {
+  taskId: number;
+  teamId: number;
+  taskName: string;
+  taskDescription: string | null;
+  taskStatus: number;
+  actStatus: number;
+  startAt: Date | null;
+  endAt: Date | null;
+  crtdAt: Date;
+  crtdBy: number;
+  comments: TaskCommentResponse[];
+};
+
+export type GetTaskDetailResponse = {
+  message: string;
+  data: TaskDetailResponse;
+};
+
+export type CreateTaskCommentRequest = {
+  commentContent: string;
+};
+
+export type CreateTaskCommentResponse = {
+  message: string;
+  data: TaskCommentResponse;
+};
+
+export type UpdateTaskCommentRequest = {
+  commentContent: string;
+};
+
+export type UpdateTaskCommentResponse = {
+  message: string;
+  data: TaskCommentResponse;
+};
+
 /**
  * 내 팀 목록 조회
  */
@@ -132,4 +181,163 @@ export async function updateTaskStatus(
 
   const data = await response.json();
   return data;
+}
+
+/**
+ * 태스크 상세 조회
+ */
+export async function getTaskDetail(
+  teamId: number,
+  taskId: number,
+  accessToken: string,
+): Promise<GetTaskDetailResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'GET',
+    endpoint: `/api/v1/teams/${teamId}/tasks/${taskId}`,
+    accessToken,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
+    }
+    if (response.status === 403) {
+      throw new Error('팀 멤버만 접근할 수 있습니다.');
+    }
+    if (response.status === 404) {
+      throw new Error('태스크를 찾을 수 없습니다.');
+    }
+    if (response.status === 400) {
+      throw new Error('태스크가 해당 팀에 속하지 않습니다.');
+    }
+    const errorText = await response.text();
+    throw new Error(`태스크 상세 조회 실패: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * 댓글 작성
+ */
+export async function createTaskComment(
+  teamId: number,
+  taskId: number,
+  request: CreateTaskCommentRequest,
+  accessToken: string,
+): Promise<CreateTaskCommentResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'POST',
+    endpoint: `/api/v1/teams/${teamId}/tasks/${taskId}/comments`,
+    accessToken,
+    body: request,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
+    }
+    if (response.status === 403) {
+      throw new Error('팀 멤버만 댓글을 작성할 수 있습니다.');
+    }
+    if (response.status === 400) {
+      throw new Error('태스크가 해당 팀에 속하지 않습니다.');
+    }
+    const errorText = await response.text();
+    throw new Error(`댓글 작성 실패: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * 댓글 수정
+ */
+export async function updateTaskComment(
+  teamId: number,
+  taskId: number,
+  commentId: number,
+  request: UpdateTaskCommentRequest,
+  accessToken: string,
+): Promise<UpdateTaskCommentResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'PATCH',
+    endpoint: `/api/v1/teams/${teamId}/tasks/${taskId}/comments/${commentId}`,
+    accessToken,
+    body: request,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
+    }
+    if (response.status === 403) {
+      throw new Error('댓글을 수정할 권한이 없습니다.');
+    }
+    if (response.status === 404) {
+      throw new Error('댓글을 찾을 수 없습니다.');
+    }
+    if (response.status === 400) {
+      throw new Error('태스크가 해당 팀에 속하지 않습니다.');
+    }
+    const errorText = await response.text();
+    throw new Error(`댓글 수정 실패: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * 댓글 삭제
+ */
+export async function deleteTaskComment(
+  teamId: number,
+  taskId: number,
+  commentId: number,
+  accessToken: string,
+): Promise<void> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'DELETE',
+    endpoint: `/api/v1/teams/${teamId}/tasks/${taskId}/comments/${commentId}`,
+    accessToken,
+  });
+
+  // DELETE 요청 성공 시 (200, 204 등) 바로 반환
+  if (response.ok) {
+    return;
+  }
+
+  // 에러 발생 시에만 응답 본문 읽기
+  let errorMessage = '';
+  try {
+    const errorText = await response.text();
+    if (errorText) {
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData?.message || errorData?.error || errorData?.detail || errorText;
+      } catch {
+        errorMessage = errorText;
+      }
+    }
+  } catch {
+    // 응답 본문 읽기 실패
+  }
+
+  // 상태 코드별 에러 처리
+  if (response.status === 401) {
+    throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
+  }
+  if (response.status === 403) {
+    throw new Error('댓글을 삭제할 권한이 없습니다.');
+  }
+  if (response.status === 404) {
+    throw new Error('댓글을 찾을 수 없습니다.');
+  }
+  if (response.status === 400) {
+    throw new Error(errorMessage || '태스크가 해당 팀에 속하지 않습니다.');
+  }
+  throw new Error(errorMessage || `댓글 삭제 실패: ${response.status}`);
 }

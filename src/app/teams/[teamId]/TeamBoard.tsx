@@ -2,7 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { DndContext, closestCenter, DragEndEvent } from "@dnd-kit/core";
+import {
+  DndContext,
+  closestCenter,
+  DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 
 import { Column } from "../../components/Column";
@@ -56,6 +63,15 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   const [teamName, setTeamName] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // activationConstraint를 사용하여 클릭과 드래그 구분
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // 8px 이상 이동해야 드래그 시작
+      },
+    })
+  );
 
   useEffect(() => {
     if (!session?.user?.accessToken) {
@@ -280,6 +296,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           </div>
         ) : (
           <DndContext
+            sensors={sensors}
             onDragEnd={handleDragEnd}
             collisionDetection={closestCenter}
           >

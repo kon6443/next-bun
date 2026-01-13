@@ -1,5 +1,6 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useRouter } from "next/navigation";
 
 import type { Task } from "../types/task";
 
@@ -8,7 +9,9 @@ type TaskCardProps = {
 };
 
 export function TaskCard({ task }: TaskCardProps) {
-  const { taskId, taskName, taskDescription, endAt } = task;
+  const { taskId, taskName, taskDescription, endAt, teamId } = task;
+  const router = useRouter();
+
   const {
     attributes,
     listeners,
@@ -34,13 +37,24 @@ export function TaskCard({ task }: TaskCardProps) {
 
   const endDateStr = endAt ? formatDate(endAt) : null;
 
+  const handleClick = (e: React.MouseEvent) => {
+    // 드래그 중이 아닐 때만 클릭 처리
+    // activationConstraint로 인해 8px 미만의 이동은 클릭으로 처리됨
+    if (!isDragging) {
+      e.preventDefault();
+      e.stopPropagation();
+      router.push(`/teams/${teamId}/tasks/${taskId}`);
+    }
+  };
+
   return (
     <article
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
-      className={`rounded-2xl border border-white/10 bg-slate-900/60 p-4 shadow-[0_15px_45px_rgba(15,23,42,0.55)] transition-all duration-200 ${
+      onClick={handleClick}
+      className={`cursor-pointer rounded-2xl border border-white/10 bg-slate-900/60 p-4 shadow-[0_15px_45px_rgba(15,23,42,0.55)] transition-all duration-200 ${
         isDragging
           ? "scale-[1.01] ring-2 ring-sky-400/60"
           : "hover:-translate-y-0.5"
