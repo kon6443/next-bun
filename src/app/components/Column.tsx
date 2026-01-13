@@ -58,7 +58,7 @@ export function Column({
               드래그해서 카드를 추가하세요
             </div>
           ) : (
-            tasks.map((task) => <TaskCard key={task.id} task={task} />)
+            tasks.map((task) => <TaskCard key={task.taskId} task={task} />)
           )}
         </div>
       </SortableContext>

@@ -205,7 +205,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         setTasks((prev) => {
           const activeItems = [...prev[activeContainer]];
           const overItems = [...prev[overContainer]];
-          const [movedItem] = overItems.splice(overIndex, 1);
+          overItems.splice(overIndex, 1);
           activeItems.splice(activeIndex, 0, movedTask);
 
           return {
