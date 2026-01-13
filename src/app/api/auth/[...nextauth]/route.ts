@@ -4,6 +4,9 @@ import { postKakaoSignInUp } from "@/services/authService";
 
 const THIRTY_DAYS_IN_SECONDS = 30 * 24 * 60 * 60;
 
+const isProd = process.env.NODE_ENV === "production";
+const cookieDomain = process.env.NEXTAUTH_COOKIE_DOMAIN;
+
 const handler = NextAuth({
   providers: [
     KakaoProvider({
@@ -116,6 +119,29 @@ const handler = NextAuth({
       // 디버깅용 로그 (필요시 주석 해제)
       // console.log("session:", session);
       return session;
+    },
+  },
+  // Caddy 프록시 뒤에서도 동작하도록 NEXTAUTH_URL 환경변수 설정 필요
+  // useSecureCookies는 cookies 옵션의 secure로 처리됨
+  cookies: {
+    sessionToken: {
+      name: isProd ? "__Secure-next-auth.session-token" : "next-auth.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: isProd,
+        ...(cookieDomain ? { domain: cookieDomain } : {}),
+      },
+    },
+    callbackUrl: {
+      name: isProd ? "__Secure-next-auth.callback-url" : "next-auth.callback-url",
+      options: {
+        sameSite: "lax",
+        path: "/",
+        secure: isProd,
+        ...(cookieDomain ? { domain: cookieDomain } : {}),
+      },
     },
   },
 });
