@@ -47,7 +47,7 @@ export function Column({
         </div>
       </div>
 
-      <SortableContext id={id} items={tasks.map((task) => task.id)}>
+      <SortableContext id={id} items={tasks.map((task) => String(task.taskId))}>
         <div
           className={`mt-6 flex-1 space-y-4 ${
             tasks.length === 0 ? "justify-center" : ""
