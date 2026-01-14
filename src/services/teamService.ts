@@ -136,6 +136,16 @@ export type GetTeamUsersResponse = {
   data: TeamUserResponse[];
 };
 
+export type CreateTeamRequest = {
+  teamName: string;
+  teamDescription: string;
+};
+
+export type CreateTeamResponse = {
+  message: string;
+  data: TeamInfoResponse;
+};
+
 /**
  * 내 팀 목록 조회
  */
@@ -152,6 +162,35 @@ export async function getMyTeams(accessToken: string): Promise<GetMyTeamsRespons
     }
     const errorText = await response.text();
     throw new Error(`팀 목록 조회 실패: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * 팀 생성
+ */
+export async function createTeam(
+  request: CreateTeamRequest,
+  accessToken: string,
+): Promise<CreateTeamResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'POST',
+    endpoint: '/api/v1/teams',
+    accessToken,
+    body: request,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
+    }
+    if (response.status === 400) {
+      throw new Error('팀 생성 요청이 올바르지 않습니다.');
+    }
+    const errorText = await response.text();
+    throw new Error(`팀 생성 실패: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
