@@ -156,6 +156,44 @@ export type UpdateTeamResponse = {
   data: TeamInfoResponse;
 };
 
+export type CreateTeamInviteRequest = {
+  endAt?: string;
+  usageMaxCnt?: number;
+};
+
+export type CreateTeamInviteResponse = {
+  inviteLink: string;
+  endAt: string;
+  usageMaxCnt: number;
+};
+
+export type TeamInviteResponse = {
+  invId: number;
+  teamId: number;
+  userId: number;
+  token: string;
+  usageCurCnt: number;
+  usageMaxCnt: number;
+  actStatus: number;
+  endAt: string;
+  crtdAt: string;
+};
+
+export type GetTeamInvitesResponse = {
+  message: string;
+  data: TeamInviteResponse[];
+};
+
+export type AcceptTeamInviteRequest = {
+  token: string;
+};
+
+export type AcceptTeamInviteResponse = {
+  teamId: number;
+  teamName: string;
+  message: string;
+};
+
 /**
  * 내 팀 목록 조회
  */
@@ -583,4 +621,103 @@ export async function deleteTaskComment(
     throw new Error(errorMessage || '태스크가 해당 팀에 속하지 않습니다.');
   }
   throw new Error(errorMessage || `댓글 삭제 실패: ${response.status}`);
+}
+
+/**
+ * 팀 초대 링크 생성
+ */
+export async function createTeamInvite(
+  teamId: number,
+  request: CreateTeamInviteRequest,
+  accessToken: string,
+): Promise<CreateTeamInviteResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'POST',
+    endpoint: `/api/v1/teams/${teamId}/invites`,
+    accessToken,
+    body: request,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
+    }
+    if (response.status === 403) {
+      throw new Error('팀 초대 링크를 생성할 권한이 없습니다.');
+    }
+    if (response.status === 404) {
+      throw new Error('팀을 찾을 수 없습니다.');
+    }
+    if (response.status === 400) {
+      throw new Error('팀 초대 링크 생성 요청이 올바르지 않습니다.');
+    }
+    const errorText = await response.text();
+    throw new Error(`팀 초대 링크 생성 실패: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * 팀 초대 링크 목록 조회
+ */
+export async function getTeamInvites(
+  teamId: number,
+  accessToken: string,
+): Promise<GetTeamInvitesResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'GET',
+    endpoint: `/api/v1/teams/${teamId}/invites`,
+    accessToken,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
+    }
+    if (response.status === 403) {
+      throw new Error('팀 초대 링크 목록을 조회할 권한이 없습니다.');
+    }
+    if (response.status === 404) {
+      throw new Error('팀을 찾을 수 없습니다.');
+    }
+    const errorText = await response.text();
+    throw new Error(`팀 초대 링크 목록 조회 실패: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * 팀 초대 수락
+ */
+export async function acceptTeamInvite(
+  request: AcceptTeamInviteRequest,
+  accessToken: string,
+): Promise<AcceptTeamInviteResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'POST',
+    endpoint: '/api/v1/teams/invites/accept',
+    accessToken,
+    body: request,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
+    }
+    if (response.status === 400) {
+      throw new Error('유효하지 않은 초대 토큰입니다.');
+    }
+    if (response.status === 404) {
+      throw new Error('초대 링크를 찾을 수 없습니다.');
+    }
+    const errorText = await response.text();
+    throw new Error(`팀 초대 수락 실패: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data;
 }
