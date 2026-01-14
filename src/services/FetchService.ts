@@ -70,8 +70,15 @@ class FetchClient {
   }
 
   private async request(endpoint: string, options?: FetchClientOptions) {
-    const { cookies, headers: customHeaders, body, credentials, accessToken, tokenType, ...rest } =
-      options ?? {};
+    const {
+      cookies,
+      headers: customHeaders,
+      body,
+      credentials,
+      accessToken,
+      tokenType,
+      ...rest
+    } = options ?? {};
 
     const url = this.createUrl(endpoint);
     const headers = this.buildHeaders(customHeaders, body);
