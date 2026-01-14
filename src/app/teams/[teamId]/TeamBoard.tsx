@@ -270,6 +270,12 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                 회의 로그 공유
               </button>
               <Link
+                href={`/teams/${teamId}/edit`}
+                className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40"
+              >
+                팀 수정
+              </Link>
+              <Link
                 href={`/teams/${teamId}/tasks/new`}
                 className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110"
               >
