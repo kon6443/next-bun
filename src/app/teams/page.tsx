@@ -72,7 +72,14 @@ export default function TeamsPage() {
                   : "로그인하면 내가 속한 팀 목록을 확인할 수 있어요."}
               </p>
             </div>
-            {!isAuthenticated && (
+            {isAuthenticated ? (
+              <Link
+                href="/teams/new"
+                className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110"
+              >
+                + 팀 생성
+              </Link>
+            ) : (
               <button
                 onClick={() => signIn("kakao")}
                 className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40"
@@ -123,7 +130,18 @@ export default function TeamsPage() {
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-white/20 px-6 py-14 text-center text-slate-400">
-                아직 가입된 팀이 없습니다. 초대를 기다리거나 관리자에게 문의하세요.
+                <p className="text-base font-semibold text-white">
+                  아직 가입된 팀이 없습니다.
+                </p>
+                <p className="mt-2 text-sm text-slate-400">
+                  새로운 팀을 생성하거나 초대를 기다려보세요.
+                </p>
+                <Link
+                  href="/teams/new"
+                  className="mt-6 inline-block rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110"
+                >
+                  + 팀 생성하기
+                </Link>
               </div>
             )
           ) : (
