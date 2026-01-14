@@ -1,53 +1,43 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
-import Link from "next/link";
-import {
-  DndContext,
-  closestCenter,
-  DragEndEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import { arrayMove } from "@dnd-kit/sortable";
+import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import Link from 'next/link';
+import { DndContext, closestCenter, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove } from '@dnd-kit/sortable';
 
-import { Column } from "../../components/Column";
-import type { Task } from "../../types/task";
-import { getTeamTasks, updateTaskStatus, getTeamUsers, type TeamUserResponse } from "@/services/teamService";
+import { Column } from '../../components/Column';
+import type { Task } from '../../types/task';
+import { getTeamTasks, updateTaskStatus, getTeamUsers, type TeamUserResponse } from '@/services/teamService';
 
-type ColumnKey = "todo" | "inProgress" | "done";
+type ColumnKey = 'todo' | 'inProgress' | 'done';
 
-const columnMeta: Record<
-  ColumnKey,
-  { title: string; helper: string; accent: string; taskStatus: number }
-> = {
+const columnMeta: Record<ColumnKey, { title: string; helper: string; accent: string; taskStatus: number }> = {
   todo: {
-    title: "Ideation",
-    helper: "아이디어 & 요청",
-    accent: "linear-gradient(135deg, #facc15, #f97316)",
+    title: 'Ideation',
+    helper: '아이디어 & 요청',
+    accent: 'linear-gradient(135deg, #facc15, #f97316)',
     taskStatus: 1, // CREATED
   },
   inProgress: {
-    title: "In Progress",
-    helper: "진행 중인 작업",
-    accent: "linear-gradient(135deg, #38bdf8, #6366f1)",
+    title: 'In Progress',
+    helper: '진행 중인 작업',
+    accent: 'linear-gradient(135deg, #38bdf8, #6366f1)',
     taskStatus: 2, // IN_PROGRESS
   },
   done: {
-    title: "Completed",
-    helper: "검수 완료",
-    accent: "linear-gradient(135deg, #34d399, #10b981)",
+    title: 'Completed',
+    helper: '검수 완료',
+    accent: 'linear-gradient(135deg, #34d399, #10b981)',
     taskStatus: 3, // COMPLETED
   },
 };
 
 // taskStatus를 ColumnKey로 매핑
 const taskStatusToColumn: Record<number, ColumnKey> = {
-  1: "todo", // CREATED
-  2: "inProgress", // IN_PROGRESS
-  3: "done", // COMPLETED
+  1: 'todo', // CREATED
+  2: 'inProgress', // IN_PROGRESS
+  3: 'done', // COMPLETED
 };
 
 type TeamBoardProps = {
@@ -61,7 +51,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     inProgress: [],
     done: [],
   });
-  const [teamName, setTeamName] = useState<string>("");
+  const [teamName, setTeamName] = useState<string>('');
+  const [teamDescription, setTeamDescription] = useState<string>('');
   const [teamLeaderId, setTeamLeaderId] = useState<number | null>(null);
   const [members, setMembers] = useState<TeamUserResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -73,12 +64,12 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       activationConstraint: {
         distance: 8, // 8px 이상 이동해야 드래그 시작
       },
-    })
+    }),
   );
 
   useEffect(() => {
     if (!session?.user?.accessToken) {
-      setError("인증이 필요합니다. 다시 로그인해주세요.");
+      setError('인증이 필요합니다. 다시 로그인해주세요.');
       setIsLoading(false);
       return;
     }
@@ -89,11 +80,12 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       try {
         const teamIdNum = parseInt(teamId, 10);
         if (isNaN(teamIdNum)) {
-          throw new Error("유효하지 않은 팀 ID입니다.");
+          throw new Error('유효하지 않은 팀 ID입니다.');
         }
 
         const response = await getTeamTasks(teamIdNum, session.user.accessToken);
         setTeamName(response.data.team.teamName);
+        setTeamDescription(response.data.team.teamDescription || '');
         setTeamLeaderId(response.data.team.leaderId);
 
         // 팀 멤버 목록 조회
@@ -102,7 +94,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           setMembers(membersResponse.data);
         } catch (memberErr) {
           // 멤버 목록 조회 실패는 치명적이지 않으므로 에러만 로깅
-          console.error("Failed to fetch team members:", memberErr);
+          console.error('Failed to fetch team members:', memberErr);
         }
 
         // taskStatus에 따라 태스크를 컬럼별로 분류
@@ -112,19 +104,19 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           done: [],
         };
 
-        response.data.tasks.forEach((task) => {
+        response.data.tasks.forEach(task => {
           // actStatus가 1(ACTIVE)인 태스크만 표시
           if (task.actStatus === 1) {
-            const columnKey = taskStatusToColumn[task.taskStatus] || "todo";
+            const columnKey = taskStatusToColumn[task.taskStatus] || 'todo';
             classifiedTasks[columnKey].push(task);
           }
         });
 
         setTasks(classifiedTasks);
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "태스크 목록을 불러오는데 실패했습니다.";
+        const errorMessage = err instanceof Error ? err.message : '태스크 목록을 불러오는데 실패했습니다.';
         setError(errorMessage);
-        console.error("Failed to fetch team tasks:", err);
+        console.error('Failed to fetch team tasks:', err);
       } finally {
         setIsLoading(false);
       }
@@ -133,26 +125,24 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     fetchTeamTasks();
   }, [teamId, session?.user?.accessToken]);
 
-  const totalTasks =
-    tasks.todo.length + tasks.inProgress.length + tasks.done.length;
-  const completionRate =
-    totalTasks === 0 ? 0 : Math.round((tasks.done.length / totalTasks) * 100);
+  const totalTasks = tasks.todo.length + tasks.inProgress.length + tasks.done.length;
+  const completionRate = totalTasks === 0 ? 0 : Math.round((tasks.done.length / totalTasks) * 100);
 
   const stats = [
     {
-      label: "진행률",
+      label: '진행률',
       value: `${completionRate}%`,
-      helper: "완료 대비 전체",
+      helper: '완료 대비 전체',
     },
     {
-      label: "진행 중",
+      label: '진행 중',
       value: tasks.inProgress.length,
-      helper: "현재 집중 작업",
+      helper: '현재 집중 작업',
     },
     {
-      label: "초기 아이디어",
+      label: '초기 아이디어',
       value: tasks.todo.length,
-      helper: "대기 중 카드",
+      helper: '대기 중 카드',
     },
   ];
 
@@ -161,17 +151,10 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
     if (!over || !session?.user?.accessToken) return;
 
-    const activeContainer = active.data.current?.sortable
-      .containerId as ColumnKey;
-    const overContainer = (over.data.current?.sortable.containerId ||
-      over.id) as ColumnKey;
+    const activeContainer = active.data.current?.sortable.containerId as ColumnKey;
+    const overContainer = (over.data.current?.sortable.containerId || over.id) as ColumnKey;
 
-    if (
-      !activeContainer ||
-      !overContainer ||
-      !tasks[activeContainer] ||
-      !tasks[overContainer]
-    ) {
+    if (!activeContainer || !overContainer || !tasks[activeContainer] || !tasks[overContainer]) {
       return;
     }
 
@@ -186,7 +169,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       const overIndex = over.data.current?.sortable.index;
       if (overIndex === undefined || activeIndex === overIndex) return;
 
-      setTasks((prev) => {
+      setTasks(prev => {
         const items = prev[activeContainer];
         return {
           ...prev,
@@ -195,12 +178,11 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       });
     } else {
       // 다른 컬럼으로 이동하는 경우 (상태 변경)
-      const overIndex =
-        over.data.current?.sortable.index ?? tasks[overContainer].length;
+      const overIndex = over.data.current?.sortable.index ?? tasks[overContainer].length;
       const newTaskStatus = columnMeta[overContainer].taskStatus;
 
       // 낙관적 업데이트
-      setTasks((prev) => {
+      setTasks(prev => {
         const activeItems = [...prev[activeContainer]];
         const overItems = [...prev[overContainer]];
         const [movedItem] = activeItems.splice(activeIndex, 1);
@@ -219,19 +201,14 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       // API 호출
       try {
         const teamIdNum = parseInt(teamId, 10);
-        await updateTaskStatus(
-          teamIdNum,
-          movedTask.taskId,
-          newTaskStatus,
-          session.user.accessToken,
-        );
+        await updateTaskStatus(teamIdNum, movedTask.taskId, newTaskStatus, session.user.accessToken);
       } catch (err) {
         // 실패 시 롤백
-        console.error("Failed to update task status:", err);
-        setError(err instanceof Error ? err.message : "태스크 상태 변경에 실패했습니다.");
+        console.error('Failed to update task status:', err);
+        setError(err instanceof Error ? err.message : '태스크 상태 변경에 실패했습니다.');
 
         // 원래 상태로 복구
-        setTasks((prev) => {
+        setTasks(prev => {
           const activeItems = [...prev[activeContainer]];
           const overItems = [...prev[overContainer]];
           overItems.splice(overIndex, 1);
@@ -248,110 +225,91 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-32 top-0 h-72 w-72 rounded-full bg-indigo-600/30 blur-[130px]" />
-        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-500/20 blur-[150px]" />
+    <div className='relative min-h-screen overflow-hidden bg-slate-950 text-slate-100'>
+      <div className='pointer-events-none absolute inset-0'>
+        <div className='absolute -left-32 top-0 h-72 w-72 rounded-full bg-indigo-600/30 blur-[130px]' />
+        <div className='absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-500/20 blur-[150px]' />
       </div>
 
-      <main className="relative z-10 mx-auto flex max-w-6xl flex-col gap-10 px-4 pb-24 pt-16 sm:px-8">
-        <section className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
-          <p className="text-xs uppercase tracking-[0.6em] text-slate-400">
-            Team Kanban
-          </p>
-          <div className="mt-4 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+      <main className='relative z-10 mx-auto flex max-w-6xl flex-col gap-10 px-4 pb-24 pt-16 sm:px-8'>
+        <section className='rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl'>
+          <p className='text-xs uppercase tracking-[0.6em] text-slate-400'>Team Kanban</p>
+          <div className='mt-4 flex flex-col gap-6 md:flex-row md:items-center md:justify-between'>
             <div>
-              <h1 className="text-4xl font-bold text-white md:text-5xl">
-                {isLoading ? "로딩 중..." : teamName || "팀"} 작업 현황판
+              <h1 className='text-4xl font-bold text-white md:text-5xl'>
+                {isLoading ? '로딩 중...' : teamName || ''}
               </h1>
+              {teamDescription && <p className='mt-2 text-sm text-slate-400'>{teamDescription}</p>}
             </div>
-            <div className="flex gap-4">
-              <button className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40">
+            <div className='flex gap-4'>
+              <button className='rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40'>
                 회의 로그 공유
               </button>
               <Link
                 href={`/teams/${teamId}/edit`}
-                className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40"
+                className='rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40'
               >
                 팀 수정
               </Link>
               <Link
                 href={`/teams/${teamId}/tasks/new`}
-                className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110"
+                className='rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110'
               >
                 새 카드 작성
               </Link>
             </div>
           </div>
 
-          <div className="mt-8 grid gap-4 sm:grid-cols-3">
-            {stats.map((stat) => (
-              <div
-                key={stat.label}
-                className="rounded-2xl border border-white/10 bg-slate-950/30 p-4"
-              >
-                <p className="text-xs uppercase tracking-[0.5em] text-slate-500">
-                  {stat.label}
-                </p>
-                <p className="mt-3 text-3xl font-bold text-white">
-                  {stat.value}
-                </p>
-                <p className="mt-1 text-sm text-slate-500">{stat.helper}</p>
+          <div className='mt-8 grid gap-4 sm:grid-cols-3'>
+            {stats.map(stat => (
+              <div key={stat.label} className='rounded-2xl border border-white/10 bg-slate-950/30 p-4'>
+                <p className='text-xs uppercase tracking-[0.5em] text-slate-500'>{stat.label}</p>
+                <p className='mt-3 text-3xl font-bold text-white'>{stat.value}</p>
+                <p className='mt-1 text-sm text-slate-500'>{stat.helper}</p>
               </div>
             ))}
           </div>
         </section>
 
         {/* 팀 멤버 목록 */}
-        <section className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
-          <div className="mb-6">
-            <p className="text-xs uppercase tracking-[0.6em] text-slate-400">
-              Team Members
-            </p>
-            <h2 className="mt-4 text-2xl font-bold text-white md:text-3xl">
-              팀 멤버
-            </h2>
+        <section className='rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl'>
+          <div className='mb-6'>
+            <p className='text-xs uppercase tracking-[0.6em] text-slate-400'>Team Members</p>
+            <h2 className='mt-4 text-2xl font-bold text-white md:text-3xl'>팀 멤버</h2>
           </div>
 
           {members.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-white/20 px-6 py-10 text-center text-slate-400">
+            <div className='rounded-2xl border border-dashed border-white/20 px-6 py-10 text-center text-slate-400'>
               멤버 정보를 불러오는 중...
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {members.map((member) => {
+            <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
+              {members.map(member => {
                 const isLeader = teamLeaderId === member.userId;
                 const formatDate = (date: Date) => {
-                  return new Date(date).toLocaleDateString("ko-KR", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
+                  return new Date(date).toLocaleDateString('ko-KR', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
                   });
                 };
 
                 return (
-                  <div
-                    key={member.userId}
-                    className="rounded-2xl border border-white/10 bg-slate-950/30 p-6"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="text-lg font-semibold text-white">
+                  <div key={member.userId} className='rounded-2xl border border-white/10 bg-slate-950/30 p-6'>
+                    <div className='flex items-center justify-between'>
+                      <div className='flex-1'>
+                        <div className='flex items-center gap-2'>
+                          <p className='text-lg font-semibold text-white'>
                             {member.userName || `사용자 ${member.userId}`}
                           </p>
                           {isLeader && (
-                            <span className="rounded-full bg-gradient-to-r from-yellow-500/20 to-orange-500/20 px-2 py-0.5 text-xs font-semibold text-yellow-400 border border-yellow-500/30">
+                            <span className='rounded-full bg-gradient-to-r from-yellow-500/20 to-orange-500/20 px-2 py-0.5 text-xs font-semibold text-yellow-400 border border-yellow-500/30'>
                               리더
                             </span>
                           )}
                         </div>
-                        <p className="mt-2 text-sm text-slate-400">
-                          {member.role}
-                        </p>
-                        <p className="mt-2 text-xs text-slate-500">
-                          가입일: {formatDate(member.joinedAt)}
-                        </p>
+                        <p className='mt-2 text-sm text-slate-400'>{member.role}</p>
+                        <p className='mt-2 text-xs text-slate-500'>가입일: {formatDate(member.joinedAt)}</p>
                       </div>
                     </div>
                   </div>
@@ -362,23 +320,19 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         </section>
 
         {error && (
-          <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-6 py-4 text-center">
-            <p className="text-base font-semibold text-red-400">{error}</p>
+          <div className='rounded-2xl border border-red-500/20 bg-red-500/10 px-6 py-4 text-center'>
+            <p className='text-base font-semibold text-red-400'>{error}</p>
           </div>
         )}
 
         {isLoading ? (
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl text-center text-slate-400">
+          <div className='rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl text-center text-slate-400'>
             태스크 목록을 불러오는 중...
           </div>
         ) : (
-          <DndContext
-            sensors={sensors}
-            onDragEnd={handleDragEnd}
-            collisionDetection={closestCenter}
-          >
-            <div className="grid gap-6 md:grid-cols-3">
-              {(Object.keys(columnMeta) as ColumnKey[]).map((columnKey) => {
+          <DndContext sensors={sensors} onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
+            <div className='grid gap-6 md:grid-cols-3'>
+              {(Object.keys(columnMeta) as ColumnKey[]).map(columnKey => {
                 const meta = columnMeta[columnKey];
                 return (
                   <Column
@@ -398,4 +352,3 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     </div>
   );
 }
-
