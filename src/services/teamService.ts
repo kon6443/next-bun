@@ -146,6 +146,16 @@ export type CreateTeamResponse = {
   data: TeamInfoResponse;
 };
 
+export type UpdateTeamRequest = {
+  teamName: string;
+  teamDescription: string;
+};
+
+export type UpdateTeamResponse = {
+  message: string;
+  data: TeamInfoResponse;
+};
+
 /**
  * 내 팀 목록 조회
  */
@@ -191,6 +201,42 @@ export async function createTeam(
     }
     const errorText = await response.text();
     throw new Error(`팀 생성 실패: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * 팀 수정
+ */
+export async function updateTeam(
+  teamId: number,
+  request: UpdateTeamRequest,
+  accessToken: string,
+): Promise<UpdateTeamResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'PATCH',
+    endpoint: `/api/v1/teams/${teamId}`,
+    accessToken,
+    body: request,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
+    }
+    if (response.status === 403) {
+      throw new Error('팀을 수정할 권한이 없습니다.');
+    }
+    if (response.status === 404) {
+      throw new Error('팀을 찾을 수 없습니다.');
+    }
+    if (response.status === 400) {
+      throw new Error('팀 수정 요청이 올바르지 않습니다.');
+    }
+    const errorText = await response.text();
+    throw new Error(`팀 수정 실패: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
