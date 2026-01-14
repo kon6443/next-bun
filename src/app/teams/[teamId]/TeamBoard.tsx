@@ -243,7 +243,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
             </div>
             <div className='flex gap-4'>
               <button className='rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40'>
-                회의 로그 공유
+                팀 초대
               </button>
               <Link
                 href={`/teams/${teamId}/edit`}
