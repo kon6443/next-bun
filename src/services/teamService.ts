@@ -188,7 +188,7 @@ export async function getTeamUsers(
   const data = await response.json();
   // 날짜 변환
   if (data.data && Array.isArray(data.data)) {
-    data.data = data.data.map((user: any) => ({
+    data.data = data.data.map((user: Omit<TeamUserResponse, 'joinedAt'> & { joinedAt: string }) => ({
       ...user,
       joinedAt: new Date(user.joinedAt),
     }));
