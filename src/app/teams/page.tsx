@@ -56,8 +56,8 @@ export default function TeamsPage() {
         <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-500/20 blur-[150px]" />
       </div>
 
-      <main className="relative z-10 mx-auto flex max-w-5xl flex-col gap-10 px-4 pb-24 pt-16 sm:px-8">
-        <section className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
+      <main className="relative z-10 mx-auto flex max-w-5xl flex-col gap-6 sm:gap-10 px-4 pb-24 pt-12 sm:pt-16 sm:px-8">
+        <section className="rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-8 backdrop-blur-xl">
           <p className="text-xs uppercase tracking-[0.7em] text-slate-400">
             Teams
           </p>
@@ -75,14 +75,14 @@ export default function TeamsPage() {
             {isAuthenticated ? (
               <Link
                 href="/teams/new"
-                className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110"
+                className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2 text-xs sm:px-6 sm:py-3 sm:text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110"
               >
                 + 팀 생성
               </Link>
             ) : (
               <button
                 onClick={() => signIn("kakao")}
-                className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40"
+                className="rounded-full border border-white/20 px-4 py-2 text-xs sm:px-6 sm:py-3 sm:text-sm font-semibold text-slate-200 transition hover:border-white/40"
               >
                 로그인하기
               </button>
@@ -90,7 +90,7 @@ export default function TeamsPage() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
+        <section className="rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-8 backdrop-blur-xl">
           {isAuthenticated ? (
             isLoading ? (
               <div className="rounded-2xl border border-dashed border-white/20 px-6 py-14 text-center text-slate-400">
@@ -104,19 +104,19 @@ export default function TeamsPage() {
                 <p className="mt-2 text-sm text-slate-400">{error}</p>
               </div>
             ) : teams.length ? (
-              <div className="grid gap-5 sm:grid-cols-2">
+              <div className="grid gap-4 sm:gap-5 sm:grid-cols-2">
                 {teams.map((team) => (
                   <Link
                     key={team.teamId}
                     href={`/teams/${team.teamId}`}
-                    className="group flex flex-col rounded-2xl border border-white/10 bg-slate-950/40 p-5 shadow-[0_20px_40px_rgba(2,6,23,0.55)] transition hover:border-white/30"
+                    className="group flex flex-col rounded-2xl border border-white/10 bg-slate-950/40 p-4 sm:p-5 shadow-[0_20px_40px_rgba(2,6,23,0.55)] transition hover:border-white/30"
                   >
                     <div className="flex items-center justify-between">
                       <p className="text-xs uppercase tracking-[0.4em] text-slate-500">
                         {team.role}
                       </p>
                     </div>
-                    <h2 className="mt-3 text-2xl font-semibold text-white">
+                    <h2 className="mt-3 text-xl sm:text-2xl font-semibold text-white">
                       {team.name}
                     </h2>
                     <p className="mt-2 text-sm text-slate-400">
@@ -138,7 +138,7 @@ export default function TeamsPage() {
                 </p>
                 <Link
                   href="/teams/new"
-                  className="mt-6 inline-block rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110"
+                  className="mt-6 inline-block rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2 text-xs sm:px-5 sm:text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110"
                 >
                   + 팀 생성하기
                 </Link>
@@ -154,7 +154,7 @@ export default function TeamsPage() {
               </p>
               <button
                 onClick={() => signIn("kakao")}
-                className="mt-6 rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110"
+                className="mt-6 rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2 text-xs sm:px-5 sm:text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110"
               >
                 로그인하고 확인하기
               </button>
