@@ -68,6 +68,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   const [isMaster, setIsMaster] = useState(false);
   const [invites, setInvites] = useState<TeamInviteResponse[]>([]);
   const [isInvitesOpen, setIsInvitesOpen] = useState(false);
+  const [isMembersOpen, setIsMembersOpen] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [isCreatingInvite, setIsCreatingInvite] = useState(false);
   const [createdInviteLink, setCreatedInviteLink] = useState<string | null>(null);
@@ -370,49 +371,64 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
         {/* 팀 멤버 목록 */}
         <section className='rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl'>
-          <div className='mb-6'>
-            <p className='text-xs uppercase tracking-[0.6em] text-slate-400'>Team Members</p>
-            <h2 className='mt-4 text-2xl font-bold text-white md:text-3xl'>팀 멤버</h2>
+          <div className='mb-6 flex items-start justify-between gap-4'>
+            <div>
+              <p className='text-xs uppercase tracking-[0.6em] text-slate-400'>Team Members</p>
+              <h2 className='mt-4 text-2xl font-bold text-white md:text-3xl'>
+                팀 멤버 <span className='text-slate-400'>({members.length})</span>
+              </h2>
+            </div>
+            <button
+              type='button'
+              onClick={() => setIsMembersOpen(v => !v)}
+              className='mt-4 rounded-full border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
+            >
+              {isMembersOpen ? '접기 ▾' : '펼치기 ▸'}
+            </button>
           </div>
 
-          {members.length === 0 ? (
-            <div className='rounded-2xl border border-dashed border-white/20 px-6 py-10 text-center text-slate-400'>
-              멤버 정보를 불러오는 중...
-            </div>
-          ) : (
-            <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
-              {members.map(member => {
-                const isLeader = teamLeaderId === member.userId;
-                const formatDate = (date: Date) => {
-                  return new Date(date).toLocaleDateString('ko-KR', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  });
-                };
+          {isMembersOpen && (
+            <>
+              {members.length === 0 ? (
+                <div className='rounded-2xl border border-dashed border-white/20 px-6 py-10 text-center text-slate-400'>
+                  멤버 정보를 불러오는 중...
+                </div>
+              ) : (
+                <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
+                  {members.map(member => {
+                    const isLeader = teamLeaderId === member.userId;
+                    const formatDate = (date: Date) => {
+                      return new Date(date).toLocaleDateString('ko-KR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      });
+                    };
 
-                return (
-                  <div key={member.userId} className='rounded-2xl border border-white/10 bg-slate-950/30 p-6'>
-                    <div className='flex items-center justify-between'>
-                      <div className='flex-1'>
-                        <div className='flex items-center gap-2'>
-                          <p className='text-lg font-semibold text-white'>
-                            {member.userName || `사용자 ${member.userId}`}
-                          </p>
-                          {isLeader && (
-                            <span className='rounded-full bg-gradient-to-r from-yellow-500/20 to-orange-500/20 px-2 py-0.5 text-xs font-semibold text-yellow-400 border border-yellow-500/30'>
-                              리더
-                            </span>
-                          )}
+                    return (
+                      <div key={member.userId} className='rounded-2xl border border-white/10 bg-slate-950/30 p-6'>
+                        <div className='flex items-center justify-between'>
+                          <div className='flex-1'>
+                            <div className='flex items-center gap-2'>
+                              <p className='text-lg font-semibold text-white'>
+                                {member.userName || `사용자 ${member.userId}`}
+                              </p>
+                              {isLeader && (
+                                <span className='rounded-full bg-gradient-to-r from-yellow-500/20 to-orange-500/20 px-2 py-0.5 text-xs font-semibold text-yellow-400 border border-yellow-500/30'>
+                                  리더
+                                </span>
+                              )}
+                            </div>
+                            <p className='mt-2 text-sm text-slate-400'>{member.role}</p>
+                            <p className='mt-2 text-xs text-slate-500'>가입일: {formatDate(member.joinedAt)}</p>
+                          </div>
                         </div>
-                        <p className='mt-2 text-sm text-slate-400'>{member.role}</p>
-                        <p className='mt-2 text-xs text-slate-500'>가입일: {formatDate(member.joinedAt)}</p>
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
         </section>
 
