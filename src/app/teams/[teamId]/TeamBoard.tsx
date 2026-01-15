@@ -65,6 +65,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMaster, setIsMaster] = useState(false);
+  const [canManageInvites, setCanManageInvites] = useState(false);
   const [invites, setInvites] = useState<TeamInviteResponse[]>([]);
   const [isInvitesOpen, setIsInvitesOpen] = useState(false);
   const [isMembersOpen, setIsMembersOpen] = useState(false);
@@ -110,20 +111,56 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         try {
           const membersResponse = await getTeamUsers(teamIdNum, session.user.accessToken);
           setMembers(membersResponse.data);
+          
+          // 멤버 목록 로드 후 현재 사용자의 권한 확인
+          const currentUserMember = membersResponse.data.find((m) => m.userId === currentUserId);
+          const userRole = currentUserMember?.role?.toUpperCase().trim();
+          const canInvite = userRole === 'MASTER' || userRole === 'MANAGER';
+          setCanManageInvites(canInvite);
+          
+          // 권한이 있는 경우 초대 링크 목록 조회
+          if (canInvite) {
+            try {
+              const invitesResponse = await getTeamInvites(teamIdNum, session.user.accessToken);
+              setInvites(invitesResponse.data);
+            } catch (inviteErr) {
+              // 403 에러는 백엔드 권한 체크로 인한 것이므로 조용히 처리
+              const errorMessage = inviteErr instanceof Error ? inviteErr.message : String(inviteErr);
+              if (errorMessage.includes('권한이 없습니다') || errorMessage.includes('403')) {
+                console.warn('팀 초대 링크 조회 권한이 없습니다. 백엔드 권한 설정을 확인해주세요.');
+                setInvites([]);
+                // 권한이 실제로 없는 경우 canManageInvites를 false로 설정
+                setCanManageInvites(false);
+              } else {
+                console.error('Failed to fetch team invites:', inviteErr);
+                setInvites([]);
+              }
+            }
+          } else {
+            setInvites([]);
+          }
         } catch (memberErr) {
           console.error('Failed to fetch team members:', memberErr);
-        }
-
-        // 마스터인 경우에만 초대 링크 목록 조회
-        if (isMasterUser) {
-          try {
-            const invitesResponse = await getTeamInvites(teamIdNum, session.user.accessToken);
-            setInvites(invitesResponse.data);
-          } catch (inviteErr) {
-            console.error('Failed to fetch team invites:', inviteErr);
+          // 멤버 목록 조회 실패 시 기존 로직 유지 (leaderId 기반)
+          setCanManageInvites(isMasterUser);
+          if (isMasterUser) {
+            try {
+              const invitesResponse = await getTeamInvites(teamIdNum, session.user.accessToken);
+              setInvites(invitesResponse.data);
+            } catch (inviteErr) {
+              const errorMessage = inviteErr instanceof Error ? inviteErr.message : String(inviteErr);
+              if (errorMessage.includes('권한이 없습니다') || errorMessage.includes('403')) {
+                console.warn('팀 초대 링크 조회 권한이 없습니다.');
+                setInvites([]);
+                setCanManageInvites(false);
+              } else {
+                console.error('Failed to fetch team invites:', inviteErr);
+                setInvites([]);
+              }
+            }
+          } else {
+            setInvites([]);
           }
-        } else {
-          setInvites([]);
         }
 
         // taskStatus에 따라 태스크를 컬럼별로 분류
@@ -333,7 +370,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
               {teamDescription && <p className='mt-2 text-sm text-slate-400'>{teamDescription}</p>}
             </div>
             <div className='flex flex-col sm:flex-row gap-2 sm:gap-4'>
-              {isMaster && (
+              {canManageInvites && (
                 <button
                   onClick={() => setShowInviteModal(true)}
                   className='w-full sm:w-auto rounded-full border border-white/20 px-4 py-2 text-xs sm:px-6 sm:py-3 sm:text-sm font-semibold text-slate-200 transition hover:border-white/40 text-center'
@@ -456,8 +493,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           )}
         </section>
 
-        {/* 초대 링크 목록 (마스터만 표시) */}
-        {isMaster && (
+        {/* 초대 링크 목록 (마스터/매니저만 표시) */}
+        {canManageInvites && (
           <section className='rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-8 backdrop-blur-xl'>
             <div className='mb-6 flex items-start justify-between gap-4'>
               <div>

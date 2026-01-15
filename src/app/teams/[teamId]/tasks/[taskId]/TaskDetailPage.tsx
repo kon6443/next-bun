@@ -45,6 +45,7 @@ export default function TaskDetailPage({
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [newComment, setNewComment] = useState("");
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
   const [editingContent, setEditingContent] = useState("");
@@ -230,12 +231,20 @@ export default function TaskDetailPage({
       );
 
       setNewComment("");
+      setError(null);
+      setSuccessMessage("댓글이 작성되었습니다.");
       // 태스크 상세를 재조회하여 최신 댓글 목록(올바른 userName 포함)을 받아옴
       await fetchTaskDetail(false);
+      
+      // 3초 후 성공 메시지 자동 제거
+      setTimeout(() => {
+        setSuccessMessage(null);
+      }, 3000);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "댓글 작성에 실패했습니다.";
       setError(errorMessage);
+      setSuccessMessage(null);
       console.error("Failed to create comment:", err);
     } finally {
       setIsSubmitting(false);
@@ -574,8 +583,15 @@ export default function TaskDetailPage({
 
         {/* 에러 메시지 */}
         {error && (
-          <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-6 py-4 text-center">
+          <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-6 py-4 text-center animate-in fade-in duration-300">
             <p className="text-base font-semibold text-red-400">{error}</p>
+          </div>
+        )}
+
+        {/* 성공 메시지 */}
+        {successMessage && (
+          <div className="rounded-2xl border border-green-500/20 bg-green-500/10 px-6 py-4 text-center animate-in fade-in duration-300">
+            <p className="text-base font-semibold text-green-400">{successMessage}</p>
           </div>
         )}
 
