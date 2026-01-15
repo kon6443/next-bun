@@ -61,13 +61,13 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   });
   const [teamName, setTeamName] = useState<string>('');
   const [teamDescription, setTeamDescription] = useState<string>('');
-  const [teamLeaderId, setTeamLeaderId] = useState<number | null>(null);
   const [members, setMembers] = useState<TeamUserResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMaster, setIsMaster] = useState(false);
   const [invites, setInvites] = useState<TeamInviteResponse[]>([]);
   const [isInvitesOpen, setIsInvitesOpen] = useState(false);
+  const [isMembersOpen, setIsMembersOpen] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [isCreatingInvite, setIsCreatingInvite] = useState(false);
   const [createdInviteLink, setCreatedInviteLink] = useState<string | null>(null);
@@ -100,7 +100,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         const response = await getTeamTasks(teamIdNum, session.user.accessToken);
         setTeamName(response.data.team.teamName);
         setTeamDescription(response.data.team.teamDescription || '');
-        setTeamLeaderId(response.data.team.leaderId);
 
         // 마스터 판별(단순): 팀 리더(leaderId) === 현재 로그인 사용자(userId)
         const currentUserId = session.user.userId;
@@ -323,8 +322,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         <div className='absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-500/20 blur-[150px]' />
       </div>
 
-      <main className='relative z-10 mx-auto flex max-w-6xl flex-col gap-10 px-4 pb-24 pt-16 sm:px-8'>
-        <section className='rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl'>
+      <main className='relative z-10 mx-auto flex max-w-6xl flex-col gap-6 sm:gap-10 px-4 pb-24 pt-12 sm:pt-16 sm:px-8'>
+        <section className='rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-8 backdrop-blur-xl'>
           <p className='text-xs uppercase tracking-[0.6em] text-slate-400'>Team Kanban</p>
           <div className='mt-4 flex flex-col gap-6 md:flex-row md:items-center md:justify-between'>
             <div>
@@ -333,33 +332,33 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
               </h1>
               {teamDescription && <p className='mt-2 text-sm text-slate-400'>{teamDescription}</p>}
             </div>
-            <div className='flex gap-4'>
+            <div className='flex flex-col sm:flex-row gap-2 sm:gap-4'>
               {isMaster && (
                 <button
                   onClick={() => setShowInviteModal(true)}
-                  className='rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40'
+                  className='w-full sm:w-auto rounded-full border border-white/20 px-4 py-2 text-xs sm:px-6 sm:py-3 sm:text-sm font-semibold text-slate-200 transition hover:border-white/40 text-center'
                 >
                   팀 초대
                 </button>
               )}
               <Link
                 href={`/teams/${teamId}/edit`}
-                className='rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40'
+                className='w-full sm:w-auto rounded-full border border-white/20 px-4 py-2 text-xs sm:px-6 sm:py-3 sm:text-sm font-semibold text-slate-200 transition hover:border-white/40 text-center'
               >
                 팀 수정
               </Link>
               <Link
                 href={`/teams/${teamId}/tasks/new`}
-                className='rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110'
+                className='w-full sm:w-auto rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2 text-xs sm:px-6 sm:py-3 sm:text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 text-center'
               >
                 새 카드 작성
               </Link>
             </div>
           </div>
 
-          <div className='mt-8 grid gap-4 sm:grid-cols-3'>
+          <div className='mt-6 sm:mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4'>
             {stats.map(stat => (
-              <div key={stat.label} className='rounded-2xl border border-white/10 bg-slate-950/30 p-4'>
+              <div key={stat.label} className='rounded-2xl border border-white/10 bg-slate-950/30 p-3 sm:p-4'>
                 <p className='text-xs uppercase tracking-[0.5em] text-slate-500'>{stat.label}</p>
                 <p className='mt-3 text-3xl font-bold text-white'>{stat.value}</p>
                 <p className='mt-1 text-sm text-slate-500'>{stat.helper}</p>
@@ -369,56 +368,97 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         </section>
 
         {/* 팀 멤버 목록 */}
-        <section className='rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl'>
-          <div className='mb-6'>
-            <p className='text-xs uppercase tracking-[0.6em] text-slate-400'>Team Members</p>
-            <h2 className='mt-4 text-2xl font-bold text-white md:text-3xl'>팀 멤버</h2>
+        <section className='rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-8 backdrop-blur-xl'>
+          <div className='mb-6 flex items-start justify-between gap-4'>
+            <div>
+              <p className='text-xs uppercase tracking-[0.6em] text-slate-400'>Team Members</p>
+              <h2 className='mt-4 text-2xl font-bold text-white md:text-3xl'>
+                팀 멤버 <span className='text-slate-400'>({members.length})</span>
+              </h2>
+            </div>
+            <button
+              type='button'
+              onClick={() => setIsMembersOpen(v => !v)}
+              className='mt-4 rounded-full border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
+            >
+              {isMembersOpen ? '접기 ▾' : '펼치기 ▸'}
+            </button>
           </div>
 
-          {members.length === 0 ? (
-            <div className='rounded-2xl border border-dashed border-white/20 px-6 py-10 text-center text-slate-400'>
-              멤버 정보를 불러오는 중...
-            </div>
-          ) : (
-            <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
-              {members.map(member => {
-                const isLeader = teamLeaderId === member.userId;
-                const formatDate = (date: Date) => {
-                  return new Date(date).toLocaleDateString('ko-KR', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  });
-                };
+          {isMembersOpen && (
+            <>
+              {members.length === 0 ? (
+                <div className='rounded-2xl border border-dashed border-white/20 px-6 py-10 text-center text-slate-400'>
+                  멤버 정보를 불러오는 중...
+                </div>
+              ) : (
+                <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
+                  {members.map(member => {
+                    const isCurrentUser = session?.user?.userId === member.userId;
+                    const formatDate = (date: Date) => {
+                      return new Date(date).toLocaleDateString('ko-KR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      });
+                    };
 
-                return (
-                  <div key={member.userId} className='rounded-2xl border border-white/10 bg-slate-950/30 p-6'>
-                    <div className='flex items-center justify-between'>
-                      <div className='flex-1'>
-                        <div className='flex items-center gap-2'>
-                          <p className='text-lg font-semibold text-white'>
-                            {member.userName || `사용자 ${member.userId}`}
-                          </p>
-                          {isLeader && (
-                            <span className='rounded-full bg-gradient-to-r from-yellow-500/20 to-orange-500/20 px-2 py-0.5 text-xs font-semibold text-yellow-400 border border-yellow-500/30'>
-                              리더
-                            </span>
-                          )}
+                    // 권한에 따른 배지 스타일 정의
+                    // role 값으로만 판단 (MASTER, MANAGER, MEMBER)
+                    const getRoleBadge = (role: string | null | undefined) => {
+                      const roleUpper = (role || 'MEMBER').trim().toUpperCase();
+                      if (roleUpper === 'MASTER') {
+                        return {
+                          label: '마스터',
+                          className: 'rounded-full bg-gradient-to-r from-yellow-500/20 to-orange-500/20 px-2 py-0.5 text-xs font-semibold text-yellow-400 border border-yellow-500/30',
+                        };
+                      } else if (roleUpper === 'MANAGER') {
+                        return {
+                          label: '매니저',
+                          className: 'rounded-full bg-gradient-to-r from-blue-500/20 to-indigo-500/20 px-2 py-0.5 text-xs font-semibold text-blue-400 border border-blue-500/30',
+                        };
+                      } else {
+                        return {
+                          label: '멤버',
+                          className: 'rounded-full bg-gradient-to-r from-slate-500/20 to-slate-600/20 px-2 py-0.5 text-xs font-semibold text-slate-400 border border-slate-500/30',
+                        };
+                      }
+                    };
+
+                    const roleBadge = getRoleBadge(member.role);
+
+                    return (
+                      <div key={member.userId} className='rounded-2xl border border-white/10 bg-slate-950/30 p-4 sm:p-6'>
+                        <div className='flex items-center justify-between'>
+                          <div className='flex-1'>
+                            <div className='flex items-center gap-2 flex-wrap'>
+                              <p className='text-lg font-semibold text-white'>
+                                {member.userName || `사용자 ${member.userId}`}
+                              </p>
+                              <span className={roleBadge.className}>
+                                {roleBadge.label}
+                              </span>
+                              {isCurrentUser && (
+                                <span className='rounded-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 px-2 py-0.5 text-xs font-semibold text-purple-400 border border-purple-500/30'>
+                                  나
+                                </span>
+                              )}
+                            </div>
+                            <p className='mt-2 text-xs text-slate-500'>가입일: {formatDate(member.joinedAt)}</p>
+                          </div>
                         </div>
-                        <p className='mt-2 text-sm text-slate-400'>{member.role}</p>
-                        <p className='mt-2 text-xs text-slate-500'>가입일: {formatDate(member.joinedAt)}</p>
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
         </section>
 
         {/* 초대 링크 목록 (마스터만 표시) */}
         {isMaster && (
-          <section className='rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl'>
+          <section className='rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-8 backdrop-blur-xl'>
             <div className='mb-6 flex items-start justify-between gap-4'>
               <div>
                 <p className='text-xs uppercase tracking-[0.6em] text-slate-400'>Team Invites</p>
@@ -460,7 +500,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                               : 'border-slate-700/50 bg-slate-950/10 opacity-60'
                           }`}
                         >
-                          <div className='flex items-start justify-between gap-4'>
+                          <div className='flex flex-col sm:flex-row items-start justify-between gap-4'>
                             <div className='flex-1'>
                               <div className='mb-2 flex items-center gap-2'>
                                 <p className='text-sm font-semibold text-slate-300'>초대 링크 #{invite.invId}</p>
@@ -491,7 +531,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                             {isActive && (
                               <button
                                 onClick={() => handleCopyInviteLink(inviteUrl)}
-                                className='whitespace-nowrap rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
+                                className='mt-4 sm:mt-0 w-full sm:w-auto whitespace-nowrap rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-xs sm:text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
                               >
                                 링크 복사
                               </button>
@@ -519,7 +559,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           </div>
         ) : (
           <DndContext sensors={sensors} onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
-            <div className='grid gap-6 md:grid-cols-3'>
+            <div className='grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6'>
               {(Object.keys(columnMeta) as ColumnKey[]).map(columnKey => {
                 const meta = columnMeta[columnKey];
                 return (
@@ -540,8 +580,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
       {/* 초대 링크 생성 모달 */}
       {showInviteModal && (
-        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm'>
-          <div className='relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-slate-900 p-8 backdrop-blur-xl'>
+        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4'>
+          <div className='relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-slate-900 p-4 sm:p-8 backdrop-blur-xl'>
             <button
               onClick={() => {
                 setShowInviteModal(false);
@@ -552,18 +592,18 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
               ✕
             </button>
 
-            <h3 className='mb-6 text-2xl font-bold text-white'>초대 링크 생성</h3>
+            <h3 className='mb-4 sm:mb-6 text-xl sm:text-2xl font-bold text-white'>초대 링크 생성</h3>
 
             {createdInviteLink ? (
               <div>
                 <p className='mb-4 text-sm text-slate-400'>초대 링크가 생성되었습니다!</p>
-                <div className='mb-4 rounded-lg bg-slate-950/50 border border-white/5 p-4'>
+                <div className='mb-4 rounded-lg bg-slate-950/50 border border-white/5 p-3 sm:p-4'>
                   <p className='mb-2 text-xs text-slate-500'>초대 링크:</p>
-                  <p className='break-all text-sm text-slate-300 font-mono'>{createdInviteLink}</p>
+                  <p className='break-all text-xs sm:text-sm text-slate-300 font-mono'>{createdInviteLink}</p>
                 </div>
                 <button
                   onClick={() => handleCopyInviteLink(createdInviteLink)}
-                  className='w-full rounded-lg border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
+                  className='w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
                 >
                   링크 복사
                 </button>
@@ -572,7 +612,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                     setShowInviteModal(false);
                     setCreatedInviteLink(null);
                   }}
-                  className='mt-3 w-full rounded-lg border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
+                  className='mt-3 w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
                 >
                   닫기
                 </button>
@@ -611,13 +651,13 @@ function InviteCreateForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className='space-y-4'>
+    <form onSubmit={handleSubmit} className='space-y-3 sm:space-y-4'>
       <div>
-        <label className='mb-2 block text-sm font-semibold text-slate-300'>만료일 (최대 3일)</label>
+        <label className='mb-2 block text-xs sm:text-sm font-semibold text-slate-300'>만료일 (최대 3일)</label>
         <select
           value={expiresInDays}
           onChange={e => setExpiresInDays(Number(e.target.value))}
-          className='w-full rounded-lg border border-white/10 bg-slate-950/50 px-4 py-2 text-slate-200 focus:border-white/20 focus:outline-none'
+          className='w-full rounded-lg border border-white/10 bg-slate-950/50 px-3 sm:px-4 py-2 text-xs sm:text-sm text-slate-200 focus:border-white/20 focus:outline-none'
         >
           {Array.from({ length: 3 }, (_, i) => i + 1).map(days => (
             <option key={days} value={days}>
@@ -629,23 +669,23 @@ function InviteCreateForm({
       </div>
 
       <div>
-        <label className='mb-2 block text-sm font-semibold text-slate-300'>최대 사용 횟수 (선택사항)</label>
+        <label className='mb-2 block text-xs sm:text-sm font-semibold text-slate-300'>최대 사용 횟수 (선택사항)</label>
         <input
           type='number'
           value={usageMaxCnt}
           onChange={e => setUsageMaxCnt(e.target.value === '' ? '' : Number(e.target.value))}
           min={1}
-          className='w-full rounded-lg border border-white/10 bg-slate-950/50 px-4 py-2 text-slate-200 focus:border-white/20 focus:outline-none'
+          className='w-full rounded-lg border border-white/10 bg-slate-950/50 px-3 sm:px-4 py-2 text-xs sm:text-sm text-slate-200 focus:border-white/20 focus:outline-none'
           placeholder='최대 사용 횟수'
         />
         <p className='mt-1 text-xs text-slate-500'>최대 사용 횟수를 지정하지 않으면 기본값이 적용됩니다.</p>
       </div>
 
-      <div className='flex gap-3 pt-4'>
+      <div className='flex gap-2 sm:gap-3 pt-3 sm:pt-4'>
         <button
           type='submit'
           disabled={isSubmitting}
-          className='flex-1 rounded-lg bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 disabled:opacity-50'
+          className='flex-1 rounded-lg bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 disabled:opacity-50'
         >
           {isSubmitting ? '생성 중...' : '생성하기'}
         </button>
@@ -653,7 +693,7 @@ function InviteCreateForm({
           type='button'
           onClick={onCancel}
           disabled={isSubmitting}
-          className='flex-1 rounded-lg border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10 disabled:opacity-50'
+          className='flex-1 rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10 disabled:opacity-50'
         >
           취소
         </button>
