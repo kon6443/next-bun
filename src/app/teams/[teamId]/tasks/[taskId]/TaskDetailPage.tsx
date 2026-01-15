@@ -375,8 +375,8 @@ export default function TaskDetailPage({
           <div className="absolute -left-32 top-0 h-72 w-72 rounded-full bg-indigo-600/30 blur-[130px]" />
           <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-500/20 blur-[150px]" />
         </div>
-        <main className="relative z-10 mx-auto flex max-w-4xl flex-col gap-10 px-4 pb-24 pt-16 sm:px-8">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl text-center text-slate-400">
+        <main className="relative z-10 mx-auto flex max-w-4xl flex-col gap-6 sm:gap-10 px-4 pb-24 pt-12 sm:pt-16 sm:px-8">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-8 backdrop-blur-xl text-center text-slate-400">
             태스크 정보를 불러오는 중...
           </div>
         </main>
@@ -391,12 +391,12 @@ export default function TaskDetailPage({
           <div className="absolute -left-32 top-0 h-72 w-72 rounded-full bg-indigo-600/30 blur-[130px]" />
           <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-500/20 blur-[150px]" />
         </div>
-        <main className="relative z-10 mx-auto flex max-w-4xl flex-col gap-10 px-4 pb-24 pt-16 sm:px-8">
-          <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-8 backdrop-blur-xl text-center">
+        <main className="relative z-10 mx-auto flex max-w-4xl flex-col gap-6 sm:gap-10 px-4 pb-24 pt-12 sm:pt-16 sm:px-8">
+          <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 sm:p-8 backdrop-blur-xl text-center">
             <p className="text-base font-semibold text-red-400">{error}</p>
             <Link
               href={`/teams/${teamId}`}
-              className="mt-4 inline-block rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40"
+              className="mt-4 inline-block rounded-full border border-white/20 px-4 py-2 text-xs sm:px-6 sm:py-3 sm:text-sm font-semibold text-slate-200 transition hover:border-white/40"
             >
               팀 보드로 돌아가기
             </Link>
@@ -417,29 +417,29 @@ export default function TaskDetailPage({
         <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-500/20 blur-[150px]" />
       </div>
 
-      <main className="relative z-10 mx-auto flex max-w-4xl flex-col gap-10 px-4 pb-24 pt-16 sm:px-8">
+      <main className="relative z-10 mx-auto flex max-w-4xl flex-col gap-6 sm:gap-10 px-4 pb-24 pt-12 sm:pt-16 sm:px-8">
         {/* 헤더 */}
         <div className="flex items-center justify-between">
           <Link
             href={`/teams/${teamId}`}
-            className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40"
+            className="rounded-full border border-white/20 px-4 py-2 text-xs sm:px-6 sm:py-3 sm:text-sm font-semibold text-slate-200 transition hover:border-white/40"
           >
             ← 팀 보드로 돌아가기
           </Link>
         </div>
 
         {/* 태스크 상세 정보 */}
-        <section className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
-          <div className="mb-6 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
+        <section className="rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 md:p-8 backdrop-blur-xl">
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-3 sm:gap-4">
               <span
-                className="h-12 w-12 rounded-2xl border border-white/20 shadow-inner"
+                className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl border border-white/20 shadow-inner flex-shrink-0"
                 style={{
                   background: taskStatusColors[taskDetail.taskStatus] || taskStatusColors[1],
                 }}
                 aria-hidden="true"
               />
-              <div>
+              <div className="flex-1 min-w-0">
                 <p className="text-xs uppercase tracking-[0.4em] text-slate-400">
                   {taskStatusLabels[taskDetail.taskStatus] || "Unknown"}
                 </p>
@@ -448,12 +448,12 @@ export default function TaskDetailPage({
                     type="text"
                     value={editTaskName}
                     onChange={(e) => setEditTaskName(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900/60 px-4 py-2 text-2xl font-bold text-white focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20 md:text-3xl"
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 sm:px-4 py-2 text-xl sm:text-2xl font-bold text-white focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20 md:text-3xl"
                     placeholder="태스크 이름"
                     disabled={isSubmitting}
                   />
                 ) : (
-                  <h1 className="mt-1 text-3xl font-bold text-white md:text-4xl">
+                  <h1 className="mt-1 text-2xl sm:text-3xl md:text-4xl font-bold text-white break-words">
                     {taskDetail.taskName}
                   </h1>
                 )}
@@ -463,7 +463,7 @@ export default function TaskDetailPage({
               <button
                 onClick={handleStartEdit}
                 disabled={isSubmitting}
-                className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40 disabled:opacity-50"
+                className="w-full sm:w-auto rounded-full border border-white/20 px-4 py-2 text-xs sm:text-sm font-semibold text-slate-200 transition hover:border-white/40 disabled:opacity-50"
               >
                 수정
               </button>
@@ -531,39 +531,39 @@ export default function TaskDetailPage({
           ) : (
             <>
               {taskDetail.taskDescription && (
-                <div className="mb-6 rounded-2xl border border-white/10 bg-slate-950/30 p-6">
-                  <p className="text-sm leading-relaxed text-slate-300">
+                <div className="mb-6 rounded-2xl border border-sky-500/30 bg-slate-900/50 p-6 sm:p-8 shadow-lg shadow-sky-500/10">
+                  <p className="text-lg sm:text-xl leading-relaxed text-slate-200">
                     {taskDetail.taskDescription}
                   </p>
                 </div>
               )}
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-3 sm:gap-4 sm:grid-cols-2">
                 {taskDetail.startAt && (
-                  <div key="startAt" className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+                  <div key="startAt" className="rounded-xl border border-white/10 bg-slate-950/30 p-3 sm:p-4">
                     <p className="text-xs uppercase tracking-[0.5em] text-slate-500">
                       시작일
                     </p>
-                    <p className="mt-2 text-base text-white">
+                    <p className="mt-1.5 sm:mt-2 text-sm text-slate-300">
                       {formatDate(taskDetail.startAt)}
                     </p>
                   </div>
                 )}
                 {taskDetail.endAt && (
-                  <div key="endAt" className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+                  <div key="endAt" className="rounded-xl border border-white/10 bg-slate-950/30 p-3 sm:p-4">
                     <p className="text-xs uppercase tracking-[0.5em] text-slate-500">
                       종료일
                     </p>
-                    <p className="mt-2 text-base text-white">
+                    <p className="mt-1.5 sm:mt-2 text-sm text-slate-300">
                       {formatDate(taskDetail.endAt)}
                     </p>
                   </div>
                 )}
-                <div key="crtdAt" className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+                <div key="crtdAt" className="rounded-xl border border-white/10 bg-slate-950/30 p-3 sm:p-4">
                   <p className="text-xs uppercase tracking-[0.5em] text-slate-500">
                     생성일
                   </p>
-                  <p className="mt-2 text-base text-white">
+                  <p className="mt-1.5 sm:mt-2 text-sm text-slate-400">
                     {formatDate(taskDetail.crtdAt)}
                   </p>
                 </div>
@@ -580,23 +580,23 @@ export default function TaskDetailPage({
         )}
 
         {/* 댓글 섹션 */}
-        <section className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
-          <h2 className="mb-6 text-2xl font-bold text-white">댓글</h2>
+        <section className="rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 md:p-8 backdrop-blur-xl">
+          <h2 className="mb-4 sm:mb-6 text-xl sm:text-2xl font-bold text-white">댓글</h2>
 
           {/* 댓글 작성 폼 */}
-          <div className="mb-8 rounded-2xl border border-white/10 bg-slate-950/30 p-6">
+          <div className="mb-6 sm:mb-8 rounded-2xl border border-white/10 bg-slate-950/30 p-4 sm:p-6">
             <textarea
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               placeholder="댓글을 입력하세요..."
-              className="w-full resize-none rounded-xl border border-white/10 bg-slate-900/60 p-4 text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+              className="w-full resize-none rounded-xl border border-white/10 bg-slate-900/60 p-3 sm:p-4 text-sm sm:text-base text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
               rows={4}
             />
             <div className="mt-4 flex justify-end">
               <button
                 onClick={handleCreateComment}
                 disabled={!newComment.trim() || isSubmitting}
-                className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2 text-xs sm:px-6 sm:py-3 sm:text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? "작성 중..." : "댓글 작성"}
               </button>
@@ -613,28 +613,28 @@ export default function TaskDetailPage({
               comments.map((comment, index) => (
                 <div
                   key={comment.commentId ?? `comment-${index}`}
-                  className="rounded-2xl border border-white/10 bg-slate-950/30 p-6"
+                  className="rounded-2xl border border-white/10 bg-slate-950/30 p-4 sm:p-6"
                 >
                   {editingCommentId === comment.commentId ? (
                     <div>
                       <textarea
                         value={editingContent}
                         onChange={(e) => setEditingContent(e.target.value)}
-                        className="w-full resize-none rounded-xl border border-white/10 bg-slate-900/60 p-4 text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                        className="w-full resize-none rounded-xl border border-white/10 bg-slate-900/60 p-3 sm:p-4 text-sm sm:text-base text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                         rows={3}
                       />
                       <div className="mt-4 flex justify-end gap-2">
                         <button
                           onClick={handleCancelEditComment}
                           disabled={isSubmitting}
-                          className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40 disabled:opacity-50"
+                          className="rounded-full border border-white/20 px-3 py-2 text-xs sm:px-4 sm:py-2 sm:text-sm font-semibold text-slate-200 transition hover:border-white/40 disabled:opacity-50"
                         >
                           취소
                         </button>
                         <button
                           onClick={() => handleUpdateComment(comment.commentId)}
                           disabled={!editingContent.trim() || isSubmitting}
-                          className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-3 py-2 text-xs sm:px-4 sm:py-2 sm:text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {isSubmitting ? "수정 중..." : "수정"}
                         </button>
@@ -642,10 +642,10 @@ export default function TaskDetailPage({
                     </div>
                   ) : (
                     <div>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3">
-                            <p className="font-semibold text-white">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                            <p className="font-semibold text-white text-sm sm:text-base">
                               {comment.userName || `사용자 ${comment.userId}`}
                             </p>
                             <span className="text-xs text-slate-500">
@@ -658,24 +658,24 @@ export default function TaskDetailPage({
                               삭제된 댓글입니다.
                             </p>
                           ) : (
-                            <p className="mt-3 text-sm leading-relaxed text-slate-300">
+                            <p className="mt-3 text-sm sm:text-base leading-relaxed text-slate-300">
                               {comment.commentContent}
                             </p>
                           )}
                         </div>
                         {currentUserId === comment.userId && comment.status !== 0 && (
-                          <div className="ml-4 flex gap-2">
+                          <div className="flex gap-2 sm:ml-4">
                         <button
                           onClick={() => handleStartEditComment(comment)}
                           disabled={isSubmitting}
-                          className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:border-white/40 disabled:opacity-50"
+                          className="rounded-lg border border-white/20 px-3 py-2 sm:py-1.5 text-xs font-semibold text-slate-300 transition hover:border-white/40 disabled:opacity-50"
                         >
                           수정
                         </button>
                             <button
                               onClick={() => handleDeleteComment(comment.commentId)}
                               disabled={isSubmitting}
-                              className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-400 transition hover:bg-red-500/20 disabled:opacity-50"
+                              className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 sm:py-1.5 text-xs font-semibold text-red-400 transition hover:bg-red-500/20 disabled:opacity-50"
                             >
                               삭제
                             </button>
