@@ -64,7 +64,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   const [members, setMembers] = useState<TeamUserResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isMaster, setIsMaster] = useState(false);
   const [canManageInvites, setCanManageInvites] = useState(false);
   const [invites, setInvites] = useState<TeamInviteResponse[]>([]);
   const [isInvitesOpen, setIsInvitesOpen] = useState(false);
@@ -105,19 +104,18 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         // 마스터 판별(단순): 팀 리더(leaderId) === 현재 로그인 사용자(userId)
         const currentUserId = session.user.userId;
         const isMasterUser = Boolean(currentUserId && response.data.team.leaderId === currentUserId);
-        setIsMaster(isMasterUser);
 
         // 팀 멤버 목록 조회(표시 목적)
         try {
           const membersResponse = await getTeamUsers(teamIdNum, session.user.accessToken);
           setMembers(membersResponse.data);
-          
+
           // 멤버 목록 로드 후 현재 사용자의 권한 확인
-          const currentUserMember = membersResponse.data.find((m) => m.userId === currentUserId);
+          const currentUserMember = membersResponse.data.find(m => m.userId === currentUserId);
           const userRole = currentUserMember?.role?.toUpperCase().trim();
           const canInvite = userRole === 'MASTER' || userRole === 'MANAGER';
           setCanManageInvites(canInvite);
-          
+
           // 권한이 있는 경우 초대 링크 목록 조회
           if (canInvite) {
             try {
@@ -315,7 +313,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       }
 
       await createTeamInvite(teamIdNum, request, session.user.accessToken);
-      
+
       // 성공 알림 표시
       alert('초대 링크가 성공적으로 생성되었습니다!');
 
@@ -447,17 +445,20 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                       if (roleUpper === 'MASTER') {
                         return {
                           label: '마스터',
-                          className: 'rounded-full bg-gradient-to-r from-yellow-500/20 to-orange-500/20 px-2 py-0.5 text-xs font-semibold text-yellow-400 border border-yellow-500/30',
+                          className:
+                            'rounded-full bg-gradient-to-r from-yellow-500/20 to-orange-500/20 px-2 py-0.5 text-xs font-semibold text-yellow-400 border border-yellow-500/30',
                         };
                       } else if (roleUpper === 'MANAGER') {
                         return {
                           label: '매니저',
-                          className: 'rounded-full bg-gradient-to-r from-blue-500/20 to-indigo-500/20 px-2 py-0.5 text-xs font-semibold text-blue-400 border border-blue-500/30',
+                          className:
+                            'rounded-full bg-gradient-to-r from-blue-500/20 to-indigo-500/20 px-2 py-0.5 text-xs font-semibold text-blue-400 border border-blue-500/30',
                         };
                       } else {
                         return {
                           label: '멤버',
-                          className: 'rounded-full bg-gradient-to-r from-slate-500/20 to-slate-600/20 px-2 py-0.5 text-xs font-semibold text-slate-400 border border-slate-500/30',
+                          className:
+                            'rounded-full bg-gradient-to-r from-slate-500/20 to-slate-600/20 px-2 py-0.5 text-xs font-semibold text-slate-400 border border-slate-500/30',
                         };
                       }
                     };
@@ -465,23 +466,26 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                     const roleBadge = getRoleBadge(member.role);
 
                     return (
-                      <div key={member.userId} className='rounded-2xl border border-white/10 bg-slate-950/30 p-4 sm:p-6'>
+                      <div
+                        key={member.userId}
+                        className='rounded-2xl border border-white/10 bg-slate-950/30 p-4 sm:p-6'
+                      >
                         <div className='flex items-center justify-between'>
                           <div className='flex-1'>
                             <div className='flex items-center gap-2 flex-wrap'>
                               <p className='text-lg font-semibold text-white'>
                                 {member.userName || `사용자 ${member.userId}`}
                               </p>
-                              <span className={roleBadge.className}>
-                                {roleBadge.label}
-                              </span>
+                              <span className={roleBadge.className}>{roleBadge.label}</span>
                               {isCurrentUser && (
                                 <span className='rounded-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 px-2 py-0.5 text-xs font-semibold text-purple-400 border border-purple-500/30'>
                                   나
                                 </span>
                               )}
                             </div>
-                            <p className='mt-2 text-xs text-slate-500'>가입일: {formatDate(member.joinedAt)}</p>
+                            <p className='mt-2 text-xs text-slate-500'>
+                              가입일: {formatDate(member.joinedAt)}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -526,7 +530,9 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                       const isActive = invite.actStatus === 1 && !isExpired && !isMaxReached;
 
                       // 초대 링크 URL 생성 (프론트엔드 URL + 토큰)
-                      const inviteUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/teams/invite/accept?token=${encodeURIComponent(invite.token)}`;
+                      const inviteUrl = `${
+                        typeof window !== 'undefined' ? window.location.origin : ''
+                      }/teams/invite/accept?token=${encodeURIComponent(invite.token)}`;
 
                       return (
                         <div
@@ -540,7 +546,9 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                           <div className='flex flex-col sm:flex-row items-start justify-between gap-4'>
                             <div className='flex-1'>
                               <div className='mb-2 flex items-center gap-2'>
-                                <p className='text-sm font-semibold text-slate-300'>초대 링크 #{invite.invId}</p>
+                                <p className='text-sm font-semibold text-slate-300'>
+                                  초대 링크 #{invite.invId}
+                                </p>
                                 {isActive ? (
                                   <span className='rounded-full border border-green-500/30 bg-green-500/20 px-2 py-0.5 text-xs font-semibold text-green-400'>
                                     활성
@@ -690,7 +698,9 @@ function InviteCreateForm({
   return (
     <form onSubmit={handleSubmit} className='space-y-3 sm:space-y-4'>
       <div>
-        <label className='mb-2 block text-xs sm:text-sm font-semibold text-slate-300'>만료일 (최대 3일)</label>
+        <label className='mb-2 block text-xs sm:text-sm font-semibold text-slate-300'>
+          만료일 (최대 3일)
+        </label>
         <select
           value={expiresInDays}
           onChange={e => setExpiresInDays(Number(e.target.value))}
@@ -706,7 +716,9 @@ function InviteCreateForm({
       </div>
 
       <div>
-        <label className='mb-2 block text-xs sm:text-sm font-semibold text-slate-300'>최대 사용 횟수 (선택사항)</label>
+        <label className='mb-2 block text-xs sm:text-sm font-semibold text-slate-300'>
+          최대 사용 횟수 (선택사항)
+        </label>
         <input
           type='number'
           value={usageMaxCnt}
