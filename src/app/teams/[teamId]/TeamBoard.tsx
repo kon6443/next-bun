@@ -61,7 +61,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   });
   const [teamName, setTeamName] = useState<string>('');
   const [teamDescription, setTeamDescription] = useState<string>('');
-  const [teamLeaderId, setTeamLeaderId] = useState<number | null>(null);
   const [members, setMembers] = useState<TeamUserResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -101,7 +100,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         const response = await getTeamTasks(teamIdNum, session.user.accessToken);
         setTeamName(response.data.team.teamName);
         setTeamDescription(response.data.team.teamDescription || '');
-        setTeamLeaderId(response.data.team.leaderId);
 
         // 마스터 판별(단순): 팀 리더(leaderId) === 현재 로그인 사용자(userId)
         const currentUserId = session.user.userId;
