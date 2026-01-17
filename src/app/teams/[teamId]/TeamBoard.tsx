@@ -7,6 +7,8 @@ import { arrayMove } from '@dnd-kit/sortable';
 
 import { Column } from '../../components/Column';
 import { GanttChart } from '../../components/GanttChart';
+import { ListView } from '../../components/ListView';
+import { CalendarView } from '../../components/CalendarView';
 import { Button, ButtonLink, SectionLabel, ErrorAlert } from '../components';
 import type { Task } from '../../types/task';
 import {
@@ -73,7 +75,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [isCreatingInvite, setIsCreatingInvite] = useState(false);
   const [createdInviteLink, setCreatedInviteLink] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'kanban' | 'gantt'>('kanban');
+  const [viewMode, setViewMode] = useState<'kanban' | 'gantt' | 'list' | 'calendar'>('kanban');
 
   // activationConstraint를 사용하여 클릭과 드래그 구분
   const sensors = useSensors(
@@ -605,7 +607,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         )}
 
         {/* 보기 전환 버튼 */}
-        <div className='flex items-center justify-end gap-2 mb-4'>
+        <div className='flex items-center justify-end gap-2 mb-4 flex-wrap'>
           <span className='text-xs text-slate-500 mr-2'>보기 방식:</span>
           <button
             onClick={() => setViewMode('kanban')}
@@ -626,6 +628,26 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
             }`}
           >
             타임라인
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
+              viewMode === 'list'
+                ? 'bg-gradient-to-r from-indigo-500 to-sky-500 text-white shadow-lg shadow-sky-500/30'
+                : 'border border-white/20 bg-white/5 text-slate-300 hover:bg-white/10'
+            }`}
+          >
+            리스트
+          </button>
+          <button
+            onClick={() => setViewMode('calendar')}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
+              viewMode === 'calendar'
+                ? 'bg-gradient-to-r from-indigo-500 to-sky-500 text-white shadow-lg shadow-sky-500/30'
+                : 'border border-white/20 bg-white/5 text-slate-300 hover:bg-white/10'
+            }`}
+          >
+            캘린더
           </button>
         </div>
 
@@ -651,8 +673,18 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
               })}
             </div>
           </DndContext>
-        ) : (
+        ) : viewMode === 'gantt' ? (
           <GanttChart
+            tasks={[...tasks.todo, ...tasks.inProgress, ...tasks.done]}
+            teamId={teamId}
+          />
+        ) : viewMode === 'list' ? (
+          <ListView
+            tasks={[...tasks.todo, ...tasks.inProgress, ...tasks.done]}
+            teamId={teamId}
+          />
+        ) : (
+          <CalendarView
             tasks={[...tasks.todo, ...tasks.inProgress, ...tasks.done]}
             teamId={teamId}
           />
