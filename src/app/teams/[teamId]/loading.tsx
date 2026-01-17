@@ -1,13 +1,11 @@
-import { TeamsPageLayout, LoadingSpinner } from "../components";
+import { TeamsPageLayout, LoadingSpinner, SectionLabel } from "../components";
 import { cardStyles } from "@/styles/teams";
 
 export default function TeamDetailLoading() {
   return (
     <TeamsPageLayout maxWidth="6xl">
       <section className={`${cardStyles.section} p-4 sm:p-8`}>
-        <p className="text-xs uppercase tracking-[0.6em] text-slate-400">
-          Team Kanban
-        </p>
+        <SectionLabel>Team Kanban</SectionLabel>
         <div className="mt-4">
           <div className="h-12 w-48 animate-pulse rounded-lg bg-slate-800" />
         </div>

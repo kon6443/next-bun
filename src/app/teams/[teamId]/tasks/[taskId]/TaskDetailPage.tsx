@@ -11,7 +11,13 @@ import {
   type TaskDetailResponse,
 } from "@/services/teamService";
 import type { TaskComment } from "@/app/types/task";
-import { TeamsPageLayout, Button, ButtonLink } from "../../../components";
+import {
+  TeamsPageLayout,
+  Button,
+  ButtonLink,
+  SectionLabel,
+  ErrorAlert,
+} from "../../../components";
 import { cardStyles } from "@/styles/teams";
 
 type TaskDetailPageProps = {
@@ -433,9 +439,9 @@ export default function TaskDetailPage({
                 aria-hidden="true"
               />
               <div className="flex-1 min-w-0">
-                <p className="text-xs uppercase tracking-[0.4em] text-slate-400">
+                <SectionLabel spacing="tight">
                   {taskStatusLabels[taskDetail.taskStatus] || "Unknown"}
-                </p>
+                </SectionLabel>
                 {isEditing ? (
                   <input
                     type="text"
@@ -537,9 +543,9 @@ export default function TaskDetailPage({
               <div className="grid gap-3 sm:gap-4 sm:grid-cols-2">
                 {taskDetail.startAt && (
                   <div key="startAt" className="rounded-xl border border-white/10 bg-slate-950/30 p-3 sm:p-4">
-                    <p className="text-xs uppercase tracking-[0.5em] text-slate-500">
+                    <SectionLabel spacing="tight" color="subtle">
                       시작일
-                    </p>
+                    </SectionLabel>
                     <p className="mt-1.5 sm:mt-2 text-sm text-slate-300">
                       {formatDate(taskDetail.startAt)}
                     </p>
@@ -547,18 +553,18 @@ export default function TaskDetailPage({
                 )}
                 {taskDetail.endAt && (
                   <div key="endAt" className="rounded-xl border border-white/10 bg-slate-950/30 p-3 sm:p-4">
-                    <p className="text-xs uppercase tracking-[0.5em] text-slate-500">
+                    <SectionLabel spacing="tight" color="subtle">
                       종료일
-                    </p>
+                    </SectionLabel>
                     <p className="mt-1.5 sm:mt-2 text-sm text-slate-300">
                       {formatDate(taskDetail.endAt)}
                     </p>
                   </div>
                 )}
                 <div key="crtdAt" className="rounded-xl border border-white/10 bg-slate-950/30 p-3 sm:p-4">
-                  <p className="text-xs uppercase tracking-[0.5em] text-slate-500">
+                  <SectionLabel spacing="tight" color="subtle">
                     생성일
-                  </p>
+                  </SectionLabel>
                   <p className="mt-1.5 sm:mt-2 text-sm text-slate-400">
                     {formatDate(taskDetail.crtdAt)}
                   </p>
@@ -570,9 +576,7 @@ export default function TaskDetailPage({
 
         {/* 에러 메시지 */}
         {error && (
-          <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-6 py-4 text-center animate-in fade-in duration-300">
-            <p className="text-base font-semibold text-red-400">{error}</p>
-          </div>
+          <ErrorAlert message={error} className="text-center animate-in fade-in duration-300" />
         )}
 
         {/* 성공 메시지 */}

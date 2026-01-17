@@ -6,7 +6,7 @@ import { DndContext, closestCenter, DragEndEvent, PointerSensor, useSensor, useS
 import { arrayMove } from '@dnd-kit/sortable';
 
 import { Column } from '../../components/Column';
-import { Button, ButtonLink } from '../components';
+import { Button, ButtonLink, SectionLabel, ErrorAlert } from '../components';
 import type { Task } from '../../types/task';
 import {
   getTeamTasks,
@@ -355,7 +355,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     <div className={layoutStyles.pageContainer} style={teamsPageBackground}>
       <main className={`${layoutStyles.mainContent} max-w-6xl`}>
         <section className={`${cardStyles.section} p-4 sm:p-8`}>
-          <p className='text-xs uppercase tracking-[0.6em] text-slate-400'>Team Kanban</p>
+          <SectionLabel>Team Kanban</SectionLabel>
           <div className='mt-4 flex flex-col gap-6 md:flex-row md:items-center md:justify-between'>
             <div>
               <h1 className='text-4xl font-bold text-white md:text-5xl'>
@@ -398,7 +398,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           <div className='mt-6 sm:mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4'>
             {stats.map(stat => (
               <div key={stat.label} className='rounded-2xl border border-white/10 bg-slate-950/30 p-3 sm:p-4'>
-                <p className='text-xs uppercase tracking-[0.5em] text-slate-500'>{stat.label}</p>
+                <SectionLabel spacing='tight' color='subtle'>{stat.label}</SectionLabel>
                 <p className='mt-3 text-3xl font-bold text-white'>{stat.value}</p>
                 <p className='mt-1 text-sm text-slate-500'>{stat.helper}</p>
               </div>
@@ -410,7 +410,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         <section className={`${cardStyles.section} p-4 sm:p-8`}>
           <div className='mb-6 flex items-start justify-between gap-4'>
             <div>
-              <p className='text-xs uppercase tracking-[0.6em] text-slate-400'>Team Members</p>
+              <SectionLabel>Team Members</SectionLabel>
               <h2 className='mt-4 text-2xl font-bold text-white md:text-3xl'>
                 팀 멤버 <span className='text-slate-400'>({members.length})</span>
               </h2>
@@ -507,7 +507,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           <section className={`${cardStyles.section} p-4 sm:p-8`}>
             <div className='mb-6 flex items-start justify-between gap-4'>
               <div>
-                <p className='text-xs uppercase tracking-[0.6em] text-slate-400'>Team Invites</p>
+                <SectionLabel>Team Invites</SectionLabel>
                 <h2 className='mt-4 text-2xl font-bold text-white md:text-3xl'>
                   초대 링크 목록 <span className='text-slate-400'>({invites.length})</span>
                 </h2>
@@ -599,9 +599,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         )}
 
         {error && (
-          <div className='rounded-2xl border border-red-500/20 bg-red-500/10 px-6 py-4 text-center'>
-            <p className='text-base font-semibold text-red-400'>{error}</p>
-          </div>
+          <ErrorAlert message={error} className='text-center' />
         )}
 
         {isLoading ? (
