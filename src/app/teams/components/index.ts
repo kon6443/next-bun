@@ -3,4 +3,5 @@ export { LoadingSpinner, LoadingSpinnerSimple, ButtonSpinner, BarLoader } from "
 export { Button, ButtonLink } from "./Button";
 export { Input, TextArea, DateInput } from "./FormInput";
 export { SectionLabel } from "./SectionLabel";
+export { DateInfoCard } from "./DateInfoCard";
 export { ErrorAlert } from "./ErrorAlert";
