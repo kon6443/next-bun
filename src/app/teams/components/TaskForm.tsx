@@ -92,7 +92,7 @@ export function TaskForm({
         disabled={isSubmitting}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 overflow-hidden">
         <DateInput
           id="startAt"
           label="시작일"
