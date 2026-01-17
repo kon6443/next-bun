@@ -3,13 +3,13 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: min(120px, 55vw);
+  width: clamp(100px, 45vw, 140px);
   max-width: 100%;
 }
 
 .battery {
   width: 100%;
-  height: clamp(160px, 55vw, 210px);
+  height: clamp(140px, 45vw, 210px);
   border-radius: 32px;
   position: relative;
   padding: 12px 12px 58px;

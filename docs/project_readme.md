@@ -24,6 +24,7 @@
 - 작업 규칙: `/docs/assistant_workflow.md`
 - 진단 규칙: `/docs/assistant_rules_diagnostics.md`
 - NextAuth 규칙: `/docs/assistant_rules_nextauth.md`
+- UI/UX 규칙: `/docs/assistant_rules_ui.md`
 
 ### 5) 개발/빌드
 - 개발 서버: `bun run dev`
