@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useSession, signIn } from "next-auth/react";
 import { acceptTeamInvite } from "@/services/teamService";
-import { TeamsCenteredLayout, LoadingSpinnerSimple } from "../../components";
+import { TeamsCenteredLayout, LoadingSpinnerSimple, Button } from "../../components";
 import { cardStyles } from "@/styles/teams";
 
 function InviteAcceptContent() {
@@ -131,12 +131,13 @@ function InviteAcceptContent() {
               팀 초대 수락 실패
             </p>
             <p className="mt-2 text-sm text-slate-300">{error}</p>
-            <button
+            <Button
+              variant="secondary"
               onClick={() => router.push("/teams")}
-              className="mt-6 rounded-full border border-white/20 bg-white/5 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10"
+              className="mt-6"
             >
               팀 목록으로 돌아가기
-            </button>
+            </Button>
           </div>
         </div>
       </TeamsCenteredLayout>
