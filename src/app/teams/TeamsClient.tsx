@@ -15,12 +15,14 @@ type TeamsClientProps = {
   session: Session | null;
   initialTeams: TeamSummary[];
   error: string | null;
+  isLoading?: boolean;
 };
 
 export default function TeamsClient({
   session,
   initialTeams,
   error,
+  isLoading = false,
 }: TeamsClientProps) {
   const isAuthenticated = !!session;
 
@@ -61,7 +63,14 @@ export default function TeamsClient({
         </section>
 
         <section className="rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-8 backdrop-blur-xl">
-          {isAuthenticated ? (
+          {isLoading ? (
+            <div className="rounded-2xl border border-dashed border-white/20 px-6 py-14 text-center">
+              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-400 border-t-transparent" />
+              <p className="mt-4 text-base font-semibold text-white">
+                팀 목록을 불러오는 중...
+              </p>
+            </div>
+          ) : isAuthenticated ? (
             error ? (
               <div className="rounded-2xl border border-dashed border-red-500/20 px-6 py-14 text-center">
                 <p className="text-base font-semibold text-red-400">
