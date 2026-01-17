@@ -379,13 +379,15 @@ export default function TaskDetailPage({
 
   if (isLoading) {
     return (
-      <div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -left-32 top-0 h-72 w-72 rounded-full bg-indigo-600/30 blur-[130px]" />
-          <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-500/20 blur-[150px]" />
-        </div>
+      <div
+        className="relative min-h-screen overflow-hidden text-slate-100"
+        style={{
+          background:
+            "radial-gradient(circle at 20% 20%, rgba(79,70,229,0.15), transparent 50%), radial-gradient(circle at 80% 80%, rgba(14,165,233,0.1), transparent 50%), rgb(2,6,23)",
+        }}
+      >
         <main className="relative z-10 mx-auto flex max-w-4xl flex-col gap-6 sm:gap-10 px-4 pb-24 pt-12 sm:pt-16 sm:px-8">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-8 backdrop-blur-xl text-center text-slate-400">
+          <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 sm:p-8 text-center text-slate-400">
             태스크 정보를 불러오는 중...
           </div>
         </main>
@@ -395,13 +397,15 @@ export default function TaskDetailPage({
 
   if (error && !taskDetail) {
     return (
-      <div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -left-32 top-0 h-72 w-72 rounded-full bg-indigo-600/30 blur-[130px]" />
-          <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-500/20 blur-[150px]" />
-        </div>
+      <div
+        className="relative min-h-screen overflow-hidden text-slate-100"
+        style={{
+          background:
+            "radial-gradient(circle at 20% 20%, rgba(79,70,229,0.15), transparent 50%), radial-gradient(circle at 80% 80%, rgba(14,165,233,0.1), transparent 50%), rgb(2,6,23)",
+        }}
+      >
         <main className="relative z-10 mx-auto flex max-w-4xl flex-col gap-6 sm:gap-10 px-4 pb-24 pt-12 sm:pt-16 sm:px-8">
-          <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 sm:p-8 backdrop-blur-xl text-center">
+          <div className="rounded-2xl border border-red-500/20 bg-red-900/50 p-4 sm:p-8 text-center">
             <p className="text-base font-semibold text-red-400">{error}</p>
             <Link
               href={`/teams/${teamId}`}
@@ -420,12 +424,13 @@ export default function TaskDetailPage({
   const currentUserId = session?.user?.userId ?? null;
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-32 top-0 h-72 w-72 rounded-full bg-indigo-600/30 blur-[130px]" />
-        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-500/20 blur-[150px]" />
-      </div>
-
+    <div
+      className="relative min-h-screen overflow-hidden text-slate-100"
+      style={{
+        background:
+          "radial-gradient(circle at 20% 20%, rgba(79,70,229,0.15), transparent 50%), radial-gradient(circle at 80% 80%, rgba(14,165,233,0.1), transparent 50%), rgb(2,6,23)",
+      }}
+    >
       <main className="relative z-10 mx-auto flex max-w-4xl flex-col gap-6 sm:gap-10 px-4 pb-24 pt-12 sm:pt-16 sm:px-8">
         {/* 헤더 */}
         <div className="flex items-center justify-between">
@@ -438,7 +443,7 @@ export default function TaskDetailPage({
         </div>
 
         {/* 태스크 상세 정보 */}
-        <section className="rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 md:p-8 backdrop-blur-xl">
+        <section className="rounded-3xl border border-white/10 bg-slate-900/80 p-4 sm:p-6 md:p-8">
           <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-3 sm:gap-4">
               <span
@@ -596,7 +601,7 @@ export default function TaskDetailPage({
         )}
 
         {/* 댓글 섹션 */}
-        <section className="rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 md:p-8 backdrop-blur-xl">
+        <section className="rounded-3xl border border-white/10 bg-slate-900/80 p-4 sm:p-6 md:p-8">
           <h2 className="mb-4 sm:mb-6 text-xl sm:text-2xl font-bold text-white">댓글</h2>
 
           {/* 댓글 작성 폼 */}

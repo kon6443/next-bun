@@ -351,14 +351,15 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   };
 
   return (
-    <div className='relative min-h-screen overflow-hidden bg-slate-950 text-slate-100'>
-      <div className='pointer-events-none absolute inset-0'>
-        <div className='absolute -left-32 top-0 h-72 w-72 rounded-full bg-indigo-600/30 blur-[130px]' />
-        <div className='absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-500/20 blur-[150px]' />
-      </div>
-
+    <div
+      className='relative min-h-screen overflow-hidden text-slate-100'
+      style={{
+        background:
+          'radial-gradient(circle at 20% 20%, rgba(79,70,229,0.15), transparent 50%), radial-gradient(circle at 80% 80%, rgba(14,165,233,0.1), transparent 50%), rgb(2,6,23)',
+      }}
+    >
       <main className='relative z-10 mx-auto flex max-w-6xl flex-col gap-6 sm:gap-10 px-4 pb-24 pt-12 sm:pt-16 sm:px-8'>
-        <section className='rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-8 backdrop-blur-xl'>
+        <section className='rounded-3xl border border-white/10 bg-slate-900/80 p-4 sm:p-8'>
           <p className='text-xs uppercase tracking-[0.6em] text-slate-400'>Team Kanban</p>
           <div className='mt-4 flex flex-col gap-6 md:flex-row md:items-center md:justify-between'>
             <div>
@@ -403,7 +404,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         </section>
 
         {/* 팀 멤버 목록 */}
-        <section className='rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-8 backdrop-blur-xl'>
+        <section className='rounded-3xl border border-white/10 bg-slate-900/80 p-4 sm:p-8'>
           <div className='mb-6 flex items-start justify-between gap-4'>
             <div>
               <p className='text-xs uppercase tracking-[0.6em] text-slate-400'>Team Members</p>
@@ -499,7 +500,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
         {/* 초대 링크 목록 (마스터/매니저만 표시) */}
         {canManageInvites && (
-          <section className='rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-8 backdrop-blur-xl'>
+          <section className='rounded-3xl border border-white/10 bg-slate-900/80 p-4 sm:p-8'>
             <div className='mb-6 flex items-start justify-between gap-4'>
               <div>
                 <p className='text-xs uppercase tracking-[0.6em] text-slate-400'>Team Invites</p>
@@ -599,7 +600,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         )}
 
         {isLoading ? (
-          <div className='rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl text-center text-slate-400'>
+          <div className='rounded-2xl border border-white/10 bg-slate-900/80 p-8 text-center text-slate-400'>
             태스크 목록을 불러오는 중...
           </div>
         ) : (
@@ -625,8 +626,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
       {/* 초대 링크 생성 모달 */}
       {showInviteModal && (
-        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4'>
-          <div className='relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-slate-900 p-4 sm:p-8 backdrop-blur-xl'>
+        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4'>
+          <div className='relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-slate-900 p-4 sm:p-8'>
             <button
               onClick={() => {
                 setShowInviteModal(false);

@@ -52,12 +52,13 @@ export default function CreateTeamPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-32 top-0 h-72 w-72 rounded-full bg-indigo-600/30 blur-[130px]" />
-        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-500/20 blur-[150px]" />
-      </div>
-
+    <div
+      className="relative min-h-screen overflow-hidden text-slate-100"
+      style={{
+        background:
+          "radial-gradient(circle at 20% 20%, rgba(79,70,229,0.15), transparent 50%), radial-gradient(circle at 80% 80%, rgba(14,165,233,0.1), transparent 50%), rgb(2,6,23)",
+      }}
+    >
       <main className="relative z-10 mx-auto flex max-w-4xl flex-col gap-10 px-4 pb-24 pt-16 sm:px-8">
         {/* 헤더 */}
         <div className="flex items-center justify-between">
@@ -70,7 +71,7 @@ export default function CreateTeamPage() {
         </div>
 
         {/* 팀 생성 폼 */}
-        <section className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
+        <section className="rounded-3xl border border-white/10 bg-slate-900/80 p-8">
           <div className="mb-6">
             <p className="text-xs uppercase tracking-[0.6em] text-slate-400">
               New Team
