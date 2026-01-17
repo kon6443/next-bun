@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { Session } from "next-auth";
-import { TeamsPageLayout, LoadingSpinner, ButtonLink } from "./components";
+import { TeamsPageLayout, LoadingSpinner, ButtonLink, SectionLabel } from "./components";
 import { cardStyles } from "@/styles/teams";
 import type { TeamSummary } from "@/types/team";
 import LoginButton from "./LoginButton";
@@ -26,9 +26,7 @@ export default function TeamsClient({
     <TeamsPageLayout>
       {/* 헤더 섹션 */}
       <section className={`${cardStyles.section} p-4 sm:p-8`}>
-        <p className="text-xs uppercase tracking-[0.7em] text-slate-400">
-          Teams
-        </p>
+        <SectionLabel spacing="wide">Teams</SectionLabel>
         <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-white sm:text-4xl">
@@ -93,9 +91,9 @@ function TeamList({ teams }: { teams: TeamSummary[] }) {
           className="group flex flex-col rounded-2xl border border-white/10 bg-slate-950/40 p-4 shadow-[0_20px_40px_rgba(2,6,23,0.55)] transition hover:border-white/30 sm:p-5"
         >
           <div className="flex items-center justify-between">
-            <p className="text-xs uppercase tracking-[0.4em] text-slate-500">
+            <SectionLabel spacing="tight" color="subtle">
               {team.role}
-            </p>
+            </SectionLabel>
           </div>
           <h2 className="mt-3 text-xl font-semibold text-white sm:text-2xl">
             {team.name}

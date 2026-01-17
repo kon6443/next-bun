@@ -4,7 +4,15 @@ import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { createTeam } from "@/services/teamService";
-import { TeamsPageLayout, Button, ButtonLink } from "../components";
+import {
+  TeamsPageLayout,
+  Button,
+  ButtonLink,
+  Input,
+  TextArea,
+  SectionLabel,
+  ErrorAlert,
+} from "../components";
 import { cardStyles } from "@/styles/teams";
 
 export default function CreateTeamPage() {
@@ -63,58 +71,34 @@ export default function CreateTeamPage() {
       {/* 팀 생성 폼 */}
       <section className={`${cardStyles.section} p-8`}>
         <div className="mb-6">
-          <p className="text-xs uppercase tracking-[0.6em] text-slate-400">
-            New Team
-          </p>
+          <SectionLabel>New Team</SectionLabel>
           <h1 className="mt-4 text-4xl font-bold text-white md:text-5xl">
             새 팀 생성
           </h1>
         </div>
 
-        {error && (
-          <div className="mb-6 rounded-2xl border border-red-500/20 bg-red-500/10 px-6 py-4">
-            <p className="text-base font-semibold text-red-400">{error}</p>
-          </div>
-        )}
+        {error && <ErrorAlert message={error} className="mb-6" />}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label
-              htmlFor="teamName"
-              className="mb-2 block text-sm font-semibold text-slate-300"
-            >
-              팀 이름 <span className="text-red-400">*</span>
-            </label>
-            <input
-              id="teamName"
-              type="text"
-              value={teamName}
-              onChange={(e) => setTeamName(e.target.value)}
-              placeholder="팀 이름을 입력하세요"
-              className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3 text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
-              required
-              disabled={isSubmitting}
-            />
-          </div>
+          <Input
+            id="teamName"
+            label="팀 이름"
+            required
+            value={teamName}
+            onChange={(e) => setTeamName(e.target.value)}
+            placeholder="팀 이름을 입력하세요"
+            disabled={isSubmitting}
+          />
 
-          <div>
-            <label
-              htmlFor="teamDescription"
-              className="mb-2 block text-sm font-semibold text-slate-300"
-            >
-              팀 설명 <span className="text-red-400">*</span>
-            </label>
-            <textarea
-              id="teamDescription"
-              value={teamDescription}
-              onChange={(e) => setTeamDescription(e.target.value)}
-              placeholder="팀에 대한 상세 설명을 입력하세요"
-              rows={6}
-              className="w-full resize-none rounded-xl border border-white/10 bg-slate-900/60 p-4 text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
-              required
-              disabled={isSubmitting}
-            />
-          </div>
+          <TextArea
+            id="teamDescription"
+            label="팀 설명"
+            required
+            value={teamDescription}
+            onChange={(e) => setTeamDescription(e.target.value)}
+            placeholder="팀에 대한 상세 설명을 입력하세요"
+            disabled={isSubmitting}
+          />
 
           <div className="flex justify-end gap-4 pt-4">
             <ButtonLink href="/teams" variant="secondary">
