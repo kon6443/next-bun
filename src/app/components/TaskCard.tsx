@@ -69,7 +69,7 @@ export function TaskCard({ task }: TaskCardProps) {
       )}
       <h3 className="mt-3 text-lg font-semibold text-white">{taskName}</h3>
       {taskDescription && (
-        <p className="mt-2 text-sm leading-relaxed text-slate-400">
+        <p className="mt-2 text-sm leading-relaxed text-slate-400 line-clamp-3 whitespace-pre-wrap">
           {taskDescription}
         </p>
       )}
