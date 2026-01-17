@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import Link from 'next/link';
 import { DndContext, closestCenter, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 
 import { Column } from '../../components/Column';
+import { Button, ButtonLink } from '../components';
 import type { Task } from '../../types/task';
 import {
   getTeamTasks,
@@ -365,25 +365,33 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
             </div>
             <div className='flex flex-col sm:flex-row gap-2 sm:gap-4'>
               {canManageInvites && (
-                <button
+                <Button
+                  variant='secondary'
+                  size='lg'
+                  fullWidth
                   onClick={() => setShowInviteModal(true)}
-                  className='w-full sm:w-auto rounded-full border border-white/20 px-4 py-2 text-xs sm:px-6 sm:py-3 sm:text-sm font-semibold text-slate-200 transition hover:border-white/40 text-center'
+                  className='sm:w-auto'
                 >
                   팀 초대
-                </button>
+                </Button>
               )}
-              <Link
+              <ButtonLink
                 href={`/teams/${teamId}/edit`}
-                className='w-full sm:w-auto rounded-full border border-white/20 px-4 py-2 text-xs sm:px-6 sm:py-3 sm:text-sm font-semibold text-slate-200 transition hover:border-white/40 text-center'
+                variant='secondary'
+                size='lg'
+                fullWidth
+                className='sm:w-auto'
               >
                 팀 수정
-              </Link>
-              <Link
+              </ButtonLink>
+              <ButtonLink
                 href={`/teams/${teamId}/tasks/new`}
-                className='w-full sm:w-auto rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2 text-xs sm:px-6 sm:py-3 sm:text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 text-center'
+                size='lg'
+                fullWidth
+                className='sm:w-auto'
               >
                 새 카드 작성
-              </Link>
+              </ButtonLink>
             </div>
           </div>
 
@@ -407,13 +415,14 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                 팀 멤버 <span className='text-slate-400'>({members.length})</span>
               </h2>
             </div>
-            <button
-              type='button'
+            <Button
+              variant='secondary'
+              size='sm'
               onClick={() => setIsMembersOpen(v => !v)}
-              className='mt-4 rounded-full border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
+              className='mt-4'
             >
               {isMembersOpen ? '접기 ▾' : '펼치기 ▸'}
-            </button>
+            </Button>
           </div>
 
           {isMembersOpen && (
@@ -503,13 +512,14 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                   초대 링크 목록 <span className='text-slate-400'>({invites.length})</span>
                 </h2>
               </div>
-              <button
-                type='button'
+              <Button
+                variant='secondary'
+                size='sm'
                 onClick={() => setIsInvitesOpen(v => !v)}
-                className='mt-4 rounded-full border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
+                className='mt-4'
               >
                 {isInvitesOpen ? '접기 ▾' : '펼치기 ▸'}
-              </button>
+              </Button>
             </div>
 
             {isInvitesOpen && (

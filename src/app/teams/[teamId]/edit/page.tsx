@@ -3,9 +3,8 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { updateTeam, getTeamTasks } from "@/services/teamService";
-import { TeamsPageLayout } from "../../components";
+import { TeamsPageLayout, Button, ButtonLink } from "../../components";
 import { cardStyles } from "@/styles/teams";
 
 type EditTeamPageProps = {
@@ -121,12 +120,9 @@ export default function EditTeamPage({ params }: EditTeamPageProps) {
     <TeamsPageLayout maxWidth="4xl">
       {/* 헤더 */}
       <div className="flex items-center justify-between">
-        <Link
-          href={`/teams/${teamId}`}
-          className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40"
-        >
+        <ButtonLink href={`/teams/${teamId}`} variant="secondary">
           ← 팀 상세로 돌아가기
-        </Link>
+        </ButtonLink>
       </div>
 
       {/* 팀 수정 폼 */}
@@ -186,21 +182,17 @@ export default function EditTeamPage({ params }: EditTeamPageProps) {
           </div>
 
           <div className="flex justify-end gap-4 pt-4">
-            <Link
-              href={`/teams/${teamId}`}
-              className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40"
-            >
+            <ButtonLink href={`/teams/${teamId}`} variant="secondary">
               취소
-            </Link>
-            <button
+            </ButtonLink>
+            <Button
               type="submit"
               disabled={
                 isSubmitting || !teamName.trim() || !teamDescription.trim()
               }
-              className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSubmitting ? "수정 중..." : "팀 수정"}
-            </button>
+            </Button>
           </div>
         </form>
       </section>
