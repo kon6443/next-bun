@@ -17,7 +17,9 @@ import {
   ButtonLink,
   SectionLabel,
   DateInfoCard,
+  TaskForm,
   ErrorAlert,
+  type TaskFormData,
 } from "../../../components";
 import { cardStyles } from "@/styles/teams";
 
@@ -59,10 +61,6 @@ export default function TaskDetailPage({
   const [editingContent, setEditingContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [editTaskName, setEditTaskName] = useState("");
-  const [editTaskDescription, setEditTaskDescription] = useState("");
-  const [editStartAt, setEditStartAt] = useState("");
-  const [editEndAt, setEditEndAt] = useState("");
 
   const fetchTaskDetail = useCallback(async (showLoading = true) => {
     if (!session?.user?.accessToken) {
@@ -123,39 +121,10 @@ export default function TaskDetailPage({
     fetchTaskDetail();
   }, [fetchTaskDetail]);
 
-  // taskDetail이 변경될 때 편집 필드 초기화 (수정 모드가 아닐 때만)
-  useEffect(() => {
-    if (taskDetail && !isEditing) {
-      setEditTaskName(taskDetail.taskName);
-      setEditTaskDescription(taskDetail.taskDescription || "");
-      setEditStartAt(
-        taskDetail.startAt
-          ? new Date(taskDetail.startAt).toISOString().split("T")[0]
-          : ""
-      );
-      setEditEndAt(
-        taskDetail.endAt
-          ? new Date(taskDetail.endAt).toISOString().split("T")[0]
-          : ""
-      );
-    }
-  }, [taskDetail, isEditing]);
 
   // 수정 모드 시작
   const handleStartEdit = () => {
     if (!taskDetail) return;
-    setEditTaskName(taskDetail.taskName);
-    setEditTaskDescription(taskDetail.taskDescription || "");
-    setEditStartAt(
-      taskDetail.startAt
-        ? new Date(taskDetail.startAt).toISOString().split("T")[0]
-        : ""
-    );
-    setEditEndAt(
-      taskDetail.endAt
-        ? new Date(taskDetail.endAt).toISOString().split("T")[0]
-        : ""
-    );
     setIsEditing(true);
     setError(null);
   };
@@ -164,30 +133,11 @@ export default function TaskDetailPage({
   const handleCancelEdit = () => {
     setIsEditing(false);
     setError(null);
-    if (taskDetail) {
-      setEditTaskName(taskDetail.taskName);
-      setEditTaskDescription(taskDetail.taskDescription || "");
-      setEditStartAt(
-        taskDetail.startAt
-          ? new Date(taskDetail.startAt).toISOString().split("T")[0]
-          : ""
-      );
-      setEditEndAt(
-        taskDetail.endAt
-          ? new Date(taskDetail.endAt).toISOString().split("T")[0]
-          : ""
-      );
-    }
   };
 
   // 태스크 수정
-  const handleUpdateTask = async () => {
+  const handleUpdateTask = async (data: TaskFormData) => {
     if (!taskDetail || !session?.user?.accessToken) return;
-
-    if (!editTaskName.trim() || !editTaskDescription.trim()) {
-      setError("태스크 이름과 설명을 모두 입력해주세요.");
-      return;
-    }
 
     setIsSubmitting(true);
     setError(null);
@@ -203,10 +153,10 @@ export default function TaskDetailPage({
         teamIdNum,
         taskIdNum,
         {
-          taskName: editTaskName.trim(),
-          taskDescription: editTaskDescription.trim(),
-          startAt: editStartAt || null,
-          endAt: editEndAt || null,
+          taskName: data.taskName,
+          taskDescription: data.taskDescription,
+          startAt: data.startAt || null,
+          endAt: data.endAt || null,
         },
         session.user.accessToken,
       );
@@ -430,109 +380,64 @@ export default function TaskDetailPage({
 
       {/* 태스크 상세 정보 */}
       <section className={`${cardStyles.section} p-4 sm:p-6 md:p-8`}>
-          <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-3 sm:gap-4">
-              <span
-                className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl border border-white/20 shadow-inner flex-shrink-0"
-                style={{
-                  background: taskStatusColors[taskDetail.taskStatus] || taskStatusColors[1],
-                }}
-                aria-hidden="true"
-              />
-              <div className="flex-1 min-w-0">
-                <SectionLabel spacing="tight">
-                  {taskStatusLabels[taskDetail.taskStatus] || "Unknown"}
-                </SectionLabel>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={editTaskName}
-                    onChange={(e) => setEditTaskName(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 sm:px-4 py-2 text-xl sm:text-2xl font-bold text-white focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20 md:text-3xl"
-                    placeholder="태스크 이름"
-                    disabled={isSubmitting}
-                  />
-                ) : (
-                  <h1 className="mt-1 text-2xl sm:text-3xl md:text-4xl font-bold text-white break-words">
-                    {taskDetail.taskName}
-                  </h1>
-                )}
-              </div>
-            </div>
-            {!isEditing && currentUserId === taskDetail.crtdBy && (
-              <Button
-                variant="secondary"
-                size="lg"
-                onClick={handleStartEdit}
-                disabled={isSubmitting}
-                className="w-full sm:w-auto"
-              >
-                수정
-              </Button>
-            )}
-          </div>
-
           {isEditing ? (
-            <div className="mb-6 space-y-4">
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-300">
-                  태스크 설명 <span className="text-red-400">*</span>
-                </label>
-                <textarea
-                  value={editTaskDescription}
-                  onChange={(e) => setEditTaskDescription(e.target.value)}
-                  placeholder="태스크에 대한 상세 설명을 입력하세요"
-                  rows={6}
-                  className="w-full resize-none rounded-xl border border-white/10 bg-slate-900/60 p-4 text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
-                  disabled={isSubmitting}
-                />
+            <>
+              <div className="mb-4 sm:mb-6">
+                <SectionLabel spacing="tight">태스크 수정</SectionLabel>
+                <h2 className="mt-2 text-xl sm:text-2xl font-bold text-white">
+                  {taskDetail.taskName}
+                </h2>
               </div>
-              <div className="grid gap-5 sm:gap-4 sm:grid-cols-2">
-                <div className="space-y-3">
-                  <label className="block text-sm font-semibold text-slate-300">
-                    시작일
-                  </label>
-                  <input
-                    type="date"
-                    value={editStartAt}
-                    onChange={(e) => setEditStartAt(e.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3 text-white focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
-                    disabled={isSubmitting}
-                  />
-                </div>
-                <div className="space-y-3">
-                  <label className="block text-sm font-semibold text-slate-300">
-                    종료일
-                  </label>
-                  <input
-                    type="date"
-                    value={editEndAt}
-                    onChange={(e) => setEditEndAt(e.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3 text-white focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
-                    disabled={isSubmitting}
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleCancelEdit}
-                  disabled={isSubmitting}
-                >
-                  취소
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleUpdateTask}
-                  disabled={isSubmitting || !editTaskName.trim() || !editTaskDescription.trim()}
-                >
-                  {isSubmitting ? "수정 중..." : "수정 완료"}
-                </Button>
-              </div>
-            </div>
+              <TaskForm
+                mode="edit"
+                initialData={{
+                  taskName: taskDetail.taskName,
+                  taskDescription: taskDetail.taskDescription || "",
+                  startAt: taskDetail.startAt
+                    ? new Date(taskDetail.startAt).toISOString().split("T")[0]
+                    : "",
+                  endAt: taskDetail.endAt
+                    ? new Date(taskDetail.endAt).toISOString().split("T")[0]
+                    : "",
+                }}
+                onSubmit={handleUpdateTask}
+                onCancel={handleCancelEdit}
+                isSubmitting={isSubmitting}
+              />
+            </>
           ) : (
             <>
+              <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <span
+                    className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl border border-white/20 shadow-inner flex-shrink-0"
+                    style={{
+                      background: taskStatusColors[taskDetail.taskStatus] || taskStatusColors[1],
+                    }}
+                    aria-hidden="true"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <SectionLabel spacing="tight">
+                      {taskStatusLabels[taskDetail.taskStatus] || "Unknown"}
+                    </SectionLabel>
+                    <h1 className="mt-1 text-2xl sm:text-3xl md:text-4xl font-bold text-white break-words">
+                      {taskDetail.taskName}
+                    </h1>
+                  </div>
+                </div>
+                {currentUserId === taskDetail.crtdBy && (
+                  <Button
+                    variant="secondary"
+                    size="lg"
+                    onClick={handleStartEdit}
+                    disabled={isSubmitting}
+                    className="w-full sm:w-auto"
+                  >
+                    수정
+                  </Button>
+                )}
+              </div>
+
               {taskDetail.taskDescription && (
                 <div className="mb-6 rounded-2xl border border-sky-500/30 bg-slate-900/50 p-6 sm:p-8 shadow-lg shadow-sky-500/10">
                   <p className="whitespace-pre-wrap text-lg sm:text-xl leading-relaxed text-slate-200">
