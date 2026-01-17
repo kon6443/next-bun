@@ -1,16 +1,22 @@
 "use client";
 
 import { useEffect } from "react";
+import type { Session } from "next-auth";
 import { SessionProvider as Provider, signOut, useSession } from "next-auth/react";
 
 type Props = {
   children: React.ReactNode;
+  session: Session | null;
 };
 
 function DevBackendAccessTokenCookieSync() {
   const { data: session } = useSession();
 
   useEffect(() => {
+    if (process.env.NODE_ENV !== "development") {
+      return;
+    }
+
     const accessToken = session?.user?.accessToken ?? null;
     const expiresAt = session?.expires ? new Date(session.expires).getTime() : null;
     const maxAgeFromSession =
@@ -36,7 +42,7 @@ function DevBackendAccessTokenCookieSync() {
   return null;
 }
 
-export default function SessionProvider({ children }: Props) {
+export default function SessionProvider({ children, session }: Props) {
   useEffect(() => {
     const onUnauthorized = () => {
       if (process.env.NODE_ENV === "development") {
@@ -54,7 +60,7 @@ export default function SessionProvider({ children }: Props) {
   }, []);
 
   return (
-    <Provider>
+    <Provider session={session} refetchOnWindowFocus={false} refetchInterval={0}>
       <DevBackendAccessTokenCookieSync />
       {children}
     </Provider>
