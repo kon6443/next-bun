@@ -4,7 +4,16 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { createTask } from "@/services/teamService";
-import { TeamsPageLayout, Button, ButtonLink } from "../../../components";
+import {
+  TeamsPageLayout,
+  Button,
+  ButtonLink,
+  Input,
+  TextArea,
+  DateInput,
+  SectionLabel,
+  ErrorAlert,
+} from "../../../components";
 import { cardStyles } from "@/styles/teams";
 
 type CreateTaskPageProps = {
@@ -82,92 +91,50 @@ export default function CreateTaskPage({ params }: CreateTaskPageProps) {
       {/* 태스크 생성 폼 */}
       <section className={`${cardStyles.section} p-8`}>
         <div className="mb-6">
-          <p className="text-xs uppercase tracking-[0.6em] text-slate-400">
-            New Task
-          </p>
+          <SectionLabel>New Task</SectionLabel>
           <h1 className="mt-4 text-4xl font-bold text-white md:text-5xl">
             새 태스크 생성
           </h1>
         </div>
 
-        {error && (
-          <div className="mb-6 rounded-2xl border border-red-500/20 bg-red-500/10 px-6 py-4">
-            <p className="text-base font-semibold text-red-400">{error}</p>
-          </div>
-        )}
+        {error && <ErrorAlert message={error} className="mb-6" />}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label
-              htmlFor="taskName"
-              className="mb-2 block text-sm font-semibold text-slate-300"
-            >
-              태스크 이름 <span className="text-red-400">*</span>
-            </label>
-            <input
-              id="taskName"
-              type="text"
-              value={taskName}
-              onChange={(e) => setTaskName(e.target.value)}
-              placeholder="태스크 이름을 입력하세요"
-              className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3 text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
-              required
-              disabled={isSubmitting}
-            />
-          </div>
+          <Input
+            id="taskName"
+            label="태스크 이름"
+            required
+            value={taskName}
+            onChange={(e) => setTaskName(e.target.value)}
+            placeholder="태스크 이름을 입력하세요"
+            disabled={isSubmitting}
+          />
 
-          <div>
-            <label
-              htmlFor="taskDescription"
-              className="mb-2 block text-sm font-semibold text-slate-300"
-            >
-              태스크 설명 <span className="text-red-400">*</span>
-            </label>
-            <textarea
-              id="taskDescription"
-              value={taskDescription}
-              onChange={(e) => setTaskDescription(e.target.value)}
-              placeholder="태스크에 대한 상세 설명을 입력하세요"
-              rows={6}
-              className="w-full resize-none rounded-xl border border-white/10 bg-slate-900/60 p-4 text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
-              required
-              disabled={isSubmitting}
-            />
-          </div>
+          <TextArea
+            id="taskDescription"
+            label="태스크 설명"
+            required
+            value={taskDescription}
+            onChange={(e) => setTaskDescription(e.target.value)}
+            placeholder="태스크에 대한 상세 설명을 입력하세요"
+            disabled={isSubmitting}
+          />
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label
-                htmlFor="startAt"
-                className="mb-2 block text-sm font-semibold text-slate-300"
-              >
-                시작일
-              </label>
-              <input
-                id="startAt"
-                type="date"
-                value={startAt}
-                onChange={(e) => setStartAt(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3 text-white focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
-                disabled={isSubmitting}
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="endAt"
-                className="mb-2 block text-sm font-semibold text-slate-300"
-              >
-                종료일
-              </label>
-              <input
-                id="endAt"
-                type="date"
-                value={endAt}
-                onChange={(e) => setEndAt(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3 text-white focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
-                disabled={isSubmitting}
-              />
-            </div>
+            <DateInput
+              id="startAt"
+              label="시작일"
+              value={startAt}
+              onChange={(e) => setStartAt(e.target.value)}
+              disabled={isSubmitting}
+            />
+            <DateInput
+              id="endAt"
+              label="종료일"
+              value={endAt}
+              onChange={(e) => setEndAt(e.target.value)}
+              disabled={isSubmitting}
+            />
           </div>
 
           <div className="flex justify-end gap-4 pt-4">
