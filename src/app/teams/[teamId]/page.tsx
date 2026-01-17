@@ -1,11 +1,13 @@
+"use client";
+
+import { use } from "react";
 import TeamBoard from "./TeamBoard";
 
 type TeamDetailPageProps = {
   params: Promise<{ teamId: string }>;
 };
 
-export default async function TeamDetailPage({ params }: TeamDetailPageProps) {
-  const { teamId } = await params;
+export default function TeamDetailPage({ params }: TeamDetailPageProps) {
+  const { teamId } = use(params);
   return <TeamBoard teamId={teamId} />;
 }
-
