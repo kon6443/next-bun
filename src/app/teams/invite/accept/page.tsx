@@ -6,6 +6,11 @@ import { useSession } from 'next-auth/react';
 import { signIn } from 'next-auth/react';
 import { acceptTeamInvite } from '@/services/teamService';
 
+const pageBackground = {
+  background:
+    'radial-gradient(circle at 20% 20%, rgba(79,70,229,0.15), transparent 50%), radial-gradient(circle at 80% 80%, rgba(14,165,233,0.1), transparent 50%), rgb(2,6,23)',
+};
+
 function InviteAcceptContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -69,13 +74,9 @@ function InviteAcceptContent() {
 
   if (!token) {
     return (
-      <div className='relative min-h-screen overflow-hidden bg-slate-950 text-slate-100'>
-        <div className='pointer-events-none absolute inset-0'>
-          <div className='absolute -left-32 top-0 h-72 w-72 rounded-full bg-indigo-600/30 blur-[130px]' />
-          <div className='absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-500/20 blur-[150px]' />
-        </div>
+      <div className='relative min-h-screen overflow-hidden text-slate-100' style={pageBackground}>
         <div className='relative z-10 flex min-h-screen items-center justify-center px-4'>
-          <div className='w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl'>
+          <div className='w-full max-w-md rounded-3xl border border-white/10 bg-slate-900/80 p-8'>
             <div className='text-center'>
               <p className='text-lg font-semibold text-red-400'>초대 링크가 유효하지 않습니다.</p>
               <p className='mt-2 text-sm text-slate-400'>토큰이 제공되지 않았습니다.</p>
@@ -88,13 +89,9 @@ function InviteAcceptContent() {
 
   if (status === 'loading' || (status === 'authenticated' && isProcessing && !success)) {
     return (
-      <div className='relative min-h-screen overflow-hidden bg-slate-950 text-slate-100'>
-        <div className='pointer-events-none absolute inset-0'>
-          <div className='absolute -left-32 top-0 h-72 w-72 rounded-full bg-indigo-600/30 blur-[130px]' />
-          <div className='absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-500/20 blur-[150px]' />
-        </div>
+      <div className='relative min-h-screen overflow-hidden text-slate-100' style={pageBackground}>
         <div className='relative z-10 flex min-h-screen items-center justify-center px-4'>
-          <div className='w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl'>
+          <div className='w-full max-w-md rounded-3xl border border-white/10 bg-slate-900/80 p-8'>
             <div className='text-center'>
               <div className='mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-400 border-t-transparent' />
               <p className='text-lg font-semibold text-slate-200'>팀 초대를 처리하는 중...</p>
@@ -108,13 +105,9 @@ function InviteAcceptContent() {
 
   if (success) {
     return (
-      <div className='relative min-h-screen overflow-hidden bg-slate-950 text-slate-100'>
-        <div className='pointer-events-none absolute inset-0'>
-          <div className='absolute -left-32 top-0 h-72 w-72 rounded-full bg-indigo-600/30 blur-[130px]' />
-          <div className='absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-500/20 blur-[150px]' />
-        </div>
+      <div className='relative min-h-screen overflow-hidden text-slate-100' style={pageBackground}>
         <div className='relative z-10 flex min-h-screen items-center justify-center px-4'>
-          <div className='w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl'>
+          <div className='w-full max-w-md rounded-3xl border border-white/10 bg-slate-900/80 p-8'>
             <div className='text-center'>
               <div className='mb-4 text-5xl'>✅</div>
               <p className='text-lg font-semibold text-green-400'>팀 초대 수락 완료!</p>
@@ -128,13 +121,9 @@ function InviteAcceptContent() {
 
   if (error) {
     return (
-      <div className='relative min-h-screen overflow-hidden bg-slate-950 text-slate-100'>
-        <div className='pointer-events-none absolute inset-0'>
-          <div className='absolute -left-32 top-0 h-72 w-72 rounded-full bg-indigo-600/30 blur-[130px]' />
-          <div className='absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-500/20 blur-[150px]' />
-        </div>
+      <div className='relative min-h-screen overflow-hidden text-slate-100' style={pageBackground}>
         <div className='relative z-10 flex min-h-screen items-center justify-center px-4'>
-          <div className='w-full max-w-md rounded-3xl border border-red-500/20 bg-red-500/10 p-8 backdrop-blur-xl'>
+          <div className='w-full max-w-md rounded-3xl border border-red-500/20 bg-red-900/50 p-8'>
             <div className='text-center'>
               <div className='mb-4 text-5xl'>❌</div>
               <p className='text-lg font-semibold text-red-400'>팀 초대 수락 실패</p>
@@ -159,13 +148,9 @@ export default function InviteAcceptPage() {
   return (
     <Suspense
       fallback={
-        <div className='relative min-h-screen overflow-hidden bg-slate-950 text-slate-100'>
-          <div className='pointer-events-none absolute inset-0'>
-            <div className='absolute -left-32 top-0 h-72 w-72 rounded-full bg-indigo-600/30 blur-[130px]' />
-            <div className='absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-500/20 blur-[150px]' />
-          </div>
+        <div className='relative min-h-screen overflow-hidden text-slate-100' style={pageBackground}>
           <div className='relative z-10 flex min-h-screen items-center justify-center px-4'>
-            <div className='w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl'>
+            <div className='w-full max-w-md rounded-3xl border border-white/10 bg-slate-900/80 p-8'>
               <div className='text-center'>
                 <p className='text-slate-400'>로딩 중...</p>
               </div>
