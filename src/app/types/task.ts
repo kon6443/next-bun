@@ -9,6 +9,7 @@ export type Task = {
   endAt: Date | null;
   crtdAt: Date;
   crtdBy: number;
+  userName: string | null;
 };
 
 export type TaskComment = {
@@ -34,6 +35,7 @@ export type TaskDetail = {
   endAt: Date | null;
   crtdAt: Date;
   crtdBy: number;
+  userName: string | null;
   comments: TaskComment[];
 };
 

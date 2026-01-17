@@ -18,6 +18,8 @@ import {
   SectionLabel,
   DateInfoCard,
   TaskForm,
+  TaskStatusBadge,
+  taskStatusLabels,
   ErrorAlert,
   type TaskFormData,
 } from "../../../components";
@@ -26,22 +28,6 @@ import { cardStyles } from "@/styles/teams";
 type TaskDetailPageProps = {
   teamId: string;
   taskId: string;
-};
-
-const taskStatusLabels: Record<number, string> = {
-  1: "Ideation",
-  2: "In Progress",
-  3: "Completed",
-  4: "On Hold",
-  5: "Cancelled",
-};
-
-const taskStatusColors: Record<number, string> = {
-  1: "linear-gradient(135deg, #facc15, #f97316)",
-  2: "linear-gradient(135deg, #38bdf8, #6366f1)",
-  3: "linear-gradient(135deg, #34d399, #10b981)",
-  4: "linear-gradient(135deg, #fbbf24, #f59e0b)",
-  5: "linear-gradient(135deg, #ef4444, #dc2626)",
 };
 
 export default function TaskDetailPage({
@@ -409,13 +395,7 @@ export default function TaskDetailPage({
             <>
               <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="flex items-center gap-3 sm:gap-4">
-                  <span
-                    className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl border border-white/20 shadow-inner flex-shrink-0"
-                    style={{
-                      background: taskStatusColors[taskDetail.taskStatus] || taskStatusColors[1],
-                    }}
-                    aria-hidden="true"
-                  />
+                  <TaskStatusBadge status={taskDetail.taskStatus} />
                   <div className="flex-1 min-w-0">
                     <SectionLabel spacing="tight">
                       {taskStatusLabels[taskDetail.taskStatus] || "Unknown"}
@@ -423,6 +403,9 @@ export default function TaskDetailPage({
                     <h1 className="mt-1 text-2xl sm:text-3xl md:text-4xl font-bold text-white break-words">
                       {taskDetail.taskName}
                     </h1>
+                    <p className="mt-2 text-sm text-slate-400">
+                      작성자: {taskDetail.userName || `사용자 ${taskDetail.crtdBy}`}
+                    </p>
                   </div>
                 </div>
                 {currentUserId === taskDetail.crtdBy && (

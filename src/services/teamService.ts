@@ -32,6 +32,7 @@ export type TeamTaskResponse = {
   endAt: Date | null;
   crtdAt: Date;
   crtdBy: number;
+  userName: string | null;
 };
 
 export type GetMyTeamsResponse = {
@@ -74,6 +75,7 @@ export type TaskDetailResponse = {
   endAt: Date | null;
   crtdAt: Date;
   crtdBy: number;
+  userName: string | null;
   comments: TaskCommentResponse[];
 };
 
