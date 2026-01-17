@@ -26,4 +26,5 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
 EXPOSE 3000
+ENV NODE_ENV=production
 CMD ["bun", "server.js"]
