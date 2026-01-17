@@ -12,6 +12,8 @@ import {
   type TaskDetailResponse,
 } from "@/services/teamService";
 import type { TaskComment } from "@/app/types/task";
+import { TeamsPageLayout } from "../../../components";
+import { cardStyles } from "@/styles/teams";
 
 type TaskDetailPageProps = {
   teamId: string;
@@ -379,43 +381,29 @@ export default function TaskDetailPage({
 
   if (isLoading) {
     return (
-      <div
-        className="relative min-h-screen overflow-hidden text-slate-100"
-        style={{
-          background:
-            "radial-gradient(circle at 20% 20%, rgba(79,70,229,0.15), transparent 50%), radial-gradient(circle at 80% 80%, rgba(14,165,233,0.1), transparent 50%), rgb(2,6,23)",
-        }}
-      >
-        <main className="relative z-10 mx-auto flex max-w-4xl flex-col gap-6 sm:gap-10 px-4 pb-24 pt-12 sm:pt-16 sm:px-8">
-          <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 sm:p-8 text-center text-slate-400">
-            태스크 정보를 불러오는 중...
-          </div>
-        </main>
-      </div>
+      <TeamsPageLayout maxWidth="4xl">
+        <div
+          className={`${cardStyles.section} p-4 sm:p-8 text-center text-slate-400`}
+        >
+          태스크 정보를 불러오는 중...
+        </div>
+      </TeamsPageLayout>
     );
   }
 
   if (error && !taskDetail) {
     return (
-      <div
-        className="relative min-h-screen overflow-hidden text-slate-100"
-        style={{
-          background:
-            "radial-gradient(circle at 20% 20%, rgba(79,70,229,0.15), transparent 50%), radial-gradient(circle at 80% 80%, rgba(14,165,233,0.1), transparent 50%), rgb(2,6,23)",
-        }}
-      >
-        <main className="relative z-10 mx-auto flex max-w-4xl flex-col gap-6 sm:gap-10 px-4 pb-24 pt-12 sm:pt-16 sm:px-8">
-          <div className="rounded-2xl border border-red-500/20 bg-red-900/50 p-4 sm:p-8 text-center">
-            <p className="text-base font-semibold text-red-400">{error}</p>
-            <Link
-              href={`/teams/${teamId}`}
-              className="mt-4 inline-block rounded-full border border-white/20 px-4 py-2 text-xs sm:px-6 sm:py-3 sm:text-sm font-semibold text-slate-200 transition hover:border-white/40"
-            >
-              팀 보드로 돌아가기
-            </Link>
-          </div>
-        </main>
-      </div>
+      <TeamsPageLayout maxWidth="4xl">
+        <div className={`${cardStyles.errorSection} p-4 sm:p-8 text-center`}>
+          <p className="text-base font-semibold text-red-400">{error}</p>
+          <Link
+            href={`/teams/${teamId}`}
+            className="mt-4 inline-block rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-slate-200 transition hover:border-white/40 sm:px-6 sm:py-3 sm:text-sm"
+          >
+            팀 보드로 돌아가기
+          </Link>
+        </div>
+      </TeamsPageLayout>
     );
   }
 
@@ -424,26 +412,19 @@ export default function TaskDetailPage({
   const currentUserId = session?.user?.userId ?? null;
 
   return (
-    <div
-      className="relative min-h-screen overflow-hidden text-slate-100"
-      style={{
-        background:
-          "radial-gradient(circle at 20% 20%, rgba(79,70,229,0.15), transparent 50%), radial-gradient(circle at 80% 80%, rgba(14,165,233,0.1), transparent 50%), rgb(2,6,23)",
-      }}
-    >
-      <main className="relative z-10 mx-auto flex max-w-4xl flex-col gap-6 sm:gap-10 px-4 pb-24 pt-12 sm:pt-16 sm:px-8">
-        {/* 헤더 */}
-        <div className="flex items-center justify-between">
-          <Link
-            href={`/teams/${teamId}`}
-            className="rounded-full border border-white/20 px-4 py-2 text-xs sm:px-6 sm:py-3 sm:text-sm font-semibold text-slate-200 transition hover:border-white/40"
-          >
-            ← 팀 보드로 돌아가기
-          </Link>
-        </div>
+    <TeamsPageLayout maxWidth="4xl">
+      {/* 헤더 */}
+      <div className="flex items-center justify-between">
+        <Link
+          href={`/teams/${teamId}`}
+          className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-slate-200 transition hover:border-white/40 sm:px-6 sm:py-3 sm:text-sm"
+        >
+          ← 팀 보드로 돌아가기
+        </Link>
+      </div>
 
-        {/* 태스크 상세 정보 */}
-        <section className="rounded-3xl border border-white/10 bg-slate-900/80 p-4 sm:p-6 md:p-8">
+      {/* 태스크 상세 정보 */}
+      <section className={`${cardStyles.section} p-4 sm:p-6 md:p-8`}>
           <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-3 sm:gap-4">
               <span
@@ -601,7 +582,7 @@ export default function TaskDetailPage({
         )}
 
         {/* 댓글 섹션 */}
-        <section className="rounded-3xl border border-white/10 bg-slate-900/80 p-4 sm:p-6 md:p-8">
+        <section className={`${cardStyles.section} p-4 sm:p-6 md:p-8`}>
           <h2 className="mb-4 sm:mb-6 text-xl sm:text-2xl font-bold text-white">댓글</h2>
 
           {/* 댓글 작성 폼 */}
@@ -710,7 +691,6 @@ export default function TaskDetailPage({
             )}
           </div>
         </section>
-      </main>
-    </div>
+    </TeamsPageLayout>
   );
 }

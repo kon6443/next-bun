@@ -17,6 +17,7 @@ import {
   type TeamUserResponse,
   type TeamInviteResponse,
 } from '@/services/teamService';
+import { teamsPageBackground, cardStyles, layoutStyles } from '@/styles/teams';
 
 type ColumnKey = 'todo' | 'inProgress' | 'done';
 
@@ -351,15 +352,9 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   };
 
   return (
-    <div
-      className='relative min-h-screen overflow-hidden text-slate-100'
-      style={{
-        background:
-          'radial-gradient(circle at 20% 20%, rgba(79,70,229,0.15), transparent 50%), radial-gradient(circle at 80% 80%, rgba(14,165,233,0.1), transparent 50%), rgb(2,6,23)',
-      }}
-    >
-      <main className='relative z-10 mx-auto flex max-w-6xl flex-col gap-6 sm:gap-10 px-4 pb-24 pt-12 sm:pt-16 sm:px-8'>
-        <section className='rounded-3xl border border-white/10 bg-slate-900/80 p-4 sm:p-8'>
+    <div className={layoutStyles.pageContainer} style={teamsPageBackground}>
+      <main className={`${layoutStyles.mainContent} max-w-6xl`}>
+        <section className={`${cardStyles.section} p-4 sm:p-8`}>
           <p className='text-xs uppercase tracking-[0.6em] text-slate-400'>Team Kanban</p>
           <div className='mt-4 flex flex-col gap-6 md:flex-row md:items-center md:justify-between'>
             <div>
@@ -404,7 +399,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         </section>
 
         {/* 팀 멤버 목록 */}
-        <section className='rounded-3xl border border-white/10 bg-slate-900/80 p-4 sm:p-8'>
+        <section className={`${cardStyles.section} p-4 sm:p-8`}>
           <div className='mb-6 flex items-start justify-between gap-4'>
             <div>
               <p className='text-xs uppercase tracking-[0.6em] text-slate-400'>Team Members</p>
@@ -500,7 +495,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
         {/* 초대 링크 목록 (마스터/매니저만 표시) */}
         {canManageInvites && (
-          <section className='rounded-3xl border border-white/10 bg-slate-900/80 p-4 sm:p-8'>
+          <section className={`${cardStyles.section} p-4 sm:p-8`}>
             <div className='mb-6 flex items-start justify-between gap-4'>
               <div>
                 <p className='text-xs uppercase tracking-[0.6em] text-slate-400'>Team Invites</p>
@@ -600,7 +595,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         )}
 
         {isLoading ? (
-          <div className='rounded-2xl border border-white/10 bg-slate-900/80 p-8 text-center text-slate-400'>
+          <div className={`${cardStyles.section} p-8 text-center text-slate-400`}>
             태스크 목록을 불러오는 중...
           </div>
         ) : (
