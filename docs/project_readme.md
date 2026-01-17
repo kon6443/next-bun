@@ -26,6 +26,6 @@
 - NextAuth 규칙: `/docs/assistant_rules_nextauth.md`
 
 ### 5) 개발/빌드
-- 개발 서버: `pnpm run dev`
-- 빌드: `pnpm run build`
-- 린트: `pnpm run lint`
+- 개발 서버: `bun run dev`
+- 빌드: `bun run build`
+- 린트: `bun run lint`
