@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { Session } from "next-auth";
-import { TeamsPageLayout, LoadingSpinner } from "./components";
+import { TeamsPageLayout, LoadingSpinner, ButtonLink } from "./components";
 import { cardStyles } from "@/styles/teams";
 import type { TeamSummary } from "@/types/team";
 import LoginButton from "./LoginButton";
@@ -41,12 +41,9 @@ export default function TeamsClient({
             </p>
           </div>
           {isAuthenticated ? (
-            <Link
-              href="/teams/new"
-              className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 sm:px-6 sm:py-3 sm:text-sm"
-            >
+            <ButtonLink href="/teams/new" size="lg">
               + 팀 생성
-            </Link>
+            </ButtonLink>
           ) : (
             <LoginButton />
           )}
@@ -125,12 +122,9 @@ function EmptyTeamList() {
       <p className="mt-2 text-sm text-slate-400">
         새로운 팀을 생성하거나 초대를 기다려보세요.
       </p>
-      <Link
-        href="/teams/new"
-        className="mt-6 inline-block rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 sm:px-5 sm:text-sm"
-      >
+      <ButtonLink href="/teams/new" size="lg" className="mt-6">
         + 팀 생성하기
-      </Link>
+      </ButtonLink>
     </div>
   );
 }

@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
-import { TeamsPageLayout } from "./components";
+import { TeamsPageLayout, Button, ButtonLink } from "./components";
 import { cardStyles } from "@/styles/teams";
 
 type ErrorProps = {
@@ -39,18 +38,12 @@ export default function Error({ error, reset }: ErrorProps) {
             {error.message || "팀 목록을 불러오는 중 문제가 발생했습니다."}
           </p>
           <div className="mt-6 flex flex-col gap-3 justify-center sm:flex-row">
-            <button
-              onClick={reset}
-              className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 sm:px-5 sm:text-sm"
-            >
+            <Button onClick={reset} size="lg">
               다시 시도
-            </button>
-            <Link
-              href="/"
-              className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-slate-200 transition hover:border-white/40 sm:px-5 sm:text-sm"
-            >
+            </Button>
+            <ButtonLink href="/" variant="secondary" size="lg">
               홈으로 돌아가기
-            </Link>
+            </ButtonLink>
           </div>
         </div>
       </section>

@@ -3,9 +3,8 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { createTask } from "@/services/teamService";
-import { TeamsPageLayout } from "../../../components";
+import { TeamsPageLayout, Button, ButtonLink } from "../../../components";
 import { cardStyles } from "@/styles/teams";
 
 type CreateTaskPageProps = {
@@ -75,12 +74,9 @@ export default function CreateTaskPage({ params }: CreateTaskPageProps) {
     <TeamsPageLayout maxWidth="4xl">
       {/* 헤더 */}
       <div className="flex items-center justify-between">
-        <Link
-          href={`/teams/${teamId || ""}`}
-          className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40"
-        >
+        <ButtonLink href={`/teams/${teamId || ""}`} variant="secondary">
           ← 팀 보드로 돌아가기
-        </Link>
+        </ButtonLink>
       </div>
 
       {/* 태스크 생성 폼 */}
@@ -175,21 +171,17 @@ export default function CreateTaskPage({ params }: CreateTaskPageProps) {
           </div>
 
           <div className="flex justify-end gap-4 pt-4">
-            <Link
-              href={`/teams/${teamId || ""}`}
-              className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40"
-            >
+            <ButtonLink href={`/teams/${teamId || ""}`} variant="secondary">
               취소
-            </Link>
-            <button
+            </ButtonLink>
+            <Button
               type="submit"
               disabled={
                 isSubmitting || !taskName.trim() || !taskDescription.trim()
               }
-              className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSubmitting ? "생성 중..." : "태스크 생성"}
-            </button>
+            </Button>
           </div>
         </form>
       </section>

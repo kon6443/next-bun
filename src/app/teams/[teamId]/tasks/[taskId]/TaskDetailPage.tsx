@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import Link from "next/link";
 import {
   getTaskDetail,
   createTaskComment,
@@ -12,7 +11,7 @@ import {
   type TaskDetailResponse,
 } from "@/services/teamService";
 import type { TaskComment } from "@/app/types/task";
-import { TeamsPageLayout } from "../../../components";
+import { TeamsPageLayout, Button, ButtonLink } from "../../../components";
 import { cardStyles } from "@/styles/teams";
 
 type TaskDetailPageProps = {
@@ -396,12 +395,14 @@ export default function TaskDetailPage({
       <TeamsPageLayout maxWidth="4xl">
         <div className={`${cardStyles.errorSection} p-4 sm:p-8 text-center`}>
           <p className="text-base font-semibold text-red-400">{error}</p>
-          <Link
+          <ButtonLink
             href={`/teams/${teamId}`}
-            className="mt-4 inline-block rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-slate-200 transition hover:border-white/40 sm:px-6 sm:py-3 sm:text-sm"
+            variant="secondary"
+            size="lg"
+            className="mt-4"
           >
             팀 보드로 돌아가기
-          </Link>
+          </ButtonLink>
         </div>
       </TeamsPageLayout>
     );
@@ -415,12 +416,9 @@ export default function TaskDetailPage({
     <TeamsPageLayout maxWidth="4xl">
       {/* 헤더 */}
       <div className="flex items-center justify-between">
-        <Link
-          href={`/teams/${teamId}`}
-          className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-slate-200 transition hover:border-white/40 sm:px-6 sm:py-3 sm:text-sm"
-        >
+        <ButtonLink href={`/teams/${teamId}`} variant="secondary" size="lg">
           ← 팀 보드로 돌아가기
-        </Link>
+        </ButtonLink>
       </div>
 
       {/* 태스크 상세 정보 */}
@@ -455,13 +453,15 @@ export default function TaskDetailPage({
               </div>
             </div>
             {!isEditing && currentUserId === taskDetail.crtdBy && (
-              <button
+              <Button
+                variant="secondary"
+                size="lg"
                 onClick={handleStartEdit}
                 disabled={isSubmitting}
-                className="w-full sm:w-auto rounded-full border border-white/20 px-4 py-2 text-xs sm:text-sm font-semibold text-slate-200 transition hover:border-white/40 disabled:opacity-50"
+                className="w-full sm:w-auto"
               >
                 수정
-              </button>
+              </Button>
             )}
           </div>
 
@@ -507,20 +507,21 @@ export default function TaskDetailPage({
                 </div>
               </div>
               <div className="flex justify-end gap-2">
-                <button
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={handleCancelEdit}
                   disabled={isSubmitting}
-                  className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40 disabled:opacity-50"
                 >
                   취소
-                </button>
-                <button
+                </Button>
+                <Button
+                  size="sm"
                   onClick={handleUpdateTask}
                   disabled={isSubmitting || !editTaskName.trim() || !editTaskDescription.trim()}
-                  className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? "수정 중..." : "수정 완료"}
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
@@ -595,13 +596,13 @@ export default function TaskDetailPage({
               rows={4}
             />
             <div className="mt-4 flex justify-end">
-              <button
+              <Button
+                size="lg"
                 onClick={handleCreateComment}
                 disabled={!newComment.trim() || isSubmitting}
-                className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2 text-xs sm:px-6 sm:py-3 sm:text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? "작성 중..." : "댓글 작성"}
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -626,20 +627,21 @@ export default function TaskDetailPage({
                         rows={3}
                       />
                       <div className="mt-4 flex justify-end gap-2">
-                        <button
+                        <Button
+                          variant="secondary"
+                          size="lg"
                           onClick={handleCancelEditComment}
                           disabled={isSubmitting}
-                          className="rounded-full border border-white/20 px-3 py-2 text-xs sm:px-4 sm:py-2 sm:text-sm font-semibold text-slate-200 transition hover:border-white/40 disabled:opacity-50"
                         >
                           취소
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          size="lg"
                           onClick={() => handleUpdateComment(comment.commentId)}
                           disabled={!editingContent.trim() || isSubmitting}
-                          className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-3 py-2 text-xs sm:px-4 sm:py-2 sm:text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {isSubmitting ? "수정 중..." : "수정"}
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   ) : (
