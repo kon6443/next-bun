@@ -486,9 +486,9 @@ export default function TaskDetailPage({
                   disabled={isSubmitting}
                 />
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-300">
+              <div className="grid gap-5 sm:gap-4 sm:grid-cols-2">
+                <div className="space-y-3">
+                  <label className="block text-sm font-semibold text-slate-300">
                     시작일
                   </label>
                   <input
@@ -499,8 +499,8 @@ export default function TaskDetailPage({
                     disabled={isSubmitting}
                   />
                 </div>
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-300">
+                <div className="space-y-3">
+                  <label className="block text-sm font-semibold text-slate-300">
                     종료일
                   </label>
                   <input

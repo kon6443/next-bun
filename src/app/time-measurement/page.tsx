@@ -191,7 +191,7 @@ function LeavingOfficePageContent() {
               </p>
 
               <div className="mt-5 grid gap-5">
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <label
                     htmlFor="startTime"
                     className="text-sm font-semibold text-slate-300"
@@ -206,7 +206,7 @@ function LeavingOfficePageContent() {
                     className="w-full rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3 text-lg font-mono text-white shadow-inner shadow-black/20 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <label
                     htmlFor="endTime"
                     className="text-sm font-semibold text-slate-300"

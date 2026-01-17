@@ -1,6 +1,6 @@
 .ring {
   position: relative;
-  width: clamp(150px, 32vw, 200px);
+  width: clamp(140px, 45vw, 200px);
   aspect-ratio: 1 / 1;
   border-radius: 32px;
   padding: 16px;
@@ -48,7 +48,7 @@
 }
 
 .percent {
-  font-size: clamp(1.8rem, 4vw, 2.5rem);
+  font-size: clamp(1.6rem, 5vw, 2.5rem);
   font-weight: 700;
   color: #f8fafc;
 }

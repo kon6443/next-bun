@@ -16,6 +16,7 @@
 ### 태스크별 규칙
 - 진단/성능 관련 규칙은 `/docs/assistant_rules_diagnostics.md`를 따른다.
 - NextAuth 관련 규칙은 `/docs/assistant_rules_nextauth.md`를 따른다.
+- UI/UX 관련 규칙은 `/docs/assistant_rules_ui.md`를 따른다.
 
 ### 문서 위치 규칙
 - 새로운 규칙/절차 문서는 `/docs` 아래에 만든다.
