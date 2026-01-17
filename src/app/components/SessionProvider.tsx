@@ -44,6 +44,34 @@ function DevBackendAccessTokenCookieSync() {
 
 export default function SessionProvider({ children, session }: Props) {
   useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (!window.location.search.includes("authTiming=1")) {
+      return;
+    }
+
+    const start = performance.now();
+    const url = `/api/auth/session?timing=1&ts=${Date.now()}`;
+
+    fetch(url, { credentials: "same-origin" })
+      .then(response => {
+        const elapsed = Math.round(performance.now() - start);
+        console.info(
+          `[next-auth] /api/auth/session ${response.status} ${elapsed}ms`,
+        );
+      })
+      .catch(error => {
+        const elapsed = Math.round(performance.now() - start);
+        console.info(
+          `[next-auth] /api/auth/session failed ${elapsed}ms`,
+          error,
+        );
+      });
+  }, []);
+
+  useEffect(() => {
     const onUnauthorized = () => {
       if (process.env.NODE_ENV === "development") {
         // 로컬 편의 쿠키도 같이 정리
