@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from '../types/task';
+import { getDeadlineStatus, getDeadlineLabel, deadlineStyles } from '../utils/taskUtils';
 
 type GanttChartProps = {
   tasks: Task[];
@@ -178,9 +179,12 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
               {sortedTasks.withStartDate.map(task => {
                 const barStyle = getBarStyle(task);
                 const colors = statusColors[task.taskStatus] || statusColors[1];
+                const deadlineStatus = task.taskStatus !== 3 ? getDeadlineStatus(task.endAt) : 'normal';
+                const deadlineLabel = getDeadlineLabel(deadlineStatus, task.endAt);
+                const showDeadlineAlert = deadlineStatus === 'overdue' || deadlineStatus === 'today' || deadlineStatus === 'soon';
 
                 return (
-                  <div key={task.taskId} className="group flex items-center hover:bg-white/5">
+                  <div key={task.taskId} className={`group flex items-center hover:bg-white/5 ${deadlineStyles[deadlineStatus].bg}`}>
                     {/* 태스크 이름 */}
                     <div
                       className="w-[200px] flex-shrink-0 cursor-pointer truncate px-3 py-3"
@@ -189,7 +193,7 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
                       <span className="text-sm font-medium text-slate-200 group-hover:text-white">
                         {task.taskName}
                       </span>
-                      <div className="mt-0.5 flex items-center gap-2">
+                      <div className="mt-0.5 flex items-center gap-2 flex-wrap">
                         <span className={`text-[10px] ${
                           task.taskStatus === 1 ? 'text-yellow-400' :
                           task.taskStatus === 2 ? 'text-sky-400' :
@@ -197,6 +201,11 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
                         }`}>
                           {statusLabels[task.taskStatus]}
                         </span>
+                        {showDeadlineAlert && (
+                          <span className={`rounded border px-1 py-0.5 text-[9px] font-semibold ${deadlineStyles[deadlineStatus].badge}`}>
+                            {deadlineLabel}
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -250,9 +259,12 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
               </div>
               {sortedTasks.withoutStartDate.map(task => {
                 const colors = statusColors[task.taskStatus] || statusColors[1];
+                const deadlineStatus = task.taskStatus !== 3 ? getDeadlineStatus(task.endAt) : 'normal';
+                const deadlineLabel = getDeadlineLabel(deadlineStatus, task.endAt);
+                const showDeadlineAlert = deadlineStatus === 'overdue' || deadlineStatus === 'today' || deadlineStatus === 'soon';
 
                 return (
-                  <div key={task.taskId} className="group flex items-center hover:bg-white/5">
+                  <div key={task.taskId} className={`group flex items-center hover:bg-white/5 ${deadlineStyles[deadlineStatus].bg}`}>
                     <div
                       className="w-[200px] flex-shrink-0 cursor-pointer truncate px-3 py-3"
                       onClick={() => handleTaskClick(task.taskId)}
@@ -260,7 +272,7 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
                       <span className="text-sm font-medium text-slate-200 group-hover:text-white">
                         {task.taskName}
                       </span>
-                      <div className="mt-0.5 flex items-center gap-2">
+                      <div className="mt-0.5 flex items-center gap-2 flex-wrap">
                         <span className={`text-[10px] ${
                           task.taskStatus === 1 ? 'text-yellow-400' :
                           task.taskStatus === 2 ? 'text-sky-400' :
@@ -268,6 +280,11 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
                         }`}>
                           {statusLabels[task.taskStatus]}
                         </span>
+                        {showDeadlineAlert && (
+                          <span className={`rounded border px-1 py-0.5 text-[9px] font-semibold ${deadlineStyles[deadlineStatus].badge}`}>
+                            {deadlineLabel}
+                          </span>
+                        )}
                       </div>
                     </div>
 

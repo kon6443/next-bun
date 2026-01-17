@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { DndContext, closestCenter, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 
@@ -9,8 +10,10 @@ import { Column } from '../../components/Column';
 import { GanttChart } from '../../components/GanttChart';
 import { ListView } from '../../components/ListView';
 import { CalendarView } from '../../components/CalendarView';
+import { TaskFilters } from '../../components/TaskFilters';
 import { Button, ButtonLink, SectionLabel, ErrorAlert } from '../components';
 import type { Task } from '../../types/task';
+import { useTaskFilter } from '../../hooks/useTaskFilter';
 import {
   getTeamTasks,
   updateTaskStatus,
@@ -56,8 +59,24 @@ type TeamBoardProps = {
   teamId: string;
 };
 
+type ViewMode = 'kanban' | 'gantt' | 'list' | 'calendar';
+const validViewModes: ViewMode[] = ['kanban', 'gantt', 'list', 'calendar'];
+
 export default function TeamBoard({ teamId }: TeamBoardProps) {
   const { data: session } = useSession();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // URL 쿼리에서 viewMode 읽기
+  const getViewModeFromQuery = useCallback((): ViewMode => {
+    const viewParam = searchParams.get('view');
+    if (viewParam && validViewModes.includes(viewParam as ViewMode)) {
+      return viewParam as ViewMode;
+    }
+    return 'kanban';
+  }, [searchParams]);
+
   const [tasks, setTasks] = useState<Record<ColumnKey, Task[]>>({
     todo: [],
     inProgress: [],
@@ -75,7 +94,21 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [isCreatingInvite, setIsCreatingInvite] = useState(false);
   const [createdInviteLink, setCreatedInviteLink] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'kanban' | 'gantt' | 'list' | 'calendar'>('kanban');
+
+  // viewMode는 URL 쿼리에서 파생
+  const viewMode = getViewModeFromQuery();
+
+  // viewMode 변경 시 URL 업데이트
+  const setViewMode = useCallback((mode: ViewMode) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (mode === 'kanban') {
+      params.delete('view'); // 기본값은 쿼리에서 제거
+    } else {
+      params.set('view', mode);
+    }
+    const queryString = params.toString();
+    router.push(`${pathname}${queryString ? `?${queryString}` : ''}`, { scroll: false });
+  }, [router, pathname, searchParams]);
 
   // activationConstraint를 사용하여 클릭과 드래그 구분
   const sensors = useSensors(
@@ -194,24 +227,63 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     fetchTeamTasks();
   }, [teamId, session?.user?.accessToken, session?.user?.userId]);
 
-  const totalTasks = tasks.todo.length + tasks.inProgress.length + tasks.done.length;
-  const completionRate = totalTasks === 0 ? 0 : Math.round((tasks.done.length / totalTasks) * 100);
+  // 모든 태스크를 하나의 배열로 합침
+  const allTasks = useMemo(
+    () => [...tasks.todo, ...tasks.inProgress, ...tasks.done],
+    [tasks]
+  );
 
-  const stats = [
+  // 필터 훅 사용
+  const {
+    filters,
+    setSearchQuery,
+    setAssigneeId,
+    setPeriod,
+    setStatus,
+    resetFilters,
+    filteredTasks,
+    stats,
+    assignees,
+    hasActiveFilters,
+  } = useTaskFilter(allTasks);
+
+  // 필터된 태스크를 컬럼별로 분류 (칸반용)
+  const filteredTasksByColumn = useMemo(() => {
+    const result: Record<ColumnKey, Task[]> = {
+      todo: [],
+      inProgress: [],
+      done: [],
+    };
+    filteredTasks.forEach(task => {
+      const columnKey = taskStatusToColumn[task.taskStatus] || 'todo';
+      result[columnKey].push(task);
+    });
+    return result;
+  }, [filteredTasks]);
+
+  // 통계 카드 데이터
+  const statsCards = [
     {
       label: '진행률',
-      value: `${completionRate}%`,
-      helper: '완료 대비 전체',
+      value: `${stats.completionRate}%`,
+      helper: `완료 ${stats.completed} / 전체 ${stats.total}`,
     },
     {
       label: '진행 중',
-      value: tasks.inProgress.length,
+      value: stats.inProgress,
       helper: '현재 집중 작업',
     },
     {
-      label: '초기 아이디어',
-      value: tasks.todo.length,
-      helper: '대기 중 카드',
+      label: '지연됨',
+      value: stats.overdue,
+      helper: '마감일 초과',
+      alert: stats.overdue > 0,
+    },
+    {
+      label: '마감 임박',
+      value: stats.dueToday + stats.dueSoon,
+      helper: `오늘 ${stats.dueToday} / D-3 ${stats.dueSoon}`,
+      warning: stats.dueToday > 0,
     },
   ];
 
@@ -399,11 +471,24 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
             </div>
           </div>
 
-          <div className='mt-6 sm:mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4'>
-            {stats.map(stat => (
-              <div key={stat.label} className='rounded-2xl border border-white/10 bg-slate-950/30 p-3 sm:p-4'>
+          <div className='mt-6 sm:mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4'>
+            {statsCards.map(stat => (
+              <div
+                key={stat.label}
+                className={`rounded-2xl border p-3 sm:p-4 ${
+                  stat.alert
+                    ? 'border-red-500/30 bg-red-500/10'
+                    : stat.warning
+                      ? 'border-orange-500/30 bg-orange-500/10'
+                      : 'border-white/10 bg-slate-950/30'
+                }`}
+              >
                 <SectionLabel spacing='tight' color='subtle'>{stat.label}</SectionLabel>
-                <p className='mt-3 text-3xl font-bold text-white'>{stat.value}</p>
+                <p className={`mt-3 text-3xl font-bold ${
+                  stat.alert ? 'text-red-400' : stat.warning ? 'text-orange-400' : 'text-white'
+                }`}>
+                  {stat.value}
+                </p>
                 <p className='mt-1 text-sm text-slate-500'>{stat.helper}</p>
               </div>
             ))}
@@ -606,6 +691,35 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           <ErrorAlert message={error} className='text-center' />
         )}
 
+        {/* 필터 UI */}
+        <TaskFilters
+          searchQuery={filters.searchQuery}
+          onSearchChange={setSearchQuery}
+          assigneeId={filters.assigneeId}
+          onAssigneeChange={setAssigneeId}
+          assignees={assignees}
+          period={filters.period}
+          onPeriodChange={setPeriod}
+          status={filters.status}
+          onStatusChange={setStatus}
+          taskCounts={{
+            total: stats.total,
+            todo: stats.todo,
+            inProgress: stats.inProgress,
+            done: stats.completed,
+          }}
+          hasActiveFilters={hasActiveFilters}
+          onResetFilters={resetFilters}
+          currentUserId={session?.user?.userId}
+        />
+
+        {/* 필터 결과 표시 */}
+        {hasActiveFilters && (
+          <div className='text-xs text-slate-500 mt-2'>
+            {filteredTasks.length}개 태스크 표시 중 (전체 {allTasks.length}개)
+          </div>
+        )}
+
         {/* 보기 전환 버튼 */}
         <div className='flex items-center justify-end gap-2 mb-4 flex-wrap'>
           <span className='text-xs text-slate-500 mr-2'>보기 방식:</span>
@@ -667,7 +781,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                     title={meta.title}
                     helper={meta.helper}
                     accent={meta.accent}
-                    tasks={tasks[columnKey]}
+                    tasks={filteredTasksByColumn[columnKey]}
                   />
                 );
               })}
@@ -675,17 +789,17 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           </DndContext>
         ) : viewMode === 'gantt' ? (
           <GanttChart
-            tasks={[...tasks.todo, ...tasks.inProgress, ...tasks.done]}
+            tasks={filteredTasks}
             teamId={teamId}
           />
         ) : viewMode === 'list' ? (
           <ListView
-            tasks={[...tasks.todo, ...tasks.inProgress, ...tasks.done]}
+            tasks={filteredTasks}
             teamId={teamId}
           />
         ) : (
           <CalendarView
-            tasks={[...tasks.todo, ...tasks.inProgress, ...tasks.done]}
+            tasks={filteredTasks}
             teamId={teamId}
           />
         )}

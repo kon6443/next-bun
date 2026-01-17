@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from '../types/task';
+import { getDeadlineStatus, getDeadlineLabel, deadlineStyles } from '../utils/taskUtils';
 
 type ListViewProps = {
   tasks: Task[];
@@ -42,19 +43,11 @@ export function ListView({ tasks, teamId }: ListViewProps) {
   const router = useRouter();
   const [sortKey, setSortKey] = useState<SortKey>('crtdAt');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
-  const [statusFilter, setStatusFilter] = useState<number | null>(null);
 
-  // 필터링 및 정렬된 태스크
-  const filteredAndSortedTasks = useMemo(() => {
-    let filtered = tasks;
-
-    // 상태 필터링
-    if (statusFilter !== null) {
-      filtered = filtered.filter(task => task.taskStatus === statusFilter);
-    }
-
+  // 정렬된 태스크
+  const sortedTasks = useMemo(() => {
     // 정렬
-    const sorted = [...filtered].sort((a, b) => {
+    const sorted = [...tasks].sort((a, b) => {
       let aValue: string | number | Date | null;
       let bValue: string | number | Date | null;
 
@@ -93,7 +86,7 @@ export function ListView({ tasks, teamId }: ListViewProps) {
     });
 
     return sorted;
-  }, [tasks, sortKey, sortOrder, statusFilter]);
+  }, [tasks, sortKey, sortOrder]);
 
   // 정렬 토글
   const handleSort = (key: SortKey) => {
@@ -122,21 +115,11 @@ export function ListView({ tasks, teamId }: ListViewProps) {
       <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <p className="text-[0.7rem] uppercase tracking-[0.4em] text-slate-400">List View</p>
-          <p className="mt-1 text-sm text-slate-500">정렬 및 필터링 가능</p>
+          <p className="mt-1 text-sm text-slate-500">컬럼 클릭으로 정렬</p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500">필터:</span>
-          <select
-            value={statusFilter ?? ''}
-            onChange={e => setStatusFilter(e.target.value === '' ? null : Number(e.target.value))}
-            className="rounded-lg border border-white/10 bg-slate-900/50 px-3 py-1.5 text-xs text-slate-200 focus:border-white/20 focus:outline-none"
-          >
-            <option value="">전체 ({tasks.length})</option>
-            <option value="1">Ideation ({tasks.filter(t => t.taskStatus === 1).length})</option>
-            <option value="2">In Progress ({tasks.filter(t => t.taskStatus === 2).length})</option>
-            <option value="3">Completed ({tasks.filter(t => t.taskStatus === 3).length})</option>
-          </select>
-        </div>
+        <span className="text-xs font-semibold text-slate-400">
+          {tasks.length} tasks
+        </span>
       </div>
 
       {/* 테이블 */}
@@ -183,19 +166,23 @@ export function ListView({ tasks, teamId }: ListViewProps) {
             </tr>
           </thead>
           <tbody>
-            {filteredAndSortedTasks.length === 0 ? (
+            {sortedTasks.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-500">
                   표시할 태스크가 없습니다
                 </td>
               </tr>
             ) : (
-              filteredAndSortedTasks.map(task => {
+              sortedTasks.map(task => {
                 const status = statusConfig[task.taskStatus] || statusConfig[1];
+                const deadlineStatus = task.taskStatus !== 3 ? getDeadlineStatus(task.endAt) : 'normal';
+                const deadlineLabel = getDeadlineLabel(deadlineStatus, task.endAt);
+                const showDeadlineAlert = deadlineStatus === 'overdue' || deadlineStatus === 'today' || deadlineStatus === 'soon';
+
                 return (
                   <tr
                     key={task.taskId}
-                    className="cursor-pointer border-b border-white/5 transition hover:bg-white/5"
+                    className={`cursor-pointer border-b border-white/5 transition hover:bg-white/5 ${deadlineStyles[deadlineStatus].bg}`}
                     onClick={() => handleRowClick(task.taskId)}
                   >
                     <td className="px-4 py-3">
@@ -217,8 +204,17 @@ export function ListView({ tasks, teamId }: ListViewProps) {
                     <td className="px-4 py-3 text-sm text-slate-400">
                       {formatDate(task.startAt)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-400">
-                      {formatDate(task.endAt)}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm ${deadlineStyles[deadlineStatus].text}`}>
+                          {formatDate(task.endAt)}
+                        </span>
+                        {showDeadlineAlert && (
+                          <span className={`rounded border px-1.5 py-0.5 text-[9px] font-semibold ${deadlineStyles[deadlineStatus].badge}`}>
+                            {deadlineLabel}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-400">
                       {formatDate(task.crtdAt)}
@@ -233,8 +229,7 @@ export function ListView({ tasks, teamId }: ListViewProps) {
 
       {/* 결과 카운트 */}
       <div className="mt-4 text-right text-xs text-slate-500">
-        {filteredAndSortedTasks.length}개 태스크
-        {statusFilter !== null && ` (전체 ${tasks.length}개 중)`}
+        {sortedTasks.length}개 태스크
       </div>
     </div>
   );
