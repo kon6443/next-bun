@@ -16,6 +16,7 @@ import {
   Button,
   ButtonLink,
   SectionLabel,
+  DateInfoCard,
   ErrorAlert,
 } from "../../../components";
 import { cardStyles } from "@/styles/teams";
@@ -534,41 +535,28 @@ export default function TaskDetailPage({
             <>
               {taskDetail.taskDescription && (
                 <div className="mb-6 rounded-2xl border border-sky-500/30 bg-slate-900/50 p-6 sm:p-8 shadow-lg shadow-sky-500/10">
-                  <p className="text-lg sm:text-xl leading-relaxed text-slate-200">
+                  <p className="whitespace-pre-wrap text-lg sm:text-xl leading-relaxed text-slate-200">
                     {taskDetail.taskDescription}
                   </p>
                 </div>
               )}
 
               <div className="grid gap-3 sm:gap-4 sm:grid-cols-2">
-                {taskDetail.startAt && (
-                  <div key="startAt" className="rounded-xl border border-white/10 bg-slate-950/30 p-3 sm:p-4">
-                    <SectionLabel spacing="tight" color="subtle">
-                      시작일
-                    </SectionLabel>
-                    <p className="mt-1.5 sm:mt-2 text-sm text-slate-300">
-                      {formatDate(taskDetail.startAt)}
-                    </p>
-                  </div>
-                )}
-                {taskDetail.endAt && (
-                  <div key="endAt" className="rounded-xl border border-white/10 bg-slate-950/30 p-3 sm:p-4">
-                    <SectionLabel spacing="tight" color="subtle">
-                      종료일
-                    </SectionLabel>
-                    <p className="mt-1.5 sm:mt-2 text-sm text-slate-300">
-                      {formatDate(taskDetail.endAt)}
-                    </p>
-                  </div>
-                )}
-                <div key="crtdAt" className="rounded-xl border border-white/10 bg-slate-950/30 p-3 sm:p-4">
-                  <SectionLabel spacing="tight" color="subtle">
-                    생성일
-                  </SectionLabel>
-                  <p className="mt-1.5 sm:mt-2 text-sm text-slate-400">
-                    {formatDate(taskDetail.crtdAt)}
-                  </p>
-                </div>
+                <DateInfoCard
+                  label="시작일"
+                  date={taskDetail.startAt}
+                  variant="default"
+                />
+                <DateInfoCard
+                  label="종료일"
+                  date={taskDetail.endAt}
+                  variant="default"
+                />
+                <DateInfoCard
+                  label="생성일"
+                  date={taskDetail.crtdAt}
+                  variant="muted"
+                />
               </div>
             </>
           )}
