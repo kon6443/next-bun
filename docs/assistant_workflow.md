@@ -1,26 +1,22 @@
-## Assistant Workflow Notes
+## 어시스턴트 작업 규칙
 
-This document defines recurring actions to perform automatically to improve
-speed and accuracy. It is intended for future reference and should be updated
-as needs evolve.
+이 문서는 반복 작업을 자동화해 정확도와 속도를 높이기 위한 기준입니다.
+필요할 때 언제든 수정할 수 있도록 간결하게 유지합니다.
 
-### Defaults for Repetitive Tasks
-- After any code edit, run lints on modified files.
-- If a build error is reported, fix the error and re-run the build.
-- Prefer minimal, safe changes first; expand scope only if needed.
-- Avoid conditional hook calls; check rules-of-hooks on React changes.
-- Keep logging/diagnostic changes gated (query flag or env) to avoid noise.
+### 반복 작업 기본 규칙
+- 요청이 모호하거나 필요한 정보가 부족하면 작업 시작 전에 충분히 질문한다.
+- 요구사항이 명확해지고 준비가 끝나면 그때 작업을 실행한다.
+- 코드 변경 후에는 수정된 파일만 린트를 실행한다.
+- 빌드 에러가 발생하면 원인을 수정한 뒤 다시 빌드를 수행한다.
+- 변경 영향이 크거나 배포 이슈가 의심되면 `pnpm run build`로 빌드 테스트를 수행한다.
+- 안전하고 작은 변경을 우선 적용하고, 필요 시 범위를 확장한다.
+- React 훅은 조건부 호출을 피하고 rules-of-hooks를 확인한다.
+- 진단/로그는 쿼리 플래그나 환경 변수로 제한해 노이즈를 줄인다.
 
-### Diagnostics First
-- When performance issues are reported, add timing logs at the client and
-  server boundary to isolate the slow segment.
-- Record measured timings and confirm which layer is slow before refactoring.
+### 태스크별 규칙
+- 진단/성능 관련 규칙은 `/docs/assistant_rules_diagnostics.md`를 따른다.
+- NextAuth 관련 규칙은 `/docs/assistant_rules_nextauth.md`를 따른다.
 
-### NextAuth-Specific Checks
-- Ensure NextAuth route handlers forward the correct arguments to `handler`.
-- Avoid inflating session/JWT payloads unless necessary.
-- Minimize `/api/auth/session` fetches on page load when possible.
-
-### Documentation Location Policy
-- Create future process documents under `/docs`.
-- Prefer short, focused files with clear headings.
+### 문서 위치 규칙
+- 새로운 규칙/절차 문서는 `/docs` 아래에 만든다.
+- 용도별로 파일을 분리하되, 내용이 겹치면 합친다.
