@@ -20,3 +20,19 @@ body {
   font-family: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
 }
+
+/* 바형 게이지 로딩 애니메이션 */
+@keyframes barLoader {
+  0%, 100% {
+    transform: scaleY(0.4);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+.animate-barLoader {
+  animation: barLoader 1s ease-in-out infinite;
+}
