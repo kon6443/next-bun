@@ -6,6 +6,7 @@ import { DndContext, closestCenter, DragEndEvent, PointerSensor, useSensor, useS
 import { arrayMove } from '@dnd-kit/sortable';
 
 import { Column } from '../../components/Column';
+import { GanttChart } from '../../components/GanttChart';
 import { Button, ButtonLink, SectionLabel, ErrorAlert } from '../components';
 import type { Task } from '../../types/task';
 import {
@@ -72,6 +73,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [isCreatingInvite, setIsCreatingInvite] = useState(false);
   const [createdInviteLink, setCreatedInviteLink] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'kanban' | 'gantt'>('kanban');
 
   // activationConstraint를 사용하여 클릭과 드래그 구분
   const sensors = useSensors(
@@ -602,11 +604,36 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           <ErrorAlert message={error} className='text-center' />
         )}
 
+        {/* 보기 전환 버튼 */}
+        <div className='flex items-center justify-end gap-2 mb-4'>
+          <span className='text-xs text-slate-500 mr-2'>보기 방식:</span>
+          <button
+            onClick={() => setViewMode('kanban')}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
+              viewMode === 'kanban'
+                ? 'bg-gradient-to-r from-indigo-500 to-sky-500 text-white shadow-lg shadow-sky-500/30'
+                : 'border border-white/20 bg-white/5 text-slate-300 hover:bg-white/10'
+            }`}
+          >
+            칸반 보드
+          </button>
+          <button
+            onClick={() => setViewMode('gantt')}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
+              viewMode === 'gantt'
+                ? 'bg-gradient-to-r from-indigo-500 to-sky-500 text-white shadow-lg shadow-sky-500/30'
+                : 'border border-white/20 bg-white/5 text-slate-300 hover:bg-white/10'
+            }`}
+          >
+            타임라인
+          </button>
+        </div>
+
         {isLoading ? (
           <div className={`${cardStyles.section} p-8 text-center text-slate-400`}>
             태스크 목록을 불러오는 중...
           </div>
-        ) : (
+        ) : viewMode === 'kanban' ? (
           <DndContext sensors={sensors} onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
             <div className='grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6'>
               {(Object.keys(columnMeta) as ColumnKey[]).map(columnKey => {
@@ -624,6 +651,11 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
               })}
             </div>
           </DndContext>
+        ) : (
+          <GanttChart
+            tasks={[...tasks.todo, ...tasks.inProgress, ...tasks.done]}
+            teamId={teamId}
+          />
         )}
       </main>
 
