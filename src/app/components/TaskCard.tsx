@@ -9,7 +9,7 @@ type TaskCardProps = {
 };
 
 export function TaskCard({ task }: TaskCardProps) {
-  const { taskId, taskName, taskDescription, endAt, teamId } = task;
+  const { taskId, taskName, taskDescription, endAt, teamId, userName, crtdBy } = task;
   const router = useRouter();
 
   const {
@@ -74,8 +74,11 @@ export function TaskCard({ task }: TaskCardProps) {
         </p>
       )}
 
-      <div className="mt-4 flex items-center justify-end">
-        <span className="text-xs font-semibold text-slate-400">드래그 가능</span>
+      <div className="mt-4 flex items-center justify-between">
+        <span className="text-xs text-slate-500 truncate max-w-[60%]">
+          {userName || `사용자 ${crtdBy}`}
+        </span>
+        <span className="text-xs font-semibold text-slate-400 flex-shrink-0">드래그 가능</span>
       </div>
     </article>
   );
