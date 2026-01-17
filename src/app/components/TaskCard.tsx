@@ -3,13 +3,14 @@ import { CSS } from "@dnd-kit/utilities";
 import { useRouter } from "next/navigation";
 
 import type { Task } from "../types/task";
+import { getDeadlineStatus, getDeadlineLabel, deadlineStyles } from "../utils/taskUtils";
 
 type TaskCardProps = {
   task: Task;
 };
 
 export function TaskCard({ task }: TaskCardProps) {
-  const { taskId, taskName, taskDescription, endAt, teamId, userName, crtdBy } = task;
+  const { taskId, taskName, taskDescription, endAt, teamId, userName, crtdBy, taskStatus } = task;
   const router = useRouter();
 
   const {
@@ -37,6 +38,11 @@ export function TaskCard({ task }: TaskCardProps) {
 
   const endDateStr = endAt ? formatDate(endAt) : null;
 
+  // 마감일 상태 (완료된 태스크는 표시 안함)
+  const deadlineStatus = taskStatus !== 3 ? getDeadlineStatus(endAt) : 'normal';
+  const deadlineLabel = getDeadlineLabel(deadlineStatus, endAt);
+  const showDeadlineAlert = deadlineStatus === 'overdue' || deadlineStatus === 'today' || deadlineStatus === 'soon';
+
   const handleClick = (e: React.MouseEvent) => {
     // 드래그 중이 아닐 때만 클릭 처리
     // activationConstraint로 인해 8px 미만의 이동은 클릭으로 처리됨
@@ -60,11 +66,18 @@ export function TaskCard({ task }: TaskCardProps) {
           : "hover:-translate-y-0.5"
       }`}
     >
-      {endDateStr && (
-        <div className="flex items-center justify-end text-xs text-slate-500">
-          <span className="text-[0.65rem] font-normal tracking-normal">
-            {endDateStr}
-          </span>
+      {(endDateStr || showDeadlineAlert) && (
+        <div className="flex items-center justify-end gap-2 text-xs">
+          {showDeadlineAlert && (
+            <span className={`rounded border px-1.5 py-0.5 text-[0.6rem] font-semibold ${deadlineStyles[deadlineStatus].badge}`}>
+              {deadlineLabel}
+            </span>
+          )}
+          {endDateStr && (
+            <span className={`text-[0.65rem] font-normal tracking-normal ${deadlineStyles[deadlineStatus].text}`}>
+              {endDateStr}
+            </span>
+          )}
         </div>
       )}
       <h3 className="mt-3 text-lg font-semibold text-white">{taskName}</h3>

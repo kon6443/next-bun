@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from '../types/task';
+import { getDeadlineStatus } from '../utils/taskUtils';
 
 type CalendarViewProps = {
   tasks: Task[];
@@ -14,6 +15,15 @@ const statusColors: Record<number, string> = {
   1: 'bg-gradient-to-r from-yellow-500/80 to-orange-500/80 border-yellow-500/50',
   2: 'bg-gradient-to-r from-sky-500/80 to-indigo-500/80 border-sky-500/50',
   3: 'bg-gradient-to-r from-emerald-500/80 to-green-500/80 border-emerald-500/50',
+};
+
+// 마감일 상태에 따른 테두리 색상
+const deadlineBorderColors: Record<string, string> = {
+  overdue: 'ring-2 ring-red-500/50',
+  today: 'ring-2 ring-orange-500/50',
+  soon: 'ring-1 ring-yellow-500/50',
+  normal: '',
+  none: '',
 };
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -204,18 +214,21 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
 
               {/* 태스크 목록 (최대 3개) */}
               <div className="space-y-1">
-                {dayTasks.slice(0, 3).map(task => (
-                  <div
-                    key={task.taskId}
-                    onClick={e => handleTaskClick(e, task.taskId)}
-                    className={`cursor-pointer truncate rounded border px-1.5 py-0.5 text-[10px] font-medium text-white transition hover:brightness-110 ${
-                      statusColors[task.taskStatus] || statusColors[1]
-                    }`}
-                    title={task.taskName}
-                  >
-                    {task.taskName}
-                  </div>
-                ))}
+                {dayTasks.slice(0, 3).map(task => {
+                  const deadlineStatus = task.taskStatus !== 3 ? getDeadlineStatus(task.endAt) : 'normal';
+                  return (
+                    <div
+                      key={task.taskId}
+                      onClick={e => handleTaskClick(e, task.taskId)}
+                      className={`cursor-pointer truncate rounded border px-1.5 py-0.5 text-[10px] font-medium text-white transition hover:brightness-110 ${
+                        statusColors[task.taskStatus] || statusColors[1]
+                      } ${deadlineBorderColors[deadlineStatus]}`}
+                      title={`${task.taskName}${deadlineStatus === 'overdue' ? ' (지연됨)' : deadlineStatus === 'today' ? ' (오늘 마감)' : ''}`}
+                    >
+                      {task.taskName}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );
