@@ -6,7 +6,7 @@ import { SessionProvider as Provider, signOut, useSession } from "next-auth/reac
 
 type Props = {
   children: React.ReactNode;
-  session: Session | null;
+  session?: Session | null;
 };
 
 function DevBackendAccessTokenCookieSync() {
