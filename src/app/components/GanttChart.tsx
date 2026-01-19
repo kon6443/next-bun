@@ -239,8 +239,8 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
                           onClick={() => handleTaskClick(task.taskId)}
                           title={`${task.taskName}\n${task.startAt ? new Date(task.startAt).toLocaleDateString('ko-KR') : ''} ~ ${task.endAt ? new Date(task.endAt).toLocaleDateString('ko-KR') : ''}`}
                         >
-                          <span className="absolute inset-0 flex items-center justify-center overflow-hidden px-2 text-[10px] font-semibold text-white drop-shadow">
-                            {barStyle.width > 80 ? task.taskName : ''}
+                          <span className="absolute inset-0 flex items-center justify-center overflow-hidden px-2 text-[10px] font-semibold text-white drop-shadow truncate">
+                            {task.taskName}
                           </span>
                         </div>
                       )}
