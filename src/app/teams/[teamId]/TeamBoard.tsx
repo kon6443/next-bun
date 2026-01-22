@@ -69,6 +69,39 @@ type TeamBoardProps = {
   teamId: string;
 };
 
+// 권한에 따른 배지 스타일 정의
+function getRoleBadge(role: string | null | undefined) {
+  const roleUpper = (role || 'MEMBER').trim().toUpperCase();
+  if (roleUpper === 'MASTER') {
+    return {
+      label: '마스터',
+      className:
+        'rounded-full bg-gradient-to-r from-yellow-500/20 to-orange-500/20 px-2 py-0.5 text-xs font-semibold text-yellow-400 border border-yellow-500/30',
+    };
+  } else if (roleUpper === 'MANAGER') {
+    return {
+      label: '매니저',
+      className:
+        'rounded-full bg-gradient-to-r from-blue-500/20 to-indigo-500/20 px-2 py-0.5 text-xs font-semibold text-blue-400 border border-blue-500/30',
+    };
+  } else {
+    return {
+      label: '멤버',
+      className:
+        'rounded-full bg-gradient-to-r from-slate-500/20 to-slate-600/20 px-2 py-0.5 text-xs font-semibold text-slate-400 border border-slate-500/30',
+    };
+  }
+}
+
+// 날짜 포맷 헬퍼 함수
+function formatMemberDate(date: Date) {
+  return new Date(date).toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
 type ViewMode = 'kanban' | 'gantt' | 'list' | 'calendar';
 const validViewModes: ViewMode[] = ['kanban', 'gantt', 'list', 'calendar'];
 
@@ -100,8 +133,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   const [error, setError] = useState<string | null>(null);
   const [canManageInvites, setCanManageInvites] = useState(false);
   const [invites, setInvites] = useState<TeamInviteResponse[]>([]);
-  const [isInvitesOpen, setIsInvitesOpen] = useState(false);
-  const [isMembersOpen, setIsMembersOpen] = useState(false);
+  const [isTeamManagementOpen, setIsTeamManagementOpen] = useState(false);
+  const [teamManagementTab, setTeamManagementTab] = useState<'members' | 'invites'>('members');
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [isCreatingInvite, setIsCreatingInvite] = useState(false);
   const [createdInviteLink, setCreatedInviteLink] = useState<string | null>(null);
@@ -597,197 +630,176 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           </div>
         </section>
 
-        {/* 팀 멤버 목록 */}
-        <section className={`${cardStyles.section} p-4 sm:p-8`}>
-          <div className='mb-6 flex items-start justify-between gap-4'>
-            <div>
-              <SectionLabel>Team Members</SectionLabel>
-              <h2 className='mt-4 text-2xl font-bold text-white md:text-3xl'>
-                팀 멤버 <span className='text-slate-400'>({members.length})</span>
-              </h2>
+        {/* 팀 관리 (멤버 + 초대 링크) */}
+        <section className={`${cardStyles.section} p-4 sm:p-6`}>
+          {/* 컴팩트 헤더 */}
+          <div className='flex items-center justify-between'>
+            <div className='flex items-center gap-3'>
+              <SectionLabel>Team Management</SectionLabel>
+              <span className='text-sm text-slate-500'>
+                멤버 {members.length}명
+                {canManageInvites && ` · 초대 ${invites.length}개`}
+              </span>
             </div>
             <Button
               variant='secondary'
               size='sm'
-              onClick={() => setIsMembersOpen(v => !v)}
-              className='mt-4'
+              onClick={() => setIsTeamManagementOpen(v => !v)}
             >
-              {isMembersOpen ? '접기 ▾' : '펼치기 ▸'}
+              {isTeamManagementOpen ? '접기 ▾' : '펼치기 ▸'}
             </Button>
           </div>
 
-          {isMembersOpen && (
+          {/* 펼쳐진 상태일 때만 표시 */}
+          {isTeamManagementOpen && (
             <>
-              {members.length === 0 ? (
-                <div className='rounded-2xl border border-dashed border-white/20 px-6 py-10 text-center text-slate-400'>
-                  멤버 정보를 불러오는 중...
+              {/* 탭 버튼 */}
+              <div className='mt-4 flex gap-2'>
+                <button
+                  onClick={() => setTeamManagementTab('members')}
+                  className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
+                    teamManagementTab === 'members'
+                      ? 'bg-gradient-to-r from-indigo-500/20 to-sky-500/20 text-white border border-white/10'
+                      : 'text-slate-400 hover:text-slate-300 border border-transparent'
+                  }`}
+                >
+                  멤버 ({members.length})
+                </button>
+                {canManageInvites && (
+                  <button
+                    onClick={() => setTeamManagementTab('invites')}
+                    className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
+                      teamManagementTab === 'invites'
+                        ? 'bg-gradient-to-r from-indigo-500/20 to-sky-500/20 text-white border border-white/10'
+                        : 'text-slate-400 hover:text-slate-300 border border-transparent'
+                    }`}
+                  >
+                    초대 링크 ({invites.length})
+                  </button>
+                )}
+              </div>
+
+              {/* 멤버 탭 내용 */}
+              {teamManagementTab === 'members' && (
+                <div className='mt-4'>
+                  {members.length === 0 ? (
+                    <div className='rounded-2xl border border-dashed border-white/20 px-6 py-10 text-center text-slate-400'>
+                      멤버 정보를 불러오는 중...
+                    </div>
+                  ) : (
+                    <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
+                      {members.map(member => {
+                        const isCurrentUser = session?.user?.userId === member.userId;
+                        const roleBadge = getRoleBadge(member.role);
+
+                        return (
+                          <div
+                            key={member.userId}
+                            className='rounded-2xl border border-white/10 bg-slate-950/30 p-4 sm:p-6'
+                          >
+                            <div className='flex items-center justify-between'>
+                              <div className='flex-1'>
+                                <div className='flex items-center gap-2 flex-wrap'>
+                                  <p className='text-lg font-semibold text-white'>
+                                    {member.userName || `사용자 ${member.userId}`}
+                                  </p>
+                                  <span className={roleBadge.className}>{roleBadge.label}</span>
+                                  {isCurrentUser && (
+                                    <span className='rounded-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 px-2 py-0.5 text-xs font-semibold text-purple-400 border border-purple-500/30'>
+                                      나
+                                    </span>
+                                  )}
+                                </div>
+                                <p className='mt-2 text-xs text-slate-500'>
+                                  가입일: {formatMemberDate(member.joinedAt)}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
-                  {members.map(member => {
-                    const isCurrentUser = session?.user?.userId === member.userId;
-                    const formatDate = (date: Date) => {
-                      return new Date(date).toLocaleDateString('ko-KR', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      });
-                    };
+              )}
 
-                    // 권한에 따른 배지 스타일 정의
-                    // role 값으로만 판단 (MASTER, MANAGER, MEMBER)
-                    const getRoleBadge = (role: string | null | undefined) => {
-                      const roleUpper = (role || 'MEMBER').trim().toUpperCase();
-                      if (roleUpper === 'MASTER') {
-                        return {
-                          label: '마스터',
-                          className:
-                            'rounded-full bg-gradient-to-r from-yellow-500/20 to-orange-500/20 px-2 py-0.5 text-xs font-semibold text-yellow-400 border border-yellow-500/30',
-                        };
-                      } else if (roleUpper === 'MANAGER') {
-                        return {
-                          label: '매니저',
-                          className:
-                            'rounded-full bg-gradient-to-r from-blue-500/20 to-indigo-500/20 px-2 py-0.5 text-xs font-semibold text-blue-400 border border-blue-500/30',
-                        };
-                      } else {
-                        return {
-                          label: '멤버',
-                          className:
-                            'rounded-full bg-gradient-to-r from-slate-500/20 to-slate-600/20 px-2 py-0.5 text-xs font-semibold text-slate-400 border border-slate-500/30',
-                        };
-                      }
-                    };
+              {/* 초대 링크 탭 내용 (권한 체크) */}
+              {teamManagementTab === 'invites' && canManageInvites && (
+                <div className='mt-4'>
+                  {invites.length === 0 ? (
+                    <div className='rounded-2xl border border-dashed border-white/20 px-6 py-10 text-center text-slate-400'>
+                      생성된 초대 링크가 없습니다.
+                    </div>
+                  ) : (
+                    <div className='grid gap-4'>
+                      {invites.map(invite => {
+                        const isExpired = new Date(invite.endAt) < new Date();
+                        const isMaxReached = invite.usageCurCnt >= invite.usageMaxCnt;
+                        const isActive = invite.actStatus === 1 && !isExpired && !isMaxReached;
 
-                    const roleBadge = getRoleBadge(member.role);
+                        // 초대 링크 URL 생성 (프론트엔드 URL + 토큰)
+                        const inviteUrl = `${
+                          typeof window !== 'undefined' ? window.location.origin : ''
+                        }/teams/invite/accept?token=${encodeURIComponent(invite.token)}`;
 
-                    return (
-                      <div
-                        key={member.userId}
-                        className='rounded-2xl border border-white/10 bg-slate-950/30 p-4 sm:p-6'
-                      >
-                        <div className='flex items-center justify-between'>
-                          <div className='flex-1'>
-                            <div className='flex items-center gap-2 flex-wrap'>
-                              <p className='text-lg font-semibold text-white'>
-                                {member.userName || `사용자 ${member.userId}`}
-                              </p>
-                              <span className={roleBadge.className}>{roleBadge.label}</span>
-                              {isCurrentUser && (
-                                <span className='rounded-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 px-2 py-0.5 text-xs font-semibold text-purple-400 border border-purple-500/30'>
-                                  나
-                                </span>
+                        return (
+                          <div
+                            key={invite.invId}
+                            className={`rounded-2xl border p-4 sm:p-6 ${
+                              isActive
+                                ? 'border-white/10 bg-slate-950/30'
+                                : 'border-slate-700/50 bg-slate-950/10 opacity-60'
+                            }`}
+                          >
+                            <div className='flex flex-col sm:flex-row items-start justify-between gap-4'>
+                              <div className='flex-1'>
+                                <div className='mb-2 flex items-center gap-2'>
+                                  <p className='text-sm font-semibold text-slate-300'>
+                                    초대 링크 #{invite.invId}
+                                  </p>
+                                  {isActive ? (
+                                    <span className='rounded-full border border-green-500/30 bg-green-500/20 px-2 py-0.5 text-xs font-semibold text-green-400'>
+                                      활성
+                                    </span>
+                                  ) : (
+                                    <span className='rounded-full border border-slate-500/30 bg-slate-500/20 px-2 py-0.5 text-xs font-semibold text-slate-400'>
+                                      비활성
+                                    </span>
+                                  )}
+                                </div>
+                                <div className='space-y-1 text-sm text-slate-400'>
+                                  <p>
+                                    사용 횟수: {invite.usageCurCnt} / {invite.usageMaxCnt}
+                                  </p>
+                                  <p>만료일: {formatDate(invite.endAt)}</p>
+                                  <p>생성일: {formatDate(invite.crtdAt)}</p>
+                                </div>
+                                {isActive && (
+                                  <div className='mt-4 rounded-lg border border-white/5 bg-slate-900/50 p-3'>
+                                    <p className='mb-1 text-xs text-slate-500'>초대 링크:</p>
+                                    <p className='break-all font-mono text-xs text-slate-300'>{inviteUrl}</p>
+                                  </div>
+                                )}
+                              </div>
+                              {isActive && (
+                                <button
+                                  onClick={() => handleCopyInviteLink(inviteUrl)}
+                                  className='mt-4 sm:mt-0 w-full sm:w-auto whitespace-nowrap rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-xs sm:text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
+                                >
+                                  링크 복사
+                                </button>
                               )}
                             </div>
-                            <p className='mt-2 text-xs text-slate-500'>
-                              가입일: {formatDate(member.joinedAt)}
-                            </p>
                           </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </>
           )}
         </section>
-
-        {/* 초대 링크 목록 (마스터/매니저만 표시) */}
-        {canManageInvites && (
-          <section className={`${cardStyles.section} p-4 sm:p-8`}>
-            <div className='mb-6 flex items-start justify-between gap-4'>
-              <div>
-                <SectionLabel>Team Invites</SectionLabel>
-                <h2 className='mt-4 text-2xl font-bold text-white md:text-3xl'>
-                  초대 링크 목록 <span className='text-slate-400'>({invites.length})</span>
-                </h2>
-              </div>
-              <Button
-                variant='secondary'
-                size='sm'
-                onClick={() => setIsInvitesOpen(v => !v)}
-                className='mt-4'
-              >
-                {isInvitesOpen ? '접기 ▾' : '펼치기 ▸'}
-              </Button>
-            </div>
-
-            {isInvitesOpen && (
-              <>
-                {invites.length === 0 ? (
-                  <div className='rounded-2xl border border-dashed border-white/20 px-6 py-10 text-center text-slate-400'>
-                    생성된 초대 링크가 없습니다.
-                  </div>
-                ) : (
-                  <div className='grid gap-4'>
-                    {invites.map(invite => {
-                      const isExpired = new Date(invite.endAt) < new Date();
-                      const isMaxReached = invite.usageCurCnt >= invite.usageMaxCnt;
-                      const isActive = invite.actStatus === 1 && !isExpired && !isMaxReached;
-
-                      // 초대 링크 URL 생성 (프론트엔드 URL + 토큰)
-                      const inviteUrl = `${
-                        typeof window !== 'undefined' ? window.location.origin : ''
-                      }/teams/invite/accept?token=${encodeURIComponent(invite.token)}`;
-
-                      return (
-                        <div
-                          key={invite.invId}
-                          className={`rounded-2xl border p-6 ${
-                            isActive
-                              ? 'border-white/10 bg-slate-950/30'
-                              : 'border-slate-700/50 bg-slate-950/10 opacity-60'
-                          }`}
-                        >
-                          <div className='flex flex-col sm:flex-row items-start justify-between gap-4'>
-                            <div className='flex-1'>
-                              <div className='mb-2 flex items-center gap-2'>
-                                <p className='text-sm font-semibold text-slate-300'>
-                                  초대 링크 #{invite.invId}
-                                </p>
-                                {isActive ? (
-                                  <span className='rounded-full border border-green-500/30 bg-green-500/20 px-2 py-0.5 text-xs font-semibold text-green-400'>
-                                    활성
-                                  </span>
-                                ) : (
-                                  <span className='rounded-full border border-slate-500/30 bg-slate-500/20 px-2 py-0.5 text-xs font-semibold text-slate-400'>
-                                    비활성
-                                  </span>
-                                )}
-                              </div>
-                              <div className='space-y-1 text-sm text-slate-400'>
-                                <p>
-                                  사용 횟수: {invite.usageCurCnt} / {invite.usageMaxCnt}
-                                </p>
-                                <p>만료일: {formatDate(invite.endAt)}</p>
-                                <p>생성일: {formatDate(invite.crtdAt)}</p>
-                              </div>
-                              {isActive && (
-                                <div className='mt-4 rounded-lg border border-white/5 bg-slate-900/50 p-3'>
-                                  <p className='mb-1 text-xs text-slate-500'>초대 링크:</p>
-                                  <p className='break-all font-mono text-xs text-slate-300'>{inviteUrl}</p>
-                                </div>
-                              )}
-                            </div>
-                            {isActive && (
-                              <button
-                                onClick={() => handleCopyInviteLink(inviteUrl)}
-                                className='mt-4 sm:mt-0 w-full sm:w-auto whitespace-nowrap rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-xs sm:text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
-                              >
-                                링크 복사
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
-            )}
-          </section>
-        )}
 
         {error && (
           <ErrorAlert message={error} className='text-center' />
