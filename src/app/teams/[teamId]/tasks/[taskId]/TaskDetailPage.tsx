@@ -542,7 +542,7 @@ export default function TaskDetailPage({
                               삭제된 댓글입니다.
                             </p>
                           ) : (
-                            <p className="mt-3 text-sm sm:text-base leading-relaxed text-slate-300">
+                            <p className="mt-3 text-sm sm:text-base leading-relaxed text-slate-300 whitespace-pre-wrap">
                               {comment.commentContent}
                             </p>
                           )}
