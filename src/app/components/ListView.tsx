@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from '../types/task';
 import { getDeadlineStatus, getDeadlineLabel, deadlineStyles } from '../utils/taskUtils';
+import { getStatusMeta } from '../config/taskStatusConfig';
 
 type ListViewProps = {
   tasks: Task[];
@@ -12,22 +13,6 @@ type ListViewProps = {
 
 type SortKey = 'taskName' | 'taskStatus' | 'userName' | 'startAt' | 'endAt' | 'crtdAt';
 type SortOrder = 'asc' | 'desc';
-
-// 상태별 색상 및 라벨
-const statusConfig: Record<number, { label: string; className: string }> = {
-  1: {
-    label: 'Ideation',
-    className: 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-400 border-yellow-500/30',
-  },
-  2: {
-    label: 'In Progress',
-    className: 'bg-gradient-to-r from-sky-500/20 to-indigo-500/20 text-sky-400 border-sky-500/30',
-  },
-  3: {
-    label: 'Completed',
-    className: 'bg-gradient-to-r from-emerald-500/20 to-green-500/20 text-emerald-400 border-emerald-500/30',
-  },
-};
 
 // 날짜 포맷
 function formatDate(date: Date | null): string {
@@ -174,7 +159,7 @@ export function ListView({ tasks, teamId }: ListViewProps) {
               </tr>
             ) : (
               sortedTasks.map(task => {
-                const status = statusConfig[task.taskStatus] || statusConfig[1];
+                const statusMeta = getStatusMeta(task.taskStatus);
                 const deadlineStatus = task.taskStatus !== 3 ? getDeadlineStatus(task.endAt) : 'normal';
                 const deadlineLabel = getDeadlineLabel(deadlineStatus, task.endAt);
                 const showDeadlineAlert = deadlineStatus === 'overdue' || deadlineStatus === 'today' || deadlineStatus === 'soon';
@@ -194,8 +179,8 @@ export function ListView({ tasks, teamId }: ListViewProps) {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-block rounded-full border px-2.5 py-1 text-[10px] font-semibold ${status.className}`}>
-                        {status.label}
+                      <span className={`inline-block rounded-full border px-2.5 py-1 text-[10px] font-semibold ${statusMeta.badgeClassName}`}>
+                        {statusMeta.label}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-400">

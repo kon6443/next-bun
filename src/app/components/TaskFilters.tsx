@@ -1,6 +1,7 @@
 'use client';
 
 import type { PeriodFilter, StatusFilter } from '../utils/taskUtils';
+import { getWorkflowStatuses } from '../config/taskStatusConfig';
 
 type TaskFiltersProps = {
   // 검색
@@ -145,9 +146,18 @@ export function TaskFilters({
             className="rounded-lg border border-white/10 bg-slate-900/50 px-3 py-2 text-xs text-slate-200 focus:border-white/20 focus:outline-none"
           >
             <option value="all">전체 상태 ({taskCounts.total})</option>
-            <option value="1">Ideation ({taskCounts.todo})</option>
-            <option value="2">In Progress ({taskCounts.inProgress})</option>
-            <option value="3">Completed ({taskCounts.done})</option>
+            {getWorkflowStatuses().map(statusMeta => {
+              const count = statusMeta.key === 1 
+                ? taskCounts.todo 
+                : statusMeta.key === 2 
+                  ? taskCounts.inProgress 
+                  : taskCounts.done;
+              return (
+                <option key={statusMeta.key} value={statusMeta.key}>
+                  {statusMeta.label} ({count})
+                </option>
+              );
+            })}
           </select>
 
           {/* 기간 필터 */}
