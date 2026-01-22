@@ -134,7 +134,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   const [canManageInvites, setCanManageInvites] = useState(false);
   const [invites, setInvites] = useState<TeamInviteResponse[]>([]);
   const [isTeamManagementOpen, setIsTeamManagementOpen] = useState(false);
-  const [teamManagementTab, setTeamManagementTab] = useState<'members' | 'invites'>('members');
+  const [teamManagementTab, setTeamManagementTab] = useState<'members' | 'stats' | 'invites'>('stats');
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [isCreatingInvite, setIsCreatingInvite] = useState(false);
   const [createdInviteLink, setCreatedInviteLink] = useState<string | null>(null);
@@ -605,29 +605,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
               </ButtonLink>
             </div>
           </div>
-
-          <div className='mt-6 sm:mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4'>
-            {statsCards.map(stat => (
-              <div
-                key={stat.label}
-                className={`rounded-2xl border p-3 sm:p-4 ${
-                  stat.alert
-                    ? 'border-red-500/30 bg-red-500/10'
-                    : stat.warning
-                      ? 'border-orange-500/30 bg-orange-500/10'
-                      : 'border-white/10 bg-slate-950/30'
-                }`}
-              >
-                <SectionLabel spacing='tight' color='subtle'>{stat.label}</SectionLabel>
-                <p className={`mt-3 text-3xl font-bold ${
-                  stat.alert ? 'text-red-400' : stat.warning ? 'text-orange-400' : 'text-white'
-                }`}>
-                  {stat.value}
-                </p>
-                <p className='mt-1 text-sm text-slate-500'>{stat.helper}</p>
-              </div>
-            ))}
-          </div>
         </section>
 
         {/* 팀 관리 (멤버 + 초대 링크) */}
@@ -637,7 +614,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
             <div className='flex items-center gap-3'>
               <SectionLabel>Team Management</SectionLabel>
               <span className='text-sm text-slate-500'>
-                멤버 {members.length}명
+                멤버 {members.length}명 · 통계
                 {canManageInvites && ` · 초대 ${invites.length}개`}
               </span>
             </div>
@@ -664,6 +641,16 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                   }`}
                 >
                   멤버 ({members.length})
+                </button>
+                <button
+                  onClick={() => setTeamManagementTab('stats')}
+                  className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
+                    teamManagementTab === 'stats'
+                      ? 'bg-gradient-to-r from-indigo-500/20 to-sky-500/20 text-white border border-white/10'
+                      : 'text-slate-400 hover:text-slate-300 border border-transparent'
+                  }`}
+                >
+                  통계
                 </button>
                 {canManageInvites && (
                   <button
@@ -720,6 +707,34 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                       })}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* 통계 탭 내용 */}
+              {teamManagementTab === 'stats' && (
+                <div className='mt-4'>
+                  <div className='grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4'>
+                    {statsCards.map(stat => (
+                      <div
+                        key={stat.label}
+                        className={`rounded-2xl border p-3 sm:p-4 ${
+                          stat.alert
+                            ? 'border-red-500/30 bg-red-500/10'
+                            : stat.warning
+                              ? 'border-orange-500/30 bg-orange-500/10'
+                              : 'border-white/10 bg-slate-950/30'
+                        }`}
+                      >
+                        <SectionLabel spacing='tight' color='subtle'>{stat.label}</SectionLabel>
+                        <p className={`mt-3 text-3xl font-bold ${
+                          stat.alert ? 'text-red-400' : stat.warning ? 'text-orange-400' : 'text-white'
+                        }`}>
+                          {stat.value}
+                        </p>
+                        <p className='mt-1 text-sm text-slate-500'>{stat.helper}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
