@@ -11,9 +11,11 @@ import { GanttChart } from '../../components/GanttChart';
 import { ListView } from '../../components/ListView';
 import { CalendarView } from '../../components/CalendarView';
 import { TaskFilters } from '../../components/TaskFilters';
+import { MobileKanban } from '../../components/MobileKanban';
 import { Button, ButtonLink, SectionLabel, ErrorAlert } from '../components';
 import type { Task } from '../../types/task';
 import { useTaskFilter } from '../../hooks/useTaskFilter';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import {
   getTeamTasks,
   updateTaskStatus,
@@ -67,6 +69,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const isMobile = useIsMobile();
 
   // URL 쿼리에서 viewMode 읽기
   const getViewModeFromQuery = useCallback((): ViewMode => {
@@ -364,6 +367,82 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       }
     }
   };
+
+  // 모바일용 퀵 액션 버튼을 통한 상태 변경 함수
+  const handleStatusChange = useCallback(async (taskId: number, newStatus: number) => {
+    if (!session?.user?.accessToken) return;
+
+    // 현재 태스크 찾기
+    let currentTask: Task | undefined;
+    let currentColumn: ColumnKey | undefined;
+
+    for (const [columnKey, columnTasks] of Object.entries(tasks) as [ColumnKey, Task[]][]) {
+      const found = columnTasks.find(t => t.taskId === taskId);
+      if (found) {
+        currentTask = found;
+        currentColumn = columnKey;
+        break;
+      }
+    }
+
+    if (!currentTask || !currentColumn) return;
+
+    const newColumn = taskStatusToColumn[newStatus];
+    if (!newColumn) return;
+
+    // 낙관적 업데이트
+    setTasks(prev => {
+      const sourceItems = [...prev[currentColumn]];
+      const targetItems = currentColumn === newColumn ? sourceItems : [...prev[newColumn]];
+      
+      const taskIndex = sourceItems.findIndex(t => t.taskId === taskId);
+      if (taskIndex === -1) return prev;
+      
+      const [movedTask] = sourceItems.splice(taskIndex, 1);
+      const updatedTask = { ...movedTask, taskStatus: newStatus };
+      
+      if (currentColumn === newColumn) {
+        return prev;
+      }
+      
+      targetItems.push(updatedTask);
+      
+      return {
+        ...prev,
+        [currentColumn]: sourceItems,
+        [newColumn]: targetItems,
+      };
+    });
+
+    // API 호출
+    try {
+      const teamIdNum = parseInt(teamId, 10);
+      await updateTaskStatus(teamIdNum, taskId, newStatus, session.user.accessToken);
+    } catch (err) {
+      // 실패 시 롤백
+      console.error('Failed to update task status:', err);
+      setError(err instanceof Error ? err.message : '태스크 상태 변경에 실패했습니다.');
+
+      // 원래 상태로 복구
+      setTasks(prev => {
+        const sourceItems = [...prev[newColumn]];
+        const targetItems = [...prev[currentColumn]];
+        
+        const taskIndex = sourceItems.findIndex(t => t.taskId === taskId);
+        if (taskIndex === -1) return prev;
+        
+        const [movedTask] = sourceItems.splice(taskIndex, 1);
+        const restoredTask = { ...movedTask, taskStatus: currentTask!.taskStatus };
+        targetItems.push(restoredTask);
+        
+        return {
+          ...prev,
+          [newColumn]: sourceItems,
+          [currentColumn]: targetItems,
+        };
+      });
+    }
+  }, [session?.user?.accessToken, tasks, teamId]);
 
   const handleCreateInvite = async (expiresInDays: number, usageMaxCnt?: number) => {
     if (!session?.user?.accessToken) return;
@@ -770,23 +849,33 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
             태스크 목록을 불러오는 중...
           </div>
         ) : viewMode === 'kanban' ? (
-          <DndContext sensors={sensors} onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
-            <div className='grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6'>
-              {(Object.keys(columnMeta) as ColumnKey[]).map(columnKey => {
-                const meta = columnMeta[columnKey];
-                return (
-                  <Column
-                    key={columnKey}
-                    id={columnKey}
-                    title={meta.title}
-                    helper={meta.helper}
-                    accent={meta.accent}
-                    tasks={filteredTasksByColumn[columnKey]}
-                  />
-                );
-              })}
-            </div>
-          </DndContext>
+          isMobile ? (
+            // 모바일: 수평 스와이프 칸반 뷰
+            <MobileKanban
+              tasksByColumn={filteredTasksByColumn}
+              onStatusChange={handleStatusChange}
+              teamId={teamId}
+            />
+          ) : (
+            // 데스크톱: 기존 드래그 앤 드롭 칸반 보드
+            <DndContext sensors={sensors} onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
+              <div className='grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6'>
+                {(Object.keys(columnMeta) as ColumnKey[]).map(columnKey => {
+                  const meta = columnMeta[columnKey];
+                  return (
+                    <Column
+                      key={columnKey}
+                      id={columnKey}
+                      title={meta.title}
+                      helper={meta.helper}
+                      accent={meta.accent}
+                      tasks={filteredTasksByColumn[columnKey]}
+                    />
+                  );
+                })}
+              </div>
+            </DndContext>
+          )
         ) : viewMode === 'gantt' ? (
           <GanttChart
             tasks={filteredTasks}
