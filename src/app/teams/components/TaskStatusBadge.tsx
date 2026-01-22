@@ -1,23 +1,9 @@
+import { getStatusLabel, getStatusAccent } from '@/app/config/taskStatusConfig';
+
 type TaskStatusBadgeProps = {
   status: number;
   /** 아이콘 크기: sm(8x8/10x10), md(10x10/12x12) */
   size?: "sm" | "md";
-};
-
-const taskStatusLabels: Record<number, string> = {
-  1: "Ideation",
-  2: "In Progress",
-  3: "Completed",
-  4: "On Hold",
-  5: "Cancelled",
-};
-
-const taskStatusColors: Record<number, string> = {
-  1: "linear-gradient(135deg, #facc15, #f97316)",
-  2: "linear-gradient(135deg, #38bdf8, #6366f1)",
-  3: "linear-gradient(135deg, #34d399, #10b981)",
-  4: "linear-gradient(135deg, #fbbf24, #f59e0b)",
-  5: "linear-gradient(135deg, #ef4444, #dc2626)",
 };
 
 /**
@@ -35,16 +21,32 @@ export function TaskStatusBadge({
     md: "h-10 w-10 sm:h-12 sm:w-12",
   };
 
-  const color = taskStatusColors[status] || taskStatusColors[1];
+  const accent = getStatusAccent(status);
 
   return (
     <span
       className={`${sizeClasses[size]} rounded-2xl border border-white/20 shadow-inner flex-shrink-0`}
-      style={{ background: color }}
+      style={{ background: accent }}
       aria-hidden="true"
     />
   );
 }
 
-// 외부에서 사용할 수 있도록 상수도 export
-export { taskStatusLabels, taskStatusColors };
+// 하위 호환성을 위해 기존 상수도 export (deprecated - config 사용 권장)
+/** @deprecated TASK_STATUS에서 직접 가져오세요 */
+export const taskStatusLabels: Record<number, string> = {
+  1: getStatusLabel(1),
+  2: getStatusLabel(2),
+  3: getStatusLabel(3),
+  4: getStatusLabel(4),
+  5: getStatusLabel(5),
+};
+
+/** @deprecated TASK_STATUS에서 직접 가져오세요 */
+export const taskStatusColors: Record<number, string> = {
+  1: getStatusAccent(1),
+  2: getStatusAccent(2),
+  3: getStatusAccent(3),
+  4: getStatusAccent(4),
+  5: getStatusAccent(5),
+};

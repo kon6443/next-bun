@@ -26,35 +26,43 @@ import {
   type TeamInviteResponse,
 } from '@/services/teamService';
 import { teamsPageBackground, cardStyles, layoutStyles } from '@/styles/teams';
+import {
+  TASK_STATUS,
+  canTransitionTo,
+  STATUS_TO_COLUMN,
+  type ColumnKey,
+  type TaskStatusKey,
+} from '../../config/taskStatusConfig';
 
-type ColumnKey = 'todo' | 'inProgress' | 'done';
-
+// 워크플로우 상태에서 컬럼 메타데이터 생성
 const columnMeta: Record<ColumnKey, { title: string; helper: string; accent: string; taskStatus: number }> = {
   todo: {
-    title: 'Ideation',
-    helper: '아이디어 & 요청',
-    accent: 'linear-gradient(135deg, #facc15, #f97316)',
-    taskStatus: 1, // CREATED
+    title: TASK_STATUS[1].label,
+    helper: TASK_STATUS[1].description,
+    accent: TASK_STATUS[1].accent,
+    taskStatus: 1,
   },
   inProgress: {
-    title: 'In Progress',
-    helper: '진행 중인 작업',
-    accent: 'linear-gradient(135deg, #38bdf8, #6366f1)',
-    taskStatus: 2, // IN_PROGRESS
+    title: TASK_STATUS[2].label,
+    helper: TASK_STATUS[2].description,
+    accent: TASK_STATUS[2].accent,
+    taskStatus: 2,
   },
   done: {
-    title: 'Completed',
-    helper: '검수 완료',
-    accent: 'linear-gradient(135deg, #34d399, #10b981)',
-    taskStatus: 3, // COMPLETED
+    title: TASK_STATUS[3].label,
+    helper: TASK_STATUS[3].description,
+    accent: TASK_STATUS[3].accent,
+    taskStatus: 3,
   },
 };
 
-// taskStatus를 ColumnKey로 매핑
-const taskStatusToColumn: Record<number, ColumnKey> = {
-  1: 'todo', // CREATED
-  2: 'inProgress', // IN_PROGRESS
-  3: 'done', // COMPLETED
+// taskStatus를 ColumnKey로 매핑 (워크플로우 상태만)
+const taskStatusToColumn: Record<number, ColumnKey | undefined> = {
+  1: STATUS_TO_COLUMN[1] ?? undefined,
+  2: STATUS_TO_COLUMN[2] ?? undefined,
+  3: STATUS_TO_COLUMN[3] ?? undefined,
+  4: STATUS_TO_COLUMN[4] ?? undefined,
+  5: STATUS_TO_COLUMN[5] ?? undefined,
 };
 
 type TeamBoardProps = {
@@ -387,8 +395,23 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
     if (!currentTask || !currentColumn) return;
 
+    // 워크플로우 전이 검증
+    const currentStatusKey = currentTask.taskStatus as TaskStatusKey;
+    const newStatusKey = newStatus as TaskStatusKey;
+    
+    if (!canTransitionTo(currentStatusKey, newStatusKey)) {
+      console.warn(`상태 전이 불가: ${currentStatusKey} → ${newStatusKey}`);
+      setError(`${TASK_STATUS[currentStatusKey]?.label || currentStatusKey}에서 ${TASK_STATUS[newStatusKey]?.label || newStatusKey}(으)로 상태를 변경할 수 없습니다.`);
+      return;
+    }
+
     const newColumn = taskStatusToColumn[newStatus];
-    if (!newColumn) return;
+    if (!newColumn) {
+      // ON_HOLD나 CANCELLED 등 칸반 보드에 표시되지 않는 상태로 변경 시
+      // 현재 컬럼에서 제거만 수행 (또는 별도 처리)
+      console.warn(`칸반 보드에 표시되지 않는 상태: ${newStatus}`);
+      return;
+    }
 
     // 낙관적 업데이트
     setTasks(prev => {
