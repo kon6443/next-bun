@@ -23,11 +23,8 @@ import {
 } from '@/services/teamService';
 import { teamsPageBackground, cardStyles, layoutStyles } from '@/styles/teams';
 import {
-  TASK_STATUS,
-  canTransitionTo,
   STATUS_TO_COLUMN,
   type ColumnKey,
-  type TaskStatusKey,
 } from '../../config/taskStatusConfig';
 
 // taskStatus를 ColumnKey로 매핑
@@ -319,16 +316,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     }
 
     if (!currentTask || !currentColumn) return;
-
-    // 워크플로우 전이 검증
-    const currentStatusKey = currentTask.taskStatus as TaskStatusKey;
-    const newStatusKey = newStatus as TaskStatusKey;
-    
-    if (!canTransitionTo(currentStatusKey, newStatusKey)) {
-      console.warn(`상태 전이 불가: ${currentStatusKey} → ${newStatusKey}`);
-      setError(`${TASK_STATUS[currentStatusKey]?.label || currentStatusKey}에서 ${TASK_STATUS[newStatusKey]?.label || newStatusKey}(으)로 상태를 변경할 수 없습니다.`);
-      return;
-    }
 
     const newColumn = taskStatusToColumn[newStatus];
     if (!newColumn) {
