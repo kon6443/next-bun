@@ -7,7 +7,7 @@ export type DeadlineStatus = 'overdue' | 'today' | 'soon' | 'normal' | 'none';
 export type PeriodFilter = 'all' | 'today' | 'thisWeek' | 'thisMonth' | 'overdue';
 
 // 상태 필터 타입
-export type StatusFilter = 'all' | 1 | 2 | 3;
+export type StatusFilter = 'all' | 1 | 2 | 3 | 4 | 5;
 
 // 마감일 상태 계산
 export function getDeadlineStatus(endAt: Date | null): DeadlineStatus {
@@ -85,6 +85,8 @@ export interface TaskStats {
   completed: number;
   inProgress: number;
   todo: number;
+  onHold: number;
+  cancelled: number;
   completionRate: number;
   overdue: number;
   dueToday: number;
@@ -96,9 +98,11 @@ export function calculateTaskStats(tasks: Task[]): TaskStats {
   const completed = tasks.filter(t => t.taskStatus === 3).length;
   const inProgress = tasks.filter(t => t.taskStatus === 2).length;
   const todo = tasks.filter(t => t.taskStatus === 1).length;
+  const onHold = tasks.filter(t => t.taskStatus === 4).length;
+  const cancelled = tasks.filter(t => t.taskStatus === 5).length;
 
-  // 완료되지 않은 태스크 중 마감일 관련 통계
-  const activeTasks = tasks.filter(t => t.taskStatus !== 3);
+  // 완료/취소되지 않은 태스크 중 마감일 관련 통계
+  const activeTasks = tasks.filter(t => t.taskStatus !== 3 && t.taskStatus !== 5);
   const overdue = activeTasks.filter(t => getDeadlineStatus(t.endAt) === 'overdue').length;
   const dueToday = activeTasks.filter(t => getDeadlineStatus(t.endAt) === 'today').length;
   const dueSoon = activeTasks.filter(t => getDeadlineStatus(t.endAt) === 'soon').length;
@@ -108,6 +112,8 @@ export function calculateTaskStats(tasks: Task[]): TaskStats {
     completed,
     inProgress,
     todo,
+    onHold,
+    cancelled,
     completionRate: total === 0 ? 0 : Math.round((completed / total) * 100),
     overdue,
     dueToday,

@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import type { PeriodFilter, StatusFilter } from '../utils/taskUtils';
-import { getWorkflowStatuses } from '../config/taskStatusConfig';
+import { getAllStatuses } from '../config/taskStatusConfig';
 
 type TaskFiltersProps = {
   // 검색
@@ -27,6 +28,8 @@ type TaskFiltersProps = {
     todo: number;
     inProgress: number;
     done: number;
+    onHold: number;
+    cancelled: number;
   };
 
   // 필터 초기화
@@ -37,12 +40,12 @@ type TaskFiltersProps = {
   currentUserId?: number;
 };
 
-const periodOptions: { value: PeriodFilter; label: string }[] = [
-  { value: 'all', label: '전체 기간' },
-  { value: 'overdue', label: '지연됨' },
-  { value: 'today', label: '오늘 마감' },
-  { value: 'thisWeek', label: '이번 주' },
-  { value: 'thisMonth', label: '이번 달' },
+const periodOptions: { value: PeriodFilter; label: string; shortLabel: string }[] = [
+  { value: 'all', label: '전체 기간', shortLabel: '전체' },
+  { value: 'overdue', label: '지연됨', shortLabel: '지연' },
+  { value: 'today', label: '오늘 마감', shortLabel: '오늘' },
+  { value: 'thisWeek', label: '이번 주', shortLabel: '이번주' },
+  { value: 'thisMonth', label: '이번 달', shortLabel: '이번달' },
 ];
 
 export function TaskFilters({
@@ -60,6 +63,8 @@ export function TaskFilters({
   onResetFilters,
   currentUserId,
 }: TaskFiltersProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   const handleMyTasksToggle = () => {
     if (currentUserId) {
       if (assigneeId === currentUserId) {
@@ -71,119 +76,161 @@ export function TaskFilters({
   };
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        {/* 검색 */}
-        <div className="flex-1 max-w-md">
-          <div className="relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => onSearchChange(e.target.value)}
-              placeholder="태스크 검색..."
-              className="w-full rounded-lg border border-white/10 bg-slate-900/50 pl-10 pr-4 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-1 focus:ring-sky-500/50"
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        {/* 검색창 */}
+        <div className="flex-1 relative">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => onSearchChange(e.target.value)}
+            placeholder="태스크 검색..."
+            className="w-full rounded-xl border border-white/10 bg-slate-900/50 pl-10 pr-10 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:border-sky-500/50 focus:outline-none"
+          />
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
             />
-            <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            {searchQuery && (
-              <button
-                onClick={() => onSearchChange('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* 필터 그룹 */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* 내 태스크만 토글 */}
-          {currentUserId && (
+          </svg>
+          {searchQuery && (
             <button
-              onClick={handleMyTasksToggle}
-              className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
-                assigneeId === currentUserId
-                  ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
-                  : 'border border-white/10 bg-slate-900/50 text-slate-400 hover:bg-slate-800/50'
-              }`}
+              onClick={() => onSearchChange('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
             >
-              내 태스크
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           )}
+        </div>
 
-          {/* 담당자 필터 */}
-          <select
-            value={assigneeId ?? ''}
-            onChange={e => onAssigneeChange(e.target.value === '' ? null : Number(e.target.value))}
-            className="rounded-lg border border-white/10 bg-slate-900/50 px-3 py-2 text-xs text-slate-200 focus:border-white/20 focus:outline-none"
-          >
-            <option value="">모든 담당자</option>
-            {assignees.map(a => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
+        {/* 필터 토글 버튼 */}
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className={`p-2.5 rounded-xl transition ${
+            isExpanded || hasActiveFilters
+              ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+              : 'border border-white/10 bg-slate-900/50 text-slate-400 hover:bg-slate-800/50'
+          }`}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+          </svg>
+        </button>
 
-          {/* 상태 필터 */}
-          <select
-            value={status}
-            onChange={e => onStatusChange(e.target.value === 'all' ? 'all' : Number(e.target.value) as StatusFilter)}
-            className="rounded-lg border border-white/10 bg-slate-900/50 px-3 py-2 text-xs text-slate-200 focus:border-white/20 focus:outline-none"
-          >
-            <option value="all">전체 상태 ({taskCounts.total})</option>
-            {getWorkflowStatuses().map(statusMeta => {
-              const count = statusMeta.key === 1 
-                ? taskCounts.todo 
-                : statusMeta.key === 2 
-                  ? taskCounts.inProgress 
-                  : taskCounts.done;
-              return (
-                <option key={statusMeta.key} value={statusMeta.key}>
-                  {statusMeta.label} ({count})
-                </option>
-              );
-            })}
-          </select>
+        {/* 활성 필터 카운트 */}
+        {hasActiveFilters && !isExpanded && (
+          <span className="text-xs text-sky-400">
+            {[
+              assigneeId !== null,
+              status !== 'all',
+              period !== 'all',
+            ].filter(Boolean).length}개 필터
+          </span>
+        )}
+      </div>
 
-          {/* 기간 필터 */}
-          <select
-            value={period}
-            onChange={e => onPeriodChange(e.target.value as PeriodFilter)}
-            className="rounded-lg border border-white/10 bg-slate-900/50 px-3 py-2 text-xs text-slate-200 focus:border-white/20 focus:outline-none"
-          >
-            {periodOptions.map(opt => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+      {/* 펼쳐진 필터 영역 */}
+      {isExpanded && (
+        <div className="rounded-xl border border-white/10 bg-slate-900/30 p-4 space-y-4">
+          {/* 내 태스크 + 담당자 */}
+          <div className="flex gap-2">
+            {currentUserId && (
+              <button
+                onClick={handleMyTasksToggle}
+                className={`flex-1 py-2.5 rounded-lg text-xs font-semibold transition ${
+                  assigneeId === currentUserId
+                    ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+                    : 'border border-white/10 bg-slate-900/50 text-slate-400 hover:bg-slate-800/50'
+                }`}
+              >
+                내 태스크
+              </button>
+            )}
+            <select
+              value={assigneeId ?? ''}
+              onChange={e => onAssigneeChange(e.target.value === '' ? null : Number(e.target.value))}
+              className="flex-1 px-3 py-2.5 rounded-lg border border-white/10 bg-slate-900/50 text-xs text-slate-200 focus:outline-none"
+            >
+              <option value="">모든 담당자</option>
+              {assignees.map(a => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          </div>
 
-          {/* 필터 초기화 */}
+          {/* 상태 버튼 그리드 */}
+          <div>
+            <label className="block text-[10px] text-slate-500 mb-2">상태</label>
+            <div className="grid grid-cols-3 gap-1.5">
+              <button
+                onClick={() => onStatusChange('all')}
+                className={`py-2 rounded-lg text-xs font-medium transition ${
+                  status === 'all'
+                    ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+                    : 'border border-white/10 bg-slate-900/50 text-slate-400 hover:bg-slate-800/50'
+                }`}
+              >
+                전체 ({taskCounts.total})
+              </button>
+              {getAllStatuses().slice(0, 5).map(s => {
+                const counts = [taskCounts.todo, taskCounts.inProgress, taskCounts.done, taskCounts.onHold, taskCounts.cancelled];
+                return (
+                  <button
+                    key={s.key}
+                    onClick={() => onStatusChange(s.key)}
+                    className={`py-2 rounded-lg text-xs font-medium transition ${
+                      status === s.key
+                        ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+                        : 'border border-white/10 bg-slate-900/50 text-slate-400 hover:bg-slate-800/50'
+                    }`}
+                  >
+                    {s.shortLabel} ({counts[s.key - 1]})
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 기간 버튼 */}
+          <div>
+            <label className="block text-[10px] text-slate-500 mb-2">기간</label>
+            <div className="flex gap-1.5 flex-wrap">
+              {periodOptions.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => onPeriodChange(opt.value)}
+                  className={`px-3 py-2 rounded-lg text-xs font-medium transition ${
+                    period === opt.value
+                      ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+                      : 'border border-white/10 bg-slate-900/50 text-slate-400 hover:bg-slate-800/50'
+                  }`}
+                >
+                  {opt.shortLabel}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 초기화 버튼 */}
           {hasActiveFilters && (
             <button
               onClick={onResetFilters}
-              className="rounded-lg border border-white/10 bg-slate-900/50 px-3 py-2 text-xs text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
+              className="w-full py-2.5 rounded-lg border border-white/10 bg-slate-900/50 text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
             >
-              초기화
+              필터 초기화
             </button>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
 }

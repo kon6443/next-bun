@@ -3,19 +3,15 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { DndContext, closestCenter, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { arrayMove } from '@dnd-kit/sortable';
 
-import { Column } from '../../components/Column';
 import { GanttChart } from '../../components/GanttChart';
 import { ListView } from '../../components/ListView';
 import { CalendarView } from '../../components/CalendarView';
 import { TaskFilters } from '../../components/TaskFilters';
-import { MobileKanban } from '../../components/MobileKanban';
+import { Kanban } from '../../components/Kanban';
 import { Button, ButtonLink, SectionLabel, ErrorAlert } from '../components';
 import type { Task } from '../../types/task';
 import { useTaskFilter } from '../../hooks/useTaskFilter';
-import { useIsMobile } from '../../hooks/useMediaQuery';
 import {
   getTeamTasks,
   updateTaskStatus,
@@ -34,29 +30,7 @@ import {
   type TaskStatusKey,
 } from '../../config/taskStatusConfig';
 
-// 워크플로우 상태에서 컬럼 메타데이터 생성
-const columnMeta: Record<ColumnKey, { title: string; helper: string; accent: string; taskStatus: number }> = {
-  todo: {
-    title: TASK_STATUS[1].label,
-    helper: TASK_STATUS[1].description,
-    accent: TASK_STATUS[1].accent,
-    taskStatus: 1,
-  },
-  inProgress: {
-    title: TASK_STATUS[2].label,
-    helper: TASK_STATUS[2].description,
-    accent: TASK_STATUS[2].accent,
-    taskStatus: 2,
-  },
-  done: {
-    title: TASK_STATUS[3].label,
-    helper: TASK_STATUS[3].description,
-    accent: TASK_STATUS[3].accent,
-    taskStatus: 3,
-  },
-};
-
-// taskStatus를 ColumnKey로 매핑 (워크플로우 상태만)
+// taskStatus를 ColumnKey로 매핑
 const taskStatusToColumn: Record<number, ColumnKey | undefined> = {
   1: STATUS_TO_COLUMN[1] ?? undefined,
   2: STATUS_TO_COLUMN[2] ?? undefined,
@@ -110,7 +84,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const isMobile = useIsMobile();
 
   // URL 쿼리에서 viewMode 읽기
   const getViewModeFromQuery = useCallback((): ViewMode => {
@@ -125,6 +98,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     todo: [],
     inProgress: [],
     done: [],
+    onHold: [],
+    cancelled: [],
   });
   const [teamName, setTeamName] = useState<string>('');
   const [teamDescription, setTeamDescription] = useState<string>('');
@@ -153,15 +128,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     const queryString = params.toString();
     router.push(`${pathname}${queryString ? `?${queryString}` : ''}`, { scroll: false });
   }, [router, pathname, searchParams]);
-
-  // activationConstraint를 사용하여 클릭과 드래그 구분
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8, // 8px 이상 이동해야 드래그 시작
-      },
-    }),
-  );
 
   useEffect(() => {
     if (!session?.user?.accessToken) {
@@ -248,6 +214,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           todo: [],
           inProgress: [],
           done: [],
+          onHold: [],
+          cancelled: [],
         };
 
         response.data.tasks.forEach(task => {
@@ -273,7 +241,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
   // 모든 태스크를 하나의 배열로 합침
   const allTasks = useMemo(
-    () => [...tasks.todo, ...tasks.inProgress, ...tasks.done],
+    () => [...tasks.todo, ...tasks.inProgress, ...tasks.done, ...tasks.onHold, ...tasks.cancelled],
     [tasks]
   );
 
@@ -297,6 +265,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       todo: [],
       inProgress: [],
       done: [],
+      onHold: [],
+      cancelled: [],
     };
     filteredTasks.forEach(task => {
       const columnKey = taskStatusToColumn[task.taskStatus] || 'todo';
@@ -331,85 +301,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     },
   ];
 
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-
-    if (!over || !session?.user?.accessToken) return;
-
-    const activeContainer = active.data.current?.sortable.containerId as ColumnKey;
-    const overContainer = (over.data.current?.sortable.containerId || over.id) as ColumnKey;
-
-    if (!activeContainer || !overContainer || !tasks[activeContainer] || !tasks[overContainer]) {
-      return;
-    }
-
-    const activeIndex = active.data.current?.sortable.index;
-    if (activeIndex === undefined) return;
-
-    const movedTask = tasks[activeContainer][activeIndex];
-    if (!movedTask) return;
-
-    // 같은 컬럼 내에서 이동하는 경우 (순서만 변경)
-    if (activeContainer === overContainer) {
-      const overIndex = over.data.current?.sortable.index;
-      if (overIndex === undefined || activeIndex === overIndex) return;
-
-      setTasks(prev => {
-        const items = prev[activeContainer];
-        return {
-          ...prev,
-          [activeContainer]: arrayMove(items, activeIndex, overIndex),
-        };
-      });
-    } else {
-      // 다른 컬럼으로 이동하는 경우 (상태 변경)
-      const overIndex = over.data.current?.sortable.index ?? tasks[overContainer].length;
-      const newTaskStatus = columnMeta[overContainer].taskStatus;
-
-      // 낙관적 업데이트
-      setTasks(prev => {
-        const activeItems = [...prev[activeContainer]];
-        const overItems = [...prev[overContainer]];
-        const [movedItem] = activeItems.splice(activeIndex, 1);
-        overItems.splice(overIndex, 0, {
-          ...movedItem,
-          taskStatus: newTaskStatus,
-        });
-
-        return {
-          ...prev,
-          [activeContainer]: activeItems,
-          [overContainer]: overItems,
-        };
-      });
-
-      // API 호출
-      try {
-        const teamIdNum = parseInt(teamId, 10);
-        await updateTaskStatus(teamIdNum, movedTask.taskId, newTaskStatus, session.user.accessToken);
-      } catch (err) {
-        // 실패 시 롤백
-        console.error('Failed to update task status:', err);
-        setError(err instanceof Error ? err.message : '태스크 상태 변경에 실패했습니다.');
-
-        // 원래 상태로 복구
-        setTasks(prev => {
-          const activeItems = [...prev[activeContainer]];
-          const overItems = [...prev[overContainer]];
-          overItems.splice(overIndex, 1);
-          activeItems.splice(activeIndex, 0, movedTask);
-
-          return {
-            ...prev,
-            [activeContainer]: activeItems,
-            [overContainer]: overItems,
-          };
-        });
-      }
-    }
-  };
-
-  // 모바일용 퀵 액션 버튼을 통한 상태 변경 함수
+  // 상태 변경 함수 (버튼 클릭으로 상태 변경)
   const handleStatusChange = useCallback(async (taskId: number, newStatus: number) => {
     if (!session?.user?.accessToken) return;
 
@@ -440,9 +332,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
     const newColumn = taskStatusToColumn[newStatus];
     if (!newColumn) {
-      // ON_HOLD나 CANCELLED 등 칸반 보드에 표시되지 않는 상태로 변경 시
-      // 현재 컬럼에서 제거만 수행 (또는 별도 처리)
-      console.warn(`칸반 보드에 표시되지 않는 상태: ${newStatus}`);
+      // 매핑되지 않은 상태의 경우 (예: 미래 확장을 위한 새로운 상태)
+      console.warn(`컬럼에 매핑되지 않은 상태: ${newStatus}`);
       return;
     }
 
@@ -564,24 +455,23 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
   return (
     <div className={layoutStyles.pageContainer} style={teamsPageBackground}>
-      <main className={`${layoutStyles.mainContent} max-w-6xl`}>
-        <section className={`${cardStyles.section} p-4 sm:p-8`}>
+      <main className={`${layoutStyles.mainContent} max-w-lg`}>
+        <section className={`${cardStyles.section} p-4`}>
           <SectionLabel>Team Kanban</SectionLabel>
-          <div className='mt-4 flex flex-col gap-6 md:flex-row md:items-center md:justify-between'>
+          <div className='mt-4 flex flex-col gap-4'>
             <div>
-              <h1 className='text-4xl font-bold text-white md:text-5xl'>
+              <h1 className='text-3xl font-bold text-white'>
                 {isLoading ? '로딩 중...' : teamName || ''}
               </h1>
               {teamDescription && <p className='mt-2 text-sm text-slate-400'>{teamDescription}</p>}
             </div>
-            <div className='flex flex-col sm:flex-row gap-2 sm:gap-4'>
+            <div className='flex flex-col gap-2'>
               {canManageInvites && (
                 <Button
                   variant='secondary'
                   size='lg'
                   fullWidth
                   onClick={() => setShowInviteModal(true)}
-                  className='sm:w-auto'
                 >
                   팀 초대
                 </Button>
@@ -591,7 +481,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                 variant='secondary'
                 size='lg'
                 fullWidth
-                className='sm:w-auto'
               >
                 팀 수정
               </ButtonLink>
@@ -599,7 +488,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                 href={`/teams/${teamId}/tasks/new`}
                 size='lg'
                 fullWidth
-                className='sm:w-auto'
               >
                 새 카드 작성
               </ButtonLink>
@@ -608,23 +496,51 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         </section>
 
         {/* 팀 관리 (멤버 + 초대 링크) */}
-        <section className={`${cardStyles.section} p-4 sm:p-6`}>
+        <section className={`${cardStyles.section} p-4`}>
           {/* 컴팩트 헤더 */}
           <div className='flex items-center justify-between'>
             <div className='flex items-center gap-3'>
               <SectionLabel>Team Management</SectionLabel>
-              <span className='text-sm text-slate-500'>
-                멤버 {members.length}명 · 통계
-                {canManageInvites && ` · 초대 ${invites.length}개`}
-              </span>
+              <div className='flex items-center gap-2'>
+                {/* 멤버 수 */}
+                <span className='flex items-center gap-1 text-xs text-slate-500' title='멤버'>
+                  <svg className='w-3.5 h-3.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                    <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' />
+                  </svg>
+                  {members.length}
+                </span>
+                {/* 통계 */}
+                <span className='flex items-center text-xs text-slate-500' title='통계'>
+                  <svg className='w-3.5 h-3.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                    <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' />
+                  </svg>
+                </span>
+                {/* 초대 (권한 있을 때만) */}
+                {canManageInvites && (
+                  <span className='flex items-center gap-1 text-xs text-slate-500' title='초대 링크'>
+                    <svg className='w-3.5 h-3.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                      <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' />
+                    </svg>
+                    {invites.length}
+                  </span>
+                )}
+              </div>
             </div>
-            <Button
-              variant='secondary'
-              size='sm'
+            <button
               onClick={() => setIsTeamManagementOpen(v => !v)}
+              className='p-2 rounded-lg hover:bg-white/5 transition text-slate-400 hover:text-slate-300'
+              aria-label={isTeamManagementOpen ? '접기' : '펼치기'}
             >
-              {isTeamManagementOpen ? '접기 ▾' : '펼치기 ▸'}
-            </Button>
+              {isTeamManagementOpen ? (
+                <svg className='w-5 h-5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M5 15l7-7 7 7' />
+                </svg>
+              ) : (
+                <svg className='w-5 h-5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 9l-7 7-7-7' />
+                </svg>
+              )}
+            </button>
           </div>
 
           {/* 펼쳐진 상태일 때만 표시 */}
@@ -674,7 +590,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                       멤버 정보를 불러오는 중...
                     </div>
                   ) : (
-                    <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
+                    <div className='grid grid-cols-1 gap-3'>
                       {members.map(member => {
                         const isCurrentUser = session?.user?.userId === member.userId;
                         const roleBadge = getRoleBadge(member.role);
@@ -682,7 +598,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                         return (
                           <div
                             key={member.userId}
-                            className='rounded-2xl border border-white/10 bg-slate-950/30 p-4 sm:p-6'
+                            className='rounded-2xl border border-white/10 bg-slate-950/30 p-4'
                           >
                             <div className='flex items-center justify-between'>
                               <div className='flex-1'>
@@ -713,11 +629,11 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
               {/* 통계 탭 내용 */}
               {teamManagementTab === 'stats' && (
                 <div className='mt-4'>
-                  <div className='grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4'>
+                  <div className='grid grid-cols-2 gap-3'>
                     {statsCards.map(stat => (
                       <div
                         key={stat.label}
-                        className={`rounded-2xl border p-3 sm:p-4 ${
+                        className={`rounded-2xl border p-3 ${
                           stat.alert
                             ? 'border-red-500/30 bg-red-500/10'
                             : stat.warning
@@ -760,14 +676,14 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                         return (
                           <div
                             key={invite.invId}
-                            className={`rounded-2xl border p-4 sm:p-6 ${
+                            className={`rounded-2xl border p-4 ${
                               isActive
                                 ? 'border-white/10 bg-slate-950/30'
                                 : 'border-slate-700/50 bg-slate-950/10 opacity-60'
                             }`}
                           >
-                            <div className='flex flex-col sm:flex-row items-start justify-between gap-4'>
-                              <div className='flex-1'>
+                            <div className='flex flex-col gap-3'>
+                              <div>
                                 <div className='mb-2 flex items-center gap-2'>
                                   <p className='text-sm font-semibold text-slate-300'>
                                     초대 링크 #{invite.invId}
@@ -790,7 +706,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                                   <p>생성일: {formatDate(invite.crtdAt)}</p>
                                 </div>
                                 {isActive && (
-                                  <div className='mt-4 rounded-lg border border-white/5 bg-slate-900/50 p-3'>
+                                  <div className='mt-3 rounded-lg border border-white/5 bg-slate-900/50 p-3'>
                                     <p className='mb-1 text-xs text-slate-500'>초대 링크:</p>
                                     <p className='break-all font-mono text-xs text-slate-300'>{inviteUrl}</p>
                                   </div>
@@ -799,7 +715,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                               {isActive && (
                                 <button
                                   onClick={() => handleCopyInviteLink(inviteUrl)}
-                                  className='mt-4 sm:mt-0 w-full sm:w-auto whitespace-nowrap rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-xs sm:text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
+                                  className='w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
                                 >
                                   링크 복사
                                 </button>
@@ -836,6 +752,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
             todo: stats.todo,
             inProgress: stats.inProgress,
             done: stats.completed,
+            onHold: stats.onHold,
+            cancelled: stats.cancelled,
           }}
           hasActiveFilters={hasActiveFilters}
           onResetFilters={resetFilters}
@@ -849,49 +767,62 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           </div>
         )}
 
-        {/* 보기 전환 버튼 */}
-        <div className='flex items-center justify-end gap-2 mb-4 flex-wrap'>
-          <span className='text-xs text-slate-500 mr-2'>보기 방식:</span>
-          <button
-            onClick={() => setViewMode('kanban')}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
-              viewMode === 'kanban'
-                ? 'bg-gradient-to-r from-indigo-500 to-sky-500 text-white shadow-lg shadow-sky-500/30'
-                : 'border border-white/20 bg-white/5 text-slate-300 hover:bg-white/10'
-            }`}
-          >
-            칸반 보드
-          </button>
-          <button
-            onClick={() => setViewMode('gantt')}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
-              viewMode === 'gantt'
-                ? 'bg-gradient-to-r from-indigo-500 to-sky-500 text-white shadow-lg shadow-sky-500/30'
-                : 'border border-white/20 bg-white/5 text-slate-300 hover:bg-white/10'
-            }`}
-          >
-            타임라인
-          </button>
-          <button
-            onClick={() => setViewMode('list')}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
-              viewMode === 'list'
-                ? 'bg-gradient-to-r from-indigo-500 to-sky-500 text-white shadow-lg shadow-sky-500/30'
-                : 'border border-white/20 bg-white/5 text-slate-300 hover:bg-white/10'
-            }`}
-          >
-            리스트
-          </button>
-          <button
-            onClick={() => setViewMode('calendar')}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
-              viewMode === 'calendar'
-                ? 'bg-gradient-to-r from-indigo-500 to-sky-500 text-white shadow-lg shadow-sky-500/30'
-                : 'border border-white/20 bg-white/5 text-slate-300 hover:bg-white/10'
-            }`}
-          >
-            캘린더
-          </button>
+        {/* 보기 전환 버튼 (아이콘 세그먼트 컨트롤) */}
+        <div className='flex justify-end mb-4'>
+          <div className='flex rounded-xl border border-white/10 bg-slate-900/30 p-1'>
+            <button
+              onClick={() => setViewMode('kanban')}
+              title='칸반 보드'
+              className={`p-2.5 rounded-lg transition ${
+                viewMode === 'kanban'
+                  ? 'bg-gradient-to-r from-indigo-500/20 to-sky-500/20 text-sky-400 border border-sky-500/30'
+                  : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+              }`}
+            >
+              <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2' />
+              </svg>
+            </button>
+            <button
+              onClick={() => setViewMode('gantt')}
+              title='타임라인'
+              className={`p-2.5 rounded-lg transition ${
+                viewMode === 'gantt'
+                  ? 'bg-gradient-to-r from-indigo-500/20 to-sky-500/20 text-sky-400 border border-sky-500/30'
+                  : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+              }`}
+            >
+              <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4 6h16M4 10h16M4 14h16M4 18h16' />
+              </svg>
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              title='리스트'
+              className={`p-2.5 rounded-lg transition ${
+                viewMode === 'list'
+                  ? 'bg-gradient-to-r from-indigo-500/20 to-sky-500/20 text-sky-400 border border-sky-500/30'
+                  : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+              }`}
+            >
+              <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4 6h16M4 12h16M4 18h16' />
+              </svg>
+            </button>
+            <button
+              onClick={() => setViewMode('calendar')}
+              title='캘린더'
+              className={`p-2.5 rounded-lg transition ${
+                viewMode === 'calendar'
+                  ? 'bg-gradient-to-r from-indigo-500/20 to-sky-500/20 text-sky-400 border border-sky-500/30'
+                  : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+              }`}
+            >
+              <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -899,33 +830,11 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
             태스크 목록을 불러오는 중...
           </div>
         ) : viewMode === 'kanban' ? (
-          isMobile ? (
-            // 모바일: 수평 스와이프 칸반 뷰
-            <MobileKanban
-              tasksByColumn={filteredTasksByColumn}
-              onStatusChange={handleStatusChange}
-              teamId={teamId}
-            />
-          ) : (
-            // 데스크톱: 기존 드래그 앤 드롭 칸반 보드
-            <DndContext sensors={sensors} onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
-              <div className='grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6'>
-                {(Object.keys(columnMeta) as ColumnKey[]).map(columnKey => {
-                  const meta = columnMeta[columnKey];
-                  return (
-                    <Column
-                      key={columnKey}
-                      id={columnKey}
-                      title={meta.title}
-                      helper={meta.helper}
-                      accent={meta.accent}
-                      tasks={filteredTasksByColumn[columnKey]}
-                    />
-                  );
-                })}
-              </div>
-            </DndContext>
-          )
+          <Kanban
+            tasksByColumn={filteredTasksByColumn}
+            onStatusChange={handleStatusChange}
+            teamId={teamId}
+          />
         ) : viewMode === 'gantt' ? (
           <GanttChart
             tasks={filteredTasks}
@@ -947,7 +856,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       {/* 초대 링크 생성 모달 */}
       {showInviteModal && (
         <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4'>
-          <div className='relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-slate-900 p-4 sm:p-8'>
+          <div className='relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-slate-900 p-4'>
             <button
               onClick={() => {
                 setShowInviteModal(false);
@@ -958,18 +867,18 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
               ✕
             </button>
 
-            <h3 className='mb-4 sm:mb-6 text-xl sm:text-2xl font-bold text-white'>초대 링크 생성</h3>
+            <h3 className='mb-4 text-xl font-bold text-white'>초대 링크 생성</h3>
 
             {createdInviteLink ? (
               <div>
                 <p className='mb-4 text-sm text-slate-400'>초대 링크가 생성되었습니다!</p>
-                <div className='mb-4 rounded-lg bg-slate-950/50 border border-white/5 p-3 sm:p-4'>
+                <div className='mb-4 rounded-lg bg-slate-950/50 border border-white/5 p-3'>
                   <p className='mb-2 text-xs text-slate-500'>초대 링크:</p>
-                  <p className='break-all text-xs sm:text-sm text-slate-300 font-mono'>{createdInviteLink}</p>
+                  <p className='break-all text-xs text-slate-300 font-mono'>{createdInviteLink}</p>
                 </div>
                 <button
                   onClick={() => handleCopyInviteLink(createdInviteLink)}
-                  className='w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
+                  className='w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-xs font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
                 >
                   링크 복사
                 </button>
@@ -978,7 +887,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                     setShowInviteModal(false);
                     setCreatedInviteLink(null);
                   }}
-                  className='mt-3 w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
+                  className='mt-3 w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-xs font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
                 >
                   닫기
                 </button>
@@ -1017,15 +926,15 @@ function InviteCreateForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className='space-y-3 sm:space-y-4'>
+    <form onSubmit={handleSubmit} className='space-y-3'>
       <div>
-        <label className='mb-2 block text-xs sm:text-sm font-semibold text-slate-300'>
+        <label className='mb-2 block text-xs font-semibold text-slate-300'>
           만료일 (최대 3일)
         </label>
         <select
           value={expiresInDays}
           onChange={e => setExpiresInDays(Number(e.target.value))}
-          className='w-full rounded-lg border border-white/10 bg-slate-950/50 px-3 sm:px-4 py-2 text-xs sm:text-sm text-slate-200 focus:border-white/20 focus:outline-none'
+          className='w-full rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2 text-xs text-slate-200 focus:border-white/20 focus:outline-none'
         >
           {Array.from({ length: 3 }, (_, i) => i + 1).map(days => (
             <option key={days} value={days}>
@@ -1037,7 +946,7 @@ function InviteCreateForm({
       </div>
 
       <div>
-        <label className='mb-2 block text-xs sm:text-sm font-semibold text-slate-300'>
+        <label className='mb-2 block text-xs font-semibold text-slate-300'>
           최대 사용 횟수 (선택사항)
         </label>
         <input
@@ -1045,17 +954,17 @@ function InviteCreateForm({
           value={usageMaxCnt}
           onChange={e => setUsageMaxCnt(e.target.value === '' ? '' : Number(e.target.value))}
           min={1}
-          className='w-full rounded-lg border border-white/10 bg-slate-950/50 px-3 sm:px-4 py-2 text-xs sm:text-sm text-slate-200 focus:border-white/20 focus:outline-none'
+          className='w-full rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2 text-xs text-slate-200 focus:border-white/20 focus:outline-none'
           placeholder='최대 사용 횟수'
         />
         <p className='mt-1 text-xs text-slate-500'>최대 사용 횟수를 지정하지 않으면 기본값이 적용됩니다.</p>
       </div>
 
-      <div className='flex gap-2 sm:gap-3 pt-3 sm:pt-4'>
+      <div className='flex gap-2 pt-3'>
         <button
           type='submit'
           disabled={isSubmitting}
-          className='flex-1 rounded-lg bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 disabled:opacity-50'
+          className='flex-1 rounded-lg bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 disabled:opacity-50'
         >
           {isSubmitting ? '생성 중...' : '생성하기'}
         </button>
@@ -1063,7 +972,7 @@ function InviteCreateForm({
           type='button'
           onClick={onCancel}
           disabled={isSubmitting}
-          className='flex-1 rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10 disabled:opacity-50'
+          className='flex-1 rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-xs font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10 disabled:opacity-50'
         >
           취소
         </button>
