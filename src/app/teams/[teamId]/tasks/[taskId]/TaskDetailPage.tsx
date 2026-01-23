@@ -141,8 +141,8 @@ export default function TaskDetailPage({
         {
           taskName: data.taskName,
           taskDescription: data.taskDescription,
-          startAt: data.startAt || null,
-          endAt: data.endAt || null,
+          startAt: data.startAt ? `${data.startAt}T00:00:00` : null,
+          endAt: data.endAt ? `${data.endAt}T23:59:59` : null,
         },
         session.user.accessToken,
       );
