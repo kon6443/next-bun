@@ -496,91 +496,91 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         </section>
 
         {/* 팀 관리 (멤버 + 초대 링크) */}
-        <section className={`${cardStyles.section} p-4`}>
-          {/* 컴팩트 헤더 */}
-          <div className='flex items-center justify-between'>
-            <div className='flex items-center gap-3'>
-              <SectionLabel>Team Management</SectionLabel>
-              <div className='flex items-center gap-2'>
-                {/* 멤버 수 */}
-                <span className='flex items-center gap-1 text-xs text-slate-500' title='멤버'>
-                  <svg className='w-3.5 h-3.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                    <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' />
-                  </svg>
-                  {members.length}
-                </span>
-                {/* 통계 */}
-                <span className='flex items-center text-xs text-slate-500' title='통계'>
-                  <svg className='w-3.5 h-3.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                    <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' />
-                  </svg>
-                </span>
-                {/* 초대 (권한 있을 때만) */}
-                {canManageInvites && (
-                  <span className='flex items-center gap-1 text-xs text-slate-500' title='초대 링크'>
-                    <svg className='w-3.5 h-3.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                      <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' />
-                    </svg>
-                    {invites.length}
-                  </span>
-                )}
-              </div>
-            </div>
-            <button
-              onClick={() => setIsTeamManagementOpen(v => !v)}
-              className='p-2 rounded-lg hover:bg-white/5 transition text-slate-400 hover:text-slate-300'
-              aria-label={isTeamManagementOpen ? '접기' : '펼치기'}
-            >
-              {isTeamManagementOpen ? (
-                <svg className='w-5 h-5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M5 15l7-7 7 7' />
-                </svg>
-              ) : (
-                <svg className='w-5 h-5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 9l-7 7-7-7' />
-                </svg>
-              )}
-            </button>
-          </div>
+        {(() => {
+          // 탭 설정 객체 (아이콘, 라벨, 카운트 통합 관리)
+          const teamManagementTabsConfig = [
+            {
+              key: 'members' as const,
+              label: '멤버',
+              iconPath: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
+              count: members.length,
+              visible: true,
+            },
+            {
+              key: 'stats' as const,
+              label: '통계',
+              iconPath: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+              count: null,
+              visible: true,
+            },
+            {
+              key: 'invites' as const,
+              label: '초대',
+              iconPath: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+              count: invites.length,
+              visible: canManageInvites,
+            },
+          ];
 
-          {/* 펼쳐진 상태일 때만 표시 */}
-          {isTeamManagementOpen && (
-            <>
-              {/* 탭 버튼 */}
-              <div className='mt-4 flex gap-2'>
+          const visibleTabs = teamManagementTabsConfig.filter(tab => tab.visible);
+
+          return (
+            <section className={`${cardStyles.section} p-4`}>
+              {/* 컴팩트 헤더 */}
+              <div className='flex items-center justify-between'>
+                <div className='flex items-center gap-3'>
+                  <SectionLabel>Team Management</SectionLabel>
+                  <div className='flex items-center gap-2'>
+                    {visibleTabs.map(tab => (
+                      <span key={tab.key} className='flex items-center gap-1 text-xs text-slate-500' title={tab.label}>
+                        <svg className='w-3.5 h-3.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                          <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d={tab.iconPath} />
+                        </svg>
+                        {tab.count !== null && tab.count}
+                      </span>
+                    ))}
+                  </div>
+                </div>
                 <button
-                  onClick={() => setTeamManagementTab('members')}
-                  className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
-                    teamManagementTab === 'members'
-                      ? 'bg-gradient-to-r from-indigo-500/20 to-sky-500/20 text-white border border-white/10'
-                      : 'text-slate-400 hover:text-slate-300 border border-transparent'
-                  }`}
+                  onClick={() => setIsTeamManagementOpen(v => !v)}
+                  className='p-2 rounded-lg hover:bg-white/5 transition text-slate-400 hover:text-slate-300'
+                  aria-label={isTeamManagementOpen ? '접기' : '펼치기'}
                 >
-                  멤버 ({members.length})
+                  {isTeamManagementOpen ? (
+                    <svg className='w-5 h-5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                      <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M5 15l7-7 7 7' />
+                    </svg>
+                  ) : (
+                    <svg className='w-5 h-5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                      <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 9l-7 7-7-7' />
+                    </svg>
+                  )}
                 </button>
-                <button
-                  onClick={() => setTeamManagementTab('stats')}
-                  className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
-                    teamManagementTab === 'stats'
-                      ? 'bg-gradient-to-r from-indigo-500/20 to-sky-500/20 text-white border border-white/10'
-                      : 'text-slate-400 hover:text-slate-300 border border-transparent'
-                  }`}
-                >
-                  통계
-                </button>
-                {canManageInvites && (
-                  <button
-                    onClick={() => setTeamManagementTab('invites')}
-                    className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
-                      teamManagementTab === 'invites'
-                        ? 'bg-gradient-to-r from-indigo-500/20 to-sky-500/20 text-white border border-white/10'
-                        : 'text-slate-400 hover:text-slate-300 border border-transparent'
-                    }`}
-                  >
-                    초대 링크 ({invites.length})
-                  </button>
-                )}
               </div>
+
+              {/* 펼쳐진 상태일 때만 표시 */}
+              {isTeamManagementOpen && (
+                <>
+                  {/* 탭 버튼 (아이콘 형태) */}
+                  <div className='mt-4 flex gap-1 rounded-xl border border-white/10 bg-slate-900/30 p-1'>
+                    {visibleTabs.map(tab => (
+                      <button
+                        key={tab.key}
+                        onClick={() => setTeamManagementTab(tab.key)}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition ${
+                          teamManagementTab === tab.key
+                            ? 'bg-gradient-to-r from-indigo-500/20 to-sky-500/20 text-white border border-white/10'
+                            : 'text-slate-400 hover:text-slate-300'
+                        }`}
+                        title={tab.label}
+                      >
+                        <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                          <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d={tab.iconPath} />
+                        </svg>
+                        {tab.count !== null && <span>{tab.count}</span>}
+                      </button>
+                    ))}
+                  </div>
 
               {/* 멤버 탭 내용 */}
               {teamManagementTab === 'members' && (
@@ -728,9 +728,11 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                   )}
                 </div>
               )}
-            </>
-          )}
-        </section>
+                </>
+              )}
+            </section>
+          );
+        })()}
 
         {error && (
           <ErrorAlert message={error} className='text-center' />
