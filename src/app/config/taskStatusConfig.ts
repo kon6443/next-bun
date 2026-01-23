@@ -62,7 +62,7 @@ export const TASK_STATUS: Record<TaskStatusKey, TaskStatusMeta> = {
     description: '보류 중',
     accent: 'linear-gradient(135deg, #a78bfa, #8b5cf6)',
     badgeClassName: 'bg-gradient-to-r from-violet-500/20 to-purple-500/20 text-violet-400 border-violet-500/30',
-    isWorkflow: false,
+    isWorkflow: true,
     order: 4,
   },
   5: {
@@ -73,7 +73,7 @@ export const TASK_STATUS: Record<TaskStatusKey, TaskStatusMeta> = {
     description: '취소됨',
     accent: 'linear-gradient(135deg, #f87171, #ef4444)',
     badgeClassName: 'bg-gradient-to-r from-red-500/20 to-rose-500/20 text-red-400 border-red-500/30',
-    isWorkflow: false,
+    isWorkflow: true,
     order: 5,
   },
 };
@@ -167,20 +167,22 @@ export function getPrevWorkflowStatus(currentStatus: TaskStatusKey): TaskStatusM
 /**
  * 상태 키로 컬럼 키 가져오기 (칸반 보드용)
  */
-export type ColumnKey = 'todo' | 'inProgress' | 'done';
+export type ColumnKey = 'todo' | 'inProgress' | 'done' | 'onHold' | 'cancelled';
 
-export const STATUS_TO_COLUMN: Record<TaskStatusKey, ColumnKey | null> = {
+export const STATUS_TO_COLUMN: Record<TaskStatusKey, ColumnKey> = {
   1: 'todo',
   2: 'inProgress',
   3: 'done',
-  4: null,  // On Hold는 별도 처리 또는 표시 안함
-  5: null,  // Cancelled는 표시 안함
+  4: 'onHold',
+  5: 'cancelled',
 };
 
 export const COLUMN_TO_STATUS: Record<ColumnKey, TaskStatusKey> = {
   todo: 1,
   inProgress: 2,
   done: 3,
+  onHold: 4,
+  cancelled: 5,
 };
 
 /**
