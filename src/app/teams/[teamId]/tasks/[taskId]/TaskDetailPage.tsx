@@ -16,10 +16,8 @@ import {
   Button,
   ButtonLink,
   SectionLabel,
-  DateInfoCard,
   TaskForm,
   TaskStatusBadge,
-  taskStatusLabels,
   ErrorAlert,
   type TaskFormData,
 } from "../../../components";
@@ -296,29 +294,12 @@ export default function TaskDetailPage({
     }
   };
 
-  const formatDate = (date: Date | null) => {
-    if (!date) return null;
-    return new Date(date).toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const formatRelativeTime = (date: Date) => {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return "방금 전";
-    if (minutes < 60) return `${minutes}분 전`;
-    if (hours < 24) return `${hours}시간 전`;
-    if (days < 7) return `${days}일 전`;
-    return formatDate(date);
+  // 컴팩트 날짜+시간 포맷 (M/D HH:mm)
+  const formatCompactDateTime = (date: Date) => {
+    const d = new Date(date);
+    const hours = d.getHours().toString().padStart(2, '0');
+    const minutes = d.getMinutes().toString().padStart(2, '0');
+    return `${d.getMonth() + 1}/${d.getDate()} ${hours}:${minutes}`;
   };
 
   if (isLoading) {
@@ -393,58 +374,77 @@ export default function TaskDetailPage({
             </>
           ) : (
             <>
-              <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <TaskStatusBadge status={taskDetail.taskStatus} />
-                  <div className="flex-1 min-w-0">
-                    <SectionLabel spacing="tight">
-                      {taskStatusLabels[taskDetail.taskStatus] || "Unknown"}
-                    </SectionLabel>
-                    <h1 className="mt-1 text-2xl sm:text-3xl md:text-4xl font-bold text-white break-words">
-                      {taskDetail.taskName}
-                    </h1>
-                    <p className="mt-2 text-sm text-slate-400">
-                      작성자: {taskDetail.userName || `사용자 ${taskDetail.crtdBy}`}
-                    </p>
+              {/* 컴팩트 헤더: 상태뱃지 + 작성자 / 제목 / 수정 아이콘 */}
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <TaskStatusBadge status={taskDetail.taskStatus} />
+                    <span className="text-xs text-slate-500">
+                      {taskDetail.userName || `사용자 ${taskDetail.crtdBy}`}
+                    </span>
                   </div>
+                  <h1 className="text-xl sm:text-2xl font-bold text-white break-words">
+                    {taskDetail.taskName}
+                  </h1>
                 </div>
                 {currentUserId === taskDetail.crtdBy && (
-                  <Button
-                    variant="secondary"
-                    size="lg"
+                  <button
                     onClick={handleStartEdit}
                     disabled={isSubmitting}
-                    className="w-full sm:w-auto"
+                    className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition disabled:opacity-50"
+                    title="수정"
                   >
-                    수정
-                  </Button>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                  </button>
                 )}
               </div>
 
+              {/* 본문 */}
               {taskDetail.taskDescription && (
-                <div className="mb-6 rounded-2xl border border-sky-500/30 bg-slate-900/50 p-6 sm:p-8 shadow-lg shadow-sky-500/10">
-                  <p className="whitespace-pre-wrap text-lg sm:text-xl leading-relaxed text-slate-200">
+                <div className="mb-4 rounded-2xl border border-sky-500/30 bg-slate-900/50 p-5 sm:p-6 shadow-lg shadow-sky-500/10">
+                  <p className="whitespace-pre-wrap text-base sm:text-lg leading-relaxed text-slate-200">
                     {taskDetail.taskDescription}
                   </p>
                 </div>
               )}
 
-              <div className="grid gap-3 sm:gap-4 sm:grid-cols-2">
-                <DateInfoCard
-                  label="시작일"
-                  date={taskDetail.startAt}
-                  variant="default"
-                />
-                <DateInfoCard
-                  label="종료일"
-                  date={taskDetail.endAt}
-                  variant="default"
-                />
-                <DateInfoCard
-                  label="생성일"
-                  date={taskDetail.crtdAt}
-                  variant="muted"
-                />
+              {/* 날짜 정보 (인라인 아이콘) - 순서: 생성일 → 시작일 → 종료일 */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-400">
+                {/* 생성일 */}
+                <span className="flex items-center gap-1.5" title="생성일">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>{formatCompactDateTime(taskDetail.crtdAt)}</span>
+                </span>
+                {/* 구분자 (시작일 또는 종료일이 있을 때) */}
+                {(taskDetail.startAt || taskDetail.endAt) && (
+                  <span className="text-slate-600">·</span>
+                )}
+                {/* 시작일 */}
+                {taskDetail.startAt && (
+                  <span className="flex items-center gap-1.5" title="시작일">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span>{formatCompactDateTime(taskDetail.startAt)}</span>
+                  </span>
+                )}
+                {/* 화살표 (시작일과 종료일 모두 있을 때) */}
+                {taskDetail.startAt && taskDetail.endAt && (
+                  <span className="text-slate-600">→</span>
+                )}
+                {/* 종료일 */}
+                {taskDetail.endAt && (
+                  <span className="flex items-center gap-1.5" title="종료일">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span>{formatCompactDateTime(taskDetail.endAt)}</span>
+                  </span>
+                )}
               </div>
             </>
           )}
@@ -464,26 +464,33 @@ export default function TaskDetailPage({
 
         {/* 댓글 섹션 */}
         <section className={`${cardStyles.section} p-4 sm:p-6 md:p-8`}>
-          <h2 className="mb-4 sm:mb-6 text-xl sm:text-2xl font-bold text-white">댓글</h2>
+          {/* 댓글 헤딩 (아이콘 + 수) */}
+          <div className="flex items-center gap-2 mb-4 text-slate-400">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            <span className="text-sm">{comments.length}</span>
+          </div>
 
-          {/* 댓글 작성 폼 */}
-          <div className="mb-6 sm:mb-8 rounded-2xl border border-white/10 bg-slate-950/30 p-4 sm:p-6">
+          {/* 댓글 작성 폼 (컴팩트) */}
+          <div className="mb-4 flex gap-2 items-end">
             <textarea
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               placeholder="댓글을 입력하세요..."
-              className="w-full resize-none rounded-xl border border-white/10 bg-slate-900/60 p-3 sm:p-4 text-sm sm:text-base text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
-              rows={4}
+              className="flex-1 resize-none rounded-xl border border-white/10 bg-slate-900/60 p-3 text-sm text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+              rows={2}
             />
-            <div className="mt-4 flex justify-end">
-              <Button
-                size="lg"
-                onClick={handleCreateComment}
-                disabled={!newComment.trim() || isSubmitting}
-              >
-                {isSubmitting ? "작성 중..." : "댓글 작성"}
-              </Button>
-            </div>
+            <button
+              onClick={handleCreateComment}
+              disabled={!newComment.trim() || isSubmitting}
+              className="p-3 rounded-xl bg-sky-500/20 text-sky-400 hover:bg-sky-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              title="댓글 작성"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            </button>
           </div>
 
           {/* 댓글 목록 */}
@@ -526,46 +533,55 @@ export default function TaskDetailPage({
                     </div>
                   ) : (
                     <div>
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                            <p className="font-semibold text-white text-sm sm:text-base">
-                              {comment.userName || `사용자 ${comment.userId}`}
-                            </p>
-                            <span className="text-xs text-slate-500">
-                              {formatRelativeTime(comment.crtdAt)}
-                              {comment.mdfdAt && " (수정됨)"}
-                            </span>
-                          </div>
-                          {comment.status === 0 ? (
-                            <p className="mt-3 text-sm italic text-slate-500">
-                              삭제된 댓글입니다.
-                            </p>
-                          ) : (
-                            <p className="mt-3 text-sm sm:text-base leading-relaxed text-slate-300 whitespace-pre-wrap">
-                              {comment.commentContent}
-                            </p>
+                      {/* 댓글 헤더: 닉네임 · 시간 (수정됨) + 아이콘 버튼 - 한 줄 */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-sm text-white">
+                            {comment.userName || `사용자 ${comment.userId}`}
+                          </span>
+                          <span className="text-xs text-slate-500">·</span>
+                          <span className="text-xs text-slate-500">
+                            {formatCompactDateTime(comment.crtdAt)}
+                          </span>
+                          {comment.mdfdAt && (
+                            <span className="text-xs text-slate-500">(수정됨)</span>
                           )}
                         </div>
                         {currentUserId === comment.userId && comment.status !== 0 && (
-                          <div className="flex gap-2 sm:ml-4">
-                        <button
-                          onClick={() => handleStartEditComment(comment)}
-                          disabled={isSubmitting}
-                          className="rounded-lg border border-white/20 px-3 py-2 sm:py-1.5 text-xs font-semibold text-slate-300 transition hover:border-white/40 disabled:opacity-50"
-                        >
-                          수정
-                        </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleStartEditComment(comment)}
+                              disabled={isSubmitting}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition disabled:opacity-50"
+                              title="수정"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                            </button>
                             <button
                               onClick={() => handleDeleteComment(comment.commentId)}
                               disabled={isSubmitting}
-                              className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 sm:py-1.5 text-xs font-semibold text-red-400 transition hover:bg-red-500/20 disabled:opacity-50"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition disabled:opacity-50"
+                              title="삭제"
                             >
-                              삭제
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
                             </button>
                           </div>
                         )}
                       </div>
+                      {/* 댓글 내용 */}
+                      {comment.status === 0 ? (
+                        <p className="mt-2 text-sm italic text-slate-500">
+                          삭제된 댓글입니다.
+                        </p>
+                      ) : (
+                        <p className="mt-2 text-sm leading-relaxed text-slate-300 whitespace-pre-wrap">
+                          {comment.commentContent}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
