@@ -79,25 +79,6 @@ export const TASK_STATUS: Record<TaskStatusKey, TaskStatusMeta> = {
 };
 
 /**
- * 상태 전이 맵
- * 각 상태에서 이동 가능한 상태 목록을 정의합니다.
- * 
- * 비즈니스 로직:
- * - Ideation(1) → In Progress(2), Cancelled(5)
- * - In Progress(2) → Ideation(1), Completed(3), On Hold(4), Cancelled(5)
- * - Completed(3) → In Progress(2) (재작업 필요시)
- * - On Hold(4) → Ideation(1), In Progress(2), Completed(3), Cancelled(5)
- * - Cancelled(5) → 이동 불가 (필요시 Ideation으로 복구 가능)
- */
-export const STATUS_TRANSITIONS: Record<TaskStatusKey, TaskStatusKey[]> = {
-  1: [2, 5],       // Ideation → In Progress, Cancelled
-  2: [1, 3, 4, 5], // In Progress → Ideation, Completed, On Hold, Cancelled
-  3: [2],          // Completed → In Progress (재작업)
-  4: [1, 2, 3, 5], // On Hold → 복귀 가능한 모든 상태
-  5: [],           // Cancelled → 이동 불가
-};
-
-/**
  * 칸반 보드에 표시되는 워크플로우 상태만 가져오기
  * 순서대로 정렬됨
  */
@@ -105,63 +86,6 @@ export function getWorkflowStatuses(): TaskStatusMeta[] {
   return Object.values(TASK_STATUS)
     .filter(status => status.isWorkflow)
     .sort((a, b) => a.order - b.order);
-}
-
-/**
- * 특정 상태에서 이동 가능한 상태 목록 가져오기
- */
-export function getAvailableTransitions(currentStatus: TaskStatusKey): TaskStatusMeta[] {
-  const availableKeys = STATUS_TRANSITIONS[currentStatus] || [];
-  return availableKeys.map(key => TASK_STATUS[key]);
-}
-
-/**
- * 특정 상태에서 다른 상태로 전이 가능한지 확인
- */
-export function canTransitionTo(currentStatus: TaskStatusKey, targetStatus: TaskStatusKey): boolean {
-  const availableKeys = STATUS_TRANSITIONS[currentStatus] || [];
-  return availableKeys.includes(targetStatus);
-}
-
-/**
- * 워크플로우 내에서 "다음" 상태 가져오기 (순차 진행용)
- * 칸반 보드에서 주요 진행 방향을 나타냄
- */
-export function getNextWorkflowStatus(currentStatus: TaskStatusKey): TaskStatusMeta | null {
-  const current = TASK_STATUS[currentStatus];
-  if (!current || !current.isWorkflow) return null;
-  
-  const workflowStatuses = getWorkflowStatuses();
-  const currentIndex = workflowStatuses.findIndex(s => s.key === currentStatus);
-  
-  if (currentIndex === -1 || currentIndex >= workflowStatuses.length - 1) return null;
-  
-  const nextStatus = workflowStatuses[currentIndex + 1];
-  // 전이 가능한지 확인
-  if (canTransitionTo(currentStatus, nextStatus.key)) {
-    return nextStatus;
-  }
-  return null;
-}
-
-/**
- * 워크플로우 내에서 "이전" 상태 가져오기 (되돌리기용)
- */
-export function getPrevWorkflowStatus(currentStatus: TaskStatusKey): TaskStatusMeta | null {
-  const current = TASK_STATUS[currentStatus];
-  if (!current || !current.isWorkflow) return null;
-  
-  const workflowStatuses = getWorkflowStatuses();
-  const currentIndex = workflowStatuses.findIndex(s => s.key === currentStatus);
-  
-  if (currentIndex <= 0) return null;
-  
-  const prevStatus = workflowStatuses[currentIndex - 1];
-  // 전이 가능한지 확인
-  if (canTransitionTo(currentStatus, prevStatus.key)) {
-    return prevStatus;
-  }
-  return null;
 }
 
 /**
