@@ -2,16 +2,20 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Task } from '../types/task';
-import { MobileTaskCard } from './MobileTaskCard';
-import { getWorkflowStatuses, type ColumnKey } from '../config/taskStatusConfig';
+import { TaskCard } from './TaskCard';
+import { getWorkflowStatuses, STATUS_TO_COLUMN, type ColumnKey } from '../config/taskStatusConfig';
 
-type MobileKanbanProps = {
+type KanbanProps = {
   tasksByColumn: Record<ColumnKey, Task[]>;
   onStatusChange: (taskId: number, newStatus: number) => Promise<void>;
   teamId: string;
 };
 
-export function MobileKanban({ tasksByColumn, onStatusChange, teamId }: MobileKanbanProps) {
+/**
+ * 탭 기반 칸반 보드 컴포넌트
+ * PC/모바일 모두에서 동일한 UX 제공 (스와이프 또는 탭 클릭으로 컬럼 전환)
+ */
+export function Kanban({ tasksByColumn, onStatusChange, teamId }: KanbanProps) {
   // 워크플로우 상태만 가져오기 (칸반 보드에 표시되는 상태)
   const workflowStatuses = getWorkflowStatuses();
   
@@ -19,12 +23,8 @@ export function MobileKanban({ tasksByColumn, onStatusChange, teamId }: MobileKa
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
 
-  // 상태 키를 컬럼 키로 매핑
-  const statusKeyToColumnKey: Record<number, ColumnKey> = {
-    1: 'todo',
-    2: 'inProgress',
-    3: 'done',
-  };
+  // 상태 키를 컬럼 키로 매핑 (config에서 가져옴)
+  const statusKeyToColumnKey = STATUS_TO_COLUMN;
 
   // 탭 클릭 시 해당 컬럼으로 스크롤
   const scrollToColumn = useCallback((index: number) => {
@@ -69,36 +69,46 @@ export function MobileKanban({ tasksByColumn, onStatusChange, teamId }: MobileKa
 
   return (
     <div className="flex flex-col h-full">
-      {/* 상태 탭 바 */}
-      <div className="flex rounded-2xl border border-white/10 bg-slate-950/50 p-1 mb-4">
-        {workflowStatuses.map((status, index) => {
-          const isActive = index === activeColumnIndex;
-          const columnKey = statusKeyToColumnKey[status.key];
-          const taskCount = tasksByColumn[columnKey]?.length || 0;
+      {/* 상태 탭 바 (아이콘 + 숫자) - 가로 스크롤 */}
+      <div className="overflow-x-auto scrollbar-hide mb-4">
+        <div className="flex gap-2 w-full rounded-2xl border border-white/10 bg-slate-950/50 p-1.5">
+          {workflowStatuses.map((status, index) => {
+            const isActive = index === activeColumnIndex;
+            const columnKey = statusKeyToColumnKey[status.key];
+            const taskCount = tasksByColumn[columnKey]?.length || 0;
 
-          return (
-            <button
-              key={status.key}
-              onClick={() => scrollToColumn(index)}
-              className={`flex-1 py-2.5 px-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
-                isActive
-                  ? 'bg-gradient-to-r from-indigo-500/20 to-sky-500/20 text-white border border-white/10'
-                  : 'text-slate-400 hover:text-slate-300'
-              }`}
-            >
-              <span className="block truncate">{status.label}</span>
-              <span className={`block text-[10px] mt-0.5 ${isActive ? 'text-sky-400' : 'text-slate-500'}`}>
-                {taskCount}개
-              </span>
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={status.key}
+                onClick={() => scrollToColumn(index)}
+                className={`min-w-[56px] flex-1 flex flex-col items-center py-2 px-3 rounded-xl transition-all duration-200 ${
+                  isActive
+                    ? 'bg-gradient-to-r from-indigo-500/20 to-sky-500/20 border border-white/10 scale-105'
+                    : 'hover:bg-white/5'
+                }`}
+              >
+                {/* 상태 색상 아이콘 */}
+                <span
+                  className={`w-5 h-5 rounded-full border-2 shadow-inner ${
+                    isActive ? 'border-white/40' : 'border-white/20'
+                  }`}
+                  style={{ background: status.accent }}
+                  aria-hidden="true"
+                />
+                {/* 태스크 수 */}
+                <span className={`text-xs font-bold mt-1 ${isActive ? 'text-white' : 'text-slate-500'}`}>
+                  {taskCount}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* 스와이프 가능한 컬럼 컨테이너 */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-x-auto overflow-y-hidden scrollbar-hide mobile-kanban-container"
+        className="flex-1 overflow-x-auto overflow-y-hidden scrollbar-hide kanban-container"
       >
         <div className="flex h-full" style={{ width: `${workflowStatuses.length * 100}%` }}>
           {workflowStatuses.map((status) => {
@@ -108,7 +118,7 @@ export function MobileKanban({ tasksByColumn, onStatusChange, teamId }: MobileKa
             return (
               <div
                 key={status.key}
-                className="flex-shrink-0 px-1 mobile-kanban-column"
+                className="flex-shrink-0 px-1 kanban-column"
                 style={{ width: `${100 / workflowStatuses.length}%` }}
               >
                 {/* 컬럼 헤더 */}
@@ -138,7 +148,7 @@ export function MobileKanban({ tasksByColumn, onStatusChange, teamId }: MobileKa
                       </div>
                     ) : (
                       tasks.map((task) => (
-                        <MobileTaskCard
+                        <TaskCard
                           key={task.taskId}
                           task={task}
                           onStatusChange={onStatusChange}
