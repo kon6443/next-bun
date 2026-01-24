@@ -24,11 +24,17 @@ export const cardStyles = {
 } as const;
 
 /**
+ * 모바일 최적화 최대 너비 (TeamBoard 기준)
+ * 모든 Teams 관련 페이지에서 공통으로 사용
+ */
+export const MOBILE_MAX_WIDTH = "max-w-lg";
+
+/**
  * 페이지 레이아웃 기본 클래스
  */
 export const layoutStyles = {
   /** 페이지 루트 컨테이너 */
   pageContainer: "relative min-h-screen overflow-hidden text-slate-100",
-  /** 메인 컨텐츠 영역 (max-w-5xl) */
-  mainContent: "relative z-10 mx-auto flex flex-col gap-6 sm:gap-10 px-4 pb-24 pt-12 sm:pt-16 sm:px-8",
+  /** 메인 컨텐츠 영역 (모바일 최적화) */
+  mainContent: "relative z-10 mx-auto flex flex-col gap-6 px-4 pb-24 pt-12",
 } as const;

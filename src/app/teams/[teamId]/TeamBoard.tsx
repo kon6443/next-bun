@@ -21,7 +21,7 @@ import {
   type TeamUserResponse,
   type TeamInviteResponse,
 } from '@/services/teamService';
-import { teamsPageBackground, cardStyles, layoutStyles } from '@/styles/teams';
+import { teamsPageBackground, cardStyles, layoutStyles, MOBILE_MAX_WIDTH } from '@/styles/teams';
 import {
   STATUS_TO_COLUMN,
   type ColumnKey,
@@ -442,7 +442,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
   return (
     <div className={layoutStyles.pageContainer} style={teamsPageBackground}>
-      <main className={`${layoutStyles.mainContent} max-w-lg`}>
+      <main className={`${layoutStyles.mainContent} ${MOBILE_MAX_WIDTH}`}>
         <section className={`${cardStyles.section} p-4`}>
           <SectionLabel>Team Kanban</SectionLabel>
           <div className='mt-4 flex flex-col gap-4'>

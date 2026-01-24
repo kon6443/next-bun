@@ -25,11 +25,11 @@ export default function TeamsClient({
   return (
     <TeamsPageLayout>
       {/* 헤더 섹션 */}
-      <section className={`${cardStyles.section} p-4 sm:p-8`}>
+      <section className={`${cardStyles.section} p-4`}>
         <SectionLabel spacing="wide">Teams</SectionLabel>
-        <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-4 flex flex-col gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-white sm:text-4xl">
+            <h1 className="text-3xl font-bold text-white">
               내가 속한 팀
             </h1>
             <p className="mt-3 text-sm text-slate-400">
@@ -39,7 +39,7 @@ export default function TeamsClient({
             </p>
           </div>
           {isAuthenticated ? (
-            <ButtonLink href="/teams/new" size="lg">
+            <ButtonLink href="/teams/new" size="lg" fullWidth>
               + 팀 생성
             </ButtonLink>
           ) : (
@@ -49,7 +49,7 @@ export default function TeamsClient({
       </section>
 
       {/* 팀 목록 섹션 */}
-      <section className={`${cardStyles.section} p-4 sm:p-8`}>
+      <section className={`${cardStyles.section} p-4`}>
         {isLoading ? (
           <LoadingSpinner message="팀 목록을 불러오는 중..." />
         ) : isAuthenticated ? (
@@ -83,19 +83,19 @@ function ErrorMessage({ message }: { message: string }) {
 /** 팀 목록 컴포넌트 */
 function TeamList({ teams }: { teams: TeamSummary[] }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
+    <div className="grid gap-4">
       {teams.map((team) => (
         <Link
           key={team.teamId}
           href={`/teams/${team.teamId}`}
-          className="group flex flex-col rounded-2xl border border-white/10 bg-slate-950/40 p-4 shadow-[0_20px_40px_rgba(2,6,23,0.55)] transition hover:border-white/30 sm:p-5"
+          className="group flex flex-col rounded-2xl border border-white/10 bg-slate-950/40 p-4 shadow-[0_20px_40px_rgba(2,6,23,0.55)] transition hover:border-white/30"
         >
           <div className="flex items-center justify-between">
             <SectionLabel spacing="tight" color="subtle">
               {team.role}
             </SectionLabel>
           </div>
-          <h2 className="mt-3 text-xl font-semibold text-white sm:text-2xl">
+          <h2 className="mt-3 text-xl font-semibold text-white">
             {team.name}
           </h2>
           <p className="mt-2 text-sm text-slate-400">{team.description}</p>
