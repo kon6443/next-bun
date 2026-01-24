@@ -304,9 +304,9 @@ export default function TaskDetailPage({
 
   if (isLoading) {
     return (
-      <TeamsPageLayout maxWidth="4xl">
+      <TeamsPageLayout>
         <div
-          className={`${cardStyles.section} p-4 sm:p-8 text-center text-slate-400`}
+          className={`${cardStyles.section} p-4 text-center text-slate-400`}
         >
           태스크 정보를 불러오는 중...
         </div>
@@ -316,8 +316,8 @@ export default function TaskDetailPage({
 
   if (error && !taskDetail) {
     return (
-      <TeamsPageLayout maxWidth="4xl">
-        <div className={`${cardStyles.errorSection} p-4 sm:p-8 text-center`}>
+      <TeamsPageLayout>
+        <div className={`${cardStyles.errorSection} p-4 text-center`}>
           <p className="text-base font-semibold text-red-400">{error}</p>
           <ButtonLink
             href={`/teams/${teamId}`}
@@ -337,7 +337,7 @@ export default function TaskDetailPage({
   const currentUserId = session?.user?.userId ?? null;
 
   return (
-    <TeamsPageLayout maxWidth="4xl">
+    <TeamsPageLayout>
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <ButtonLink href={`/teams/${teamId}`} variant="secondary" size="lg">
@@ -346,12 +346,12 @@ export default function TaskDetailPage({
       </div>
 
       {/* 태스크 상세 정보 */}
-      <section className={`${cardStyles.section} p-4 sm:p-6 md:p-8`}>
+      <section className={`${cardStyles.section} p-4`}>
           {isEditing ? (
             <>
-              <div className="mb-4 sm:mb-6">
+              <div className="mb-4">
                 <SectionLabel spacing="tight">태스크 수정</SectionLabel>
-                <h2 className="mt-2 text-xl sm:text-2xl font-bold text-white">
+                <h2 className="mt-2 text-xl font-bold text-white">
                   {taskDetail.taskName}
                 </h2>
               </div>
@@ -383,7 +383,7 @@ export default function TaskDetailPage({
                       {taskDetail.userName || `사용자 ${taskDetail.crtdBy}`}
                     </span>
                   </div>
-                  <h1 className="text-xl sm:text-2xl font-bold text-white break-words">
+                  <h1 className="text-xl font-bold text-white break-words">
                     {taskDetail.taskName}
                   </h1>
                 </div>
@@ -403,8 +403,8 @@ export default function TaskDetailPage({
 
               {/* 본문 */}
               {taskDetail.taskDescription && (
-                <div className="mb-4 rounded-2xl border border-sky-500/30 bg-slate-900/50 p-5 sm:p-6 shadow-lg shadow-sky-500/10">
-                  <p className="whitespace-pre-wrap text-base sm:text-lg leading-relaxed text-slate-200">
+                <div className="mb-4 rounded-2xl border border-sky-500/30 bg-slate-900/50 p-4 shadow-lg shadow-sky-500/10">
+                  <p className="whitespace-pre-wrap text-base leading-relaxed text-slate-200">
                     {taskDetail.taskDescription}
                   </p>
                 </div>
@@ -463,7 +463,7 @@ export default function TaskDetailPage({
         )}
 
         {/* 댓글 섹션 */}
-        <section className={`${cardStyles.section} p-4 sm:p-6 md:p-8`}>
+        <section className={`${cardStyles.section} p-4`}>
           {/* 댓글 헤딩 (아이콘 + 수) */}
           <div className="flex items-center gap-2 mb-4 text-slate-400">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -503,14 +503,14 @@ export default function TaskDetailPage({
               comments.map((comment, index) => (
                 <div
                   key={comment.commentId ?? `comment-${index}`}
-                  className="rounded-2xl border border-white/10 bg-slate-950/30 p-4 sm:p-6"
+                  className="rounded-2xl border border-white/10 bg-slate-950/30 p-4"
                 >
                   {editingCommentId === comment.commentId ? (
                     <div>
                       <textarea
                         value={editingContent}
                         onChange={(e) => setEditingContent(e.target.value)}
-                        className="w-full resize-none rounded-xl border border-white/10 bg-slate-900/60 p-3 sm:p-4 text-sm sm:text-base text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                        className="w-full resize-none rounded-xl border border-white/10 bg-slate-900/60 p-3 text-sm text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                         rows={3}
                       />
                       <div className="mt-4 flex justify-end gap-2">
