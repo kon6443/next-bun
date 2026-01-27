@@ -4,10 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from '../types/task';
 import { getDeadlineStatus, getDeadlineLabel, deadlineStyles } from '../utils/taskUtils';
-import {
-  TASK_STATUS,
-  type TaskStatusKey,
-} from '../config/taskStatusConfig';
+import { type TaskStatusKey } from '../config/taskStatusConfig';
+import { StatusDropdown } from './StatusDropdown';
 
 type TaskCardProps = {
   task: Task;
@@ -31,17 +29,13 @@ export function TaskCard({ task, onStatusChange, teamId }: TaskCardProps) {
 
   const endDateStr = endAt ? formatDate(endAt) : null;
 
-  // 현재 상태 메타데이터
+  // 현재 상태 키
   const currentStatusKey = taskStatus as TaskStatusKey;
-  const currentStatusMeta = TASK_STATUS[currentStatusKey] || TASK_STATUS[1];
 
   // 마감일 상태 (완료/취소된 태스크는 표시 안함)
   const deadlineStatus = taskStatus !== 3 && taskStatus !== 5 ? getDeadlineStatus(endAt) : 'normal';
   const deadlineLabel = getDeadlineLabel(deadlineStatus, endAt);
   const showDeadlineAlert = deadlineStatus === 'overdue' || deadlineStatus === 'today' || deadlineStatus === 'soon';
-
-  // 현재 상태를 제외한 모든 상태 가져오기
-  const otherStatuses = Object.values(TASK_STATUS).filter(s => s.key !== currentStatusKey);
 
   const handleCardClick = () => {
     router.push(`/teams/${teamId}/tasks/${taskId}`);
@@ -97,39 +91,13 @@ export function TaskCard({ task, onStatusChange, teamId }: TaskCardProps) {
         </span>
       </div>
 
-      {/* 상태 변경 버튼 그룹 */}
+      {/* 상태 드롭다운 */}
       <div className="mt-4 pt-3 border-t border-white/5">
-        {/* 현재 상태 표시 */}
-        <div className="flex items-center gap-2 mb-2">
-          <span
-            className="w-3 h-3 rounded-full border border-white/20"
-            style={{ background: currentStatusMeta.accent }}
-            aria-hidden="true"
-          />
-          <span className="text-xs font-semibold text-slate-400">
-            {currentStatusMeta.label}
-          </span>
-        </div>
-
-        {/* 다른 상태로 변경 버튼들 */}
-        <div className="flex flex-wrap gap-2">
-          {otherStatuses.map((status) => (
-            <button
-              key={status.key}
-              onClick={(e) => handleStatusChange(status.key, e)}
-              disabled={isUpdating}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 ${status.badgeClassName} border hover:brightness-110 disabled:opacity-50`}
-            >
-              <span
-                className="w-2.5 h-2.5 rounded-full"
-                style={{ background: status.accent }}
-                aria-hidden="true"
-              />
-              {status.shortLabel}
-            </button>
-          ))}
-        </div>
-
+        <StatusDropdown
+          currentStatus={currentStatusKey}
+          onStatusChange={handleStatusChange}
+          disabled={isUpdating}
+        />
         {/* 로딩 인디케이터 */}
         {isUpdating && (
           <div className="mt-2 text-center">
