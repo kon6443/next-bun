@@ -18,8 +18,12 @@ import {
   getTeamUsers,
   getTeamInvites,
   createTeamInvite,
+  getTelegramStatus,
+  createTelegramLink,
+  deleteTelegramLink,
   type TeamUserResponse,
   type TeamInviteResponse,
+  type TelegramStatusResponse,
 } from '@/services/teamService';
 import { teamsPageBackground, cardStyles, layoutStyles, MOBILE_MAX_WIDTH } from '@/styles/teams';
 import {
@@ -106,10 +110,16 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   const [canManageInvites, setCanManageInvites] = useState(false);
   const [invites, setInvites] = useState<TeamInviteResponse[]>([]);
   const [isTeamManagementOpen, setIsTeamManagementOpen] = useState(false);
-  const [teamManagementTab, setTeamManagementTab] = useState<'members' | 'stats' | 'invites'>('stats');
+  const [teamManagementTab, setTeamManagementTab] = useState<'members' | 'stats' | 'invites' | 'telegram'>('stats');
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [isCreatingInvite, setIsCreatingInvite] = useState(false);
   const [createdInviteLink, setCreatedInviteLink] = useState<string | null>(null);
+  
+  // 텔레그램 연동 상태
+  const [telegramStatus, setTelegramStatus] = useState<TelegramStatusResponse | null>(null);
+  const [isLoadingTelegram, setIsLoadingTelegram] = useState(false);
+  const [isCreatingTelegramLink, setIsCreatingTelegramLink] = useState(false);
+  const [isDeletingTelegramLink, setIsDeletingTelegramLink] = useState(false);
 
   // viewMode는 URL 쿼리에서 파생
   const viewMode = getViewModeFromQuery();
@@ -204,6 +214,15 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           } else {
             setInvites([]);
           }
+        }
+
+        // 텔레그램 연동 상태 조회
+        try {
+          const telegramResponse = await getTelegramStatus(teamIdNum, session.user.accessToken);
+          setTelegramStatus(telegramResponse.data);
+        } catch (telegramErr) {
+          console.error('Failed to fetch telegram status:', telegramErr);
+          setTelegramStatus(null);
         }
 
         // taskStatus에 따라 태스크를 컬럼별로 분류
@@ -430,6 +449,90 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     });
   };
 
+  // 텔레그램 연동 링크 생성
+  const handleCreateTelegramLink = async () => {
+    if (!session?.user?.accessToken) return;
+
+    setIsCreatingTelegramLink(true);
+    setError(null);
+    try {
+      const teamIdNum = parseInt(teamId, 10);
+      if (isNaN(teamIdNum)) {
+        throw new Error('유효하지 않은 팀 ID입니다.');
+      }
+
+      const response = await createTelegramLink(teamIdNum, session.user.accessToken);
+      
+      // 상태 업데이트
+      setTelegramStatus({
+        isLinked: false,
+        chatId: null,
+        pendingLink: {
+          token: response.data.token,
+          deepLink: response.data.deepLink,
+          endAt: response.data.endAt,
+        },
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '텔레그램 연동 링크 생성에 실패했습니다.';
+      setError(errorMessage);
+      console.error('Failed to create telegram link:', err);
+    } finally {
+      setIsCreatingTelegramLink(false);
+    }
+  };
+
+  // 텔레그램 연동 해제
+  const handleDeleteTelegramLink = async () => {
+    if (!session?.user?.accessToken) return;
+
+    const confirmed = window.confirm('텔레그램 연동을 해제하시겠습니까?\n연동 해제 후에는 팀 알림을 받을 수 없습니다.');
+    if (!confirmed) return;
+
+    setIsDeletingTelegramLink(true);
+    setError(null);
+    try {
+      const teamIdNum = parseInt(teamId, 10);
+      if (isNaN(teamIdNum)) {
+        throw new Error('유효하지 않은 팀 ID입니다.');
+      }
+
+      await deleteTelegramLink(teamIdNum, session.user.accessToken);
+      
+      // 상태 업데이트
+      setTelegramStatus({
+        isLinked: false,
+        chatId: null,
+      });
+
+      alert('텔레그램 연동이 해제되었습니다.');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '텔레그램 연동 해제에 실패했습니다.';
+      setError(errorMessage);
+      console.error('Failed to delete telegram link:', err);
+    } finally {
+      setIsDeletingTelegramLink(false);
+    }
+  };
+
+  // 텔레그램 상태 새로고침
+  const handleRefreshTelegramStatus = async () => {
+    if (!session?.user?.accessToken) return;
+
+    setIsLoadingTelegram(true);
+    try {
+      const teamIdNum = parseInt(teamId, 10);
+      if (isNaN(teamIdNum)) return;
+
+      const response = await getTelegramStatus(teamIdNum, session.user.accessToken);
+      setTelegramStatus(response.data);
+    } catch (err) {
+      console.error('Failed to refresh telegram status:', err);
+    } finally {
+      setIsLoadingTelegram(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('ko-KR', {
       year: 'numeric',
@@ -505,6 +608,13 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
               label: '초대',
               iconPath: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
               count: invites.length,
+              visible: canManageInvites,
+            },
+            {
+              key: 'telegram' as const,
+              label: '텔레그램',
+              iconPath: 'M12 19l9 2-9-18-9 18 9-2zm0 0v-8',
+              count: null,
               visible: canManageInvites,
             },
           ];
@@ -711,6 +821,123 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                           </div>
                         );
                       })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 텔레그램 탭 내용 */}
+              {teamManagementTab === 'telegram' && (
+                <div className='mt-4'>
+                  {isLoadingTelegram ? (
+                    <div className='rounded-2xl border border-dashed border-white/20 px-6 py-10 text-center text-slate-400'>
+                      텔레그램 연동 상태를 불러오는 중...
+                    </div>
+                  ) : telegramStatus?.isLinked ? (
+                    // 연동 완료 상태
+                    <div className='rounded-2xl border border-green-500/30 bg-green-500/10 p-4'>
+                      <div className='flex items-center gap-3 mb-4'>
+                        <div className='flex h-10 w-10 items-center justify-center rounded-full bg-green-500/20'>
+                          <svg className='w-5 h-5 text-green-400' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M5 13l4 4L19 7' />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className='text-sm font-semibold text-green-400'>텔레그램 연동 완료</p>
+                          <p className='text-xs text-slate-400'>팀 알림이 텔레그램 그룹으로 전송됩니다.</p>
+                        </div>
+                      </div>
+                      <div className='mb-4 rounded-lg border border-white/5 bg-slate-900/50 p-3'>
+                        <p className='text-xs text-slate-500 mb-1'>Chat ID</p>
+                        <p className='text-sm font-mono text-slate-300'>{telegramStatus.chatId}</p>
+                      </div>
+                      <button
+                        onClick={handleDeleteTelegramLink}
+                        disabled={isDeletingTelegramLink}
+                        className='w-full rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-xs font-semibold text-red-400 transition hover:bg-red-500/20 disabled:opacity-50'
+                      >
+                        {isDeletingTelegramLink ? '해제 중...' : '연동 해제'}
+                      </button>
+                    </div>
+                  ) : telegramStatus?.pendingLink ? (
+                    // 대기 중 상태 (연동 링크 생성됨)
+                    <div className='rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-4'>
+                      <div className='flex items-center gap-3 mb-4'>
+                        <div className='flex h-10 w-10 items-center justify-center rounded-full bg-yellow-500/20'>
+                          <svg className='w-5 h-5 text-yellow-400' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className='text-sm font-semibold text-yellow-400'>연동 대기 중</p>
+                          <p className='text-xs text-slate-400'>아래 링크를 클릭하여 텔레그램 그룹에 봇을 추가해주세요.</p>
+                        </div>
+                      </div>
+                      <div className='mb-4 rounded-lg border border-white/5 bg-slate-900/50 p-3'>
+                        <p className='text-xs text-slate-500 mb-1'>연동 링크</p>
+                        <a
+                          href={telegramStatus.pendingLink.deepLink}
+                          target='_blank'
+                          rel='noopener noreferrer'
+                          className='block break-all text-xs font-mono text-sky-400 hover:text-sky-300 underline'
+                        >
+                          {telegramStatus.pendingLink.deepLink}
+                        </a>
+                      </div>
+                      <div className='mb-4 text-xs text-slate-400'>
+                        <span className='text-slate-500'>만료:</span>{' '}
+                        {formatDate(telegramStatus.pendingLink.endAt)}
+                      </div>
+                      <div className='flex gap-2'>
+                        <button
+                          onClick={() => handleCopyInviteLink(telegramStatus.pendingLink!.deepLink)}
+                          className='flex-1 rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-xs font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
+                        >
+                          링크 복사
+                        </button>
+                        <button
+                          onClick={handleRefreshTelegramStatus}
+                          disabled={isLoadingTelegram}
+                          className='rounded-lg border border-white/20 bg-white/5 px-3 py-2.5 text-xs font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10 disabled:opacity-50'
+                          title='상태 새로고침'
+                        >
+                          <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15' />
+                          </svg>
+                        </button>
+                      </div>
+                      <div className='mt-3'>
+                        <button
+                          onClick={handleCreateTelegramLink}
+                          disabled={isCreatingTelegramLink}
+                          className='w-full rounded-lg border border-slate-500/30 bg-slate-500/10 px-4 py-2 text-xs font-semibold text-slate-400 transition hover:bg-slate-500/20 disabled:opacity-50'
+                        >
+                          {isCreatingTelegramLink ? '생성 중...' : '새 링크 생성'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    // 미연동 상태
+                    <div className='rounded-2xl border border-dashed border-white/20 px-6 py-10 text-center'>
+                      <div className='flex justify-center mb-4'>
+                        <div className='flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/10'>
+                          <svg className='w-8 h-8 text-sky-400' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 19l9 2-9-18-9 18 9-2zm0 0v-8' />
+                          </svg>
+                        </div>
+                      </div>
+                      <p className='text-sm font-semibold text-slate-300 mb-2'>텔레그램 그룹 연동</p>
+                      <p className='text-xs text-slate-400 mb-6'>
+                        텔레그램 그룹과 연동하여<br />
+                        팀 알림을 받을 수 있습니다.
+                      </p>
+                      <button
+                        onClick={handleCreateTelegramLink}
+                        disabled={isCreatingTelegramLink}
+                        className='rounded-lg bg-gradient-to-r from-sky-500 to-indigo-500 px-6 py-2.5 text-xs font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 disabled:opacity-50'
+                      >
+                        {isCreatingTelegramLink ? '생성 중...' : '연동 링크 생성'}
+                      </button>
                     </div>
                   )}
                 </div>
