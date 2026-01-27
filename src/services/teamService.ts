@@ -723,3 +723,135 @@ export async function acceptTeamInvite(
   const data = await response.json();
   return data;
 }
+
+// ==================== 텔레그램 연동 API ====================
+
+export type CreateTelegramLinkResponse = {
+  message: string;
+  data: {
+    token: string;
+    deepLink: string;
+    endAt: string;
+  };
+};
+
+export type TelegramStatusResponse = {
+  isLinked: boolean;
+  chatId: number | null;
+  pendingLink?: {
+    token: string;
+    deepLink: string;
+    endAt: string;
+  };
+};
+
+export type GetTelegramStatusResponse = {
+  message: string;
+  data: TelegramStatusResponse;
+};
+
+/**
+ * 텔레그램 연동 링크 생성
+ */
+export async function createTelegramLink(
+  teamId: number,
+  accessToken: string,
+): Promise<CreateTelegramLinkResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'POST',
+    endpoint: `/api/v1/teams/${teamId}/telegram/link`,
+    accessToken,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
+    }
+    if (response.status === 403) {
+      throw new Error('팀 멤버만 텔레그램 연동을 할 수 있습니다.');
+    }
+    if (response.status === 404) {
+      throw new Error('팀을 찾을 수 없습니다.');
+    }
+    const errorText = await response.text();
+    throw new Error(`텔레그램 연동 링크 생성 실패: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * 텔레그램 연동 상태 조회
+ */
+export async function getTelegramStatus(
+  teamId: number,
+  accessToken: string,
+): Promise<GetTelegramStatusResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'GET',
+    endpoint: `/api/v1/teams/${teamId}/telegram/status`,
+    accessToken,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
+    }
+    if (response.status === 403) {
+      throw new Error('팀 멤버만 접근할 수 있습니다.');
+    }
+    if (response.status === 404) {
+      throw new Error('팀을 찾을 수 없습니다.');
+    }
+    const errorText = await response.text();
+    throw new Error(`텔레그램 연동 상태 조회 실패: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * 텔레그램 연동 해제
+ */
+export async function deleteTelegramLink(
+  teamId: number,
+  accessToken: string,
+): Promise<void> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'DELETE',
+    endpoint: `/api/v1/teams/${teamId}/telegram/link`,
+    accessToken,
+  });
+
+  if (response.ok) {
+    return;
+  }
+
+  let errorMessage = '';
+  try {
+    const errorText = await response.text();
+    if (errorText) {
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData?.message || errorData?.error || errorData?.detail || errorText;
+      } catch {
+        errorMessage = errorText;
+      }
+    }
+  } catch {
+    // 응답 본문 읽기 실패
+  }
+
+  if (response.status === 401) {
+    throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
+  }
+  if (response.status === 403) {
+    throw new Error('팀 멤버만 텔레그램 연동을 해제할 수 있습니다.');
+  }
+  if (response.status === 404) {
+    throw new Error('팀을 찾을 수 없습니다.');
+  }
+  throw new Error(errorMessage || `텔레그램 연동 해제 실패: ${response.status}`);
+}
