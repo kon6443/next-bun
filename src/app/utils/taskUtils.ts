@@ -209,3 +209,21 @@ export function getUniqueAssignees(tasks: Task[]): { id: number; name: string }[
   });
   return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
 }
+
+// 컴팩트 날짜+시간 포맷 (M/D HH:mm)
+export function formatCompactDateTime(date: Date): string {
+  const d = new Date(date);
+  const hours = d.getHours().toString().padStart(2, '0');
+  const minutes = d.getMinutes().toString().padStart(2, '0');
+  return `${d.getMonth() + 1}/${d.getDate()} ${hours}:${minutes}`;
+}
+
+// 짧은 날짜 포맷 (M월 D일)
+export function formatShortDate(date: Date | null): string | null {
+  if (!date) return null;
+  const d = new Date(date);
+  return d.toLocaleDateString('ko-KR', {
+    month: 'short',
+    day: 'numeric',
+  });
+}

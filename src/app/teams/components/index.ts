@@ -7,3 +7,4 @@ export { DateInfoCard } from "./DateInfoCard";
 export { TaskForm, type TaskFormData } from "./TaskForm";
 export { TaskStatusBadge, taskStatusLabels, taskStatusColors } from "./TaskStatusBadge";
 export { ErrorAlert } from "./ErrorAlert";
+export { SuccessAlert } from "./SuccessAlert";

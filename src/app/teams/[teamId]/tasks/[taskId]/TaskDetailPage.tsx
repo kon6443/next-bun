@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import {
   getTaskDetail,
@@ -8,6 +8,7 @@ import {
   updateTaskComment,
   deleteTaskComment,
   updateTask,
+  updateTaskStatus,
   type TaskDetailResponse,
 } from "@/services/teamService";
 import type { TaskComment } from "@/app/types/task";
@@ -17,10 +18,14 @@ import {
   ButtonLink,
   SectionLabel,
   TaskForm,
-  TaskStatusBadge,
   ErrorAlert,
+  SuccessAlert,
   type TaskFormData,
 } from "../../../components";
+import { StatusDropdown } from "@/app/components/StatusDropdown";
+import { EditIcon, TrashIcon, ClockIcon, CalendarIcon, CommentIcon, SendIcon } from "@/app/components/Icons";
+import { formatCompactDateTime } from "@/app/utils/taskUtils";
+import type { TaskStatusKey } from "@/app/config/taskStatusConfig";
 import { cardStyles } from "@/styles/teams";
 
 type TaskDetailPageProps = {
@@ -33,10 +38,7 @@ export default function TaskDetailPage({
   taskId,
 }: TaskDetailPageProps) {
   const { data: session } = useSession();
-  const [taskDetail, setTaskDetail] = useState<TaskDetailResponse | null>(
-    null,
-  );
-  const [comments, setComments] = useState<TaskComment[]>([]);
+  const [taskDetail, setTaskDetail] = useState<TaskDetailResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -45,10 +47,31 @@ export default function TaskDetailPage({
   const [editingContent, setEditingContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isStatusUpdating, setIsStatusUpdating] = useState(false);
+
+  // ID 파싱 (한 번만 수행)
+  const { teamIdNum, taskIdNum, isValidIds } = useMemo(() => {
+    const teamIdNum = parseInt(teamId, 10);
+    const taskIdNum = parseInt(taskId, 10);
+    return {
+      teamIdNum,
+      taskIdNum,
+      isValidIds: !isNaN(teamIdNum) && !isNaN(taskIdNum),
+    };
+  }, [teamId, taskId]);
+
+  // 댓글 목록 (taskDetail에서 직접 참조)
+  const comments = taskDetail?.comments ?? [];
 
   const fetchTaskDetail = useCallback(async (showLoading = true) => {
     if (!session?.user?.accessToken) {
       setError("인증이 필요합니다. 다시 로그인해주세요.");
+      if (showLoading) setIsLoading(false);
+      return;
+    }
+
+    if (!isValidIds) {
+      setError("유효하지 않은 팀 ID 또는 태스크 ID입니다.");
       if (showLoading) setIsLoading(false);
       return;
     }
@@ -58,12 +81,6 @@ export default function TaskDetailPage({
     }
     setError(null);
     try {
-      const teamIdNum = parseInt(teamId, 10);
-      const taskIdNum = parseInt(taskId, 10);
-      if (isNaN(teamIdNum) || isNaN(taskIdNum)) {
-        throw new Error("유효하지 않은 팀 ID 또는 태스크 ID입니다.");
-      }
-
       const response = await getTaskDetail(
         teamIdNum,
         taskIdNum,
@@ -86,7 +103,6 @@ export default function TaskDetailPage({
       };
 
       setTaskDetail(taskData);
-      setComments(taskData.comments);
     } catch (err) {
       const errorMessage =
         err instanceof Error
@@ -99,12 +115,30 @@ export default function TaskDetailPage({
         setIsLoading(false);
       }
     }
-  }, [teamId, taskId, session?.user?.accessToken]);
+  }, [teamIdNum, taskIdNum, isValidIds, session?.user?.accessToken]);
 
   useEffect(() => {
     fetchTaskDetail();
   }, [fetchTaskDetail]);
 
+  // 상태 변경 핸들러
+  const handleStatusChange = async (newStatus: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isStatusUpdating || !session?.user?.accessToken || !taskDetail || !isValidIds) return;
+
+    setIsStatusUpdating(true);
+    setError(null);
+    try {
+      await updateTaskStatus(teamIdNum, taskIdNum, newStatus, session.user.accessToken);
+      await fetchTaskDetail(false);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "상태 변경에 실패했습니다.";
+      setError(errorMessage);
+    } finally {
+      setIsStatusUpdating(false);
+    }
+  };
 
   // 수정 모드 시작
   const handleStartEdit = () => {
@@ -121,18 +155,12 @@ export default function TaskDetailPage({
 
   // 태스크 수정
   const handleUpdateTask = async (data: TaskFormData) => {
-    if (!taskDetail || !session?.user?.accessToken) return;
+    if (!taskDetail || !session?.user?.accessToken || !isValidIds) return;
 
     setIsSubmitting(true);
     setError(null);
 
     try {
-      const teamIdNum = parseInt(teamId, 10);
-      const taskIdNum = parseInt(taskId, 10);
-      if (isNaN(teamIdNum) || isNaN(taskIdNum)) {
-        throw new Error("유효하지 않은 팀 ID 또는 태스크 ID입니다.");
-      }
-
       await updateTask(
         teamIdNum,
         taskIdNum,
@@ -146,7 +174,6 @@ export default function TaskDetailPage({
       );
 
       setIsEditing(false);
-      // 태스크 상세 정보 재조회
       await fetchTaskDetail(false);
     } catch (err) {
       const errorMessage =
@@ -159,12 +186,10 @@ export default function TaskDetailPage({
   };
 
   const handleCreateComment = async () => {
-    if (!newComment.trim() || !session?.user?.accessToken) return;
+    if (!newComment.trim() || !session?.user?.accessToken || !isValidIds) return;
 
     setIsSubmitting(true);
     try {
-      const teamIdNum = parseInt(teamId, 10);
-      const taskIdNum = parseInt(taskId, 10);
       await createTaskComment(
         teamIdNum,
         taskIdNum,
@@ -175,13 +200,9 @@ export default function TaskDetailPage({
       setNewComment("");
       setError(null);
       setSuccessMessage("댓글이 작성되었습니다.");
-      // 태스크 상세를 재조회하여 최신 댓글 목록(올바른 userName 포함)을 받아옴
       await fetchTaskDetail(false);
-      
-      // 3초 후 성공 메시지 자동 제거
-      setTimeout(() => {
-        setSuccessMessage(null);
-      }, 3000);
+
+      setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "댓글 작성에 실패했습니다.";
@@ -204,12 +225,10 @@ export default function TaskDetailPage({
   };
 
   const handleUpdateComment = async (commentId: number) => {
-    if (!editingContent.trim() || !session?.user?.accessToken) return;
+    if (!editingContent.trim() || !session?.user?.accessToken || !isValidIds) return;
 
     setIsSubmitting(true);
     try {
-      const teamIdNum = parseInt(teamId, 10);
-      const taskIdNum = parseInt(taskId, 10);
       await updateTaskComment(
         teamIdNum,
         taskIdNum,
@@ -220,7 +239,6 @@ export default function TaskDetailPage({
 
       setEditingCommentId(null);
       setEditingContent("");
-      // 태스크 상세를 재조회하여 최신 댓글 목록(올바른 userName 포함)을 받아옴
       await fetchTaskDetail(false);
     } catch (err) {
       const errorMessage =
@@ -233,73 +251,28 @@ export default function TaskDetailPage({
   };
 
   const handleDeleteComment = async (commentId: number) => {
-    if (!session?.user?.accessToken) return;
+    if (!session?.user?.accessToken || !isValidIds) return;
     if (!confirm("댓글을 삭제하시겠습니까?")) return;
 
     setIsSubmitting(true);
     setError(null);
     try {
-      const teamIdNum = parseInt(teamId, 10);
-      const taskIdNum = parseInt(taskId, 10);
-      
-      if (isNaN(teamIdNum) || isNaN(taskIdNum)) {
-        throw new Error("유효하지 않은 팀 ID 또는 태스크 ID입니다.");
-      }
+      await deleteTaskComment(teamIdNum, taskIdNum, commentId, session.user.accessToken);
 
-      // 댓글 삭제 시도
-      await deleteTaskComment(
-        teamIdNum,
-        taskIdNum,
-        commentId,
-        session.user.accessToken,
-      );
-
-      // 삭제 성공 후 태스크 상세를 재조회하여 최신 댓글 목록을 받아옴
-      // 목록 갱신 실패는 별도로 처리하여 삭제 성공 여부와 분리
       try {
         await fetchTaskDetail(false);
       } catch (refreshErr) {
-        // 목록 갱신 실패는 경고만 표시 (삭제는 이미 성공)
         console.warn("Failed to refresh task detail after delete:", refreshErr);
         setError("댓글이 삭제되었지만 목록을 새로고침하지 못했습니다. 페이지를 새로고침해주세요.");
       }
     } catch (err) {
-      // 실제 삭제 실패 시 에러 처리
       const errorMessage =
         err instanceof Error ? err.message : "댓글 삭제에 실패했습니다.";
       setError(errorMessage);
-      
-      // 에러 로깅 개선
-      if (err instanceof Error) {
-        console.error("Failed to delete comment:", {
-          message: err.message,
-          stack: err.stack,
-          name: err.name,
-          commentId,
-          teamId,
-          taskId,
-        });
-      } else {
-        console.error("Failed to delete comment (unknown error type):", {
-          error: err,
-          errorType: typeof err,
-          errorString: String(err),
-          commentId,
-          teamId,
-          taskId,
-        });
-      }
+      console.error("Failed to delete comment:", { err, commentId, teamIdNum, taskIdNum });
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  // 컴팩트 날짜+시간 포맷 (M/D HH:mm)
-  const formatCompactDateTime = (date: Date) => {
-    const d = new Date(date);
-    const hours = d.getHours().toString().padStart(2, '0');
-    const minutes = d.getMinutes().toString().padStart(2, '0');
-    return `${d.getMonth() + 1}/${d.getDate()} ${hours}:${minutes}`;
   };
 
   if (isLoading) {
@@ -378,7 +351,11 @@ export default function TaskDetailPage({
               <div className="flex items-start justify-between gap-3 mb-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <TaskStatusBadge status={taskDetail.taskStatus} />
+                    <StatusDropdown
+                      currentStatus={taskDetail.taskStatus as TaskStatusKey}
+                      onStatusChange={handleStatusChange}
+                      disabled={isStatusUpdating}
+                    />
                     <span className="text-xs text-slate-500">
                       {taskDetail.userName || `사용자 ${taskDetail.crtdBy}`}
                     </span>
@@ -394,9 +371,7 @@ export default function TaskDetailPage({
                     className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition disabled:opacity-50"
                     title="수정"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                    </svg>
+                    <EditIcon className="w-5 h-5" />
                   </button>
                 )}
               </div>
@@ -414,9 +389,7 @@ export default function TaskDetailPage({
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-400">
                 {/* 생성일 */}
                 <span className="flex items-center gap-1.5" title="생성일">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                  <ClockIcon className="w-3.5 h-3.5" />
                   <span>{formatCompactDateTime(taskDetail.crtdAt)}</span>
                 </span>
                 {/* 구분자 (시작일 또는 종료일이 있을 때) */}
@@ -426,9 +399,7 @@ export default function TaskDetailPage({
                 {/* 시작일 */}
                 {taskDetail.startAt && (
                   <span className="flex items-center gap-1.5" title="시작일">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
+                    <CalendarIcon className="w-3.5 h-3.5" />
                     <span>{formatCompactDateTime(taskDetail.startAt)}</span>
                   </span>
                 )}
@@ -439,9 +410,7 @@ export default function TaskDetailPage({
                 {/* 종료일 */}
                 {taskDetail.endAt && (
                   <span className="flex items-center gap-1.5" title="종료일">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
+                    <CalendarIcon className="w-3.5 h-3.5" />
                     <span>{formatCompactDateTime(taskDetail.endAt)}</span>
                   </span>
                 )}
@@ -457,18 +426,14 @@ export default function TaskDetailPage({
 
         {/* 성공 메시지 */}
         {successMessage && (
-          <div className="rounded-2xl border border-green-500/20 bg-green-500/10 px-6 py-4 text-center animate-in fade-in duration-300">
-            <p className="text-base font-semibold text-green-400">{successMessage}</p>
-          </div>
+          <SuccessAlert message={successMessage} className="text-center animate-in fade-in duration-300" />
         )}
 
         {/* 댓글 섹션 */}
         <section className={`${cardStyles.section} p-4`}>
           {/* 댓글 헤딩 (아이콘 + 수) */}
           <div className="flex items-center gap-2 mb-4 text-slate-400">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
+            <CommentIcon />
             <span className="text-sm">{comments.length}</span>
           </div>
 
@@ -487,9 +452,7 @@ export default function TaskDetailPage({
               className="p-3 rounded-xl bg-sky-500/20 text-sky-400 hover:bg-sky-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
               title="댓글 작성"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
+              <SendIcon className="w-5 h-5" />
             </button>
           </div>
 
@@ -555,9 +518,7 @@ export default function TaskDetailPage({
                               className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition disabled:opacity-50"
                               title="수정"
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                              </svg>
+                              <EditIcon />
                             </button>
                             <button
                               onClick={() => handleDeleteComment(comment.commentId)}
@@ -565,9 +526,7 @@ export default function TaskDetailPage({
                               className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition disabled:opacity-50"
                               title="삭제"
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
+                              <TrashIcon />
                             </button>
                           </div>
                         )}
