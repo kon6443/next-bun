@@ -10,6 +10,7 @@ import { CalendarView } from '../../components/CalendarView';
 import { TaskFilters } from '../../components/TaskFilters';
 import { Kanban } from '../../components/Kanban';
 import { Button, ButtonLink, SectionLabel, ErrorAlert } from '../components';
+import { ClockIcon, CalendarIcon, SendIcon } from '../../components/Icons';
 import type { Task } from '../../types/task';
 import { useTaskFilter } from '../../hooks/useTaskFilter';
 import {
@@ -26,10 +27,7 @@ import {
   type TelegramStatusResponse,
 } from '@/services/teamService';
 import { teamsPageBackground, cardStyles, layoutStyles, MOBILE_MAX_WIDTH } from '@/styles/teams';
-import {
-  STATUS_TO_COLUMN,
-  type ColumnKey,
-} from '../../config/taskStatusConfig';
+import { STATUS_TO_COLUMN, type ColumnKey } from '../../config/taskStatusConfig';
 
 // taskStatus를 ColumnKey로 매핑
 const taskStatusToColumn: Record<number, ColumnKey | undefined> = {
@@ -110,11 +108,13 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   const [canManageInvites, setCanManageInvites] = useState(false);
   const [invites, setInvites] = useState<TeamInviteResponse[]>([]);
   const [isTeamManagementOpen, setIsTeamManagementOpen] = useState(false);
-  const [teamManagementTab, setTeamManagementTab] = useState<'members' | 'stats' | 'invites' | 'telegram'>('stats');
+  const [teamManagementTab, setTeamManagementTab] = useState<'members' | 'stats' | 'invites' | 'telegram'>(
+    'stats',
+  );
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [isCreatingInvite, setIsCreatingInvite] = useState(false);
   const [createdInviteLink, setCreatedInviteLink] = useState<string | null>(null);
-  
+
   // 텔레그램 연동 상태
   const [telegramStatus, setTelegramStatus] = useState<TelegramStatusResponse | null>(null);
   const [isLoadingTelegram, setIsLoadingTelegram] = useState(false);
@@ -125,16 +125,19 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   const viewMode = getViewModeFromQuery();
 
   // viewMode 변경 시 URL 업데이트
-  const setViewMode = useCallback((mode: ViewMode) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (mode === 'kanban') {
-      params.delete('view'); // 기본값은 쿼리에서 제거
-    } else {
-      params.set('view', mode);
-    }
-    const queryString = params.toString();
-    router.push(`${pathname}${queryString ? `?${queryString}` : ''}`, { scroll: false });
-  }, [router, pathname, searchParams]);
+  const setViewMode = useCallback(
+    (mode: ViewMode) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (mode === 'kanban') {
+        params.delete('view'); // 기본값은 쿼리에서 제거
+      } else {
+        params.set('view', mode);
+      }
+      const queryString = params.toString();
+      router.push(`${pathname}${queryString ? `?${queryString}` : ''}`, { scroll: false });
+    },
+    [router, pathname, searchParams],
+  );
 
   useEffect(() => {
     if (!session?.user?.accessToken) {
@@ -258,7 +261,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   // 모든 태스크를 하나의 배열로 합침
   const allTasks = useMemo(
     () => [...tasks.todo, ...tasks.inProgress, ...tasks.done, ...tasks.onHold, ...tasks.cancelled],
-    [tasks]
+    [tasks],
   );
 
   // 필터 훅 사용
@@ -318,84 +321,87 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   ];
 
   // 상태 변경 함수 (버튼 클릭으로 상태 변경)
-  const handleStatusChange = useCallback(async (taskId: number, newStatus: number) => {
-    if (!session?.user?.accessToken) return;
+  const handleStatusChange = useCallback(
+    async (taskId: number, newStatus: number) => {
+      if (!session?.user?.accessToken) return;
 
-    // 현재 태스크 찾기
-    let currentTask: Task | undefined;
-    let currentColumn: ColumnKey | undefined;
+      // 현재 태스크 찾기
+      let currentTask: Task | undefined;
+      let currentColumn: ColumnKey | undefined;
 
-    for (const [columnKey, columnTasks] of Object.entries(tasks) as [ColumnKey, Task[]][]) {
-      const found = columnTasks.find(t => t.taskId === taskId);
-      if (found) {
-        currentTask = found;
-        currentColumn = columnKey;
-        break;
+      for (const [columnKey, columnTasks] of Object.entries(tasks) as [ColumnKey, Task[]][]) {
+        const found = columnTasks.find(t => t.taskId === taskId);
+        if (found) {
+          currentTask = found;
+          currentColumn = columnKey;
+          break;
+        }
       }
-    }
 
-    if (!currentTask || !currentColumn) return;
+      if (!currentTask || !currentColumn) return;
 
-    const newColumn = taskStatusToColumn[newStatus];
-    if (!newColumn) {
-      // 매핑되지 않은 상태의 경우 (예: 미래 확장을 위한 새로운 상태)
-      console.warn(`컬럼에 매핑되지 않은 상태: ${newStatus}`);
-      return;
-    }
-
-    // 낙관적 업데이트
-    setTasks(prev => {
-      const sourceItems = [...prev[currentColumn]];
-      const targetItems = currentColumn === newColumn ? sourceItems : [...prev[newColumn]];
-      
-      const taskIndex = sourceItems.findIndex(t => t.taskId === taskId);
-      if (taskIndex === -1) return prev;
-      
-      const [movedTask] = sourceItems.splice(taskIndex, 1);
-      const updatedTask = { ...movedTask, taskStatus: newStatus };
-      
-      if (currentColumn === newColumn) {
-        return prev;
+      const newColumn = taskStatusToColumn[newStatus];
+      if (!newColumn) {
+        // 매핑되지 않은 상태의 경우 (예: 미래 확장을 위한 새로운 상태)
+        console.warn(`컬럼에 매핑되지 않은 상태: ${newStatus}`);
+        return;
       }
-      
-      targetItems.push(updatedTask);
-      
-      return {
-        ...prev,
-        [currentColumn]: sourceItems,
-        [newColumn]: targetItems,
-      };
-    });
 
-    // API 호출
-    try {
-      const teamIdNum = parseInt(teamId, 10);
-      await updateTaskStatus(teamIdNum, taskId, newStatus, session.user.accessToken);
-    } catch (err) {
-      // 실패 시 롤백
-      console.error('Failed to update task status:', err);
-      setError(err instanceof Error ? err.message : '태스크 상태 변경에 실패했습니다.');
-
-      // 원래 상태로 복구
+      // 낙관적 업데이트
       setTasks(prev => {
-        const sourceItems = [...prev[newColumn]];
-        const targetItems = [...prev[currentColumn]];
-        
+        const sourceItems = [...prev[currentColumn]];
+        const targetItems = currentColumn === newColumn ? sourceItems : [...prev[newColumn]];
+
         const taskIndex = sourceItems.findIndex(t => t.taskId === taskId);
         if (taskIndex === -1) return prev;
-        
+
         const [movedTask] = sourceItems.splice(taskIndex, 1);
-        const restoredTask = { ...movedTask, taskStatus: currentTask!.taskStatus };
-        targetItems.push(restoredTask);
-        
+        const updatedTask = { ...movedTask, taskStatus: newStatus };
+
+        if (currentColumn === newColumn) {
+          return prev;
+        }
+
+        targetItems.push(updatedTask);
+
         return {
           ...prev,
-          [newColumn]: sourceItems,
-          [currentColumn]: targetItems,
+          [currentColumn]: sourceItems,
+          [newColumn]: targetItems,
         };
       });
-    }
-  }, [session?.user?.accessToken, tasks, teamId]);
+
+      // API 호출
+      try {
+        const teamIdNum = parseInt(teamId, 10);
+        await updateTaskStatus(teamIdNum, taskId, newStatus, session.user.accessToken);
+      } catch (err) {
+        // 실패 시 롤백
+        console.error('Failed to update task status:', err);
+        setError(err instanceof Error ? err.message : '태스크 상태 변경에 실패했습니다.');
+
+        // 원래 상태로 복구
+        setTasks(prev => {
+          const sourceItems = [...prev[newColumn]];
+          const targetItems = [...prev[currentColumn]];
+
+          const taskIndex = sourceItems.findIndex(t => t.taskId === taskId);
+          if (taskIndex === -1) return prev;
+
+          const [movedTask] = sourceItems.splice(taskIndex, 1);
+          const restoredTask = { ...movedTask, taskStatus: currentTask!.taskStatus };
+          targetItems.push(restoredTask);
+
+          return {
+            ...prev,
+            [newColumn]: sourceItems,
+            [currentColumn]: targetItems,
+          };
+        });
+      }
+    },
+    [session?.user?.accessToken, tasks, teamId],
+  );
 
   const handleCreateInvite = async (expiresInDays: number, usageMaxCnt?: number) => {
     if (!session?.user?.accessToken) return;
@@ -462,7 +468,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       }
 
       const response = await createTelegramLink(teamIdNum, session.user.accessToken);
-      
+
       // 상태 업데이트
       setTelegramStatus({
         isLinked: false,
@@ -486,7 +492,9 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   const handleDeleteTelegramLink = async () => {
     if (!session?.user?.accessToken) return;
 
-    const confirmed = window.confirm('텔레그램 연동을 해제하시겠습니까?\n연동 해제 후에는 팀 알림을 받을 수 없습니다.');
+    const confirmed = window.confirm(
+      '텔레그램 연동을 해제하시겠습니까?\n연동 해제 후에는 팀 알림을 받을 수 없습니다.',
+    );
     if (!confirmed) return;
 
     setIsDeletingTelegramLink(true);
@@ -498,7 +506,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       }
 
       await deleteTelegramLink(teamIdNum, session.user.accessToken);
-      
+
       // 상태 업데이트
       setTelegramStatus({
         isLinked: false,
@@ -550,35 +558,19 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           <SectionLabel>Team Kanban</SectionLabel>
           <div className='mt-4 flex flex-col gap-4'>
             <div>
-              <h1 className='text-3xl font-bold text-white'>
-                {isLoading ? '로딩 중...' : teamName || ''}
-              </h1>
+              <h1 className='text-3xl font-bold text-white'>{isLoading ? '로딩 중...' : teamName || ''}</h1>
               {teamDescription && <p className='mt-2 text-sm text-slate-400'>{teamDescription}</p>}
             </div>
             <div className='flex flex-col gap-2'>
               {canManageInvites && (
-                <Button
-                  variant='secondary'
-                  size='lg'
-                  fullWidth
-                  onClick={() => setShowInviteModal(true)}
-                >
+                <Button variant='secondary' size='lg' fullWidth onClick={() => setShowInviteModal(true)}>
                   팀 초대
                 </Button>
               )}
-              <ButtonLink
-                href={`/teams/${teamId}/edit`}
-                variant='secondary'
-                size='lg'
-                fullWidth
-              >
+              <ButtonLink href={`/teams/${teamId}/edit`} variant='secondary' size='lg' fullWidth>
                 팀 수정
               </ButtonLink>
-              <ButtonLink
-                href={`/teams/${teamId}/tasks/new`}
-                size='lg'
-                fullWidth
-              >
+              <ButtonLink href={`/teams/${teamId}/tasks/new`} size='lg' fullWidth>
                 새 카드 작성
               </ButtonLink>
             </div>
@@ -599,14 +591,16 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
             {
               key: 'stats' as const,
               label: '통계',
-              iconPath: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+              iconPath:
+                'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
               count: null,
               visible: true,
             },
             {
               key: 'invites' as const,
               label: '초대',
-              iconPath: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+              iconPath:
+                'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
               count: invites.length,
               visible: canManageInvites,
             },
@@ -629,9 +623,18 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                   <SectionLabel>Team Management</SectionLabel>
                   <div className='flex items-center gap-2'>
                     {visibleTabs.map(tab => (
-                      <span key={tab.key} className='flex items-center gap-1 text-xs text-slate-500' title={tab.label}>
+                      <span
+                        key={tab.key}
+                        className='flex items-center gap-1 text-xs text-slate-500'
+                        title={tab.label}
+                      >
                         <svg className='w-3.5 h-3.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                          <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d={tab.iconPath} />
+                          <path
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                            strokeWidth={2}
+                            d={tab.iconPath}
+                          />
                         </svg>
                         {tab.count !== null && tab.count}
                       </span>
@@ -672,285 +675,309 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                         title={tab.label}
                       >
                         <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                          <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d={tab.iconPath} />
+                          <path
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                            strokeWidth={2}
+                            d={tab.iconPath}
+                          />
                         </svg>
                         {tab.count !== null && <span>{tab.count}</span>}
                       </button>
                     ))}
                   </div>
 
-              {/* 멤버 탭 내용 */}
-              {teamManagementTab === 'members' && (
-                <div className='mt-4'>
-                  {members.length === 0 ? (
-                    <div className='rounded-2xl border border-dashed border-white/20 px-6 py-10 text-center text-slate-400'>
-                      멤버 정보를 불러오는 중...
-                    </div>
-                  ) : (
-                    <div className='grid grid-cols-1 gap-3'>
-                      {members.map(member => {
-                        const isCurrentUser = session?.user?.userId === member.userId;
-                        const roleBadge = getRoleBadge(member.role);
+                  {/* 멤버 탭 내용 */}
+                  {teamManagementTab === 'members' && (
+                    <div className='mt-4'>
+                      {members.length === 0 ? (
+                        <div className='rounded-2xl border border-dashed border-white/20 px-6 py-10 text-center text-slate-400'>
+                          멤버 정보를 불러오는 중...
+                        </div>
+                      ) : (
+                        <div className='grid grid-cols-1 gap-3'>
+                          {members.map(member => {
+                            const isCurrentUser = session?.user?.userId === member.userId;
+                            const roleBadge = getRoleBadge(member.role);
 
-                        return (
-                          <div
-                            key={member.userId}
-                            className='rounded-2xl border border-white/10 bg-slate-950/30 p-4'
-                          >
-                            <div className='flex items-center justify-between'>
-                              <div className='flex-1'>
-                                <div className='flex items-center gap-2 flex-wrap'>
-                                  <p className='text-lg font-semibold text-white'>
-                                    {member.userName || `사용자 ${member.userId}`}
-                                  </p>
-                                  <span className={roleBadge.className}>{roleBadge.label}</span>
-                                  {isCurrentUser && (
-                                    <span className='rounded-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 px-2 py-0.5 text-xs font-semibold text-purple-400 border border-purple-500/30'>
-                                      나
-                                    </span>
-                                  )}
+                            return (
+                              <div
+                                key={member.userId}
+                                className='rounded-2xl border border-white/10 bg-slate-950/30 p-4'
+                              >
+                                <div className='flex items-center justify-between'>
+                                  <div className='flex-1'>
+                                    <div className='flex items-center gap-2 flex-wrap'>
+                                      <p className='text-lg font-semibold text-white'>
+                                        {member.userName || `사용자 ${member.userId}`}
+                                      </p>
+                                      <span className={roleBadge.className}>{roleBadge.label}</span>
+                                      {isCurrentUser && (
+                                        <span className='rounded-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 px-2 py-0.5 text-xs font-semibold text-purple-400 border border-purple-500/30'>
+                                          나
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className='mt-2 text-xs text-slate-500'>
+                                      가입일: {formatMemberDate(member.joinedAt)}
+                                    </p>
+                                  </div>
                                 </div>
-                                <p className='mt-2 text-xs text-slate-500'>
-                                  가입일: {formatMemberDate(member.joinedAt)}
-                                </p>
                               </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
-              )}
 
-              {/* 통계 탭 내용 */}
-              {teamManagementTab === 'stats' && (
-                <div className='mt-4'>
-                  <div className='grid grid-cols-2 gap-3'>
-                    {statsCards.map(stat => (
-                      <div
-                        key={stat.label}
-                        className={`rounded-2xl border p-3 ${
-                          stat.alert
-                            ? 'border-red-500/30 bg-red-500/10'
-                            : stat.warning
-                              ? 'border-orange-500/30 bg-orange-500/10'
-                              : 'border-white/10 bg-slate-950/30'
-                        }`}
-                      >
-                        <SectionLabel spacing='tight' color='subtle'>{stat.label}</SectionLabel>
-                        <p className={`mt-3 text-3xl font-bold ${
-                          stat.alert ? 'text-red-400' : stat.warning ? 'text-orange-400' : 'text-white'
-                        }`}>
-                          {stat.value}
-                        </p>
-                        <p className='mt-1 text-sm text-slate-500'>{stat.helper}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* 초대 링크 탭 내용 (권한 체크) */}
-              {teamManagementTab === 'invites' && canManageInvites && (
-                <div className='mt-4'>
-                  {invites.length === 0 ? (
-                    <div className='rounded-2xl border border-dashed border-white/20 px-6 py-10 text-center text-slate-400'>
-                      생성된 초대 링크가 없습니다.
-                    </div>
-                  ) : (
-                    <div className='grid gap-4'>
-                      {invites.map(invite => {
-                        const isExpired = new Date(invite.endAt) < new Date();
-                        const isMaxReached = invite.usageCurCnt >= invite.usageMaxCnt;
-                        const isActive = invite.actStatus === 1 && !isExpired && !isMaxReached;
-
-                        // 초대 링크 URL 생성 (프론트엔드 URL + 토큰)
-                        const inviteUrl = `${
-                          typeof window !== 'undefined' ? window.location.origin : ''
-                        }/teams/invite/accept?token=${encodeURIComponent(invite.token)}`;
-
-                        return (
+                  {/* 통계 탭 내용 */}
+                  {teamManagementTab === 'stats' && (
+                    <div className='mt-4'>
+                      <div className='grid grid-cols-2 gap-3'>
+                        {statsCards.map(stat => (
                           <div
-                            key={invite.invId}
-                            className={`rounded-2xl border p-4 ${
-                              isActive
-                                ? 'border-white/10 bg-slate-950/30'
-                                : 'border-slate-700/50 bg-slate-950/10 opacity-60'
+                            key={stat.label}
+                            className={`rounded-2xl border p-3 ${
+                              stat.alert
+                                ? 'border-red-500/30 bg-red-500/10'
+                                : stat.warning
+                                  ? 'border-orange-500/30 bg-orange-500/10'
+                                  : 'border-white/10 bg-slate-950/30'
                             }`}
                           >
-                            <div className='flex flex-col gap-3'>
-                              <div>
-                                <div className='mb-2 flex items-center gap-2'>
-                                  <p className='text-sm font-semibold text-slate-300'>
-                                    초대 링크 #{invite.invId}
-                                  </p>
-                                  {isActive ? (
-                                    <span className='rounded-full border border-green-500/30 bg-green-500/20 px-2 py-0.5 text-xs font-semibold text-green-400'>
-                                      활성
-                                    </span>
-                                  ) : (
-                                    <span className='rounded-full border border-slate-500/30 bg-slate-500/20 px-2 py-0.5 text-xs font-semibold text-slate-400'>
-                                      비활성
-                                    </span>
+                            <SectionLabel spacing='tight' color='subtle'>
+                              {stat.label}
+                            </SectionLabel>
+                            <p
+                              className={`mt-3 text-3xl font-bold ${
+                                stat.alert ? 'text-red-400' : stat.warning ? 'text-orange-400' : 'text-white'
+                              }`}
+                            >
+                              {stat.value}
+                            </p>
+                            <p className='mt-1 text-sm text-slate-500'>{stat.helper}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 초대 링크 탭 내용 (권한 체크) */}
+                  {teamManagementTab === 'invites' && canManageInvites && (
+                    <div className='mt-4'>
+                      {invites.length === 0 ? (
+                        <div className='rounded-2xl border border-dashed border-white/20 px-6 py-10 text-center text-slate-400'>
+                          생성된 초대 링크가 없습니다.
+                        </div>
+                      ) : (
+                        <div className='grid gap-4'>
+                          {invites.map(invite => {
+                            const isExpired = new Date(invite.endAt) < new Date();
+                            const isMaxReached = invite.usageCurCnt >= invite.usageMaxCnt;
+                            const isActive = invite.actStatus === 1 && !isExpired && !isMaxReached;
+
+                            // 초대 링크 URL 생성 (프론트엔드 URL + 토큰)
+                            const inviteUrl = `${
+                              typeof window !== 'undefined' ? window.location.origin : ''
+                            }/teams/invite/accept?token=${encodeURIComponent(invite.token)}`;
+
+                            return (
+                              <div
+                                key={invite.invId}
+                                className={`rounded-2xl border p-4 ${
+                                  isActive
+                                    ? 'border-white/10 bg-slate-950/30'
+                                    : 'border-slate-700/50 bg-slate-950/10 opacity-60'
+                                }`}
+                              >
+                                <div className='flex flex-col gap-3'>
+                                  <div>
+                                    <div className='mb-2 flex items-center gap-2'>
+                                      <p className='text-sm font-semibold text-slate-300'>
+                                        초대 링크 #{invite.invId}
+                                      </p>
+                                      {isActive ? (
+                                        <span className='rounded-full border border-green-500/30 bg-green-500/20 px-2 py-0.5 text-xs font-semibold text-green-400'>
+                                          활성
+                                        </span>
+                                      ) : (
+                                        <span className='rounded-full border border-slate-500/30 bg-slate-500/20 px-2 py-0.5 text-xs font-semibold text-slate-400'>
+                                          비활성
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className='space-y-1 text-sm text-slate-400'>
+                                      <p>
+                                        사용 횟수: {invite.usageCurCnt} / {invite.usageMaxCnt}
+                                      </p>
+                                      <p>만료일: {formatDate(invite.endAt)}</p>
+                                      <p>생성일: {formatDate(invite.crtdAt)}</p>
+                                    </div>
+                                    {isActive && (
+                                      <div className='mt-3 rounded-lg border border-white/5 bg-slate-900/50 p-3'>
+                                        <p className='mb-1 text-xs text-slate-500'>초대 링크:</p>
+                                        <p className='break-all font-mono text-xs text-slate-300'>
+                                          {inviteUrl}
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                  {isActive && (
+                                    <button
+                                      onClick={() => handleCopyInviteLink(inviteUrl)}
+                                      className='w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
+                                    >
+                                      링크 복사
+                                    </button>
                                   )}
                                 </div>
-                                <div className='space-y-1 text-sm text-slate-400'>
-                                  <p>
-                                    사용 횟수: {invite.usageCurCnt} / {invite.usageMaxCnt}
-                                  </p>
-                                  <p>만료일: {formatDate(invite.endAt)}</p>
-                                  <p>생성일: {formatDate(invite.crtdAt)}</p>
-                                </div>
-                                {isActive && (
-                                  <div className='mt-3 rounded-lg border border-white/5 bg-slate-900/50 p-3'>
-                                    <p className='mb-1 text-xs text-slate-500'>초대 링크:</p>
-                                    <p className='break-all font-mono text-xs text-slate-300'>{inviteUrl}</p>
-                                  </div>
-                                )}
                               </div>
-                              {isActive && (
-                                <button
-                                  onClick={() => handleCopyInviteLink(inviteUrl)}
-                                  className='w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
-                                >
-                                  링크 복사
-                                </button>
-                              )}
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 텔레그램 탭 내용 */}
+                  {teamManagementTab === 'telegram' && (
+                    <div className='mt-4'>
+                      {isLoadingTelegram ? (
+                        <div className='rounded-2xl border border-dashed border-white/20 px-6 py-10 text-center text-slate-400'>
+                          텔레그램 연동 상태를 불러오는 중...
+                        </div>
+                      ) : telegramStatus?.isLinked ? (
+                        // 연동 완료 상태
+                        <div className='rounded-2xl border border-green-500/30 bg-green-500/10 p-4'>
+                          <div className='flex items-center gap-3 mb-4'>
+                            <div className='flex h-10 w-10 items-center justify-center rounded-full bg-green-500/20'>
+                              <svg
+                                className='w-5 h-5 text-green-400'
+                                fill='none'
+                                stroke='currentColor'
+                                viewBox='0 0 24 24'
+                              >
+                                <path
+                                  strokeLinecap='round'
+                                  strokeLinejoin='round'
+                                  strokeWidth={2}
+                                  d='M5 13l4 4L19 7'
+                                />
+                              </svg>
+                            </div>
+                            <div>
+                              <p className='text-sm font-semibold text-green-400'>텔레그램 연동 완료</p>
+                              <p className='text-xs text-slate-400'>
+                                팀 알림이 텔레그램 그룹으로 전송됩니다.
+                              </p>
                             </div>
                           </div>
-                        );
-                      })}
+                          <div className='mb-4 rounded-lg border border-white/5 bg-slate-900/50 p-3'>
+                            <p className='text-xs text-slate-500 mb-1'>Chat ID</p>
+                            <p className='text-sm font-mono text-slate-300'>{telegramStatus.chatId}</p>
+                          </div>
+                          <button
+                            onClick={handleDeleteTelegramLink}
+                            disabled={isDeletingTelegramLink}
+                            className='w-full rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-xs font-semibold text-red-400 transition hover:bg-red-500/20 disabled:opacity-50'
+                          >
+                            {isDeletingTelegramLink ? '해제 중...' : '연동 해제'}
+                          </button>
+                        </div>
+                      ) : telegramStatus?.pendingLink ? (
+                        // 대기 중 상태 (연동 링크 생성됨)
+                        <div className='rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-4'>
+                          <div className='flex items-center gap-3 mb-4'>
+                            <div className='flex h-10 w-10 items-center justify-center rounded-full bg-yellow-500/20'>
+                              <ClockIcon className='w-5 h-5 text-yellow-400' />
+                            </div>
+                            <div>
+                              <p className='text-sm font-semibold text-yellow-400'>연동 대기 중</p>
+                              <p className='text-xs text-slate-400'>
+                                아래 링크를 클릭하여 텔레그램 그룹에 봇을 추가해주세요.
+                              </p>
+                            </div>
+                          </div>
+                          <div className='mb-4 rounded-lg border border-white/5 bg-slate-900/50 p-3'>
+                            <p className='text-xs text-slate-500 mb-1'>연동 링크</p>
+                            <a
+                              href={telegramStatus.pendingLink.deepLink}
+                              target='_blank'
+                              rel='noopener noreferrer'
+                              className='block break-all text-xs font-mono text-sky-400 hover:text-sky-300 underline'
+                            >
+                              {telegramStatus.pendingLink.deepLink}
+                            </a>
+                          </div>
+                          <div className='mb-4 text-xs text-slate-400'>
+                            <span className='text-slate-500'>만료:</span>{' '}
+                            {formatDate(telegramStatus.pendingLink.endAt)}
+                          </div>
+                          <div className='flex gap-2'>
+                            <button
+                              onClick={() => handleCopyInviteLink(telegramStatus.pendingLink!.deepLink)}
+                              className='flex-1 rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-xs font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
+                            >
+                              링크 복사
+                            </button>
+                            <button
+                              onClick={handleRefreshTelegramStatus}
+                              disabled={isLoadingTelegram}
+                              className='rounded-lg border border-white/20 bg-white/5 px-3 py-2.5 text-xs font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10 disabled:opacity-50'
+                              title='상태 새로고침'
+                            >
+                              <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                                <path
+                                  strokeLinecap='round'
+                                  strokeLinejoin='round'
+                                  strokeWidth={2}
+                                  d='M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'
+                                />
+                              </svg>
+                            </button>
+                          </div>
+                          <div className='mt-3'>
+                            <button
+                              onClick={handleCreateTelegramLink}
+                              disabled={isCreatingTelegramLink}
+                              className='w-full rounded-lg border border-slate-500/30 bg-slate-500/10 px-4 py-2 text-xs font-semibold text-slate-400 transition hover:bg-slate-500/20 disabled:opacity-50'
+                            >
+                              {isCreatingTelegramLink ? '생성 중...' : '새 링크 생성'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        // 미연동 상태
+                        <div className='rounded-2xl border border-dashed border-white/20 px-6 py-10 text-center'>
+                          <div className='flex justify-center mb-4'>
+                            <div className='flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/10'>
+                              <SendIcon className='w-8 h-8 text-sky-400' />
+                            </div>
+                          </div>
+                          <p className='text-sm font-semibold text-slate-300 mb-2'>텔레그램 그룹 연동</p>
+                          <p className='text-xs text-slate-400 mb-6'>
+                            텔레그램 그룹과 연동하여
+                            <br />팀 알림을 받을 수 있습니다.
+                          </p>
+                          <button
+                            onClick={handleCreateTelegramLink}
+                            disabled={isCreatingTelegramLink}
+                            className='rounded-lg bg-gradient-to-r from-sky-500 to-indigo-500 px-6 py-2.5 text-xs font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 disabled:opacity-50'
+                          >
+                            {isCreatingTelegramLink ? '생성 중...' : '연동 링크 생성'}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
-              )}
-
-              {/* 텔레그램 탭 내용 */}
-              {teamManagementTab === 'telegram' && (
-                <div className='mt-4'>
-                  {isLoadingTelegram ? (
-                    <div className='rounded-2xl border border-dashed border-white/20 px-6 py-10 text-center text-slate-400'>
-                      텔레그램 연동 상태를 불러오는 중...
-                    </div>
-                  ) : telegramStatus?.isLinked ? (
-                    // 연동 완료 상태
-                    <div className='rounded-2xl border border-green-500/30 bg-green-500/10 p-4'>
-                      <div className='flex items-center gap-3 mb-4'>
-                        <div className='flex h-10 w-10 items-center justify-center rounded-full bg-green-500/20'>
-                          <svg className='w-5 h-5 text-green-400' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M5 13l4 4L19 7' />
-                          </svg>
-                        </div>
-                        <div>
-                          <p className='text-sm font-semibold text-green-400'>텔레그램 연동 완료</p>
-                          <p className='text-xs text-slate-400'>팀 알림이 텔레그램 그룹으로 전송됩니다.</p>
-                        </div>
-                      </div>
-                      <div className='mb-4 rounded-lg border border-white/5 bg-slate-900/50 p-3'>
-                        <p className='text-xs text-slate-500 mb-1'>Chat ID</p>
-                        <p className='text-sm font-mono text-slate-300'>{telegramStatus.chatId}</p>
-                      </div>
-                      <button
-                        onClick={handleDeleteTelegramLink}
-                        disabled={isDeletingTelegramLink}
-                        className='w-full rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-xs font-semibold text-red-400 transition hover:bg-red-500/20 disabled:opacity-50'
-                      >
-                        {isDeletingTelegramLink ? '해제 중...' : '연동 해제'}
-                      </button>
-                    </div>
-                  ) : telegramStatus?.pendingLink ? (
-                    // 대기 중 상태 (연동 링크 생성됨)
-                    <div className='rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-4'>
-                      <div className='flex items-center gap-3 mb-4'>
-                        <div className='flex h-10 w-10 items-center justify-center rounded-full bg-yellow-500/20'>
-                          <svg className='w-5 h-5 text-yellow-400' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' />
-                          </svg>
-                        </div>
-                        <div>
-                          <p className='text-sm font-semibold text-yellow-400'>연동 대기 중</p>
-                          <p className='text-xs text-slate-400'>아래 링크를 클릭하여 텔레그램 그룹에 봇을 추가해주세요.</p>
-                        </div>
-                      </div>
-                      <div className='mb-4 rounded-lg border border-white/5 bg-slate-900/50 p-3'>
-                        <p className='text-xs text-slate-500 mb-1'>연동 링크</p>
-                        <a
-                          href={telegramStatus.pendingLink.deepLink}
-                          target='_blank'
-                          rel='noopener noreferrer'
-                          className='block break-all text-xs font-mono text-sky-400 hover:text-sky-300 underline'
-                        >
-                          {telegramStatus.pendingLink.deepLink}
-                        </a>
-                      </div>
-                      <div className='mb-4 text-xs text-slate-400'>
-                        <span className='text-slate-500'>만료:</span>{' '}
-                        {formatDate(telegramStatus.pendingLink.endAt)}
-                      </div>
-                      <div className='flex gap-2'>
-                        <button
-                          onClick={() => handleCopyInviteLink(telegramStatus.pendingLink!.deepLink)}
-                          className='flex-1 rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-xs font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10'
-                        >
-                          링크 복사
-                        </button>
-                        <button
-                          onClick={handleRefreshTelegramStatus}
-                          disabled={isLoadingTelegram}
-                          className='rounded-lg border border-white/20 bg-white/5 px-3 py-2.5 text-xs font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10 disabled:opacity-50'
-                          title='상태 새로고침'
-                        >
-                          <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15' />
-                          </svg>
-                        </button>
-                      </div>
-                      <div className='mt-3'>
-                        <button
-                          onClick={handleCreateTelegramLink}
-                          disabled={isCreatingTelegramLink}
-                          className='w-full rounded-lg border border-slate-500/30 bg-slate-500/10 px-4 py-2 text-xs font-semibold text-slate-400 transition hover:bg-slate-500/20 disabled:opacity-50'
-                        >
-                          {isCreatingTelegramLink ? '생성 중...' : '새 링크 생성'}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    // 미연동 상태
-                    <div className='rounded-2xl border border-dashed border-white/20 px-6 py-10 text-center'>
-                      <div className='flex justify-center mb-4'>
-                        <div className='flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/10'>
-                          <svg className='w-8 h-8 text-sky-400' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 19l9 2-9-18-9 18 9-2zm0 0v-8' />
-                          </svg>
-                        </div>
-                      </div>
-                      <p className='text-sm font-semibold text-slate-300 mb-2'>텔레그램 그룹 연동</p>
-                      <p className='text-xs text-slate-400 mb-6'>
-                        텔레그램 그룹과 연동하여<br />
-                        팀 알림을 받을 수 있습니다.
-                      </p>
-                      <button
-                        onClick={handleCreateTelegramLink}
-                        disabled={isCreatingTelegramLink}
-                        className='rounded-lg bg-gradient-to-r from-sky-500 to-indigo-500 px-6 py-2.5 text-xs font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 disabled:opacity-50'
-                      >
-                        {isCreatingTelegramLink ? '생성 중...' : '연동 링크 생성'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
                 </>
               )}
             </section>
           );
         })()}
 
-        {error && (
-          <ErrorAlert message={error} className='text-center' />
-        )}
+        {error && <ErrorAlert message={error} className='text-center' />}
 
         {/* 필터 UI */}
         <TaskFilters
@@ -996,7 +1023,12 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
               }`}
             >
               <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2' />
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={2}
+                  d='M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2'
+                />
               </svg>
             </button>
             <button
@@ -1009,7 +1041,12 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
               }`}
             >
               <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4 6h16M4 10h16M4 14h16M4 18h16' />
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={2}
+                  d='M4 6h16M4 10h16M4 14h16M4 18h16'
+                />
               </svg>
             </button>
             <button
@@ -1022,7 +1059,12 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
               }`}
             >
               <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4 6h16M4 12h16M4 18h16' />
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={2}
+                  d='M4 6h16M4 12h16M4 18h16'
+                />
               </svg>
             </button>
             <button
@@ -1034,9 +1076,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                   : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
               }`}
             >
-              <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' />
-              </svg>
+              <CalendarIcon />
             </button>
           </div>
         </div>
@@ -1046,26 +1086,13 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
             태스크 목록을 불러오는 중...
           </div>
         ) : viewMode === 'kanban' ? (
-          <Kanban
-            tasksByColumn={filteredTasksByColumn}
-            onStatusChange={handleStatusChange}
-            teamId={teamId}
-          />
+          <Kanban tasksByColumn={filteredTasksByColumn} onStatusChange={handleStatusChange} teamId={teamId} />
         ) : viewMode === 'gantt' ? (
-          <GanttChart
-            tasks={filteredTasks}
-            teamId={teamId}
-          />
+          <GanttChart tasks={filteredTasks} teamId={teamId} />
         ) : viewMode === 'list' ? (
-          <ListView
-            tasks={filteredTasks}
-            teamId={teamId}
-          />
+          <ListView tasks={filteredTasks} teamId={teamId} />
         ) : (
-          <CalendarView
-            tasks={filteredTasks}
-            teamId={teamId}
-          />
+          <CalendarView tasks={filteredTasks} teamId={teamId} />
         )}
       </main>
 
@@ -1144,9 +1171,7 @@ function InviteCreateForm({
   return (
     <form onSubmit={handleSubmit} className='space-y-3'>
       <div>
-        <label className='mb-2 block text-xs font-semibold text-slate-300'>
-          만료일 (최대 3일)
-        </label>
+        <label className='mb-2 block text-xs font-semibold text-slate-300'>만료일 (최대 3일)</label>
         <select
           value={expiresInDays}
           onChange={e => setExpiresInDays(Number(e.target.value))}
@@ -1162,9 +1187,7 @@ function InviteCreateForm({
       </div>
 
       <div>
-        <label className='mb-2 block text-xs font-semibold text-slate-300'>
-          최대 사용 횟수 (선택사항)
-        </label>
+        <label className='mb-2 block text-xs font-semibold text-slate-300'>최대 사용 횟수 (선택사항)</label>
         <input
           type='number'
           value={usageMaxCnt}

@@ -286,10 +286,7 @@ export async function updateTeam(
 /**
  * 팀 멤버 목록 조회
  */
-export async function getTeamUsers(
-  teamId: number,
-  accessToken: string,
-): Promise<GetTeamUsersResponse> {
+export async function getTeamUsers(teamId: number, accessToken: string): Promise<GetTeamUsersResponse> {
   const response = await fetchServiceInstance.backendFetch({
     method: 'GET',
     endpoint: `/api/v1/teams/${teamId}/users`,
@@ -324,10 +321,7 @@ export async function getTeamUsers(
 /**
  * 팀 태스크 목록 조회
  */
-export async function getTeamTasks(
-  teamId: number,
-  accessToken: string,
-): Promise<GetTeamTasksResponse> {
+export async function getTeamTasks(teamId: number, accessToken: string): Promise<GetTeamTasksResponse> {
   const response = await fetchServiceInstance.backendFetch({
     method: 'GET',
     endpoint: `/api/v1/teams/${teamId}/tasks`,
@@ -664,10 +658,7 @@ export async function createTeamInvite(
 /**
  * 팀 초대 링크 목록 조회
  */
-export async function getTeamInvites(
-  teamId: number,
-  accessToken: string,
-): Promise<GetTeamInvitesResponse> {
+export async function getTeamInvites(teamId: number, accessToken: string): Promise<GetTeamInvitesResponse> {
   const response = await fetchServiceInstance.backendFetch({
     method: 'GET',
     endpoint: `/api/v1/teams/${teamId}/invites`,
@@ -815,10 +806,7 @@ export async function getTelegramStatus(
 /**
  * 텔레그램 연동 해제
  */
-export async function deleteTelegramLink(
-  teamId: number,
-  accessToken: string,
-): Promise<void> {
+export async function deleteTelegramLink(teamId: number, accessToken: string): Promise<void> {
   const response = await fetchServiceInstance.backendFetch({
     method: 'DELETE',
     endpoint: `/api/v1/teams/${teamId}/telegram/link`,
