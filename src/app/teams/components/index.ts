@@ -8,6 +8,8 @@ export { TaskForm, type TaskFormData } from './TaskForm';
 export { TaskStatusBadge } from './TaskStatusBadge';
 export { Alert, ErrorAlert, SuccessAlert } from './Alert';
 export { EmptyState } from './EmptyState';
+export { FAB } from './FAB';
+export { IconButton } from './IconButton';
 export {
   Skeleton,
   SkeletonText,

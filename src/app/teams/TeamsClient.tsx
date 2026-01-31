@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import type { Session } from "next-auth";
-import { TeamsPageLayout, TeamListSkeleton, TeamsHeaderSkeleton, ButtonLink, SectionLabel } from "./components";
+import { TeamsPageLayout, TeamListSkeleton, TeamsHeaderSkeleton, ButtonLink, SectionLabel, FAB, IconButton } from "./components";
+import { PlusIcon } from "../components/Icons";
 import { cardStyles } from "@/styles/teams";
 import type { TeamSummary } from "@/types/team";
 import LoginButton from "./LoginButton";
@@ -25,16 +26,21 @@ export default function TeamsClient({
   const isAuthenticated = !!session?.user?.accessToken;
 
   return (
-    <TeamsPageLayout>
-      {/* 헤더 섹션 */}
-      <section className={`${cardStyles.section} p-4`}>
-        {isLoading ? (
-          <TeamsHeaderSkeleton />
-        ) : (
-          <>
-            <SectionLabel spacing="wide">Teams</SectionLabel>
-            <div className="mt-4 flex flex-col gap-4">
-              <div>
+    <>
+      <TeamsPageLayout>
+        {/* 헤더 섹션 */}
+        <section className={`${cardStyles.section} p-4`}>
+          {isLoading ? (
+            <TeamsHeaderSkeleton />
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <SectionLabel spacing="wide">Teams</SectionLabel>
+                {isAuthenticated && (
+                  <IconButton icon={PlusIcon} label="팀 생성" variant="outlined" href="/teams/new" />
+                )}
+              </div>
+              <div className="mt-4">
                 <h1 className="text-3xl font-bold text-white">
                   내가 속한 팀
                 </h1>
@@ -43,36 +49,37 @@ export default function TeamsClient({
                     ? `${session?.user?.name ?? "사용자"}님이 참여 중인 팀 목록이에요.`
                     : "로그인하면 내가 속한 팀 목록을 확인할 수 있어요."}
                 </p>
+                {!isAuthenticated && (
+                  <div className="mt-4">
+                    <LoginButton />
+                  </div>
+                )}
               </div>
-              {isAuthenticated ? (
-                <ButtonLink href="/teams/new" size="lg" fullWidth>
-                  + 팀 생성
-                </ButtonLink>
-              ) : (
-                <LoginButton />
-              )}
-            </div>
-          </>
-        )}
-      </section>
+            </>
+          )}
+        </section>
 
-      {/* 팀 목록 섹션 */}
-      <section className={`${cardStyles.section} p-4`}>
-        {isLoading ? (
-          <TeamListSkeleton cardCount={3} />
-        ) : isAuthenticated ? (
-          error ? (
-            <ErrorMessage message={error} />
-          ) : initialTeams.length ? (
-            <TeamList teams={initialTeams} />
+        {/* 팀 목록 섹션 */}
+        <section className={`${cardStyles.section} p-4`}>
+          {isLoading ? (
+            <TeamListSkeleton cardCount={3} />
+          ) : isAuthenticated ? (
+            error ? (
+              <ErrorMessage message={error} />
+            ) : initialTeams.length ? (
+              <TeamList teams={initialTeams} />
+            ) : (
+              <EmptyTeamList />
+            )
           ) : (
-            <EmptyTeamList />
-          )
-        ) : (
-          <LoginPrompt />
-        )}
-      </section>
-    </TeamsPageLayout>
+            <LoginPrompt />
+          )}
+        </section>
+      </TeamsPageLayout>
+
+      {/* FAB: 팀 생성 (인증된 경우에만) */}
+      {isAuthenticated && <FAB href="/teams/new" label="팀 생성" />}
+    </>
   );
 }
 
