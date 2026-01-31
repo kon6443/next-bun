@@ -71,7 +71,7 @@ export default function CreateTaskPage({ params }: CreateTaskPageProps) {
   };
 
   return (
-    <TeamsPageLayout maxWidth="4xl">
+    <TeamsPageLayout>
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <ButtonLink href={`/teams/${teamId || ""}`} variant="secondary">
@@ -80,15 +80,15 @@ export default function CreateTaskPage({ params }: CreateTaskPageProps) {
       </div>
 
       {/* 태스크 생성 폼 */}
-      <section className={`${cardStyles.section} p-4 sm:p-6 md:p-8`}>
-        <div className="mb-4 sm:mb-6">
+      <section className={`${cardStyles.section} p-4`}>
+        <div className="mb-4">
           <SectionLabel>New Task</SectionLabel>
-          <h1 className="mt-3 sm:mt-4 text-2xl sm:text-4xl font-bold text-white md:text-5xl">
+          <h1 className="mt-3 text-2xl font-bold text-white">
             새 태스크 생성
           </h1>
         </div>
 
-        {error && <ErrorAlert message={error} className="mb-4 sm:mb-6" />}
+        {error && <ErrorAlert message={error} className="mb-4" />}
 
         <TaskForm
           mode="create"
