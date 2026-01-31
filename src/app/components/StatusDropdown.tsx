@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { TASK_STATUS, type TaskStatusKey } from '../config/taskStatusConfig';
+import { ChevronDownIcon } from './Icons';
 
 type StatusDropdownProps = {
   currentStatus: TaskStatusKey;
@@ -11,13 +12,31 @@ type StatusDropdownProps = {
 
 export function StatusDropdown({ currentStatus, onStatusChange, disabled = false }: StatusDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [openDirection, setOpenDirection] = useState<'up' | 'down'>('up');
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   // 현재 상태 메타데이터
   const currentStatusMeta = TASK_STATUS[currentStatus] || TASK_STATUS[1];
 
   // 현재 상태를 제외한 다른 상태들
   const otherStatuses = Object.values(TASK_STATUS).filter(s => s.key !== currentStatus);
+
+  // 드롭다운 열릴 방향 계산
+  const calculateOpenDirection = useCallback(() => {
+    if (!buttonRef.current) return 'up';
+
+    const rect = buttonRef.current.getBoundingClientRect();
+    const spaceAbove = rect.top;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const dropdownHeight = otherStatuses.length * 44; // 대략적인 드롭다운 높이
+
+    // 위쪽 공간이 부족하면 아래로, 그렇지 않으면 위로
+    if (spaceAbove < dropdownHeight && spaceBelow > spaceAbove) {
+      return 'down';
+    }
+    return 'up';
+  }, [otherStatuses.length]);
 
   // 외부 클릭 감지로 드롭다운 닫기
   useEffect(() => {
@@ -36,6 +55,7 @@ export function StatusDropdown({ currentStatus, onStatusChange, disabled = false
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation(); // 카드 클릭 이벤트 방지
     if (!disabled) {
+      setOpenDirection(calculateOpenDirection());
       setIsOpen(!isOpen);
     }
   };
@@ -50,6 +70,7 @@ export function StatusDropdown({ currentStatus, onStatusChange, disabled = false
     <div ref={dropdownRef} className='relative'>
       {/* 현재 상태 버튼 (드롭다운 트리거) */}
       <button
+        ref={buttonRef}
         onClick={handleToggle}
         disabled={disabled}
         className={`
@@ -68,25 +89,24 @@ export function StatusDropdown({ currentStatus, onStatusChange, disabled = false
           <span className='font-medium text-slate-200'>{currentStatusMeta.label}</span>
         </div>
         {/* 화살표 아이콘 */}
-        <svg
+        <ChevronDownIcon
           className={`h-4 w-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-          fill='none'
-          stroke='currentColor'
-          viewBox='0 0 24 24'
-        >
-          <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 9l-7 7-7-7' />
-        </svg>
+        />
       </button>
 
       {/* 드롭다운 메뉴 */}
       {isOpen && (
         <div
-          className='
-            absolute bottom-full left-0 right-0 z-50 mb-1
+          className={`
+            absolute left-0 right-0 z-50
             rounded-lg border border-white/10 bg-slate-800/95 backdrop-blur-sm
             shadow-xl shadow-black/20 overflow-hidden
-            animate-in fade-in slide-in-from-bottom-2 duration-150
-          '
+            animate-in fade-in duration-150
+            ${openDirection === 'up' 
+              ? 'bottom-full mb-1 slide-in-from-bottom-2' 
+              : 'top-full mt-1 slide-in-from-top-2'
+            }
+          `}
         >
           {otherStatuses.map(status => (
             <button

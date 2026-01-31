@@ -1,4 +1,4 @@
-import { getStatusLabel, getStatusAccent } from '@/app/config/taskStatusConfig';
+import { getStatusAccent } from '@/app/config/taskStatusConfig';
 
 type TaskStatusBadgeProps = {
   status: number;
@@ -32,21 +32,3 @@ export function TaskStatusBadge({
   );
 }
 
-// 하위 호환성을 위해 기존 상수도 export (deprecated - config 사용 권장)
-/** @deprecated TASK_STATUS에서 직접 가져오세요 */
-export const taskStatusLabels: Record<number, string> = {
-  1: getStatusLabel(1),
-  2: getStatusLabel(2),
-  3: getStatusLabel(3),
-  4: getStatusLabel(4),
-  5: getStatusLabel(5),
-};
-
-/** @deprecated TASK_STATUS에서 직접 가져오세요 */
-export const taskStatusColors: Record<number, string> = {
-  1: getStatusAccent(1),
-  2: getStatusAccent(2),
-  3: getStatusAccent(3),
-  4: getStatusAccent(4),
-  5: getStatusAccent(5),
-};
