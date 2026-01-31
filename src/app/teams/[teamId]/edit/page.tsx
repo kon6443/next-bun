@@ -12,6 +12,7 @@ import {
   TextArea,
   SectionLabel,
   ErrorAlert,
+  FormPageSkeleton,
 } from '../../components';
 import { cardStyles } from '@/styles/teams';
 import { useTeamId, useAuthenticatedFetch, useAsyncOperation } from '@/app/hooks';
@@ -90,9 +91,7 @@ export default function EditTeamPage({ params }: EditTeamPageProps) {
   if (isLoading) {
     return (
       <TeamsPageLayout maxWidth='4xl'>
-        <div className={`${cardStyles.section} p-8 text-center`}>
-          <p className='text-slate-400'>팀 정보를 불러오는 중...</p>
-        </div>
+        <FormPageSkeleton />
       </TeamsPageLayout>
     );
   }
@@ -107,15 +106,15 @@ export default function EditTeamPage({ params }: EditTeamPageProps) {
       </div>
 
       {/* 팀 수정 폼 */}
-      <section className={`${cardStyles.section} p-8`}>
-        <div className='mb-6'>
+      <section className={`${cardStyles.section} p-4 sm:p-6 md:p-8`}>
+        <div className='mb-4 sm:mb-6'>
           <SectionLabel>Edit Team</SectionLabel>
-          <h1 className='mt-4 text-4xl font-bold text-white md:text-5xl'>팀 수정</h1>
+          <h1 className='mt-3 sm:mt-4 text-2xl sm:text-4xl font-bold text-white md:text-5xl'>팀 수정</h1>
         </div>
 
-        {error && <ErrorAlert message={error} className='mb-6' />}
+        {error && <ErrorAlert message={error} className='mb-4 sm:mb-6' />}
 
-        <form onSubmit={handleSubmit} className='space-y-6'>
+        <form onSubmit={handleSubmit} className='space-y-4 sm:space-y-6'>
           <Input
             id='teamName'
             label='팀 이름'
@@ -136,7 +135,7 @@ export default function EditTeamPage({ params }: EditTeamPageProps) {
             disabled={submitOperation.isLoading}
           />
 
-          <div className='flex justify-end gap-4 pt-4'>
+          <div className='flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-4 pt-2 sm:pt-4'>
             <ButtonLink href={`/teams/${teamId}`} variant='secondary'>
               취소
             </ButtonLink>

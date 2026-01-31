@@ -234,6 +234,122 @@ export function ListViewSkeleton({ rowCount = 5 }: { rowCount?: number }) {
 }
 
 /**
+ * 팀 카드 스켈레톤
+ */
+export function TeamCardSkeleton() {
+  return (
+    <div
+      className="rounded-2xl border border-white/10 bg-slate-950/40 p-4 space-y-3"
+      aria-hidden="true"
+    >
+      {/* 역할 라벨 */}
+      <Skeleton width="60px" height="0.75rem" rounded="md" />
+
+      {/* 팀 이름 */}
+      <Skeleton width="70%" height="1.5rem" rounded="md" className="mt-3" />
+
+      {/* 설명 */}
+      <SkeletonText lines={2} className="mt-2" />
+
+      {/* 링크 */}
+      <Skeleton width="100px" height="0.875rem" rounded="md" className="mt-6" />
+    </div>
+  );
+}
+
+/**
+ * 팀 목록 스켈레톤
+ */
+export function TeamListSkeleton({ cardCount = 3 }: { cardCount?: number }) {
+  return (
+    <div className="grid gap-4" aria-hidden="true" role="status" aria-label="팀 목록 로딩 중">
+      {Array.from({ length: cardCount }, (_, i) => (
+        <TeamCardSkeleton key={i} />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * 팀 목록 헤더 스켈레톤 (인증 상태 확인 전 표시)
+ */
+export function TeamsHeaderSkeleton() {
+  return (
+    <div aria-hidden="true">
+      <Skeleton width="60px" height="0.625rem" className="mb-4" />
+      <div className="flex flex-col gap-4">
+        <div>
+          <Skeleton width="160px" height="2rem" />
+          <Skeleton width="250px" height="0.875rem" className="mt-3" />
+        </div>
+        <Skeleton width="100%" height="3rem" rounded="xl" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 팀 목록 페이지 전체 스켈레톤
+ */
+export function TeamsPageSkeleton() {
+  return (
+    <div className="space-y-6" aria-hidden="true" role="status" aria-label="로딩 중">
+      {/* 헤더 섹션 */}
+      <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-4">
+        <TeamsHeaderSkeleton />
+      </div>
+
+      {/* 팀 목록 섹션 */}
+      <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-4">
+        <TeamListSkeleton cardCount={3} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 팀/태스크 폼 스켈레톤 (수정 페이지 로딩용)
+ */
+export function FormPageSkeleton() {
+  return (
+    <div className="space-y-6" aria-hidden="true" role="status" aria-label="로딩 중">
+      {/* 뒤로가기 버튼 */}
+      <Skeleton width="180px" height="2.5rem" rounded="full" />
+
+      {/* 폼 섹션 */}
+      <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-6">
+        {/* 헤더 */}
+        <div className="mb-4 sm:mb-6">
+          <Skeleton width="80px" height="0.625rem" />
+          <Skeleton width="150px" height="2rem" className="mt-3 sm:mt-4" />
+        </div>
+
+        {/* 입력 필드들 */}
+        <div className="space-y-4 sm:space-y-6">
+          {/* 이름 입력 */}
+          <div>
+            <Skeleton width="80px" height="0.875rem" className="mb-2" />
+            <Skeleton width="100%" height="3rem" rounded="xl" />
+          </div>
+
+          {/* 설명 입력 */}
+          <div>
+            <Skeleton width="60px" height="0.875rem" className="mb-2" />
+            <Skeleton width="100%" height="8rem" rounded="xl" />
+          </div>
+
+          {/* 버튼 영역 */}
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-4 pt-2 sm:pt-4">
+            <Skeleton width="80px" height="2.5rem" rounded="full" />
+            <Skeleton width="100px" height="2.5rem" rounded="full" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * 마이페이지 스켈레톤
  */
 export function MypageSkeleton() {

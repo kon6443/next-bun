@@ -109,7 +109,7 @@ export function TaskForm({
         />
       </div>
 
-      <div className="flex justify-end gap-2 sm:gap-4 pt-2 sm:pt-4">
+      <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-4 pt-2 sm:pt-4">
         {cancelHref ? (
           <ButtonLink href={cancelHref} variant="secondary">
             취소

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { Session } from "next-auth";
-import { TeamsPageLayout, LoadingSpinner, ButtonLink, SectionLabel } from "./components";
+import { TeamsPageLayout, TeamListSkeleton, TeamsHeaderSkeleton, ButtonLink, SectionLabel } from "./components";
 import { cardStyles } from "@/styles/teams";
 import type { TeamSummary } from "@/types/team";
 import LoginButton from "./LoginButton";
@@ -26,32 +26,38 @@ export default function TeamsClient({
     <TeamsPageLayout>
       {/* 헤더 섹션 */}
       <section className={`${cardStyles.section} p-4`}>
-        <SectionLabel spacing="wide">Teams</SectionLabel>
-        <div className="mt-4 flex flex-col gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-white">
-              내가 속한 팀
-            </h1>
-            <p className="mt-3 text-sm text-slate-400">
-              {isAuthenticated
-                ? `${session?.user?.name ?? "사용자"}님이 참여 중인 팀 목록이에요.`
-                : "로그인하면 내가 속한 팀 목록을 확인할 수 있어요."}
-            </p>
-          </div>
-          {isAuthenticated ? (
-            <ButtonLink href="/teams/new" size="lg" fullWidth>
-              + 팀 생성
-            </ButtonLink>
-          ) : (
-            <LoginButton />
-          )}
-        </div>
+        {isLoading ? (
+          <TeamsHeaderSkeleton />
+        ) : (
+          <>
+            <SectionLabel spacing="wide">Teams</SectionLabel>
+            <div className="mt-4 flex flex-col gap-4">
+              <div>
+                <h1 className="text-3xl font-bold text-white">
+                  내가 속한 팀
+                </h1>
+                <p className="mt-3 text-sm text-slate-400">
+                  {isAuthenticated
+                    ? `${session?.user?.name ?? "사용자"}님이 참여 중인 팀 목록이에요.`
+                    : "로그인하면 내가 속한 팀 목록을 확인할 수 있어요."}
+                </p>
+              </div>
+              {isAuthenticated ? (
+                <ButtonLink href="/teams/new" size="lg" fullWidth>
+                  + 팀 생성
+                </ButtonLink>
+              ) : (
+                <LoginButton />
+              )}
+            </div>
+          </>
+        )}
       </section>
 
       {/* 팀 목록 섹션 */}
       <section className={`${cardStyles.section} p-4`}>
         {isLoading ? (
-          <LoadingSpinner message="팀 목록을 불러오는 중..." />
+          <TeamListSkeleton cardCount={3} />
         ) : isAuthenticated ? (
           error ? (
             <ErrorMessage message={error} />
