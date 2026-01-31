@@ -60,6 +60,10 @@ export default function EditTeamPage({ params }: EditTeamPageProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!isTeamIdValid) {
+      return;
+    }
+
     if (!teamName.trim() || !teamDescription.trim()) {
       return;
     }
@@ -138,7 +142,7 @@ export default function EditTeamPage({ params }: EditTeamPageProps) {
             </ButtonLink>
             <Button
               type='submit'
-              disabled={submitOperation.isLoading || !teamName.trim() || !teamDescription.trim()}
+              disabled={submitOperation.isLoading || !teamName.trim() || !teamDescription.trim() || !isTeamIdValid}
             >
               {submitOperation.isLoading ? '수정 중...' : '팀 수정'}
             </Button>
