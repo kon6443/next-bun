@@ -5,6 +5,13 @@
  * 새로운 상태 추가 시 이 파일만 수정하면 됩니다.
  */
 
+// 상태 상수 정의
+export const STATUS_CREATED = 1 as const;
+export const STATUS_IN_PROGRESS = 2 as const;
+export const STATUS_COMPLETED = 3 as const;
+export const STATUS_ON_HOLD = 4 as const;
+export const STATUS_CANCELLED = 5 as const;
+
 export type TaskStatusKey = 1 | 2 | 3 | 4 | 5;
 
 export type TaskStatusMeta = {

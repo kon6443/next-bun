@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from '../types/task';
 import { getDeadlineStatus, getDeadlineLabel, deadlineStyles, formatCompactDateTime } from '../utils/taskUtils';
-import { type TaskStatusKey } from '../config/taskStatusConfig';
+import { type TaskStatusKey, STATUS_COMPLETED, STATUS_CANCELLED } from '../config/taskStatusConfig';
 import { StatusDropdown } from './StatusDropdown';
 import { ClockIcon, CalendarIcon } from './Icons';
 
@@ -28,7 +28,7 @@ export function TaskCard({ task, onStatusChange, teamId }: TaskCardProps) {
   const currentStatusKey = taskStatus as TaskStatusKey;
 
   // 마감일 상태 (완료/취소된 태스크는 표시 안함)
-  const deadlineStatus = taskStatus !== 3 && taskStatus !== 5 ? getDeadlineStatus(endAt) : 'normal';
+  const deadlineStatus = taskStatus !== STATUS_COMPLETED && taskStatus !== STATUS_CANCELLED ? getDeadlineStatus(endAt) : 'normal';
   const deadlineLabel = getDeadlineLabel(deadlineStatus, endAt);
   const showDeadlineAlert = deadlineStatus === 'overdue' || deadlineStatus === 'today' || deadlineStatus === 'soon';
 
@@ -36,8 +36,16 @@ export function TaskCard({ task, onStatusChange, teamId }: TaskCardProps) {
     router.push(`/teams/${teamId}/tasks/${taskId}`);
   };
 
+  // 키보드로 카드 선택 (Enter 또는 Space)
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleCardClick();
+    }
+  };
+
   const handleStatusChange = async (newStatus: number, e: React.MouseEvent) => {
-    e.stopPropagation(); // 카드 클릭 이벤트 방지
+    e.stopPropagation();
     if (isUpdating) return;
 
     setIsUpdating(true);
@@ -51,7 +59,11 @@ export function TaskCard({ task, onStatusChange, teamId }: TaskCardProps) {
   return (
     <article
       onClick={handleCardClick}
-      className="cursor-pointer rounded-2xl border border-white/10 bg-slate-900/60 p-4 shadow-[0_15px_45px_rgba(15,23,42,0.55)] transition-all duration-200 active:scale-[0.98]"
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+      role="button"
+      aria-label={`태스크: ${taskName}${showDeadlineAlert ? `, ${deadlineLabel}` : ''}. 클릭하여 상세보기`}
+      className="cursor-pointer rounded-2xl border border-white/10 bg-slate-900/60 p-4 shadow-[0_15px_45px_rgba(15,23,42,0.55)] transition-all duration-200 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-sky-500/50"
     >
       {/* 마감일 표시 */}
       {(endDateStr || showDeadlineAlert) && (
@@ -115,7 +127,7 @@ export function TaskCard({ task, onStatusChange, teamId }: TaskCardProps) {
         />
         {/* 로딩 인디케이터 */}
         {isUpdating && (
-          <div className="mt-2 text-center">
+          <div className="mt-2 text-center" role="status" aria-live="polite">
             <span className="text-xs text-sky-400 animate-pulse">상태 변경 중...</span>
           </div>
         )}

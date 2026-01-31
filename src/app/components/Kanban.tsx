@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Task } from '../types/task';
 import { TaskCard } from './TaskCard';
 import { getWorkflowStatuses, STATUS_TO_COLUMN, type ColumnKey } from '../config/taskStatusConfig';
+import { EmptyState } from '../teams/components';
 
 type KanbanProps = {
   tasksByColumn: Record<ColumnKey, Task[]>;
@@ -139,13 +140,16 @@ export function Kanban({ tasksByColumn, onStatusChange, teamId }: KanbanProps) {
                   </span>
                 </div>
 
-                {/* 태스크 목록 (세로 스크롤) */}
-                <div className="overflow-y-auto pr-1" style={{ maxHeight: 'calc(100vh - 400px)' }}>
+                {/* 태스크 목록 (세로 스크롤) - CSS 변수로 유연한 높이 계산 */}
+                <div 
+                  className="overflow-y-auto pr-1"
+                  style={{ 
+                    maxHeight: 'calc(100vh - var(--kanban-header-height, 350px) - var(--bottom-nav-height, 80px))'
+                  }}
+                >
                   <div className="space-y-3 pb-4">
                     {tasks.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-slate-600/80 px-4 py-10 text-center text-sm text-slate-500">
-                        태스크가 없습니다
-                      </div>
+                      <EmptyState message="태스크가 없습니다" variant="dashed" />
                     ) : (
                       tasks.map((task) => (
                         <TaskCard
