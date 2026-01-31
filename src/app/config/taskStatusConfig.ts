@@ -15,6 +15,8 @@ export type TaskStatusMeta = {
   description: string;    // 설명
   accent: string;         // 그라데이션 색상 (아이콘용)
   badgeClassName: string; // 배지 스타일 (Tailwind 클래스)
+  bgClassName: string;    // 배경 스타일 (캘린더 등에서 사용)
+  borderClassName: string; // 테두리 스타일
   isWorkflow: boolean;    // 일반 워크플로우 상태인지 (칸반 보드에 표시)
   order: number;          // 워크플로우 순서 (칸반 보드 컬럼 순서)
 };
@@ -29,6 +31,8 @@ export const TASK_STATUS: Record<TaskStatusKey, TaskStatusMeta> = {
     description: '아이디어 & 요청',
     accent: 'linear-gradient(135deg, #facc15, #f97316)',
     badgeClassName: 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-400 border-yellow-500/30',
+    bgClassName: 'bg-gradient-to-r from-yellow-500/80 to-orange-500/80',
+    borderClassName: 'border-yellow-500/50',
     isWorkflow: true,
     order: 1,
   },
@@ -40,6 +44,8 @@ export const TASK_STATUS: Record<TaskStatusKey, TaskStatusMeta> = {
     description: '진행 중인 작업',
     accent: 'linear-gradient(135deg, #38bdf8, #6366f1)',
     badgeClassName: 'bg-gradient-to-r from-sky-500/20 to-indigo-500/20 text-sky-400 border-sky-500/30',
+    bgClassName: 'bg-gradient-to-r from-sky-500/80 to-indigo-500/80',
+    borderClassName: 'border-sky-500/50',
     isWorkflow: true,
     order: 2,
   },
@@ -51,6 +57,8 @@ export const TASK_STATUS: Record<TaskStatusKey, TaskStatusMeta> = {
     description: '검수 완료',
     accent: 'linear-gradient(135deg, #34d399, #10b981)',
     badgeClassName: 'bg-gradient-to-r from-emerald-500/20 to-green-500/20 text-emerald-400 border-emerald-500/30',
+    bgClassName: 'bg-gradient-to-r from-emerald-500/80 to-green-500/80',
+    borderClassName: 'border-emerald-500/50',
     isWorkflow: true,
     order: 3,
   },
@@ -62,6 +70,8 @@ export const TASK_STATUS: Record<TaskStatusKey, TaskStatusMeta> = {
     description: '보류 중',
     accent: 'linear-gradient(135deg, #a78bfa, #8b5cf6)',
     badgeClassName: 'bg-gradient-to-r from-violet-500/20 to-purple-500/20 text-violet-400 border-violet-500/30',
+    bgClassName: 'bg-gradient-to-r from-violet-500/80 to-purple-500/80',
+    borderClassName: 'border-violet-500/50',
     isWorkflow: true,
     order: 4,
   },
@@ -73,6 +83,8 @@ export const TASK_STATUS: Record<TaskStatusKey, TaskStatusMeta> = {
     description: '취소됨',
     accent: 'linear-gradient(135deg, #f87171, #ef4444)',
     badgeClassName: 'bg-gradient-to-r from-red-500/20 to-rose-500/20 text-red-400 border-red-500/30',
+    bgClassName: 'bg-gradient-to-r from-red-500/80 to-rose-500/80',
+    borderClassName: 'border-red-500/50',
     isWorkflow: true,
     order: 5,
   },
@@ -136,6 +148,20 @@ export function getStatusBadgeClassName(statusKey: number): string {
  */
 export function getStatusAccent(statusKey: number): string {
   return getStatusMeta(statusKey).accent;
+}
+
+/**
+ * 상태 키로 배경 클래스 가져오기
+ */
+export function getStatusBgClassName(statusKey: number): string {
+  return getStatusMeta(statusKey).bgClassName;
+}
+
+/**
+ * 상태 키로 테두리 클래스 가져오기
+ */
+export function getStatusBorderClassName(statusKey: number): string {
+  return getStatusMeta(statusKey).borderClassName;
 }
 
 /**
