@@ -10,21 +10,15 @@ import { ListView } from '../../components/ListView';
 import { CalendarView } from '../../components/CalendarView';
 import { TaskFilters } from '../../components/TaskFilters';
 import { Kanban } from '../../components/Kanban';
-import { Button, ButtonLink, SectionLabel, ErrorAlert } from '../components';
+import { Button, ButtonLink, SectionLabel, ErrorAlert, TeamBoardSkeleton, ListViewSkeleton } from '../components';
 import type { Task } from '../../types/task';
-import { useTaskFilter } from '../../hooks/useTaskFilter';
+import { useTaskFilter, useTelegramLink, useTeamInvite } from '../../hooks';
 import {
   getTeamTasks,
   updateTaskStatus,
   getTeamUsers,
-  getTeamInvites,
-  createTeamInvite,
   getTelegramStatus,
-  createTelegramLink,
-  deleteTelegramLink,
   type TeamUserResponse,
-  type TeamInviteResponse,
-  type TelegramStatusResponse,
 } from '@/services/teamService';
 import { teamsPageBackground, cardStyles, layoutStyles, MOBILE_MAX_WIDTH } from '@/styles/teams';
 import { STATUS_TO_COLUMN, type ColumnKey } from '../../config/taskStatusConfig';
@@ -60,6 +54,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     return 'kanban';
   }, [searchParams]);
 
+  const teamIdNum = parseInt(teamId, 10);
+
   const [tasks, setTasks] = useState<Record<ColumnKey, Task[]>>({
     todo: [],
     inProgress: [],
@@ -73,16 +69,29 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [canManageInvites, setCanManageInvites] = useState(false);
-  const [invites, setInvites] = useState<TeamInviteResponse[]>([]);
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [isCreatingInvite, setIsCreatingInvite] = useState(false);
-  const [createdInviteLink, setCreatedInviteLink] = useState<string | null>(null);
 
-  // 텔레그램 연동 상태
-  const [telegramStatus, setTelegramStatus] = useState<TelegramStatusResponse | null>(null);
-  const [isLoadingTelegram, setIsLoadingTelegram] = useState(false);
-  const [isCreatingTelegramLink, setIsCreatingTelegramLink] = useState(false);
-  const [isDeletingTelegramLink, setIsDeletingTelegramLink] = useState(false);
+  // 커스텀 훅으로 분리된 로직
+  const {
+    telegramStatus,
+    isLoading: isLoadingTelegram,
+    isCreating: isCreatingTelegramLink,
+    isDeleting: isDeletingTelegramLink,
+    setTelegramStatus,
+    handleCreateLink: handleCreateTelegramLink,
+    handleDeleteLink: handleDeleteTelegramLink,
+    handleRefreshStatus: handleRefreshTelegramStatus,
+  } = useTelegramLink(teamIdNum, session?.user?.accessToken);
+
+  const {
+    invites,
+    showModal: showInviteModal,
+    isCreating: isCreatingInvite,
+    createdInviteLink,
+    setShowModal: setShowInviteModal,
+    setCreatedInviteLink,
+    handleCreateInvite,
+    fetchInvites,
+  } = useTeamInvite(teamIdNum, session?.user?.accessToken);
 
   // viewMode는 URL 쿼리에서 파생
   const viewMode = getViewModeFromQuery();
@@ -113,7 +122,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       setIsLoading(true);
       setError(null);
       try {
-        const teamIdNum = parseInt(teamId, 10);
         if (isNaN(teamIdNum)) {
           throw new Error('유효하지 않은 팀 ID입니다.');
         }
@@ -149,31 +157,12 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           setCanManageInvites(canInvite);
 
           if (canInvite) {
-            try {
-              const invitesResponse = await getTeamInvites(teamIdNum, session.user.accessToken);
-              setInvites(invitesResponse.data);
-            } catch (inviteErr) {
-              const errorMessage = inviteErr instanceof Error ? inviteErr.message : String(inviteErr);
-              if (errorMessage.includes('권한이 없습니다') || errorMessage.includes('403')) {
-                console.warn('팀 초대 링크 조회 권한이 없습니다.');
-                setInvites([]);
-                setCanManageInvites(false);
-              } else {
-                console.error('Failed to fetch team invites:', inviteErr);
-                setInvites([]);
-              }
-            }
+            await fetchInvites();
           }
         } else {
           setCanManageInvites(isMasterUser);
           if (isMasterUser) {
-            try {
-              const invitesResponse = await getTeamInvites(teamIdNum, session.user.accessToken);
-              setInvites(invitesResponse.data);
-            } catch (inviteErr) {
-              console.error('Failed to fetch team invites:', inviteErr);
-              setInvites([]);
-            }
+            await fetchInvites();
           }
         }
 
@@ -207,7 +196,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     };
 
     fetchTeamData();
-  }, [teamId, session?.user?.accessToken, session?.user?.userId]);
+  }, [teamId, teamIdNum, session?.user?.accessToken, session?.user?.userId, fetchInvites, setTelegramStatus]);
 
   // 모든 태스크를 하나의 배열로 합침
   const allTasks = useMemo(
@@ -353,134 +342,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     [session?.user?.accessToken, tasks, teamId],
   );
 
-  // 초대 링크 생성
-  const handleCreateInvite = useCallback(
-    async (expiresInDays: number, usageMaxCnt?: number) => {
-      if (!session?.user?.accessToken) return;
-
-      setIsCreatingInvite(true);
-      setError(null);
-      try {
-        const teamIdNum = parseInt(teamId, 10);
-        if (isNaN(teamIdNum)) {
-          throw new Error('유효하지 않은 팀 ID입니다.');
-        }
-
-        const days = Math.min(3, Math.max(1, Math.floor(expiresInDays)));
-        const endDate = new Date();
-        endDate.setDate(endDate.getDate() + days);
-        endDate.setHours(23, 59, 59, 999);
-
-        const request: { endAt: string; usageMaxCnt?: number } = {
-          endAt: endDate.toISOString(),
-        };
-        if (typeof usageMaxCnt === 'number') {
-          request.usageMaxCnt = usageMaxCnt;
-        }
-
-        await createTeamInvite(teamIdNum, request, session.user.accessToken);
-
-        toast.success('초대 링크가 성공적으로 생성되었습니다!');
-        setShowInviteModal(false);
-        setCreatedInviteLink(null);
-
-        // 초대 링크 목록 새로고침
-        const invitesResponse = await getTeamInvites(teamIdNum, session.user.accessToken);
-        setInvites(invitesResponse.data);
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : '초대 링크 생성에 실패했습니다.';
-        toast.error(errorMessage);
-        console.error('Failed to create invite:', err);
-      } finally {
-        setIsCreatingInvite(false);
-      }
-    },
-    [session?.user?.accessToken, teamId],
-  );
-
-  // 텔레그램 연동 링크 생성
-  const handleCreateTelegramLink = useCallback(async () => {
-    if (!session?.user?.accessToken) return;
-
-    setIsCreatingTelegramLink(true);
-    setError(null);
-    try {
-      const teamIdNum = parseInt(teamId, 10);
-      if (isNaN(teamIdNum)) {
-        throw new Error('유효하지 않은 팀 ID입니다.');
-      }
-
-      const response = await createTelegramLink(teamIdNum, session.user.accessToken);
-
-      setTelegramStatus({
-        isLinked: false,
-        chatId: null,
-        pendingLink: {
-          token: response.data.token,
-          deepLink: response.data.deepLink,
-          endAt: response.data.endAt,
-        },
-      });
-      toast.success('텔레그램 연동 링크가 생성되었습니다.');
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '텔레그램 연동 링크 생성에 실패했습니다.';
-      toast.error(errorMessage);
-      console.error('Failed to create telegram link:', err);
-    } finally {
-      setIsCreatingTelegramLink(false);
-    }
-  }, [session?.user?.accessToken, teamId]);
-
-  // 텔레그램 연동 해제
-  const handleDeleteTelegramLink = useCallback(async () => {
-    if (!session?.user?.accessToken) return;
-
-    const confirmed = window.confirm('텔레그램 연동을 해제하시겠습니까?\n연동 해제 후에는 팀 알림을 받을 수 없습니다.');
-    if (!confirmed) return;
-
-    setIsDeletingTelegramLink(true);
-    setError(null);
-    try {
-      const teamIdNum = parseInt(teamId, 10);
-      if (isNaN(teamIdNum)) {
-        throw new Error('유효하지 않은 팀 ID입니다.');
-      }
-
-      await deleteTelegramLink(teamIdNum, session.user.accessToken);
-
-      setTelegramStatus({
-        isLinked: false,
-        chatId: null,
-      });
-
-      toast.success('텔레그램 연동이 해제되었습니다.');
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '텔레그램 연동 해제에 실패했습니다.';
-      toast.error(errorMessage);
-      console.error('Failed to delete telegram link:', err);
-    } finally {
-      setIsDeletingTelegramLink(false);
-    }
-  }, [session?.user?.accessToken, teamId]);
-
-  // 텔레그램 상태 새로고침
-  const handleRefreshTelegramStatus = useCallback(async () => {
-    if (!session?.user?.accessToken) return;
-
-    setIsLoadingTelegram(true);
-    try {
-      const teamIdNum = parseInt(teamId, 10);
-      if (isNaN(teamIdNum)) return;
-
-      const response = await getTelegramStatus(teamIdNum, session.user.accessToken);
-      setTelegramStatus(response.data);
-    } catch (err) {
-      console.error('Failed to refresh telegram status:', err);
-    } finally {
-      setIsLoadingTelegram(false);
-    }
-  }, [session?.user?.accessToken, teamId]);
-
   return (
     <div className={layoutStyles.pageContainer} style={teamsPageBackground}>
       <main className={`${layoutStyles.mainContent} ${MOBILE_MAX_WIDTH}`}>
@@ -560,9 +421,9 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         {/* 보기 전환 버튼 */}
         <ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
 
-        {/* 뷰 렌더링 */}
+        {/* 뷰 렌더링 - 로딩 시 스켈레톤 표시 */}
         {isLoading ? (
-          <div className={`${cardStyles.section} p-8 text-center text-slate-400`}>태스크 목록을 불러오는 중...</div>
+          viewMode === 'list' ? <ListViewSkeleton /> : <TeamBoardSkeleton />
         ) : viewMode === 'kanban' ? (
           <Kanban tasksByColumn={filteredTasksByColumn} onStatusChange={handleStatusChange} teamId={teamId} />
         ) : viewMode === 'gantt' ? (

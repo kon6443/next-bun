@@ -4,7 +4,9 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from '../types/task';
 import { getDeadlineStatus, getDeadlineLabel, deadlineStyles, formatDateWithYear } from '../utils/taskUtils';
-import { getStatusMeta } from '../config/taskStatusConfig';
+import { getStatusMeta, STATUS_COMPLETED } from '../config/taskStatusConfig';
+import { EmptyState } from '../teams/components';
+import { ChevronUpIcon, ChevronDownIcon } from './Icons';
 
 type ListViewProps = {
   tasks: Task[];
@@ -73,12 +75,25 @@ export function ListView({ tasks, teamId }: ListViewProps) {
     }
   };
 
-  // 정렬 아이콘
+  // 정렬 아이콘 - SVG 아이콘 사용
   const SortIcon = ({ columnKey }: { columnKey: SortKey }) => {
     if (sortKey !== columnKey) {
-      return <span className="ml-1 text-slate-600">↕</span>;
+      return (
+        <span className="ml-1 inline-flex flex-col text-slate-600">
+          <ChevronUpIcon className="w-3 h-3 -mb-1" />
+          <ChevronDownIcon className="w-3 h-3" />
+        </span>
+      );
     }
-    return <span className="ml-1 text-sky-400">{sortOrder === 'asc' ? '↑' : '↓'}</span>;
+    return (
+      <span className="ml-1 text-sky-400">
+        {sortOrder === 'asc' ? (
+          <ChevronUpIcon className="w-3 h-3 inline" />
+        ) : (
+          <ChevronDownIcon className="w-3 h-3 inline" />
+        )}
+      </span>
+    );
   };
 
   const handleRowClick = (taskId: number) => {
@@ -143,14 +158,14 @@ export function ListView({ tasks, teamId }: ListViewProps) {
           <tbody>
             {sortedTasks.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-500">
-                  표시할 태스크가 없습니다
+                <td colSpan={6}>
+                  <EmptyState message="표시할 태스크가 없습니다" variant="minimal" />
                 </td>
               </tr>
             ) : (
               sortedTasks.map(task => {
                 const statusMeta = getStatusMeta(task.taskStatus);
-                const deadlineStatus = task.taskStatus !== 3 ? getDeadlineStatus(task.endAt) : 'normal';
+                const deadlineStatus = task.taskStatus !== STATUS_COMPLETED ? getDeadlineStatus(task.endAt) : 'normal';
                 const deadlineLabel = getDeadlineLabel(deadlineStatus, task.endAt);
                 const showDeadlineAlert = deadlineStatus === 'overdue' || deadlineStatus === 'today' || deadlineStatus === 'soon';
 
