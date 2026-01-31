@@ -1,18 +1,30 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from '../types/task';
-import { getDeadlineStatus, formatDateKey } from '../utils/taskUtils';
-import { getStatusBgClassName, getStatusBorderClassName, STATUS_COMPLETED } from '../config/taskStatusConfig';
+import { formatDateKey, getTaskDeadlineInfo, type DeadlineStatus } from '../utils/taskUtils';
+import { normalizeDate, generateCalendarGrid, splitIntoWeeks, WEEKDAYS_KO, isWeekend as isWeekendDate } from '../utils/dateUtils';
+import { getStatusBgClassName, getStatusBorderClassName } from '../config/taskStatusConfig';
+import { viewContainerStyles } from '@/styles/teams';
+import { CloseIcon } from './Icons';
 
 type CalendarViewProps = {
   tasks: Task[];
   teamId: string;
 };
 
+// 팝오버에 표시할 태스크 정보
+type PopoverState = {
+  isOpen: boolean;
+  dateKey: string;
+  date: Date | null;
+  tasks: Task[];
+  position: { top: number; left: number };
+};
+
 // 마감일 상태에 따른 테두리 색상
-const deadlineBorderColors: Record<string, string> = {
+const deadlineBorderColors: Record<DeadlineStatus, string> = {
   overdue: 'ring-2 ring-red-500/50',
   today: 'ring-2 ring-orange-500/50',
   soon: 'ring-1 ring-yellow-500/50',
@@ -23,15 +35,6 @@ const deadlineBorderColors: Record<string, string> = {
 // 상태별 색상 헬퍼 함수
 function getTaskStatusClassName(taskStatus: number): string {
   return `${getStatusBgClassName(taskStatus)} ${getStatusBorderClassName(taskStatus)}`;
-}
-
-const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
-
-// 날짜를 자정으로 정규화
-function normalizeDate(date: Date): Date {
-  const normalized = new Date(date);
-  normalized.setHours(0, 0, 0, 0);
-  return normalized;
 }
 
 // 태스크가 멀티 데이인지 확인
@@ -53,50 +56,6 @@ function taskOverlapsRange(task: Task, rangeStart: Date, rangeEnd: Date): boolea
   const end = taskEnd || taskStart!;
   
   return start <= rangeEnd && end >= rangeStart;
-}
-
-// 월의 첫 날과 마지막 날 계산
-function getMonthDays(year: number, month: number) {
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
-  return { firstDay, lastDay };
-}
-
-// 캘린더 그리드 생성 (날짜 객체 배열)
-function generateCalendarGrid(year: number, month: number): (Date | null)[] {
-  const { firstDay, lastDay } = getMonthDays(year, month);
-  const startDayOfWeek = firstDay.getDay();
-  const daysInMonth = lastDay.getDate();
-
-  const grid: (Date | null)[] = [];
-
-  // 이전 달의 날짜 (빈 칸 대신 실제 날짜)
-  const prevMonthLastDay = new Date(year, month, 0).getDate();
-  for (let i = startDayOfWeek - 1; i >= 0; i--) {
-    grid.push(new Date(year, month - 1, prevMonthLastDay - i));
-  }
-
-  // 현재 달의 날짜
-  for (let day = 1; day <= daysInMonth; day++) {
-    grid.push(new Date(year, month, day));
-  }
-
-  // 다음 달의 날짜 (6주 고정)
-  let nextDay = 1;
-  while (grid.length < 42) {
-    grid.push(new Date(year, month + 1, nextDay++));
-  }
-
-  return grid;
-}
-
-// 주 단위로 캘린더 분할
-function splitIntoWeeks(grid: (Date | null)[]): (Date | null)[][] {
-  const weeks: (Date | null)[][] = [];
-  for (let i = 0; i < grid.length; i += 7) {
-    weeks.push(grid.slice(i, i + 7));
-  }
-  return weeks;
 }
 
 // 멀티 데이 태스크 바 정보
@@ -189,9 +148,47 @@ function assignRows(bars: Omit<TaskBar, 'row'>[]): TaskBar[] {
 export function CalendarView({ tasks, teamId }: CalendarViewProps) {
   const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [popover, setPopover] = useState<PopoverState>({
+    isOpen: false,
+    dateKey: '',
+    date: null,
+    tasks: [],
+    position: { top: 0, left: 0 },
+  });
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
+
+  // 팝오버 외부 클릭 시 닫기
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
+        setPopover(prev => ({ ...prev, isOpen: false }));
+      }
+    };
+
+    if (popover.isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [popover.isOpen]);
+
+  // 더보기 클릭 핸들러
+  const handleMoreClick = (e: React.MouseEvent, date: Date, allTasks: Task[]) => {
+    e.stopPropagation();
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    setPopover({
+      isOpen: true,
+      dateKey: formatDateKey(date),
+      date,
+      tasks: allTasks,
+      position: {
+        top: rect.bottom + window.scrollY + 8,
+        left: Math.min(rect.left, window.innerWidth - 280),
+      },
+    });
+  };
 
   // 캘린더 그리드
   const calendarGrid = useMemo(() => generateCalendarGrid(year, month), [year, month]);
@@ -259,7 +256,7 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
   };
 
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-[0_25px_60px_rgba(15,23,42,0.55)] backdrop-blur-xl">
+    <div className={viewContainerStyles}>
       {/* 헤더 */}
       <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
@@ -293,7 +290,7 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
 
       {/* 요일 헤더 */}
       <div className="grid grid-cols-7 border-b border-white/10">
-        {WEEKDAYS.map((day, idx) => (
+        {WEEKDAYS_KO.map((day, idx) => (
           <div
             key={day}
             className={`py-2 text-center text-xs font-semibold ${
@@ -332,7 +329,7 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
                   const dateKey = formatDateKey(date);
                   const dayTasks = singleDayTasksByDate.get(dateKey) || [];
                   const isToday = dateKey === todayKey;
-                  const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                  const isWeekend = isWeekendDate(date);
                   const isCurrentMonth = date.getMonth() === month;
 
                   return (
@@ -357,10 +354,31 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
                         >
                           {date.getDate()}
                         </span>
-                        {(dayTasks.length > 2 || hasMoreBars) && dayIdx === 6 && (
-                          <span className="text-[10px] text-slate-500">
-                            {hasMoreBars ? `+${maxRow - 2}` : `+${dayTasks.length - 2}`}
-                          </span>
+                        {/* +n more 버튼 - 태스크가 2개 초과하거나 멀티데이 바가 있을 때 */}
+                        {(dayTasks.length > 2 || (hasMoreBars && dayIdx === 6)) && (
+                          <button
+                            onClick={(e) => {
+                              // 해당 날짜의 모든 태스크 수집 (멀티데이 + 단일데이)
+                              const allTasksForDay = [
+                                ...dayTasks,
+                                ...taskBars.filter(bar => {
+                                  // 해당 날짜가 멀티데이 바 범위에 포함되는지 확인
+                                  const barStart = weekDates[bar.startCol];
+                                  const barEnd = weekDates[bar.startCol + bar.span - 1];
+                                  if (!barStart || !barEnd) return false;
+                                  return date >= normalizeDate(barStart) && date <= normalizeDate(barEnd);
+                                }).map(bar => bar.task)
+                              ];
+                              // 중복 제거
+                              const uniqueTasks = allTasksForDay.filter(
+                                (task, idx, arr) => arr.findIndex(t => t.taskId === task.taskId) === idx
+                              );
+                              handleMoreClick(e, date, uniqueTasks);
+                            }}
+                            className="text-[10px] text-sky-400 hover:text-sky-300 hover:underline"
+                          >
+                            +{dayTasks.length > 2 ? dayTasks.length - 2 : maxRow - 2} more
+                          </button>
                         )}
                       </div>
 
@@ -372,7 +390,7 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
                       {/* 단일 데이 태스크 목록 (최대 2개) */}
                       <div className="space-y-1">
                         {dayTasks.slice(0, 2).map(task => {
-                          const deadlineStatus = task.taskStatus !== STATUS_COMPLETED ? getDeadlineStatus(task.endAt) : 'normal';
+                          const { status: deadlineStatus } = getTaskDeadlineInfo(task);
                           return (
                             <div
                               key={task.taskId}
@@ -396,7 +414,7 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
               {taskBars.slice(0, displayRows * 7).map((bar, barIdx) => {
                 if (bar.row >= displayRows) return null;
                 
-                const deadlineStatus = bar.task.taskStatus !== STATUS_COMPLETED ? getDeadlineStatus(bar.task.endAt) : 'normal';
+                const { status: deadlineStatus } = getTaskDeadlineInfo(bar.task);
                 const leftPercent = (bar.startCol / 7) * 100;
                 const widthPercent = (bar.span / 7) * 100;
                 // 날짜(28px) + 마진(4px) 이후부터 시작
@@ -448,6 +466,60 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
                 {task.taskName}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* 더보기 팝오버 */}
+      {popover.isOpen && (
+        <div
+          ref={popoverRef}
+          className="fixed z-50 w-64 max-h-80 overflow-y-auto rounded-xl border border-white/10 bg-slate-800/95 backdrop-blur-sm shadow-xl"
+          style={{
+            top: popover.position.top,
+            left: popover.position.left,
+          }}
+        >
+          {/* 팝오버 헤더 */}
+          <div className="sticky top-0 flex items-center justify-between border-b border-white/10 bg-slate-800/95 px-3 py-2">
+            <span className="text-sm font-semibold text-white">
+              {popover.date ? `${popover.date.getMonth() + 1}월 ${popover.date.getDate()}일` : ''}
+            </span>
+            <button
+              onClick={() => setPopover(prev => ({ ...prev, isOpen: false }))}
+              className="rounded p-1 text-slate-400 hover:bg-slate-700/50 hover:text-slate-200"
+              aria-label="닫기"
+            >
+              <CloseIcon className="h-4 w-4" />
+            </button>
+          </div>
+          
+          {/* 태스크 목록 */}
+          <div className="p-2 space-y-1.5">
+            {popover.tasks.length === 0 ? (
+              <p className="text-center text-xs text-slate-500 py-4">태스크가 없습니다</p>
+            ) : (
+              popover.tasks.map(task => {
+                const { status: deadlineStatus } = getTaskDeadlineInfo(task);
+                return (
+                  <div
+                    key={task.taskId}
+                    onClick={e => {
+                      handleTaskClick(e, task.taskId);
+                      setPopover(prev => ({ ...prev, isOpen: false }));
+                    }}
+                    className={`cursor-pointer rounded-lg border px-3 py-2 transition hover:brightness-110 ${
+                      getTaskStatusClassName(task.taskStatus)
+                    } ${deadlineBorderColors[deadlineStatus]}`}
+                  >
+                    <p className="text-xs font-medium text-white truncate">{task.taskName}</p>
+                    {task.taskDescription && (
+                      <p className="mt-0.5 text-[10px] text-white/70 truncate">{task.taskDescription}</p>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       )}
