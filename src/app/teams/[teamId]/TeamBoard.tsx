@@ -10,7 +10,8 @@ import { ListView } from '../../components/ListView';
 import { CalendarView } from '../../components/CalendarView';
 import { TaskFilters } from '../../components/TaskFilters';
 import { Kanban } from '../../components/Kanban';
-import { Button, ButtonLink, SectionLabel, ErrorAlert, TeamBoardSkeleton, ListViewSkeleton, Skeleton } from '../components';
+import { SectionLabel, ErrorAlert, TeamBoardSkeleton, ListViewSkeleton, Skeleton, FAB, IconButton } from '../components';
+import { EditIcon, UserGroupIcon, PlusIcon } from '../../components/Icons';
 import type { Task } from '../../types/task';
 import { useTaskFilter, useTelegramLink, useTeamInvite } from '../../hooks';
 import {
@@ -363,25 +364,36 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         {/* 팀 헤더 섹션 */}
         <section className={`${cardStyles.section} p-4`}>
           <SectionLabel>Team Kanban</SectionLabel>
-          <div className="mt-4 flex flex-col gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-white">
-                {isLoading ? <Skeleton width="200px" height="2rem" /> : teamName || ''}
-              </h1>
-              {teamDescription && <p className="mt-2 text-sm text-slate-400">{teamDescription}</p>}
-            </div>
-            <div className="flex flex-col gap-2">
-              {canManageInvites && (
-                <Button variant="secondary" size="lg" fullWidth onClick={() => setShowInviteModal(true)}>
-                  팀 초대
-                </Button>
-              )}
-              <ButtonLink href={`/teams/${teamId}/edit`} variant="secondary" size="lg" fullWidth>
-                팀 수정
-              </ButtonLink>
-              <ButtonLink href={`/teams/${teamId}/tasks/new`} size="lg" fullWidth>
-                새 카드 작성
-              </ButtonLink>
+          <div className="mt-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <h1 className="text-3xl font-bold text-white truncate">
+                  {isLoading ? <Skeleton width="200px" height="2rem" /> : teamName || ''}
+                </h1>
+                {teamDescription && <p className="mt-2 text-sm text-slate-400">{teamDescription}</p>}
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <IconButton
+                  icon={PlusIcon}
+                  label="새 카드 작성"
+                  variant="outlined"
+                  href={`/teams/${teamId}/tasks/new`}
+                />
+                {canManageInvites && (
+                  <IconButton
+                    icon={UserGroupIcon}
+                    label="팀 초대"
+                    variant="outlined"
+                    onClick={() => setShowInviteModal(true)}
+                  />
+                )}
+                <IconButton
+                  icon={EditIcon}
+                  label="팀 수정"
+                  variant="outlined"
+                  href={`/teams/${teamId}/edit`}
+                />
+              </div>
             </div>
           </div>
         </section>
@@ -461,6 +473,9 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         createdInviteLink={createdInviteLink}
         onClearCreatedLink={() => setCreatedInviteLink(null)}
       />
+
+      {/* FAB: 새 카드 작성 */}
+      <FAB href={`/teams/${teamId}/tasks/new`} label="새 카드 작성" />
     </div>
   );
 }
