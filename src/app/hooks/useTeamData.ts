@@ -13,6 +13,7 @@ import {
 } from '@/services/teamService';
 import { STATUS_TO_COLUMN, type ColumnKey } from '../config/taskStatusConfig';
 import { useTelegramLink, useTeamInvite } from './index';
+import { ApiError } from '@/types/api';
 
 // taskStatus를 ColumnKey로 매핑
 const taskStatusToColumn: Record<number, ColumnKey | undefined> = {
@@ -191,7 +192,11 @@ export function useTeamData(teamId: string): UseTeamDataReturn {
 
         setTasks(classifiedTasks);
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : '태스크 목록을 불러오는데 실패했습니다.';
+        const errorMessage = err instanceof ApiError 
+          ? err.message 
+          : err instanceof Error 
+            ? err.message 
+            : '태스크 목록을 불러오는데 실패했습니다.';
         setError(errorMessage);
         console.error('Failed to fetch team data:', err);
       } finally {
@@ -255,7 +260,12 @@ export function useTeamData(teamId: string): UseTeamDataReturn {
         toast.success('상태가 변경되었습니다.');
       } catch (err) {
         console.error('Failed to update task status:', err);
-        toast.error(err instanceof Error ? err.message : '태스크 상태 변경에 실패했습니다.');
+        const errorMessage = err instanceof ApiError 
+          ? err.message 
+          : err instanceof Error 
+            ? err.message 
+            : '태스크 상태 변경에 실패했습니다.';
+        toast.error(errorMessage);
 
         // 롤백
         setTasks(prev => {

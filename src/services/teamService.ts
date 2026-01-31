@@ -1,4 +1,5 @@
 import fetchServiceInstance from './FetchService';
+import { ApiError, ApiErrorResponse, createApiError } from '@/types/api';
 
 // ==================== 공통 에러 처리 ====================
 
@@ -10,46 +11,60 @@ type ErrorMessageMap = {
   default: string;
 };
 
-const DEFAULT_ERROR_MESSAGES = {
-  401: '인증이 필요합니다. 다시 로그인해주세요.',
-} as const;
-
 /**
  * API 응답 에러를 처리하는 공통 핸들러
+ * 에러 코드 기반으로 세밀한 에러 처리 가능
+ * 
  * @param response - fetch Response 객체
- * @param errorMessages - 상태 코드별 에러 메시지 매핑
+ * @param errorMessages - 상태 코드별 폴백 에러 메시지 (code가 없을 때 사용)
+ * @throws ApiError - 에러 코드와 메시지를 포함한 ApiError
  */
 async function handleApiError(response: Response, errorMessages: ErrorMessageMap): Promise<never> {
-  let errorMessage = '';
+  let errorData: ApiErrorResponse | null = null;
   
-  // 응답 본문에서 에러 메시지 추출 시도
+  // 응답 본문에서 에러 정보 추출
   try {
     const errorText = await response.text();
     if (errorText) {
       try {
-        const errorData = JSON.parse(errorText);
-        errorMessage = errorData?.message || errorData?.error || errorData?.detail || '';
+        errorData = JSON.parse(errorText) as ApiErrorResponse;
       } catch {
-        errorMessage = errorText;
+        // JSON 파싱 실패 시 텍스트 그대로 사용
+        throw new ApiError(
+          'UNKNOWN_ERROR',
+          errorText || errorMessages.default,
+          response.status,
+        );
       }
     }
-  } catch {
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
     // 응답 본문 읽기 실패
   }
 
-  // 401은 항상 동일한 메시지 사용
-  if (response.status === 401) {
-    throw new Error(DEFAULT_ERROR_MESSAGES[401]);
+  // 에러 코드가 있으면 ApiError 생성
+  if (errorData?.code) {
+    throw createApiError(errorData, response.status);
   }
 
-  // 상태 코드별 커스텀 에러 메시지
+  // 에러 코드가 없으면 HTTP 상태 코드 기반 에러 생성
   const statusMessage = errorMessages[response.status as keyof ErrorMessageMap];
-  if (statusMessage) {
-    throw new Error(errorMessage || statusMessage);
-  }
-
-  // 기본 에러 메시지
-  throw new Error(errorMessage || `${errorMessages.default}: ${response.status}`);
+  const message = errorData?.message || statusMessage || `${errorMessages.default}: ${response.status}`;
+  
+  // HTTP 상태 코드를 기본 에러 코드로 매핑
+  const defaultCodeMap: Record<number, string> = {
+    400: 'BAD_REQUEST',
+    401: 'UNAUTHORIZED',
+    403: 'FORBIDDEN',
+    404: 'NOT_FOUND',
+    500: 'INTERNAL_SERVER_ERROR',
+  };
+  
+  throw new ApiError(
+    defaultCodeMap[response.status] || 'UNKNOWN_ERROR',
+    message,
+    response.status,
+  );
 }
 
 // ==================== 타입 정의 ====================
@@ -90,10 +105,13 @@ export type TeamTaskResponse = {
 };
 
 export type GetMyTeamsResponse = {
+  code: 'SUCCESS';
   data: TeamMemberResponse[];
+  message: string;
 };
 
 export type GetTeamTasksResponse = {
+  code: 'SUCCESS';
   message: string;
   data: {
     team: TeamInfoResponse;
@@ -102,6 +120,7 @@ export type GetTeamTasksResponse = {
 };
 
 export type UpdateTaskStatusResponse = {
+  code: 'SUCCESS';
   message: string;
   data: TeamTaskResponse;
 };
@@ -134,6 +153,7 @@ export type TaskDetailResponse = {
 };
 
 export type GetTaskDetailResponse = {
+  code: 'SUCCESS';
   message: string;
   data: TaskDetailResponse;
 };
@@ -143,6 +163,7 @@ export type CreateTaskCommentRequest = {
 };
 
 export type CreateTaskCommentResponse = {
+  code: 'SUCCESS';
   message: string;
   data: TaskCommentResponse;
 };
@@ -152,6 +173,7 @@ export type UpdateTaskCommentRequest = {
 };
 
 export type UpdateTaskCommentResponse = {
+  code: 'SUCCESS';
   message: string;
   data: TaskCommentResponse;
 };
@@ -164,6 +186,7 @@ export type CreateTaskRequest = {
 };
 
 export type CreateTaskResponse = {
+  code: 'SUCCESS';
   message: string;
   data: TeamTaskResponse;
 };
@@ -176,6 +199,7 @@ export type UpdateTaskRequest = {
 };
 
 export type UpdateTaskResponse = {
+  code: 'SUCCESS';
   message: string;
   data: TeamTaskResponse;
 };
@@ -188,6 +212,7 @@ export type TeamUserResponse = {
 };
 
 export type GetTeamUsersResponse = {
+  code: 'SUCCESS';
   message: string;
   data: TeamUserResponse[];
 };
@@ -198,6 +223,7 @@ export type CreateTeamRequest = {
 };
 
 export type CreateTeamResponse = {
+  code: 'SUCCESS';
   message: string;
   data: TeamInfoResponse;
 };
@@ -208,6 +234,7 @@ export type UpdateTeamRequest = {
 };
 
 export type UpdateTeamResponse = {
+  code: 'SUCCESS';
   message: string;
   data: TeamInfoResponse;
 };
@@ -218,9 +245,13 @@ export type CreateTeamInviteRequest = {
 };
 
 export type CreateTeamInviteResponse = {
-  inviteLink: string;
-  endAt: string;
-  usageMaxCnt: number;
+  code: 'SUCCESS';
+  message: string;
+  data: {
+    inviteLink: string;
+    endAt: string;
+    usageMaxCnt: number;
+  };
 };
 
 export type TeamInviteResponse = {
@@ -236,6 +267,7 @@ export type TeamInviteResponse = {
 };
 
 export type GetTeamInvitesResponse = {
+  code: 'SUCCESS';
   message: string;
   data: TeamInviteResponse[];
 };
@@ -245,9 +277,13 @@ export type AcceptTeamInviteRequest = {
 };
 
 export type AcceptTeamInviteResponse = {
-  teamId: number;
-  teamName: string;
+  code: 'SUCCESS';
   message: string;
+  data: {
+    teamId: number;
+    teamName: string;
+    message: string;
+  };
 };
 
 /**
@@ -632,6 +668,7 @@ export async function acceptTeamInvite(
 // ==================== 텔레그램 연동 API ====================
 
 export type CreateTelegramLinkResponse = {
+  code: 'SUCCESS';
   message: string;
   data: {
     token: string;
@@ -651,6 +688,7 @@ export type TelegramStatusResponse = {
 };
 
 export type GetTelegramStatusResponse = {
+  code: 'SUCCESS';
   message: string;
   data: TelegramStatusResponse;
 };

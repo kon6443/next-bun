@@ -8,6 +8,7 @@ import {
   deleteTelegramLink,
   type TelegramStatusResponse,
 } from '@/services/teamService';
+import { ApiError } from '@/types/api';
 
 export type UseTelegramLinkReturn = {
   telegramStatus: TelegramStatusResponse | null;
@@ -52,7 +53,11 @@ export function useTelegramLink(
       });
       toast.success('텔레그램 연동 링크가 생성되었습니다.');
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '텔레그램 연동 링크 생성에 실패했습니다.';
+      const errorMessage = err instanceof ApiError 
+        ? err.message 
+        : err instanceof Error 
+          ? err.message 
+          : '텔레그램 연동 링크 생성에 실패했습니다.';
       toast.error(errorMessage);
       console.error('Failed to create telegram link:', err);
     } finally {
@@ -78,7 +83,11 @@ export function useTelegramLink(
 
       toast.success('텔레그램 연동이 해제되었습니다.');
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '텔레그램 연동 해제에 실패했습니다.';
+      const errorMessage = err instanceof ApiError 
+        ? err.message 
+        : err instanceof Error 
+          ? err.message 
+          : '텔레그램 연동 해제에 실패했습니다.';
       toast.error(errorMessage);
       console.error('Failed to delete telegram link:', err);
     } finally {

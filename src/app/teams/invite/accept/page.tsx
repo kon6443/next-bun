@@ -6,6 +6,7 @@ import { useSession, signIn } from "next-auth/react";
 import { acceptTeamInvite } from "@/services/teamService";
 import { TeamsCenteredLayout, LoadingSpinnerSimple, Button } from "../../components";
 import { cardStyles } from "@/styles/teams";
+import { ApiError } from "@/types/api";
 
 function InviteAcceptContent() {
   const searchParams = useSearchParams();
@@ -33,11 +34,14 @@ function InviteAcceptContent() {
 
       setSuccess(true);
       setTimeout(() => {
-        router.push(`/teams/${response.teamId}`);
+        router.push(`/teams/${response.data.teamId}`);
       }, 1500);
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "팀 초대 수락에 실패했습니다.";
+      const errorMessage = err instanceof ApiError
+        ? err.message
+        : err instanceof Error
+          ? err.message
+          : "팀 초대 수락에 실패했습니다.";
       setError(errorMessage);
       setIsProcessing(false);
     }

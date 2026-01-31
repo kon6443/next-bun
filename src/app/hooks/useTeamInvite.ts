@@ -7,6 +7,7 @@ import {
   createTeamInvite,
   type TeamInviteResponse,
 } from '@/services/teamService';
+import { ApiError } from '@/types/api';
 
 export type UseTeamInviteReturn = {
   invites: TeamInviteResponse[];
@@ -41,8 +42,7 @@ export function useTeamInvite(
       const invitesResponse = await getTeamInvites(teamId, accessToken);
       setInvites(invitesResponse.data);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      if (errorMessage.includes('권한이 없습니다') || errorMessage.includes('403')) {
+      if (err instanceof ApiError && err.isForbiddenError()) {
         console.warn('팀 초대 링크 조회 권한이 없습니다.');
         setInvites([]);
       } else {
@@ -80,7 +80,11 @@ export function useTeamInvite(
         // 초대 링크 목록 새로고침
         await fetchInvites();
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : '초대 링크 생성에 실패했습니다.';
+        const errorMessage = err instanceof ApiError 
+          ? err.message 
+          : err instanceof Error 
+            ? err.message 
+            : '초대 링크 생성에 실패했습니다.';
         toast.error(errorMessage);
         console.error('Failed to create invite:', err);
       } finally {
