@@ -1,22 +1,11 @@
 import { SectionLabel } from "./SectionLabel";
+import { formatFullDateTime } from "@/app/utils/taskUtils";
 
 type DateInfoCardProps = {
   label: string;
   date: Date | null;
   /** 텍스트 색상 variant: default(slate-300), muted(slate-400) */
   variant?: "default" | "muted";
-};
-
-const formatDate = (date: Date | null) => {
-  if (!date) return null;
-  return new Date(date).toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
 };
 
 /**
@@ -38,7 +27,7 @@ export function DateInfoCard({
         {label}
       </SectionLabel>
       <p className={`mt-1.5 sm:mt-2 text-sm break-words ${textColorClass}`}>
-        {formatDate(date)}
+        {formatFullDateTime(date)}
       </p>
     </div>
   );

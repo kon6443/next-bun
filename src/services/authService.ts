@@ -1,112 +1,96 @@
+import fetchServiceInstance from './FetchService';
+
+type KakaoSignInUpRequest = {
+  kakaoNickname: string;
+  accessToken: string;
+};
+
+type KakaoSignInUpResponse = {
+  message: string;
+  userId: number;
+  loginType: 'KAKAO';
+  accessToken: string;
+  tokenType: string;
+};
+
+/**
+ * API 응답에서 에러 메시지 추출
+ */
+async function extractErrorMessage(response: Response, defaultMessage: string): Promise<string> {
+  try {
+    const errorData = await response.text();
+    if (errorData) {
+      try {
+        const parsedError = JSON.parse(errorData);
+        // NestJS validation 에러는 message가 배열일 수 있음
+        if (Array.isArray(parsedError.message)) {
+          return parsedError.message.join(', ');
+        }
+        return parsedError.message || parsedError.error || defaultMessage;
+      } catch {
+        return errorData || defaultMessage;
+      }
+    }
+  } catch {
+    // 응답 본문 읽기 실패
+  }
+  return defaultMessage;
+}
+
+/**
+ * 카카오 로그인/회원가입
+ */
 export async function postKakaoSignInUp({
   kakaoNickname,
   accessToken,
-}: {
-  kakaoNickname: string;
-  accessToken: string;
-}): Promise<{
-  message: string;
-  userId: number;
-  loginType: "KAKAO";
-  accessToken: string;
-  tokenType: string;
-}> {
-  const endPoint = "/api/v1/auth/kakao";
-  
+}: KakaoSignInUpRequest): Promise<KakaoSignInUpResponse> {
   // AbortController를 사용하여 timeout 설정
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000); // 10초 타임아웃
 
   try {
-    const url = `${process.env.NEXT_PUBLIC_API}${endPoint}`;
-    
-    // 디버깅용 로그 (필요시 주석 해제)
-    // console.log("Request URL:", url);
-    // console.log("Request body:", { kakaoNickname, accessToken: accessToken ? "***" : undefined });
-    
-    // 백엔드 DTO가 refreshToken을 허용하지 않으므로 제외
-    const requestBody: { kakaoNickname: string; accessToken: string } = {
-      kakaoNickname,
-      accessToken,
-    };
-    
-    const response = await fetch(url, {
-      method: "post",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
+    const response = await fetchServiceInstance.backendFetch({
+      method: 'POST',
+      endpoint: '/api/v1/auth/kakao',
+      body: { kakaoNickname, accessToken },
       signal: controller.signal,
     });
-    
+
     clearTimeout(timeoutId);
-    
-    // 디버깅용 로그 (필요시 주석 해제)
-    // console.log("Response status:", response.status);
-    // console.log("Response statusText:", response.statusText);
-    // console.log("Response headers:", Object.fromEntries(response.headers.entries()));
-    
-    // NestJS는 200-299 범위의 성공 상태 코드를 사용할 수 있음
-    // 200 (OK), 201 (Created), 204 (No Content) 등을 허용
+
     if (!response.ok) {
-      // 응답 본문을 먼저 읽어서 에러 메시지 확인
-      let errorMessage = "LOGIN FAILED";
-      try {
-        const errorData = await response.text();
-        console.error("Error response body:", errorData);
-        if (errorData) {
-          try {
-            const parsedError = JSON.parse(errorData);
-            // NestJS validation 에러는 message가 배열일 수 있음
-            if (Array.isArray(parsedError.message)) {
-              errorMessage = parsedError.message.join(", ");
-            } else {
-              errorMessage = parsedError.message || parsedError.error || errorMessage;
-            }
-          } catch {
-            errorMessage = errorData || errorMessage;
-          }
-        }
-      } catch (parseError) {
-        console.error("Failed to parse error response:", parseError);
-      }
+      const errorMessage = await extractErrorMessage(response, 'LOGIN FAILED');
       throw new Error(`LOGIN FAILED: ${response.status} ${response.statusText} - ${errorMessage}`);
     }
-    
-    // 성공 응답 처리
-    const contentType = response.headers.get("content-type");
-    let data;
-    
-    if (contentType && contentType.includes("application/json")) {
-      data = await response.json();
-    } else {
-      // JSON이 아닌 경우 에러 발생
+
+    // Content-Type 확인
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
       await response.text(); // 응답 본문 소비 (메모리 누수 방지)
-      throw new Error("서버가 예상하지 못한 형식으로 응답했습니다.");
+      throw new Error('서버가 예상하지 못한 형식으로 응답했습니다.');
     }
-    
-    // 디버깅용 로그 (필요시 주석 해제)
-    // console.log("Response data:", { ...data, userId: data.userId, loginType: data.loginType });
-    
+
+    const data = await response.json();
+
     // 응답 데이터 검증
     if (
       !data ||
-      typeof data.userId !== "number" ||
+      typeof data.userId !== 'number' ||
       !data.loginType ||
-      typeof data.accessToken !== "string" ||
+      typeof data.accessToken !== 'string' ||
       !data.accessToken ||
-      typeof data.tokenType !== "string" ||
+      typeof data.tokenType !== 'string' ||
       !data.tokenType
     ) {
-      console.error("Invalid response data structure:", data);
-      throw new Error("서버 응답 형식이 올바르지 않습니다.");
+      console.error('Invalid response data structure:', data);
+      throw new Error('서버 응답 형식이 올바르지 않습니다.');
     }
-    
+
     return data;
   } catch (error) {
     clearTimeout(timeoutId);
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.");
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.');
     }
     throw error;
   }

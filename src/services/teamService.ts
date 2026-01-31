@@ -1,5 +1,59 @@
 import fetchServiceInstance from './FetchService';
 
+// ==================== 공통 에러 처리 ====================
+
+type ErrorMessageMap = {
+  401?: string;
+  403?: string;
+  404?: string;
+  400?: string;
+  default: string;
+};
+
+const DEFAULT_ERROR_MESSAGES = {
+  401: '인증이 필요합니다. 다시 로그인해주세요.',
+} as const;
+
+/**
+ * API 응답 에러를 처리하는 공통 핸들러
+ * @param response - fetch Response 객체
+ * @param errorMessages - 상태 코드별 에러 메시지 매핑
+ */
+async function handleApiError(response: Response, errorMessages: ErrorMessageMap): Promise<never> {
+  let errorMessage = '';
+  
+  // 응답 본문에서 에러 메시지 추출 시도
+  try {
+    const errorText = await response.text();
+    if (errorText) {
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData?.message || errorData?.error || errorData?.detail || '';
+      } catch {
+        errorMessage = errorText;
+      }
+    }
+  } catch {
+    // 응답 본문 읽기 실패
+  }
+
+  // 401은 항상 동일한 메시지 사용
+  if (response.status === 401) {
+    throw new Error(DEFAULT_ERROR_MESSAGES[401]);
+  }
+
+  // 상태 코드별 커스텀 에러 메시지
+  const statusMessage = errorMessages[response.status as keyof ErrorMessageMap];
+  if (statusMessage) {
+    throw new Error(errorMessage || statusMessage);
+  }
+
+  // 기본 에러 메시지
+  throw new Error(errorMessage || `${errorMessages.default}: ${response.status}`);
+}
+
+// ==================== 타입 정의 ====================
+
 export type TeamMemberResponse = {
   teamId: number;
   userId: number;
@@ -207,15 +261,10 @@ export async function getMyTeams(accessToken: string): Promise<GetMyTeamsRespons
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
-    }
-    const errorText = await response.text();
-    throw new Error(`팀 목록 조회 실패: ${response.status} - ${errorText}`);
+    await handleApiError(response, { default: '팀 목록 조회 실패' });
   }
 
-  const data = await response.json();
-  return data;
+  return response.json();
 }
 
 /**
@@ -233,18 +282,13 @@ export async function createTeam(
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
-    }
-    if (response.status === 400) {
-      throw new Error('팀 생성 요청이 올바르지 않습니다.');
-    }
-    const errorText = await response.text();
-    throw new Error(`팀 생성 실패: ${response.status} - ${errorText}`);
+    await handleApiError(response, {
+      400: '팀 생성 요청이 올바르지 않습니다.',
+      default: '팀 생성 실패',
+    });
   }
 
-  const data = await response.json();
-  return data;
+  return response.json();
 }
 
 /**
@@ -263,24 +307,15 @@ export async function updateTeam(
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
-    }
-    if (response.status === 403) {
-      throw new Error('팀을 수정할 권한이 없습니다.');
-    }
-    if (response.status === 404) {
-      throw new Error('팀을 찾을 수 없습니다.');
-    }
-    if (response.status === 400) {
-      throw new Error('팀 수정 요청이 올바르지 않습니다.');
-    }
-    const errorText = await response.text();
-    throw new Error(`팀 수정 실패: ${response.status} - ${errorText}`);
+    await handleApiError(response, {
+      403: '팀을 수정할 권한이 없습니다.',
+      404: '팀을 찾을 수 없습니다.',
+      400: '팀 수정 요청이 올바르지 않습니다.',
+      default: '팀 수정 실패',
+    });
   }
 
-  const data = await response.json();
-  return data;
+  return response.json();
 }
 
 /**
@@ -294,17 +329,11 @@ export async function getTeamUsers(teamId: number, accessToken: string): Promise
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
-    }
-    if (response.status === 403) {
-      throw new Error('팀 멤버만 접근할 수 있습니다.');
-    }
-    if (response.status === 404) {
-      throw new Error('팀을 찾을 수 없습니다.');
-    }
-    const errorText = await response.text();
-    throw new Error(`팀 멤버 목록 조회 실패: ${response.status} - ${errorText}`);
+    await handleApiError(response, {
+      403: '팀 멤버만 접근할 수 있습니다.',
+      404: '팀을 찾을 수 없습니다.',
+      default: '팀 멤버 목록 조회 실패',
+    });
   }
 
   const data = await response.json();
@@ -329,18 +358,13 @@ export async function getTeamTasks(teamId: number, accessToken: string): Promise
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
-    }
-    if (response.status === 403) {
-      throw new Error('팀 멤버만 접근할 수 있습니다.');
-    }
-    const errorText = await response.text();
-    throw new Error(`태스크 목록 조회 실패: ${response.status} - ${errorText}`);
+    await handleApiError(response, {
+      403: '팀 멤버만 접근할 수 있습니다.',
+      default: '태스크 목록 조회 실패',
+    });
   }
 
-  const data = await response.json();
-  return data;
+  return response.json();
 }
 
 /**
@@ -359,21 +383,14 @@ export async function createTask(
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
-    }
-    if (response.status === 403) {
-      throw new Error('팀 멤버만 태스크를 생성할 수 있습니다.');
-    }
-    if (response.status === 400) {
-      throw new Error('태스크 생성 요청이 올바르지 않습니다.');
-    }
-    const errorText = await response.text();
-    throw new Error(`태스크 생성 실패: ${response.status} - ${errorText}`);
+    await handleApiError(response, {
+      403: '팀 멤버만 태스크를 생성할 수 있습니다.',
+      400: '태스크 생성 요청이 올바르지 않습니다.',
+      default: '태스크 생성 실패',
+    });
   }
 
-  const data = await response.json();
-  return data;
+  return response.json();
 }
 
 /**
@@ -393,38 +410,15 @@ export async function updateTask(
   });
 
   if (!response.ok) {
-    let errorMessage = '';
-    try {
-      const errorText = await response.text();
-      if (errorText) {
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData?.message || errorData?.error || errorData?.detail || errorText;
-        } catch {
-          errorMessage = errorText;
-        }
-      }
-    } catch {
-      // 응답 본문 읽기 실패
-    }
-
-    if (response.status === 401) {
-      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
-    }
-    if (response.status === 403) {
-      throw new Error('태스크를 수정할 권한이 없습니다.');
-    }
-    if (response.status === 404) {
-      throw new Error(errorMessage || '태스크를 찾을 수 없습니다.');
-    }
-    if (response.status === 400) {
-      throw new Error(errorMessage || '태스크 수정 요청이 올바르지 않습니다.');
-    }
-    throw new Error(errorMessage || `태스크 수정 실패: ${response.status}`);
+    await handleApiError(response, {
+      403: '태스크를 수정할 권한이 없습니다.',
+      404: '태스크를 찾을 수 없습니다.',
+      400: '태스크 수정 요청이 올바르지 않습니다.',
+      default: '태스크 수정 실패',
+    });
   }
 
-  const data = await response.json();
-  return data;
+  return response.json();
 }
 
 /**
@@ -446,18 +440,13 @@ export async function updateTaskStatus(
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
-    }
-    if (response.status === 403) {
-      throw new Error('팀 멤버만 태스크 상태를 변경할 수 있습니다.');
-    }
-    const errorText = await response.text();
-    throw new Error(`태스크 상태 변경 실패: ${response.status} - ${errorText}`);
+    await handleApiError(response, {
+      403: '팀 멤버만 태스크 상태를 변경할 수 있습니다.',
+      default: '태스크 상태 변경 실패',
+    });
   }
 
-  const data = await response.json();
-  return data;
+  return response.json();
 }
 
 /**
@@ -475,24 +464,15 @@ export async function getTaskDetail(
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
-    }
-    if (response.status === 403) {
-      throw new Error('팀 멤버만 접근할 수 있습니다.');
-    }
-    if (response.status === 404) {
-      throw new Error('태스크를 찾을 수 없습니다.');
-    }
-    if (response.status === 400) {
-      throw new Error('태스크가 해당 팀에 속하지 않습니다.');
-    }
-    const errorText = await response.text();
-    throw new Error(`태스크 상세 조회 실패: ${response.status} - ${errorText}`);
+    await handleApiError(response, {
+      403: '팀 멤버만 접근할 수 있습니다.',
+      404: '태스크를 찾을 수 없습니다.',
+      400: '태스크가 해당 팀에 속하지 않습니다.',
+      default: '태스크 상세 조회 실패',
+    });
   }
 
-  const data = await response.json();
-  return data;
+  return response.json();
 }
 
 /**
@@ -512,21 +492,14 @@ export async function createTaskComment(
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
-    }
-    if (response.status === 403) {
-      throw new Error('팀 멤버만 댓글을 작성할 수 있습니다.');
-    }
-    if (response.status === 400) {
-      throw new Error('태스크가 해당 팀에 속하지 않습니다.');
-    }
-    const errorText = await response.text();
-    throw new Error(`댓글 작성 실패: ${response.status} - ${errorText}`);
+    await handleApiError(response, {
+      403: '팀 멤버만 댓글을 작성할 수 있습니다.',
+      400: '태스크가 해당 팀에 속하지 않습니다.',
+      default: '댓글 작성 실패',
+    });
   }
 
-  const data = await response.json();
-  return data;
+  return response.json();
 }
 
 /**
@@ -547,24 +520,15 @@ export async function updateTaskComment(
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
-    }
-    if (response.status === 403) {
-      throw new Error('댓글을 수정할 권한이 없습니다.');
-    }
-    if (response.status === 404) {
-      throw new Error('댓글을 찾을 수 없습니다.');
-    }
-    if (response.status === 400) {
-      throw new Error('태스크가 해당 팀에 속하지 않습니다.');
-    }
-    const errorText = await response.text();
-    throw new Error(`댓글 수정 실패: ${response.status} - ${errorText}`);
+    await handleApiError(response, {
+      403: '댓글을 수정할 권한이 없습니다.',
+      404: '댓글을 찾을 수 없습니다.',
+      400: '태스크가 해당 팀에 속하지 않습니다.',
+      default: '댓글 수정 실패',
+    });
   }
 
-  const data = await response.json();
-  return data;
+  return response.json();
 }
 
 /**
@@ -582,41 +546,14 @@ export async function deleteTaskComment(
     accessToken,
   });
 
-  // DELETE 요청 성공 시 (200, 204 등) 바로 반환
-  if (response.ok) {
-    return;
-  }
+  if (response.ok) return;
 
-  // 에러 발생 시에만 응답 본문 읽기
-  let errorMessage = '';
-  try {
-    const errorText = await response.text();
-    if (errorText) {
-      try {
-        const errorData = JSON.parse(errorText);
-        errorMessage = errorData?.message || errorData?.error || errorData?.detail || errorText;
-      } catch {
-        errorMessage = errorText;
-      }
-    }
-  } catch {
-    // 응답 본문 읽기 실패
-  }
-
-  // 상태 코드별 에러 처리
-  if (response.status === 401) {
-    throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
-  }
-  if (response.status === 403) {
-    throw new Error('댓글을 삭제할 권한이 없습니다.');
-  }
-  if (response.status === 404) {
-    throw new Error('댓글을 찾을 수 없습니다.');
-  }
-  if (response.status === 400) {
-    throw new Error(errorMessage || '태스크가 해당 팀에 속하지 않습니다.');
-  }
-  throw new Error(errorMessage || `댓글 삭제 실패: ${response.status}`);
+  await handleApiError(response, {
+    403: '댓글을 삭제할 권한이 없습니다.',
+    404: '댓글을 찾을 수 없습니다.',
+    400: '태스크가 해당 팀에 속하지 않습니다.',
+    default: '댓글 삭제 실패',
+  });
 }
 
 /**
@@ -635,24 +572,15 @@ export async function createTeamInvite(
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
-    }
-    if (response.status === 403) {
-      throw new Error('팀 초대 링크를 생성할 권한이 없습니다.');
-    }
-    if (response.status === 404) {
-      throw new Error('팀을 찾을 수 없습니다.');
-    }
-    if (response.status === 400) {
-      throw new Error('팀 초대 링크 생성 요청이 올바르지 않습니다.');
-    }
-    const errorText = await response.text();
-    throw new Error(`팀 초대 링크 생성 실패: ${response.status} - ${errorText}`);
+    await handleApiError(response, {
+      403: '팀 초대 링크를 생성할 권한이 없습니다.',
+      404: '팀을 찾을 수 없습니다.',
+      400: '팀 초대 링크 생성 요청이 올바르지 않습니다.',
+      default: '팀 초대 링크 생성 실패',
+    });
   }
 
-  const data = await response.json();
-  return data;
+  return response.json();
 }
 
 /**
@@ -666,21 +594,14 @@ export async function getTeamInvites(teamId: number, accessToken: string): Promi
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
-    }
-    if (response.status === 403) {
-      throw new Error('팀 초대 링크 목록을 조회할 권한이 없습니다.');
-    }
-    if (response.status === 404) {
-      throw new Error('팀을 찾을 수 없습니다.');
-    }
-    const errorText = await response.text();
-    throw new Error(`팀 초대 링크 목록 조회 실패: ${response.status} - ${errorText}`);
+    await handleApiError(response, {
+      403: '팀 초대 링크 목록을 조회할 권한이 없습니다.',
+      404: '팀을 찾을 수 없습니다.',
+      default: '팀 초대 링크 목록 조회 실패',
+    });
   }
 
-  const data = await response.json();
-  return data;
+  return response.json();
 }
 
 /**
@@ -698,21 +619,14 @@ export async function acceptTeamInvite(
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
-    }
-    if (response.status === 400) {
-      throw new Error('유효하지 않은 초대 토큰입니다.');
-    }
-    if (response.status === 404) {
-      throw new Error('초대 링크를 찾을 수 없습니다.');
-    }
-    const errorText = await response.text();
-    throw new Error(`팀 초대 수락 실패: ${response.status} - ${errorText}`);
+    await handleApiError(response, {
+      400: '유효하지 않은 초대 토큰입니다.',
+      404: '초대 링크를 찾을 수 없습니다.',
+      default: '팀 초대 수락 실패',
+    });
   }
 
-  const data = await response.json();
-  return data;
+  return response.json();
 }
 
 // ==================== 텔레그램 연동 API ====================
@@ -755,21 +669,14 @@ export async function createTelegramLink(
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
-    }
-    if (response.status === 403) {
-      throw new Error('팀 멤버만 텔레그램 연동을 할 수 있습니다.');
-    }
-    if (response.status === 404) {
-      throw new Error('팀을 찾을 수 없습니다.');
-    }
-    const errorText = await response.text();
-    throw new Error(`텔레그램 연동 링크 생성 실패: ${response.status} - ${errorText}`);
+    await handleApiError(response, {
+      403: '팀 멤버만 텔레그램 연동을 할 수 있습니다.',
+      404: '팀을 찾을 수 없습니다.',
+      default: '텔레그램 연동 링크 생성 실패',
+    });
   }
 
-  const data = await response.json();
-  return data;
+  return response.json();
 }
 
 /**
@@ -786,21 +693,14 @@ export async function getTelegramStatus(
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
-    }
-    if (response.status === 403) {
-      throw new Error('팀 멤버만 접근할 수 있습니다.');
-    }
-    if (response.status === 404) {
-      throw new Error('팀을 찾을 수 없습니다.');
-    }
-    const errorText = await response.text();
-    throw new Error(`텔레그램 연동 상태 조회 실패: ${response.status} - ${errorText}`);
+    await handleApiError(response, {
+      403: '팀 멤버만 접근할 수 있습니다.',
+      404: '팀을 찾을 수 없습니다.',
+      default: '텔레그램 연동 상태 조회 실패',
+    });
   }
 
-  const data = await response.json();
-  return data;
+  return response.json();
 }
 
 /**
@@ -813,33 +713,11 @@ export async function deleteTelegramLink(teamId: number, accessToken: string): P
     accessToken,
   });
 
-  if (response.ok) {
-    return;
-  }
+  if (response.ok) return;
 
-  let errorMessage = '';
-  try {
-    const errorText = await response.text();
-    if (errorText) {
-      try {
-        const errorData = JSON.parse(errorText);
-        errorMessage = errorData?.message || errorData?.error || errorData?.detail || errorText;
-      } catch {
-        errorMessage = errorText;
-      }
-    }
-  } catch {
-    // 응답 본문 읽기 실패
-  }
-
-  if (response.status === 401) {
-    throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
-  }
-  if (response.status === 403) {
-    throw new Error('팀 멤버만 텔레그램 연동을 해제할 수 있습니다.');
-  }
-  if (response.status === 404) {
-    throw new Error('팀을 찾을 수 없습니다.');
-  }
-  throw new Error(errorMessage || `텔레그램 연동 해제 실패: ${response.status}`);
+  await handleApiError(response, {
+    403: '팀 멤버만 텔레그램 연동을 해제할 수 있습니다.',
+    404: '팀을 찾을 수 없습니다.',
+    default: '텔레그램 연동 해제 실패',
+  });
 }
