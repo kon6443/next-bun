@@ -23,13 +23,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and Push multi-arch image
-        run: |
-          docker buildx build \
-            --platform linux/amd64,linux/arm64 \
-            -t ${{ secrets.REGISTRY_URL }}/sys_next:latest \
-            --push \
-            .
+      - name: Build and Push arm64 image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: ${{ secrets.REGISTRY_URL }}/sys_next:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Deploy via SSH to Docker Swarm
         uses: appleboy/ssh-action@v1.0.0
