@@ -5,12 +5,18 @@ type KakaoSignInUpRequest = {
   accessToken: string;
 };
 
-type KakaoSignInUpResponse = {
-  message: string;
+type KakaoSignInUpDataResponse = {
   userId: number;
+  userName: string;
   loginType: 'KAKAO';
   accessToken: string;
   tokenType: string;
+};
+
+type KakaoSignInUpResponse = {
+  code: 'SUCCESS';
+  data: KakaoSignInUpDataResponse;
+  message: string;
 };
 
 /**
@@ -70,23 +76,26 @@ export async function postKakaoSignInUp({
       throw new Error('서버가 예상하지 못한 형식으로 응답했습니다.');
     }
 
-    const data = await response.json();
+    const response_data: KakaoSignInUpResponse = await response.json();
 
-    // 응답 데이터 검증
+    // 응답 데이터 검증 (새로운 표준 응답 형식: { code, data, message })
     if (
-      !data ||
-      typeof data.userId !== 'number' ||
-      !data.loginType ||
-      typeof data.accessToken !== 'string' ||
-      !data.accessToken ||
-      typeof data.tokenType !== 'string' ||
-      !data.tokenType
+      !response_data ||
+      response_data.code !== 'SUCCESS' ||
+      !response_data.data ||
+      typeof response_data.data.userId !== 'number' ||
+      typeof response_data.data.userName !== 'string' ||
+      !response_data.data.loginType ||
+      typeof response_data.data.accessToken !== 'string' ||
+      !response_data.data.accessToken ||
+      typeof response_data.data.tokenType !== 'string' ||
+      !response_data.data.tokenType
     ) {
-      console.error('Invalid response data structure:', data);
+      console.error('Invalid response data structure:', response_data);
       throw new Error('서버 응답 형식이 올바르지 않습니다.');
     }
 
-    return data;
+    return response_data;
   } catch (error) {
     clearTimeout(timeoutId);
     if (error instanceof Error && error.name === 'AbortError') {

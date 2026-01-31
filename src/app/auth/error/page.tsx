@@ -3,8 +3,7 @@
 import type { CSSProperties } from "react";
 import { Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
-import { clearAuthLoading, AUTH_LOADING_KEY } from "@/app/components/AuthLoadingOverlay";
+import { clearAuthLoading } from "@/app/components/AuthLoadingOverlay";
 
 function AuthErrorContent() {
   const searchParams = useSearchParams();
@@ -22,60 +21,70 @@ function AuthErrorContent() {
           title: "카카오 로그인 오류",
           message: "카카오 로그인 처리 중 문제가 발생했습니다.",
           detail: "카카오 API 요청 제한이 초과되었을 수 있습니다. 잠시 후 다시 시도해주세요.",
+          tip: "계속 실패할 경우, 카카오톡 앱 또는 카카오 웹사이트에서 로그아웃 후 다시 시도해주세요.",
         };
       case "OAuthSignin":
         return {
           title: "로그인 오류",
           message: "로그인 요청을 시작하는데 실패했습니다.",
           detail: "잠시 후 다시 시도해주세요.",
+          tip: null,
         };
       case "OAuthCreateAccount":
         return {
           title: "계정 생성 오류",
           message: "계정을 생성하는데 실패했습니다.",
           detail: "잠시 후 다시 시도해주세요.",
+          tip: null,
         };
       case "EmailCreateAccount":
         return {
           title: "이메일 계정 생성 오류",
           message: "이메일 계정을 생성하는데 실패했습니다.",
           detail: "잠시 후 다시 시도해주세요.",
+          tip: null,
         };
       case "Callback":
         return {
           title: "콜백 오류",
           message: "인증 콜백 처리 중 문제가 발생했습니다.",
           detail: "잠시 후 다시 시도해주세요.",
+          tip: "계속 실패할 경우, 카카오톡 앱 또는 카카오 웹사이트에서 로그아웃 후 다시 시도해주세요.",
         };
       case "OAuthAccountNotLinked":
         return {
           title: "계정 연결 오류",
           message: "이미 다른 방법으로 가입된 이메일입니다.",
           detail: "다른 로그인 방법을 사용해주세요.",
+          tip: null,
         };
       case "EmailSignin":
         return {
           title: "이메일 로그인 오류",
           message: "이메일을 전송하는데 실패했습니다.",
           detail: "잠시 후 다시 시도해주세요.",
+          tip: null,
         };
       case "CredentialsSignin":
         return {
           title: "로그인 정보 오류",
           message: "이메일 또는 비밀번호가 올바르지 않습니다.",
           detail: "다시 확인해주세요.",
+          tip: null,
         };
       case "SessionRequired":
         return {
           title: "세션 오류",
           message: "로그인이 필요합니다.",
           detail: "로그인 후 다시 시도해주세요.",
+          tip: null,
         };
       default:
         return {
           title: "인증 오류",
           message: "로그인 처리 중 문제가 발생했습니다.",
           detail: "잠시 후 다시 시도해주세요.",
+          tip: null,
         };
     }
   };
@@ -91,17 +100,15 @@ function AuthErrorContent() {
         <p style={eyebrowStyle}>오류 발생</p>
         <h1 style={titleStyle}>{errorInfo.title}</h1>
         <p style={descriptionStyle}>{errorInfo.message}</p>
-        <p style={detailStyle}>{errorInfo.detail}</p>
+        <p style={{ ...detailStyle, marginBottom: errorInfo.tip ? "0.75rem" : "1.85rem" }}>{errorInfo.detail}</p>
+        {errorInfo.tip && <p style={tipStyle}>{errorInfo.tip}</p>}
         <div style={buttonGroupStyle}>
           <button
             style={kakaoButtonStyle}
-            onClick={() => {
-              sessionStorage.setItem(AUTH_LOADING_KEY, "true");
-              signIn("kakao", { callbackUrl: "/mypage" });
-            }}
+            onClick={() => (window.location.href = "/auth/signin")}
           >
             <span style={{ fontSize: "1.25rem", marginRight: 8 }}>💬</span>
-            다시 시도하기
+            로그인 페이지로 돌아가기
           </button>
           <button
             style={secondaryButtonStyle}
@@ -195,7 +202,18 @@ const detailStyle: CSSProperties = {
   fontSize: "0.875rem",
   color: "#94a3b8",
   lineHeight: 1.6,
+  marginBottom: "0.75rem",
+};
+
+const tipStyle: CSSProperties = {
+  fontSize: "0.8rem",
+  color: "#fbbf24",
+  lineHeight: 1.6,
   marginBottom: "1.85rem",
+  padding: "0.75rem",
+  background: "rgba(251,191,36,0.1)",
+  borderRadius: "8px",
+  border: "1px solid rgba(251,191,36,0.2)",
 };
 
 const buttonGroupStyle: CSSProperties = {
