@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { TASK_STATUS, type TaskStatusKey } from '../config/taskStatusConfig';
 import { ChevronDownIcon } from './Icons';
 import { useClickOutside } from '../hooks';
@@ -17,6 +17,7 @@ export function StatusDropdown({ currentStatus, onStatusChange, disabled = false
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   // 현재 상태 메타데이터
   const currentStatusMeta = TASK_STATUS[currentStatus] || TASK_STATUS[1];
@@ -41,6 +42,20 @@ export function StatusDropdown({ currentStatus, onStatusChange, disabled = false
 
   // 외부 클릭 감지로 드롭다운 닫기 (커스텀 훅 사용)
   useClickOutside(dropdownRef as React.RefObject<HTMLElement | null>, () => setIsOpen(false), isOpen);
+
+  // focusedIndex 변경 시 해당 옵션에 실제 포커스 적용
+  useEffect(() => {
+    if (isOpen && focusedIndex >= 0 && optionRefs.current[focusedIndex]) {
+      optionRefs.current[focusedIndex]?.focus();
+    }
+  }, [isOpen, focusedIndex]);
+
+  // 드롭다운이 닫힐 때 focusedIndex 리셋
+  useEffect(() => {
+    if (!isOpen) {
+      setFocusedIndex(-1);
+    }
+  }, [isOpen]);
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -120,6 +135,7 @@ export function StatusDropdown({ currentStatus, onStatusChange, disabled = false
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-controls={dropdownId}
+        aria-activedescendant={isOpen && focusedIndex >= 0 ? `${dropdownId}-option-${otherStatuses[focusedIndex]?.key}` : undefined}
         aria-label={`태스크 상태: ${currentStatusMeta.label}. 상태 변경하려면 클릭하세요.`}
         className={`
           flex w-full items-center justify-between gap-2 rounded-lg border border-white/10 
@@ -161,15 +177,20 @@ export function StatusDropdown({ currentStatus, onStatusChange, disabled = false
           {otherStatuses.map((status, index) => (
             <button
               key={status.key}
+              ref={el => { optionRefs.current[index] = el; }}
+              id={`${dropdownId}-option-${status.key}`}
               role="option"
               aria-selected={focusedIndex === index}
+              tabIndex={focusedIndex === index ? 0 : -1}
               onClick={e => handleSelect(status.key, e)}
               onKeyDown={handleKeyDown}
+              onMouseEnter={() => setFocusedIndex(index)}
               className={`
                 flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm
-                text-slate-300 transition-colors
+                text-slate-300 transition-colors outline-none
                 first:rounded-t-lg last:rounded-b-lg
                 ${focusedIndex === index ? 'bg-slate-700/50' : 'hover:bg-slate-700/50'}
+                focus:bg-slate-700/50 focus:ring-1 focus:ring-sky-500/30 focus:ring-inset
               `}
             >
               <span

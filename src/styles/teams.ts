@@ -38,3 +38,10 @@ export const layoutStyles = {
   /** 메인 컨텐츠 영역 (모바일 최적화) */
   mainContent: "relative z-10 mx-auto flex flex-col gap-6 px-4 pb-24 pt-12",
 } as const;
+
+/**
+ * 뷰 컨테이너 공통 스타일
+ * GanttChart, ListView, CalendarView 등에서 사용
+ */
+export const viewContainerStyles = 
+  "rounded-3xl border border-white/10 bg-white/5 p-5 shadow-[0_25px_60px_rgba(15,23,42,0.55)] backdrop-blur-xl";

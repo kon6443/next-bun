@@ -3,53 +3,17 @@
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from '../types/task';
-import { getDeadlineStatus, getDeadlineLabel, deadlineStyles, formatDateKey, formatDateDisplay } from '../utils/taskUtils';
-import { getStatusMeta, STATUS_COMPLETED } from '../config/taskStatusConfig';
+import { deadlineStyles, formatDateDisplay, getTaskDeadlineInfo } from '../utils/taskUtils';
+import { daysBetween, generateDateRange, isToday, isWeekend } from '../utils/dateUtils';
+import { getStatusMeta, getStatusColors, getStatusTextColor } from '../config/taskStatusConfig';
 import { EmptyState } from '../teams/components';
+import { viewContainerStyles } from '@/styles/teams';
+import { ViewHeader } from './ViewHeader';
 
 type GanttChartProps = {
   tasks: Task[];
   teamId: string;
 };
-
-// taskStatusConfig에서 스타일 가져오기 헬퍼
-function getStatusColors(taskStatus: number): { bg: string; border: string } {
-  const meta = getStatusMeta(taskStatus);
-  return { bg: meta.bgClassName, border: meta.borderClassName };
-}
-
-function getStatusLabel(taskStatus: number): string {
-  return getStatusMeta(taskStatus).label;
-}
-
-function getStatusTextColor(taskStatus: number): string {
-  const meta = getStatusMeta(taskStatus);
-  // badgeClassName에서 text-* 클래스 추출
-  const textMatch = meta.badgeClassName.match(/text-(\w+)-\d+/);
-  return textMatch ? `text-${textMatch[1]}-400` : 'text-slate-400';
-}
-
-// 두 날짜 사이의 일수 계산
-function daysBetween(start: Date, end: Date): number {
-  const startTime = new Date(start).setHours(0, 0, 0, 0);
-  const endTime = new Date(end).setHours(0, 0, 0, 0);
-  return Math.ceil((endTime - startTime) / (1000 * 60 * 60 * 24));
-}
-
-// 날짜 범위 생성
-function generateDateRange(start: Date, end: Date): Date[] {
-  const dates: Date[] = [];
-  const current = new Date(start);
-  current.setHours(0, 0, 0, 0);
-  const endDate = new Date(end);
-  endDate.setHours(0, 0, 0, 0);
-
-  while (current <= endDate) {
-    dates.push(new Date(current));
-    current.setDate(current.getDate() + 1);
-  }
-  return dates;
-}
 
 export function GanttChart({ tasks, teamId }: GanttChartProps) {
   const router = useRouter();
@@ -129,16 +93,8 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
   const totalWidth = dateRange.length * cellWidth;
 
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-[0_25px_60px_rgba(15,23,42,0.55)] backdrop-blur-xl">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <p className="text-[0.7rem] uppercase tracking-[0.4em] text-slate-400">Timeline</p>
-          <p className="mt-1 text-sm text-slate-500">시작일 기준 정렬</p>
-        </div>
-        <span className="text-xs font-semibold text-slate-400">
-          {tasks.length} tasks
-        </span>
-      </div>
+    <div className={viewContainerStyles}>
+      <ViewHeader title="Timeline" subtitle="시작일 기준 정렬" count={tasks.length} />
 
       {/* 간트 차트 영역 */}
       <div className="overflow-x-auto">
@@ -150,17 +106,17 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
             </div>
             <div className="flex">
               {dateRange.map((date, idx) => {
-                const isToday = formatDateKey(date) === formatDateKey(new Date());
-                const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                const isTodayDate = isToday(date);
+                const isWeekendDate = isWeekend(date);
                 return (
                   <div
                     key={idx}
                     className={`flex-shrink-0 border-l border-white/5 px-1 py-2 text-center ${
-                      isToday ? 'bg-sky-500/20' : isWeekend ? 'bg-slate-800/30' : ''
+                      isTodayDate ? 'bg-sky-500/20' : isWeekendDate ? 'bg-slate-800/30' : ''
                     }`}
                     style={{ width: cellWidth }}
                   >
-                    <span className={`text-[10px] ${isToday ? 'font-bold text-sky-400' : 'text-slate-500'}`}>
+                    <span className={`text-[10px] ${isTodayDate ? 'font-bold text-sky-400' : 'text-slate-500'}`}>
                       {formatDateDisplay(date)}
                     </span>
                   </div>
@@ -175,9 +131,7 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
               {sortedTasks.withStartDate.map(task => {
                 const barStyle = getBarStyle(task);
                 const colors = getStatusColors(task.taskStatus);
-                const deadlineStatus = task.taskStatus !== STATUS_COMPLETED ? getDeadlineStatus(task.endAt) : 'normal';
-                const deadlineLabel = getDeadlineLabel(deadlineStatus, task.endAt);
-                const showDeadlineAlert = deadlineStatus === 'overdue' || deadlineStatus === 'today' || deadlineStatus === 'soon';
+                const { status: deadlineStatus, label: deadlineLabel, showAlert: showDeadlineAlert } = getTaskDeadlineInfo(task);
 
                 return (
                   <div key={task.taskId} className={`group flex items-center hover:bg-white/5 ${deadlineStyles[deadlineStatus].bg}`}>
@@ -191,7 +145,7 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
                       </span>
                       <div className="mt-0.5 flex items-center gap-2 flex-wrap">
                         <span className={`text-[10px] ${getStatusTextColor(task.taskStatus)}`}>
-                          {getStatusLabel(task.taskStatus)}
+                          {getStatusMeta(task.taskStatus).label}
                         </span>
                         {showDeadlineAlert && (
                           <span className={`rounded border px-1 py-0.5 text-[9px] font-semibold ${deadlineStyles[deadlineStatus].badge}`}>
@@ -206,13 +160,13 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
                       {/* 그리드 라인 */}
                       <div className="absolute inset-0 flex">
                         {dateRange.map((date, idx) => {
-                          const isToday = formatDateKey(date) === formatDateKey(new Date());
-                          const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                          const isTodayDate = isToday(date);
+                          const isWeekendDate = isWeekend(date);
                           return (
                             <div
                               key={idx}
                               className={`flex-shrink-0 border-l border-white/5 ${
-                                isToday ? 'bg-sky-500/10' : isWeekend ? 'bg-slate-800/20' : ''
+                                isTodayDate ? 'bg-sky-500/10' : isWeekendDate ? 'bg-slate-800/20' : ''
                               }`}
                               style={{ width: cellWidth }}
                             />
@@ -251,9 +205,7 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
               </div>
               {sortedTasks.withoutStartDate.map(task => {
                 const colors = getStatusColors(task.taskStatus);
-                const deadlineStatus = task.taskStatus !== STATUS_COMPLETED ? getDeadlineStatus(task.endAt) : 'normal';
-                const deadlineLabel = getDeadlineLabel(deadlineStatus, task.endAt);
-                const showDeadlineAlert = deadlineStatus === 'overdue' || deadlineStatus === 'today' || deadlineStatus === 'soon';
+                const { status: deadlineStatus, label: deadlineLabel, showAlert: showDeadlineAlert } = getTaskDeadlineInfo(task);
 
                 return (
                   <div key={task.taskId} className={`group flex items-center hover:bg-white/5 ${deadlineStyles[deadlineStatus].bg}`}>
@@ -266,7 +218,7 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
                       </span>
                       <div className="mt-0.5 flex items-center gap-2 flex-wrap">
                         <span className={`text-[10px] ${getStatusTextColor(task.taskStatus)}`}>
-                          {getStatusLabel(task.taskStatus)}
+                          {getStatusMeta(task.taskStatus).label}
                         </span>
                         {showDeadlineAlert && (
                           <span className={`rounded border px-1 py-0.5 text-[9px] font-semibold ${deadlineStyles[deadlineStatus].badge}`}>
