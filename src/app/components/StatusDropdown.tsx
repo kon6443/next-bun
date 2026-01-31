@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { TASK_STATUS, type TaskStatusKey } from '../config/taskStatusConfig';
 import { ChevronDownIcon } from './Icons';
+import { useClickOutside } from '../hooks';
 
 type StatusDropdownProps = {
   currentStatus: TaskStatusKey;
@@ -13,6 +14,7 @@ type StatusDropdownProps = {
 export function StatusDropdown({ currentStatus, onStatusChange, disabled = false }: StatusDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [openDirection, setOpenDirection] = useState<'up' | 'down'>('up');
+  const [focusedIndex, setFocusedIndex] = useState(-1);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -29,42 +31,83 @@ export function StatusDropdown({ currentStatus, onStatusChange, disabled = false
     const rect = buttonRef.current.getBoundingClientRect();
     const spaceAbove = rect.top;
     const spaceBelow = window.innerHeight - rect.bottom;
-    const dropdownHeight = otherStatuses.length * 44; // 대략적인 드롭다운 높이
+    const dropdownHeight = otherStatuses.length * 44;
 
-    // 위쪽 공간이 부족하면 아래로, 그렇지 않으면 위로
     if (spaceAbove < dropdownHeight && spaceBelow > spaceAbove) {
       return 'down';
     }
     return 'up';
   }, [otherStatuses.length]);
 
-  // 외부 클릭 감지로 드롭다운 닫기
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen]);
+  // 외부 클릭 감지로 드롭다운 닫기 (커스텀 훅 사용)
+  useClickOutside(dropdownRef as React.RefObject<HTMLElement | null>, () => setIsOpen(false), isOpen);
 
   const handleToggle = (e: React.MouseEvent) => {
-    e.stopPropagation(); // 카드 클릭 이벤트 방지
+    e.stopPropagation();
     if (!disabled) {
       setOpenDirection(calculateOpenDirection());
       setIsOpen(!isOpen);
+      setFocusedIndex(-1);
     }
   };
 
-  const handleSelect = (statusKey: number, e: React.MouseEvent) => {
-    e.stopPropagation(); // 카드 클릭 이벤트 방지
+  const handleSelect = (statusKey: number, e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation();
     setIsOpen(false);
-    onStatusChange(statusKey, e);
+    onStatusChange(statusKey, e as React.MouseEvent);
   };
+
+  // 키보드 네비게이션
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (disabled) return;
+
+    switch (e.key) {
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        if (isOpen && focusedIndex >= 0) {
+          handleSelect(otherStatuses[focusedIndex].key, e);
+        } else {
+          setOpenDirection(calculateOpenDirection());
+          setIsOpen(!isOpen);
+        }
+        break;
+      case 'Escape':
+        setIsOpen(false);
+        buttonRef.current?.focus();
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        if (!isOpen) {
+          setOpenDirection(calculateOpenDirection());
+          setIsOpen(true);
+          setFocusedIndex(0);
+        } else {
+          setFocusedIndex(prev => Math.min(prev + 1, otherStatuses.length - 1));
+        }
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        if (isOpen) {
+          setFocusedIndex(prev => Math.max(prev - 1, 0));
+        }
+        break;
+      case 'Home':
+        if (isOpen) {
+          e.preventDefault();
+          setFocusedIndex(0);
+        }
+        break;
+      case 'End':
+        if (isOpen) {
+          e.preventDefault();
+          setFocusedIndex(otherStatuses.length - 1);
+        }
+        break;
+    }
+  };
+
+  const dropdownId = `status-dropdown-${currentStatus}`;
 
   return (
     <div ref={dropdownRef} className='relative'>
@@ -72,7 +115,12 @@ export function StatusDropdown({ currentStatus, onStatusChange, disabled = false
       <button
         ref={buttonRef}
         onClick={handleToggle}
+        onKeyDown={handleKeyDown}
         disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls={dropdownId}
+        aria-label={`태스크 상태: ${currentStatusMeta.label}. 상태 변경하려면 클릭하세요.`}
         className={`
           flex w-full items-center justify-between gap-2 rounded-lg border border-white/10 
           bg-slate-800/50 px-3 py-2 text-left text-sm transition-all
@@ -88,7 +136,6 @@ export function StatusDropdown({ currentStatus, onStatusChange, disabled = false
           />
           <span className='font-medium text-slate-200'>{currentStatusMeta.label}</span>
         </div>
-        {/* 화살표 아이콘 */}
         <ChevronDownIcon
           className={`h-4 w-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
         />
@@ -97,6 +144,9 @@ export function StatusDropdown({ currentStatus, onStatusChange, disabled = false
       {/* 드롭다운 메뉴 */}
       {isOpen && (
         <div
+          id={dropdownId}
+          role="listbox"
+          aria-label="상태 선택"
           className={`
             absolute left-0 right-0 z-50
             rounded-lg border border-white/10 bg-slate-800/95 backdrop-blur-sm
@@ -108,15 +158,19 @@ export function StatusDropdown({ currentStatus, onStatusChange, disabled = false
             }
           `}
         >
-          {otherStatuses.map(status => (
+          {otherStatuses.map((status, index) => (
             <button
               key={status.key}
+              role="option"
+              aria-selected={focusedIndex === index}
               onClick={e => handleSelect(status.key, e)}
-              className='
+              onKeyDown={handleKeyDown}
+              className={`
                 flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm
-                text-slate-300 transition-colors hover:bg-slate-700/50
+                text-slate-300 transition-colors
                 first:rounded-t-lg last:rounded-b-lg
-              '
+                ${focusedIndex === index ? 'bg-slate-700/50' : 'hover:bg-slate-700/50'}
+              `}
             >
               <span
                 className='h-3 w-3 rounded-full border border-white/20 flex-shrink-0'

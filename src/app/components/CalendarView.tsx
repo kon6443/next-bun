@@ -3,8 +3,8 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from '../types/task';
-import { getDeadlineStatus } from '../utils/taskUtils';
-import { getStatusBgClassName, getStatusBorderClassName } from '../config/taskStatusConfig';
+import { getDeadlineStatus, formatDateKey } from '../utils/taskUtils';
+import { getStatusBgClassName, getStatusBorderClassName, STATUS_COMPLETED } from '../config/taskStatusConfig';
 
 type CalendarViewProps = {
   tasks: Task[];
@@ -26,14 +26,6 @@ function getTaskStatusClassName(taskStatus: number): string {
 }
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
-
-// 날짜 키 생성 (YYYY-MM-DD)
-function getDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 // 날짜를 자정으로 정규화
 function normalizeDate(date: Date): Date {
@@ -231,7 +223,7 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
       // startAt 또는 endAt 기준
       const dateStr = task.startAt || task.endAt;
       if (dateStr) {
-        const key = getDateKey(new Date(dateStr));
+        const key = formatDateKey(new Date(dateStr));
         const existing = map.get(key) || [];
         map.set(key, [...existing, task]);
       }
@@ -246,7 +238,7 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
   }, [tasks]);
 
   // 오늘 날짜 키
-  const todayKey = getDateKey(new Date());
+  const todayKey = formatDateKey(new Date());
 
   // 이전/다음 달 이동
   const goToPrevMonth = () => {
@@ -337,7 +329,7 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
                     );
                   }
 
-                  const dateKey = getDateKey(date);
+                  const dateKey = formatDateKey(date);
                   const dayTasks = singleDayTasksByDate.get(dateKey) || [];
                   const isToday = dateKey === todayKey;
                   const isWeekend = date.getDay() === 0 || date.getDay() === 6;
@@ -380,7 +372,7 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
                       {/* 단일 데이 태스크 목록 (최대 2개) */}
                       <div className="space-y-1">
                         {dayTasks.slice(0, 2).map(task => {
-                          const deadlineStatus = task.taskStatus !== 3 ? getDeadlineStatus(task.endAt) : 'normal';
+                          const deadlineStatus = task.taskStatus !== STATUS_COMPLETED ? getDeadlineStatus(task.endAt) : 'normal';
                           return (
                             <div
                               key={task.taskId}
@@ -404,7 +396,7 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
               {taskBars.slice(0, displayRows * 7).map((bar, barIdx) => {
                 if (bar.row >= displayRows) return null;
                 
-                const deadlineStatus = bar.task.taskStatus !== 3 ? getDeadlineStatus(bar.task.endAt) : 'normal';
+                const deadlineStatus = bar.task.taskStatus !== STATUS_COMPLETED ? getDeadlineStatus(bar.task.endAt) : 'normal';
                 const leftPercent = (bar.startCol / 7) * 100;
                 const widthPercent = (bar.span / 7) * 100;
                 // 날짜(28px) + 마진(4px) 이후부터 시작

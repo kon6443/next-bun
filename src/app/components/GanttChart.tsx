@@ -4,24 +4,30 @@ import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from '../types/task';
 import { getDeadlineStatus, getDeadlineLabel, deadlineStyles, formatDateKey, formatDateDisplay } from '../utils/taskUtils';
+import { getStatusMeta, STATUS_COMPLETED } from '../config/taskStatusConfig';
+import { EmptyState } from '../teams/components';
 
 type GanttChartProps = {
   tasks: Task[];
   teamId: string;
 };
 
-// 상태별 색상 정의
-const statusColors: Record<number, { bg: string; border: string }> = {
-  1: { bg: 'bg-gradient-to-r from-yellow-500/80 to-orange-500/80', border: 'border-yellow-500/50' }, // Ideation
-  2: { bg: 'bg-gradient-to-r from-sky-500/80 to-indigo-500/80', border: 'border-sky-500/50' }, // In Progress
-  3: { bg: 'bg-gradient-to-r from-emerald-500/80 to-green-500/80', border: 'border-emerald-500/50' }, // Completed
-};
+// taskStatusConfig에서 스타일 가져오기 헬퍼
+function getStatusColors(taskStatus: number): { bg: string; border: string } {
+  const meta = getStatusMeta(taskStatus);
+  return { bg: meta.bgClassName, border: meta.borderClassName };
+}
 
-const statusLabels: Record<number, string> = {
-  1: 'Ideation',
-  2: 'In Progress',
-  3: 'Completed',
-};
+function getStatusLabel(taskStatus: number): string {
+  return getStatusMeta(taskStatus).label;
+}
+
+function getStatusTextColor(taskStatus: number): string {
+  const meta = getStatusMeta(taskStatus);
+  // badgeClassName에서 text-* 클래스 추출
+  const textMatch = meta.badgeClassName.match(/text-(\w+)-\d+/);
+  return textMatch ? `text-${textMatch[1]}-400` : 'text-slate-400';
+}
 
 // 두 날짜 사이의 일수 계산
 function daysBetween(start: Date, end: Date): number {
@@ -168,8 +174,8 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
             <div className="border-b border-white/10">
               {sortedTasks.withStartDate.map(task => {
                 const barStyle = getBarStyle(task);
-                const colors = statusColors[task.taskStatus] || statusColors[1];
-                const deadlineStatus = task.taskStatus !== 3 ? getDeadlineStatus(task.endAt) : 'normal';
+                const colors = getStatusColors(task.taskStatus);
+                const deadlineStatus = task.taskStatus !== STATUS_COMPLETED ? getDeadlineStatus(task.endAt) : 'normal';
                 const deadlineLabel = getDeadlineLabel(deadlineStatus, task.endAt);
                 const showDeadlineAlert = deadlineStatus === 'overdue' || deadlineStatus === 'today' || deadlineStatus === 'soon';
 
@@ -184,12 +190,8 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
                         {task.taskName}
                       </span>
                       <div className="mt-0.5 flex items-center gap-2 flex-wrap">
-                        <span className={`text-[10px] ${
-                          task.taskStatus === 1 ? 'text-yellow-400' :
-                          task.taskStatus === 2 ? 'text-sky-400' :
-                          'text-emerald-400'
-                        }`}>
-                          {statusLabels[task.taskStatus]}
+                        <span className={`text-[10px] ${getStatusTextColor(task.taskStatus)}`}>
+                          {getStatusLabel(task.taskStatus)}
                         </span>
                         {showDeadlineAlert && (
                           <span className={`rounded border px-1 py-0.5 text-[9px] font-semibold ${deadlineStyles[deadlineStatus].badge}`}>
@@ -248,8 +250,8 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
                 <span className="text-xs font-semibold text-slate-500">날짜 미지정</span>
               </div>
               {sortedTasks.withoutStartDate.map(task => {
-                const colors = statusColors[task.taskStatus] || statusColors[1];
-                const deadlineStatus = task.taskStatus !== 3 ? getDeadlineStatus(task.endAt) : 'normal';
+                const colors = getStatusColors(task.taskStatus);
+                const deadlineStatus = task.taskStatus !== STATUS_COMPLETED ? getDeadlineStatus(task.endAt) : 'normal';
                 const deadlineLabel = getDeadlineLabel(deadlineStatus, task.endAt);
                 const showDeadlineAlert = deadlineStatus === 'overdue' || deadlineStatus === 'today' || deadlineStatus === 'soon';
 
@@ -263,12 +265,8 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
                         {task.taskName}
                       </span>
                       <div className="mt-0.5 flex items-center gap-2 flex-wrap">
-                        <span className={`text-[10px] ${
-                          task.taskStatus === 1 ? 'text-yellow-400' :
-                          task.taskStatus === 2 ? 'text-sky-400' :
-                          'text-emerald-400'
-                        }`}>
-                          {statusLabels[task.taskStatus]}
+                        <span className={`text-[10px] ${getStatusTextColor(task.taskStatus)}`}>
+                          {getStatusLabel(task.taskStatus)}
                         </span>
                         {showDeadlineAlert && (
                           <span className={`rounded border px-1 py-0.5 text-[9px] font-semibold ${deadlineStyles[deadlineStatus].badge}`}>
@@ -303,9 +301,7 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
 
           {/* 태스크가 없는 경우 */}
           {tasks.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-slate-600/80 px-4 py-10 text-center text-sm text-slate-500">
-              표시할 태스크가 없습니다
-            </div>
+            <EmptyState message="표시할 태스크가 없습니다" variant="dashed" />
           )}
         </div>
       </div>
