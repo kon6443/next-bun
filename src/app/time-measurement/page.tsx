@@ -2,12 +2,14 @@
 
 import { useState, useEffect, Suspense, type JSX } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { TeamsPageLayout, SectionLabel, Skeleton } from "@/app/teams/components";
+import { cardStyles } from "@/styles/teams";
 import BatteryAnimation from "./components/BatteryAnimation";
 import OrbitAnimation from "./components/OrbitAnimation";
 import WaveAnimation from "./components/WaveAnimation";
 import RingAnimation from "./components/RingAnimation";
 
-// 남은 시간을 시, 분, 초 등 다양한 형식으로 저장하기 위한 인터페이스
+/** 남은 시간을 시, 분, 초 등 다양한 형식으로 저장하기 위한 인터페이스 */
 interface TimeLeft {
   totalSeconds: number;
   totalMinutes: number;
@@ -18,7 +20,19 @@ interface TimeLeft {
 
 type AnimationType = "battery" | "orbit" | "wave" | "ring";
 
-function LeavingOfficePageContent() {
+/** 공통 입력 스타일 */
+const inputStyles =
+  "w-full rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3 text-base font-mono text-white focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20";
+
+/** 애니메이션 버튼 스타일 */
+const baseButtonStyle =
+  "flex-1 rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-center transition-all duration-200";
+const activeButtonStyle =
+  "bg-gradient-to-r from-indigo-500 to-sky-500 text-white shadow-lg shadow-sky-500/30 border-transparent";
+const inactiveButtonStyle =
+  "bg-white/5 text-slate-400 hover:text-white hover:border-white/30";
+
+function TimeMeasurementContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -34,9 +48,7 @@ function LeavingOfficePageContent() {
   const [isTimeToGoHome, setIsTimeToGoHome] = useState(false);
   const [progress, setProgress] = useState(0);
   const [animationType, setAnimationType] = useState<AnimationType>("battery");
-  const [startTime, setStartTime] = useState(
-    getInitialTime("startTime", "09:00")
-  );
+  const [startTime, setStartTime] = useState(getInitialTime("startTime", "09:00"));
   const [endTime, setEndTime] = useState(getInitialTime("endTime", "18:00"));
 
   useEffect(() => {
@@ -113,8 +125,7 @@ function LeavingOfficePageContent() {
   };
 
   const renderAnimation = () => {
-    const SelectedAnimation =
-      animationComponents[animationType] ?? BatteryAnimation;
+    const SelectedAnimation = animationComponents[animationType] ?? BatteryAnimation;
     return <SelectedAnimation progress={progress} />;
   };
 
@@ -125,169 +136,176 @@ function LeavingOfficePageContent() {
     { value: "ring", label: "포커스 링" },
   ];
 
-  const buttonStyle =
-    "flex-1 min-w-[120px] rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-center transition-all duration-200";
-  const activeButtonStyle =
-    "bg-gradient-to-r from-indigo-500 to-sky-500 text-white shadow-lg shadow-sky-500/30 border-transparent";
-  const inactiveButtonStyle =
-    "bg-white/5 text-slate-400 hover:text-white hover:border-white/30";
-
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-24 top-10 h-72 w-72 rounded-full bg-indigo-600/30 blur-[140px]" />
-        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-500/20 blur-[150px]" />
-      </div>
+    <TeamsPageLayout>
+      {/* 헤더 섹션 */}
+      <section className={`${cardStyles.section} p-4`}>
+        <SectionLabel spacing="wide">Time Tracker</SectionLabel>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <span className="rounded-full border border-white/10 bg-slate-900/40 px-3 py-1.5 text-xs font-semibold text-slate-300">
+            시작 {startTime}
+          </span>
+          <span className="rounded-full border border-white/10 bg-slate-900/40 px-3 py-1.5 text-xs font-semibold text-slate-300">
+            종료 {endTime}
+          </span>
+        </div>
+      </section>
 
-      <main className="relative z-10 mx-auto max-w-5xl px-4 pb-24 pt-16 sm:px-8">
-        <section className="rounded-3xl border border-white/10 bg-white/5 p-6 sm:p-8 backdrop-blur-xl">
-          <div className="flex flex-col gap-5 text-center sm:flex-row sm:items-end sm:justify-between sm:text-left">
-            <div>
-              <p className="text-xs uppercase tracking-[1em] text-slate-400">
-                Time Tracker
-              </p>
-            </div>
-            <div className="flex flex-wrap justify-center gap-3 text-xs font-semibold uppercase tracking-[0.35em] text-slate-400 sm:justify-end">
-              <span className="rounded-full border border-white/10 px-4 py-2 text-slate-200">
-                시작 {startTime}
-              </span>
-              <span className="rounded-full border border-white/10 px-4 py-2 text-slate-200">
-                종료 {endTime}
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-10 grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-            <div className="rounded-[28px] border border-white/10 bg-slate-950/40 p-6 shadow-[0_25px_60px_rgba(2,6,23,0.6)]">
-              <div className="flex h-56 items-center justify-center rounded-2xl bg-slate-900/60">
-                {isTimeToGoHome ? (
-                  <div className="px-4 text-2xl font-bold text-emerald-300 md:text-3xl">
-                    설정한 시간이 완료되었습니다
-                  </div>
-                ) : (
-                  renderAnimation()
-                )}
-              </div>
-
-              <div className="mt-6 space-y-3">
-                <div className="flex items-center justify-between text-sm text-slate-400">
-                  <span>진행률</span>
-                  <span className="font-semibold text-white">
-                    {progress.toFixed(2)}%
-                  </span>
-                </div>
-                <div className="h-2 rounded-full bg-slate-800">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 transition-all duration-300"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-[28px] border border-white/10 bg-slate-950/40 p-6 shadow-[0_20px_40px_rgba(2,6,23,0.45)]">
-              <p className="text-xs uppercase tracking-[0.4em] text-slate-400">
-                설정
-              </p>
-
-              <div className="mt-5 grid gap-5">
-                <div className="space-y-3">
-                  <label
-                    htmlFor="startTime"
-                    className="text-sm font-semibold text-slate-300"
-                  >
-                    시작 시간
-                  </label>
-                  <input
-                    type="time"
-                    id="startTime"
-                    value={startTime}
-                    onChange={(e) => handleTimeChange("start", e.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3 text-lg font-mono text-white shadow-inner shadow-black/20 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
-                  />
-                </div>
-                <div className="space-y-3">
-                  <label
-                    htmlFor="endTime"
-                    className="text-sm font-semibold text-slate-300"
-                  >
-                    종료 시간
-                  </label>
-                  <input
-                    type="time"
-                    id="endTime"
-                    value={endTime}
-                    onChange={(e) => handleTimeChange("end", e.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3 text-lg font-mono text-white shadow-inner shadow-black/20 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <p className="text-sm font-semibold text-slate-300">
-                    애니메이션 선택
-                  </p>
-                  <div className="flex flex-wrap gap-3">
-                    {animationOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={() => setAnimationType(option.value)}
-                        className={`${buttonStyle} ${
-                          animationType === option.value
-                            ? activeButtonStyle
-                            : inactiveButtonStyle
-                        }`}
-                        aria-pressed={animationType === option.value}
-                        type="button"
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {timeLeft && !isTimeToGoHome && (
-            <div className="mt-10 grid gap-4 md:grid-cols-3">
-              <div className="md:col-span-2 rounded-[24px] border border-white/10 bg-slate-950/40 p-6 text-center">
-                <p className="text-sm uppercase tracking-[0.6em] text-slate-400">
-                  남은 시간
-                </p>
-                <p className="mt-3 text-5xl font-mono tracking-widest text-white">
-                  {formatTime(timeLeft.hours)}:{formatTime(timeLeft.minutes)}:
-                  {formatTime(timeLeft.seconds)}
-                </p>
-              </div>
-              <div className="space-y-4">
-                <div className="rounded-[24px] border border-white/10 bg-slate-950/40 p-4">
-                  <p className="text-xs uppercase tracking-[0.4em] text-slate-400">
-                    분 단위
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold text-white">
-                    {timeLeft.totalMinutes.toLocaleString()} 분
-                  </p>
-                </div>
-                <div className="rounded-[24px] border border-white/10 bg-slate-950/40 p-4">
-                  <p className="text-xs uppercase tracking-[0.4em] text-slate-400">
-                    진행률
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold text-white">
-                    {progress.toFixed(2)} %
-                  </p>
-                </div>
-              </div>
-            </div>
+      {/* 애니메이션 & 진행률 섹션 */}
+      <section className={`${cardStyles.section} p-4`}>
+        <div className="flex h-48 items-center justify-center rounded-2xl bg-slate-900/60">
+          {isTimeToGoHome ? (
+            <p className="px-4 text-xl font-bold text-emerald-300">
+              설정한 시간이 완료되었습니다
+            </p>
+          ) : (
+            renderAnimation()
           )}
+        </div>
+
+        <div className="mt-4 space-y-2">
+          <div className="flex items-center justify-between text-sm text-slate-400">
+            <span>진행률</span>
+            <span className="font-semibold text-white">{progress.toFixed(2)}%</span>
+          </div>
+          <div className="h-2 rounded-full bg-slate-800">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* 남은 시간 섹션 */}
+      {timeLeft && !isTimeToGoHome && (
+        <section className={`${cardStyles.section} p-4 text-center`}>
+          <p className="text-xs uppercase tracking-widest text-slate-400">남은 시간</p>
+          <p className="mt-2 text-4xl font-mono tracking-widest text-white">
+            {formatTime(timeLeft.hours)}:{formatTime(timeLeft.minutes)}:
+            {formatTime(timeLeft.seconds)}
+          </p>
+
+          {/* 통계 그리드 */}
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-3">
+              <p className="text-xs uppercase tracking-wide text-slate-400">분 단위</p>
+              <p className="mt-1 text-xl font-semibold text-white">
+                {timeLeft.totalMinutes.toLocaleString()} 분
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-3">
+              <p className="text-xs uppercase tracking-wide text-slate-400">진행률</p>
+              <p className="mt-1 text-xl font-semibold text-white">
+                {progress.toFixed(2)} %
+              </p>
+            </div>
+          </div>
         </section>
-      </main>
-    </div>
+      )}
+
+      {/* 설정 섹션 */}
+      <section className={`${cardStyles.section} p-4`}>
+        <SectionLabel spacing="tight">설정</SectionLabel>
+
+        <div className="mt-4 space-y-4">
+          {/* 시작 시간 */}
+          <div>
+            <label htmlFor="startTime" className="mb-2 block text-sm font-semibold text-slate-300">
+              시작 시간
+            </label>
+            <input
+              type="time"
+              id="startTime"
+              value={startTime}
+              onChange={(e) => handleTimeChange("start", e.target.value)}
+              className={inputStyles}
+            />
+          </div>
+
+          {/* 종료 시간 */}
+          <div>
+            <label htmlFor="endTime" className="mb-2 block text-sm font-semibold text-slate-300">
+              종료 시간
+            </label>
+            <input
+              type="time"
+              id="endTime"
+              value={endTime}
+              onChange={(e) => handleTimeChange("end", e.target.value)}
+              className={inputStyles}
+            />
+          </div>
+
+          {/* 애니메이션 선택 */}
+          <div>
+            <p className="mb-2 text-sm font-semibold text-slate-300">애니메이션 선택</p>
+            <div className="grid grid-cols-2 gap-2">
+              {animationOptions.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setAnimationType(option.value)}
+                  className={`${baseButtonStyle} ${
+                    animationType === option.value ? activeButtonStyle : inactiveButtonStyle
+                  }`}
+                  aria-pressed={animationType === option.value}
+                  type="button"
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+    </TeamsPageLayout>
   );
 }
 
-export default function LeavingOfficePage() {
+/** 로딩 스켈레톤 */
+function TimeMeasurementSkeleton() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <LeavingOfficePageContent />
+    <TeamsPageLayout>
+      <section className={`${cardStyles.section} p-4`}>
+        <Skeleton width="100px" height="0.625rem" />
+        <div className="mt-4 flex gap-2">
+          <Skeleton width="80px" height="1.75rem" rounded="full" />
+          <Skeleton width="80px" height="1.75rem" rounded="full" />
+        </div>
+      </section>
+
+      <section className={`${cardStyles.section} p-4`}>
+        <Skeleton width="100%" height="12rem" rounded="2xl" />
+        <div className="mt-4 space-y-2">
+          <div className="flex justify-between">
+            <Skeleton width="50px" height="0.875rem" />
+            <Skeleton width="60px" height="0.875rem" />
+          </div>
+          <Skeleton width="100%" height="0.5rem" rounded="full" />
+        </div>
+      </section>
+
+      <section className={`${cardStyles.section} p-4`}>
+        <Skeleton width="60px" height="0.625rem" />
+        <div className="mt-4 space-y-4">
+          <div>
+            <Skeleton width="80px" height="0.875rem" className="mb-2" />
+            <Skeleton width="100%" height="3rem" rounded="xl" />
+          </div>
+          <div>
+            <Skeleton width="80px" height="0.875rem" className="mb-2" />
+            <Skeleton width="100%" height="3rem" rounded="xl" />
+          </div>
+        </div>
+      </section>
+    </TeamsPageLayout>
+  );
+}
+
+export default function TimeMeasurementPage() {
+  return (
+    <Suspense fallback={<TimeMeasurementSkeleton />}>
+      <TimeMeasurementContent />
     </Suspense>
   );
 }

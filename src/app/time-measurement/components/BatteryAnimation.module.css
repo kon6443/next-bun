@@ -1,18 +1,17 @@
-
 .wrapper {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: clamp(100px, 45vw, 140px);
+  width: clamp(90px, 28vw, 120px);
   max-width: 100%;
 }
 
 .battery {
   width: 100%;
-  height: clamp(140px, 45vw, 210px);
-  border-radius: 32px;
+  height: clamp(130px, 38vw, 170px);
+  border-radius: 24px;
   position: relative;
-  padding: 12px 12px 58px;
+  padding: 10px 10px 50px;
   border: 1px solid rgba(148, 163, 184, 0.35);
   background: linear-gradient(
       135deg,
@@ -30,12 +29,12 @@
 .battery::after {
   content: "";
   position: absolute;
-  top: -10px;
+  top: -8px;
   left: 50%;
   transform: translateX(-50%);
-  width: 34px;
-  height: 10px;
-  border-radius: 8px;
+  width: clamp(24px, 8vw, 32px);
+  height: 8px;
+  border-radius: 6px;
   background: linear-gradient(135deg, #94a3b8, #e2e8f0);
   border: 1px solid rgba(15, 23, 42, 0.2);
   box-shadow: inset 0 0 6px rgba(15, 23, 42, 0.35);
@@ -43,26 +42,49 @@
 
 .level {
   position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: 58px;
-  border-radius: 24px;
+  left: 10px;
+  right: 10px;
+  bottom: 50px;
+  border-radius: 18px;
   transition: height 0.6s ease, background 0.6s ease;
   box-shadow:
     inset 0 10px 30px rgba(255, 255, 255, 0.18),
     inset 0 -6px 12px rgba(15, 23, 42, 0.6);
+  overflow: hidden;
+}
+
+.level::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.2) 0%,
+    transparent 50%,
+    rgba(0, 0, 0, 0.1) 100%
+  );
+  animation: batteryShimmer 2s ease-in-out infinite;
+}
+
+@keyframes batteryShimmer {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .glow {
   position: absolute;
-  inset: 12px;
-  border-radius: 24px;
+  inset: 10px;
+  border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.05);
   pointer-events: none;
 }
 
 .percent {
-  font-size: 1.1rem;
+  font-size: clamp(0.9rem, 3vw, 1.1rem);
   font-weight: 600;
   letter-spacing: 0.08em;
   color: #f8fafc;
@@ -72,33 +94,22 @@
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  bottom: 14px;
-  width: calc(100% - 40px);
-  border-radius: 18px;
+  bottom: 10px;
+  width: calc(100% - 24px);
+  border-radius: 14px;
   border: 1px solid rgba(148, 163, 184, 0.25);
-  padding: 6px 0;
+  padding: 5px 0;
   text-align: center;
   background: linear-gradient(135deg, rgba(15, 23, 42, 0.85), rgba(15, 23, 42, 0.6));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .label {
-  font-size: 0.55rem;
+  font-size: clamp(0.45rem, 1.5vw, 0.55rem);
   text-transform: uppercase;
-  letter-spacing: 0.35em;
+  letter-spacing: 0.3em;
   color: rgba(148, 163, 184, 0.7);
-}
-
-@media (min-width: 640px) {
-  .wrapper {
-    width: 140px;
-  }
-  .battery::after {
-    top: -14px;
-    width: 38px;
-    height: 12px;
-  }
 }
