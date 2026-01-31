@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { updateTeam, getTeamTasks } from "@/services/teamService";
+import { use, useState, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { updateTeam, getTeamTasks } from '@/services/teamService';
 import {
   TeamsPageLayout,
   Button,
@@ -12,170 +12,135 @@ import {
   TextArea,
   SectionLabel,
   ErrorAlert,
-} from "../../components";
-import { cardStyles } from "@/styles/teams";
+} from '../../components';
+import { cardStyles } from '@/styles/teams';
+import { useTeamId, useAuthenticatedFetch, useAsyncOperation } from '@/app/hooks';
 
 type EditTeamPageProps = {
   params: Promise<{ teamId: string }>;
 };
 
 export default function EditTeamPage({ params }: EditTeamPageProps) {
+  const { teamId } = use(params);
   const { data: session } = useSession();
   const router = useRouter();
-  const [teamId, setTeamId] = useState<string>("");
-  const [teamName, setTeamName] = useState("");
-  const [teamDescription, setTeamDescription] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { teamIdNum, isValid: isTeamIdValid, error: teamIdError } = useTeamId(teamId);
 
-  useEffect(() => {
-    params.then((resolvedParams) => {
-      setTeamId(resolvedParams.teamId);
-    });
-  }, [params]);
+  const [teamName, setTeamName] = useState('');
+  const [teamDescription, setTeamDescription] = useState('');
 
-  useEffect(() => {
-    if (!teamId || !session?.user?.accessToken) {
-      return;
-    }
-
-    const fetchTeamInfo = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const teamIdNum = parseInt(teamId, 10);
-        if (isNaN(teamIdNum)) {
-          throw new Error("유효하지 않은 팀 ID입니다.");
-        }
-
-        const response = await getTeamTasks(teamIdNum, session.user.accessToken);
-        setTeamName(response.data.team.teamName);
-        setTeamDescription(response.data.team.teamDescription || "");
-      } catch (err) {
-        const errorMessage =
-          err instanceof Error
-            ? err.message
-            : "팀 정보를 불러오는데 실패했습니다.";
-        setError(errorMessage);
-        console.error("Failed to fetch team info:", err);
-      } finally {
-        setIsLoading(false);
+  // 팀 정보 로드
+  const fetchTeamInfo = useCallback(
+    async (accessToken: string) => {
+      if (!isTeamIdValid) {
+        throw new Error(teamIdError || '유효하지 않은 팀 ID입니다.');
       }
-    };
+      const response = await getTeamTasks(teamIdNum, accessToken);
+      return response.data.team;
+    },
+    [teamIdNum, isTeamIdValid, teamIdError],
+  );
 
-    fetchTeamInfo();
-  }, [teamId, session?.user?.accessToken]);
+  const { isLoading, error: fetchError } = useAuthenticatedFetch(fetchTeamInfo, {
+    enabled: isTeamIdValid,
+    onSuccess: team => {
+      setTeamName(team.teamName);
+      setTeamDescription(team.teamDescription || '');
+    },
+  });
+
+  // 폼 제출 처리
+  const submitOperation = useAsyncOperation<void>({
+    defaultErrorMessage: '팀 수정에 실패했습니다.',
+    onSuccess: () => {
+      router.push(`/teams/${teamId}`);
+    },
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!teamName.trim() || !teamDescription.trim()) {
-      setError("팀 이름과 설명을 모두 입력해주세요.");
       return;
     }
 
     if (!session?.user?.accessToken) {
-      setError("인증이 필요합니다. 다시 로그인해주세요.");
       return;
     }
 
-    if (!teamId) {
-      setError("팀 ID가 없습니다.");
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      const teamIdNum = parseInt(teamId, 10);
-      if (isNaN(teamIdNum)) {
-        throw new Error("유효하지 않은 팀 ID입니다.");
-      }
-
+    await submitOperation.execute(async () => {
       await updateTeam(
         teamIdNum,
         {
           teamName: teamName.trim(),
           teamDescription: teamDescription.trim(),
         },
-        session.user.accessToken
+        session.user.accessToken,
       );
-
-      router.push(`/teams/${teamId}`);
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "팀 수정에 실패했습니다.";
-      setError(errorMessage);
-      console.error("Failed to update team:", err);
-    } finally {
-      setIsSubmitting(false);
-    }
+    });
   };
+
+  // 에러 통합 (팀 ID 에러, 페치 에러, 제출 에러)
+  const error = teamIdError || fetchError || submitOperation.error;
 
   if (isLoading) {
     return (
-      <TeamsPageLayout maxWidth="4xl">
+      <TeamsPageLayout maxWidth='4xl'>
         <div className={`${cardStyles.section} p-8 text-center`}>
-          <p className="text-slate-400">팀 정보를 불러오는 중...</p>
+          <p className='text-slate-400'>팀 정보를 불러오는 중...</p>
         </div>
       </TeamsPageLayout>
     );
   }
 
   return (
-    <TeamsPageLayout maxWidth="4xl">
+    <TeamsPageLayout maxWidth='4xl'>
       {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <ButtonLink href={`/teams/${teamId}`} variant="secondary">
+      <div className='flex items-center justify-between'>
+        <ButtonLink href={`/teams/${teamId}`} variant='secondary'>
           ← 팀 상세로 돌아가기
         </ButtonLink>
       </div>
 
       {/* 팀 수정 폼 */}
       <section className={`${cardStyles.section} p-8`}>
-        <div className="mb-6">
+        <div className='mb-6'>
           <SectionLabel>Edit Team</SectionLabel>
-          <h1 className="mt-4 text-4xl font-bold text-white md:text-5xl">
-            팀 수정
-          </h1>
+          <h1 className='mt-4 text-4xl font-bold text-white md:text-5xl'>팀 수정</h1>
         </div>
 
-        {error && <ErrorAlert message={error} className="mb-6" />}
+        {error && <ErrorAlert message={error} className='mb-6' />}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className='space-y-6'>
           <Input
-            id="teamName"
-            label="팀 이름"
+            id='teamName'
+            label='팀 이름'
             required
             value={teamName}
-            onChange={(e) => setTeamName(e.target.value)}
-            placeholder="팀 이름을 입력하세요"
-            disabled={isSubmitting}
+            onChange={e => setTeamName(e.target.value)}
+            placeholder='팀 이름을 입력하세요'
+            disabled={submitOperation.isLoading}
           />
 
           <TextArea
-            id="teamDescription"
-            label="팀 설명"
+            id='teamDescription'
+            label='팀 설명'
             required
             value={teamDescription}
-            onChange={(e) => setTeamDescription(e.target.value)}
-            placeholder="팀에 대한 상세 설명을 입력하세요"
-            disabled={isSubmitting}
+            onChange={e => setTeamDescription(e.target.value)}
+            placeholder='팀에 대한 상세 설명을 입력하세요'
+            disabled={submitOperation.isLoading}
           />
 
-          <div className="flex justify-end gap-4 pt-4">
-            <ButtonLink href={`/teams/${teamId}`} variant="secondary">
+          <div className='flex justify-end gap-4 pt-4'>
+            <ButtonLink href={`/teams/${teamId}`} variant='secondary'>
               취소
             </ButtonLink>
             <Button
-              type="submit"
-              disabled={
-                isSubmitting || !teamName.trim() || !teamDescription.trim()
-              }
+              type='submit'
+              disabled={submitOperation.isLoading || !teamName.trim() || !teamDescription.trim()}
             >
-              {isSubmitting ? "수정 중..." : "팀 수정"}
+              {submitOperation.isLoading ? '수정 중...' : '팀 수정'}
             </Button>
           </div>
         </form>
