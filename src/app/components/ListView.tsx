@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from '../types/task';
-import { getDeadlineStatus, getDeadlineLabel, deadlineStyles } from '../utils/taskUtils';
+import { getDeadlineStatus, getDeadlineLabel, deadlineStyles, formatDateWithYear } from '../utils/taskUtils';
 import { getStatusMeta } from '../config/taskStatusConfig';
 
 type ListViewProps = {
@@ -13,16 +13,6 @@ type ListViewProps = {
 
 type SortKey = 'taskName' | 'taskStatus' | 'userName' | 'startAt' | 'endAt' | 'crtdAt';
 type SortOrder = 'asc' | 'desc';
-
-// 날짜 포맷
-function formatDate(date: Date | null): string {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('ko-KR', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
 
 export function ListView({ tasks, teamId }: ListViewProps) {
   const router = useRouter();
@@ -187,12 +177,12 @@ export function ListView({ tasks, teamId }: ListViewProps) {
                       {task.userName || `사용자 ${task.crtdBy}`}
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-400">
-                      {formatDate(task.startAt)}
+                      {formatDateWithYear(task.startAt)}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <span className={`text-sm ${deadlineStyles[deadlineStatus].text}`}>
-                          {formatDate(task.endAt)}
+                          {formatDateWithYear(task.endAt)}
                         </span>
                         {showDeadlineAlert && (
                           <span className={`rounded border px-1.5 py-0.5 text-[9px] font-semibold ${deadlineStyles[deadlineStatus].badge}`}>
@@ -202,7 +192,7 @@ export function ListView({ tasks, teamId }: ListViewProps) {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-400">
-                      {formatDate(task.crtdAt)}
+                      {formatDateWithYear(task.crtdAt)}
                     </td>
                   </tr>
                 );

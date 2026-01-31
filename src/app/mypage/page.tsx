@@ -2,11 +2,18 @@
 
 import type { CSSProperties } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
+import { AUTH_LOADING_KEY } from "@/app/components/AuthLoadingOverlay";
 // import { getMypage } from "@/services/authService";
 
 export default function Mypage() {
   const { data: session, status } = useSession();
   const user = session?.user;
+
+  const handleKakaoLogin = () => {
+    // 전역 로딩 오버레이 활성화
+    sessionStorage.setItem(AUTH_LOADING_KEY, "true");
+    signIn("kakao");
+  };
 
   if (status === "loading") {
     return (
@@ -46,7 +53,7 @@ export default function Mypage() {
         <p style={descriptionStyle}>
           마이페이지에서는 개인화된 일정과 즐겨찾기를 확인할 수 있습니다.
         </p>
-        <button style={kakaoButtonStyle} onClick={() => signIn("kakao")}>
+        <button style={kakaoButtonStyle} onClick={handleKakaoLogin}>
           <span style={{ fontSize: "1.25rem", marginRight: 8 }}>💬</span>
           카카오로 계속하기
         </button>

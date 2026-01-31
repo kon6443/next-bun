@@ -27,6 +27,7 @@ import {
   type TelegramStatusResponse,
 } from '@/services/teamService';
 import { teamsPageBackground, cardStyles, layoutStyles, MOBILE_MAX_WIDTH } from '@/styles/teams';
+import { formatFullDateTime } from '@/app/utils/taskUtils';
 import { STATUS_TO_COLUMN, type ColumnKey } from '../../config/taskStatusConfig';
 
 // taskStatus를 ColumnKey로 매핑
@@ -541,15 +542,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   return (
     <div className={layoutStyles.pageContainer} style={teamsPageBackground}>
@@ -811,8 +803,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                                       <p>
                                         사용 횟수: {invite.usageCurCnt} / {invite.usageMaxCnt}
                                       </p>
-                                      <p>만료일: {formatDate(invite.endAt)}</p>
-                                      <p>생성일: {formatDate(invite.crtdAt)}</p>
+                                      <p>만료일: {formatFullDateTime(new Date(invite.endAt))}</p>
+                                      <p>생성일: {formatFullDateTime(new Date(invite.crtdAt))}</p>
                                     </div>
                                     {isActive && (
                                       <div className='mt-3 rounded-lg border border-white/5 bg-slate-900/50 p-3'>
@@ -912,7 +904,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                           </div>
                           <div className='mb-4 text-xs text-slate-400'>
                             <span className='text-slate-500'>만료:</span>{' '}
-                            {formatDate(telegramStatus.pendingLink.endAt)}
+                            {formatFullDateTime(new Date(telegramStatus.pendingLink.endAt))}
                           </div>
                           <div className='flex gap-2'>
                             <button
