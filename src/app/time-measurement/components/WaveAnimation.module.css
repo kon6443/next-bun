@@ -1,8 +1,8 @@
 .waveBox {
-  width: min(320px, 85vw);
-  height: clamp(160px, 40vw, 200px);
-  border-radius: 30px;
-  padding: 18px 22px;
+  width: min(280px, 90vw);
+  height: clamp(140px, 38vw, 170px);
+  border-radius: 24px;
+  padding: 14px 18px;
   background: linear-gradient(145deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.7));
   border: 1px solid rgba(148, 163, 184, 0.25);
   box-shadow:
@@ -20,14 +20,14 @@
 }
 
 .badge {
-  font-size: 0.65rem;
-  letter-spacing: 0.35em;
+  font-size: 0.6rem;
+  letter-spacing: 0.3em;
   text-transform: uppercase;
   color: rgba(148, 163, 184, 0.8);
 }
 
 .value {
-  font-size: 1.25rem;
+  font-size: clamp(1rem, 4vw, 1.25rem);
   font-weight: 600;
   color: #f8fafc;
 }
@@ -36,22 +36,39 @@
   flex: 1;
   display: flex;
   align-items: flex-end;
-  gap: 14px;
-  padding-bottom: 8px;
+  gap: clamp(6px, 2vw, 10px);
+  padding-bottom: 6px;
 }
 
 .bar {
   flex: 1;
+  min-width: 0;
   border-radius: 999px;
   background: linear-gradient(180deg, rgba(59, 130, 246, 0.9), rgba(14, 165, 233, 0.65));
-  box-shadow: 0 10px 20px rgba(14, 165, 233, 0.35);
+  box-shadow: 0 8px 16px rgba(14, 165, 233, 0.35);
   transform-origin: bottom center;
   transition: height 0.35s ease, opacity 0.35s ease;
   opacity: 0.9;
+  animation: waveFloat 2s ease-in-out infinite;
+}
+
+.bar:nth-child(1) { animation-delay: 0s; }
+.bar:nth-child(2) { animation-delay: 0.15s; }
+.bar:nth-child(3) { animation-delay: 0.3s; }
+.bar:nth-child(4) { animation-delay: 0.45s; }
+.bar:nth-child(5) { animation-delay: 0.6s; }
+
+@keyframes waveFloat {
+  0%, 100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(1.15);
+  }
 }
 
 .bar:nth-child(even) {
   background: linear-gradient(180deg, rgba(236, 72, 153, 0.9), rgba(249, 115, 22, 0.7));
-  box-shadow: 0 10px 25px rgba(236, 72, 153, 0.35);
+  box-shadow: 0 8px 20px rgba(236, 72, 153, 0.35);
 }
 
