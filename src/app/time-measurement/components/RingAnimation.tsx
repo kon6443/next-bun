@@ -13,19 +13,26 @@ export default function RingAnimation({ progress }: AnimationProps) {
   return (
     <div className={styles.ring}>
       <svg viewBox="0 0 160 160" className={styles.svg}>
+        <defs>
+          <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#60a5fa" />
+            <stop offset="50%" stopColor="#a78bfa" />
+            <stop offset="100%" stopColor="#f472b6" />
+          </linearGradient>
+        </defs>
         <circle
           className={styles.track}
           cx="80"
           cy="80"
           r={radius}
-          strokeWidth="12"
+          strokeWidth="10"
         />
         <circle
           className={styles.progress}
           cx="80"
           cy="80"
           r={radius}
-          strokeWidth="12"
+          strokeWidth="10"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
         />
