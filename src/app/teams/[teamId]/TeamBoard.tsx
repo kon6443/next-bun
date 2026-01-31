@@ -147,7 +147,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       return;
     }
 
-    const fetchTeamTasks = async () => {
+    const fetchTeamData = async () => {
       setIsLoading(true);
       setError(null);
       try {
@@ -156,21 +156,37 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           throw new Error('유효하지 않은 팀 ID입니다.');
         }
 
-        const response = await getTeamTasks(teamIdNum, session.user.accessToken);
-        setTeamName(response.data.team.teamName);
-        setTeamDescription(response.data.team.teamDescription || '');
+        const currentUserId = session.user.userId;
+
+        // ✅ Promise.all로 독립적인 API들을 병렬 호출 (성능 최적화)
+        const [tasksResponse, membersResult, telegramResult] = await Promise.all([
+          // 태스크 목록 조회 (필수)
+          getTeamTasks(teamIdNum, session.user.accessToken),
+          // 멤버 목록 조회 (실패해도 계속 진행)
+          getTeamUsers(teamIdNum, session.user.accessToken).catch(err => {
+            console.error('Failed to fetch team members:', err);
+            return null;
+          }),
+          // 텔레그램 상태 조회 (실패해도 계속 진행)
+          getTelegramStatus(teamIdNum, session.user.accessToken).catch(err => {
+            console.error('Failed to fetch telegram status:', err);
+            return null;
+          }),
+        ]);
+
+        // 태스크 데이터 처리
+        setTeamName(tasksResponse.data.team.teamName);
+        setTeamDescription(tasksResponse.data.team.teamDescription || '');
 
         // 마스터 판별(단순): 팀 리더(leaderId) === 현재 로그인 사용자(userId)
-        const currentUserId = session.user.userId;
-        const isMasterUser = Boolean(currentUserId && response.data.team.leaderId === currentUserId);
+        const isMasterUser = Boolean(currentUserId && tasksResponse.data.team.leaderId === currentUserId);
 
-        // 팀 멤버 목록 조회(표시 목적)
-        try {
-          const membersResponse = await getTeamUsers(teamIdNum, session.user.accessToken);
-          setMembers(membersResponse.data);
+        // 멤버 데이터 처리
+        if (membersResult) {
+          setMembers(membersResult.data);
 
-          // 멤버 목록 로드 후 현재 사용자의 권한 확인
-          const currentUserMember = membersResponse.data.find(m => m.userId === currentUserId);
+          // 멤버 목록에서 현재 사용자의 권한 확인
+          const currentUserMember = membersResult.data.find(m => m.userId === currentUserId);
           const userRole = currentUserMember?.role?.toUpperCase().trim();
           const canInvite = userRole === 'MASTER' || userRole === 'MANAGER';
           setCanManageInvites(canInvite);
@@ -181,12 +197,10 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
               const invitesResponse = await getTeamInvites(teamIdNum, session.user.accessToken);
               setInvites(invitesResponse.data);
             } catch (inviteErr) {
-              // 403 에러는 백엔드 권한 체크로 인한 것이므로 조용히 처리
               const errorMessage = inviteErr instanceof Error ? inviteErr.message : String(inviteErr);
               if (errorMessage.includes('권한이 없습니다') || errorMessage.includes('403')) {
                 console.warn('팀 초대 링크 조회 권한이 없습니다. 백엔드 권한 설정을 확인해주세요.');
                 setInvites([]);
-                // 권한이 실제로 없는 경우 canManageInvites를 false로 설정
                 setCanManageInvites(false);
               } else {
                 console.error('Failed to fetch team invites:', inviteErr);
@@ -196,8 +210,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           } else {
             setInvites([]);
           }
-        } catch (memberErr) {
-          console.error('Failed to fetch team members:', memberErr);
+        } else {
           // 멤버 목록 조회 실패 시 기존 로직 유지 (leaderId 기반)
           setCanManageInvites(isMasterUser);
           if (isMasterUser) {
@@ -220,14 +233,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           }
         }
 
-        // 텔레그램 연동 상태 조회
-        try {
-          const telegramResponse = await getTelegramStatus(teamIdNum, session.user.accessToken);
-          setTelegramStatus(telegramResponse.data);
-        } catch (telegramErr) {
-          console.error('Failed to fetch telegram status:', telegramErr);
-          setTelegramStatus(null);
-        }
+        // 텔레그램 데이터 처리
+        setTelegramStatus(telegramResult?.data ?? null);
 
         // taskStatus에 따라 태스크를 컬럼별로 분류
         const classifiedTasks: Record<ColumnKey, Task[]> = {
@@ -238,7 +245,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           cancelled: [],
         };
 
-        response.data.tasks.forEach(task => {
+        tasksResponse.data.tasks.forEach(task => {
           // actStatus가 1(ACTIVE)인 태스크만 표시
           if (task.actStatus === 1) {
             const columnKey = taskStatusToColumn[task.taskStatus] || 'todo';
@@ -250,13 +257,13 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : '태스크 목록을 불러오는데 실패했습니다.';
         setError(errorMessage);
-        console.error('Failed to fetch team tasks:', err);
+        console.error('Failed to fetch team data:', err);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchTeamTasks();
+    fetchTeamData();
   }, [teamId, session?.user?.accessToken, session?.user?.userId]);
 
   // 모든 태스크를 하나의 배열로 합침
@@ -541,7 +548,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       setIsLoadingTelegram(false);
     }
   };
-
 
   return (
     <div className={layoutStyles.pageContainer} style={teamsPageBackground}>

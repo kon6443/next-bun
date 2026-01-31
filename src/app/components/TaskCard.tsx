@@ -3,9 +3,10 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from '../types/task';
-import { getDeadlineStatus, getDeadlineLabel, deadlineStyles, formatShortDate } from '../utils/taskUtils';
+import { getDeadlineStatus, getDeadlineLabel, deadlineStyles, formatCompactDateTime } from '../utils/taskUtils';
 import { type TaskStatusKey } from '../config/taskStatusConfig';
 import { StatusDropdown } from './StatusDropdown';
+import { ClockIcon, CalendarIcon } from './Icons';
 
 type TaskCardProps = {
   task: Task;
@@ -14,11 +15,14 @@ type TaskCardProps = {
 };
 
 export function TaskCard({ task, onStatusChange, teamId }: TaskCardProps) {
-  const { taskId, taskName, taskDescription, endAt, userName, crtdBy, taskStatus } = task;
+  const { taskId, taskName, taskDescription, startAt, endAt, crtdAt, userName, crtdBy, taskStatus } = task;
   const router = useRouter();
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const endDateStr = formatShortDate(endAt);
+  // 날짜 포맷팅 (태스크 상세와 동일한 포맷: M/D HH:mm)
+  const endDateStr = endAt ? formatCompactDateTime(endAt) : null;
+  const startDateStr = startAt ? formatCompactDateTime(startAt) : null;
+  const crtdDateStr = formatCompactDateTime(crtdAt);
 
   // 현재 상태 키
   const currentStatusKey = taskStatus as TaskStatusKey;
@@ -80,6 +84,26 @@ export function TaskCard({ task, onStatusChange, teamId }: TaskCardProps) {
         <span className="text-xs text-slate-500 truncate max-w-[60%]">
           {userName || `사용자 ${crtdBy}`}
         </span>
+      </div>
+
+      {/* 날짜 정보: 생성일 · 시작일 → 종료일 (아이콘 사용) */}
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.65rem] text-slate-500">
+        {/* 생성일 */}
+        {crtdDateStr && (
+          <span className="flex items-center gap-1" title="생성일">
+            <ClockIcon className="w-3 h-3" />
+            <span>{crtdDateStr}</span>
+          </span>
+        )}
+        {/* 시작일 → 종료일 */}
+        {(startDateStr || endDateStr) && (
+          <span className="flex items-center gap-1" title={startDateStr && endDateStr ? "시작일 → 종료일" : startDateStr ? "시작일" : "종료일"}>
+            <CalendarIcon className="w-3 h-3" />
+            {startDateStr && <span>{startDateStr}</span>}
+            {startDateStr && endDateStr && <span className="text-slate-600">→</span>}
+            {endDateStr && <span>{endDateStr}</span>}
+          </span>
+        )}
       </div>
 
       {/* 상태 드롭다운 */}
