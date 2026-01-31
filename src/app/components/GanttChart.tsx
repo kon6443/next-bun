@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from '../types/task';
-import { getDeadlineStatus, getDeadlineLabel, deadlineStyles } from '../utils/taskUtils';
+import { getDeadlineStatus, getDeadlineLabel, deadlineStyles, formatDateKey, formatDateDisplay } from '../utils/taskUtils';
 
 type GanttChartProps = {
   tasks: Task[];
@@ -22,16 +22,6 @@ const statusLabels: Record<number, string> = {
   2: 'In Progress',
   3: 'Completed',
 };
-
-// 날짜를 YYYY-MM-DD 형식으로 변환
-function formatDateKey(date: Date): string {
-  return date.toISOString().split('T')[0];
-}
-
-// 날짜를 MM/DD 형식으로 표시
-function formatDateDisplay(date: Date): string {
-  return `${date.getMonth() + 1}/${date.getDate()}`;
-}
 
 // 두 날짜 사이의 일수 계산
 function daysBetween(start: Date, end: Date): number {

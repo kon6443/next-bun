@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from '../types/task';
-import { getDeadlineStatus, getDeadlineLabel, deadlineStyles } from '../utils/taskUtils';
+import { getDeadlineStatus, getDeadlineLabel, deadlineStyles, formatShortDate } from '../utils/taskUtils';
 import { type TaskStatusKey } from '../config/taskStatusConfig';
 import { StatusDropdown } from './StatusDropdown';
 
@@ -18,16 +18,7 @@ export function TaskCard({ task, onStatusChange, teamId }: TaskCardProps) {
   const router = useRouter();
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const formatDate = (date: Date | null) => {
-    if (!date) return null;
-    const d = new Date(date);
-    return d.toLocaleDateString('ko-KR', {
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const endDateStr = endAt ? formatDate(endAt) : null;
+  const endDateStr = formatShortDate(endAt);
 
   // 현재 상태 키
   const currentStatusKey = taskStatus as TaskStatusKey;

@@ -210,7 +210,12 @@ export function getUniqueAssignees(tasks: Task[]): { id: number; name: string }[
   return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
 }
 
-// 컴팩트 날짜+시간 포맷 (M/D HH:mm)
+// ==================== 날짜 포맷팅 유틸리티 ====================
+
+/**
+ * 컴팩트 날짜+시간 포맷 (M/D HH:mm)
+ * @example "1/15 14:30"
+ */
 export function formatCompactDateTime(date: Date): string {
   const d = new Date(date);
   const hours = d.getHours().toString().padStart(2, '0');
@@ -218,7 +223,10 @@ export function formatCompactDateTime(date: Date): string {
   return `${d.getMonth() + 1}/${d.getDate()} ${hours}:${minutes}`;
 }
 
-// 짧은 날짜 포맷 (M월 D일)
+/**
+ * 짧은 날짜 포맷 (M월 D일)
+ * @example "1월 15일"
+ */
 export function formatShortDate(date: Date | null): string | null {
   if (!date) return null;
   const d = new Date(date);
@@ -226,4 +234,49 @@ export function formatShortDate(date: Date | null): string | null {
     month: 'short',
     day: 'numeric',
   });
+}
+
+/**
+ * 연도 포함 날짜 포맷 (YYYY년 M월 D일)
+ * @example "2024년 1월 15일"
+ */
+export function formatDateWithYear(date: Date | null): string {
+  if (!date) return '-';
+  return new Date(date).toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+/**
+ * 전체 날짜+시간 포맷 (YYYY년 M월 D일 HH:mm)
+ * @example "2024년 1월 15일 14:30"
+ */
+export function formatFullDateTime(date: Date | null): string | null {
+  if (!date) return null;
+  return new Date(date).toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+/**
+ * ISO 날짜 키 포맷 (YYYY-MM-DD)
+ * @example "2024-01-15"
+ */
+export function formatDateKey(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
+/**
+ * 간단한 날짜 표시 포맷 (M/D)
+ * @example "1/15"
+ */
+export function formatDateDisplay(date: Date): string {
+  return `${date.getMonth() + 1}/${date.getDate()}`;
 }

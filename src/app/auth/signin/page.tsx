@@ -1,29 +1,19 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { Suspense, useState } from "react";
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { BarLoader } from "@/app/teams/components";
+import { AUTH_LOADING_KEY } from "@/app/components/AuthLoadingOverlay";
 
 function SignInContent() {
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
-  const code = searchParams.get("code");
-  const [isLoading, setIsLoading] = useState(false);
-
-  // 콜백 처리 중 감지 (카카오에서 돌아올 때 code 파라미터가 있음)
-  const isProcessingCallback = !!code;
-  const showLoading = isLoading || isProcessingCallback;
 
   const handleKakaoLogin = () => {
-    setIsLoading(true);
-    // 렌더링 완료를 보장하기 위해 requestAnimationFrame + setTimeout 사용
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        signIn("kakao", { callbackUrl: "/mypage" });
-      }, 300);
-    });
+    // 전역 로딩 오버레이 활성화
+    sessionStorage.setItem(AUTH_LOADING_KEY, "true");
+    signIn("kakao", { callbackUrl: "/mypage" });
   };
 
   const getErrorMessage = () => {
@@ -52,25 +42,6 @@ function SignInContent() {
   };
 
   const errorMessage = getErrorMessage();
-
-  // 로딩 중일 때 로딩 UI 표시
-  if (showLoading) {
-    return (
-      <div style={containerStyle}>
-        <section style={cardStyle}>
-          <div style={avatarWrapStyle}>
-            <span style={avatarStyle}>💬</span>
-          </div>
-          <p style={eyebrowStyle}>카카오 로그인</p>
-          <h1 style={{ ...titleStyle, fontSize: "1.75rem" }}>로그인 중...</h1>
-          <p style={{ ...descriptionStyle, marginBottom: "2rem" }}>
-            카카오 계정으로 로그인하고 있어요
-          </p>
-          <BarLoader barCount={5} barHeight="32px" />
-        </section>
-      </div>
-    );
-  }
 
   return (
     <div style={containerStyle}>

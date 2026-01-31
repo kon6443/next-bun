@@ -1,13 +1,19 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
+import { clearAuthLoading, AUTH_LOADING_KEY } from "@/app/components/AuthLoadingOverlay";
 
 function AuthErrorContent() {
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
+
+  // 에러 페이지 진입 시 로딩 플래그 제거 (무한 로딩 방지)
+  useEffect(() => {
+    clearAuthLoading();
+  }, []);
 
   const getErrorMessage = () => {
     switch (error) {
@@ -89,7 +95,10 @@ function AuthErrorContent() {
         <div style={buttonGroupStyle}>
           <button
             style={kakaoButtonStyle}
-            onClick={() => signIn("kakao", { callbackUrl: "/mypage" })}
+            onClick={() => {
+              sessionStorage.setItem(AUTH_LOADING_KEY, "true");
+              signIn("kakao", { callbackUrl: "/mypage" });
+            }}
           >
             <span style={{ fontSize: "1.25rem", marginRight: 8 }}>💬</span>
             다시 시도하기
