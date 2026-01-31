@@ -7,3 +7,4 @@ export { useTaskFilter } from './useTaskFilter';
 export { useClickOutside } from './useClickOutside';
 export { useTelegramLink } from './useTelegramLink';
 export { useTeamInvite } from './useTeamInvite';
+export { useTeamData, type UseTeamDataReturn, type TasksByColumn } from './useTeamData';

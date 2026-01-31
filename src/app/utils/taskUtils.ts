@@ -1,4 +1,5 @@
 import type { Task } from '../types/task';
+import { STATUS_COMPLETED, STATUS_CANCELLED } from '../config/taskStatusConfig';
 
 // 마감일 상태 타입
 export type DeadlineStatus = 'overdue' | 'today' | 'soon' | 'normal' | 'none';
@@ -68,6 +69,31 @@ export function getDeadlineLabel(status: DeadlineStatus, endAt: Date | null): st
     return `D-${days}`;
   }
   return '';
+}
+
+// ==================== 마감일 정보 통합 함수 ====================
+
+export type TaskDeadlineInfo = {
+  status: DeadlineStatus;
+  label: string;
+  showAlert: boolean;
+};
+
+/**
+ * 태스크의 마감일 관련 정보를 한 번에 가져오기
+ * 완료/취소 상태의 태스크는 항상 'normal' 반환
+ * 
+ * @param task 태스크 객체
+ * @returns 마감일 상태, 라벨, 알림 표시 여부
+ */
+export function getTaskDeadlineInfo(task: Task): TaskDeadlineInfo {
+  // 완료 또는 취소 상태인 경우 마감일 경고 표시 안함
+  const isTerminal = task.taskStatus === STATUS_COMPLETED || task.taskStatus === STATUS_CANCELLED;
+  const status = isTerminal ? 'normal' : getDeadlineStatus(task.endAt);
+  const label = getDeadlineLabel(status, task.endAt);
+  const showAlert = ['overdue', 'today', 'soon'].includes(status);
+
+  return { status, label, showAlert };
 }
 
 // 오늘로부터의 일수 계산
@@ -211,10 +237,25 @@ export function getUniqueAssignees(tasks: Task[]): { id: number; name: string }[
 }
 
 // ==================== 날짜 포맷팅 유틸리티 ====================
+/**
+ * 날짜 포맷 함수 사용 가이드:
+ * 
+ * | 함수명                 | 포맷 예시           | 용도                              |
+ * |------------------------|---------------------|-----------------------------------|
+ * | formatCompactDateTime  | "1/15 14:30"        | 카드 날짜 표시, 좁은 공간         |
+ * | formatShortDate        | "1월 15일"          | 한글 날짜, 중간 공간              |
+ * | formatDateWithYear     | "2024년 1월 15일"   | 테이블, 상세 정보                 |
+ * | formatFullDateTime     | "2024년 1월 15일 14:30" | 상세 페이지, 전체 정보        |
+ * | formatDateKey          | "2024-01-15"        | 내부 키, 비교용 (표시 X)          |
+ * | formatDateDisplay      | "1/15"              | 간트 차트 헤더, 최소 공간         |
+ */
 
 /**
  * 컴팩트 날짜+시간 포맷 (M/D HH:mm)
- * @example "1/15 14:30"
+ * 카드, 목록 등 좁은 공간에서 날짜와 시간을 함께 표시할 때 사용
+ * @param date - 포맷할 날짜
+ * @returns "M/D HH:mm" 형식 문자열
+ * @example formatCompactDateTime(new Date('2024-01-15T14:30:00')) // "1/15 14:30"
  */
 export function formatCompactDateTime(date: Date): string {
   const d = new Date(date);
@@ -225,7 +266,10 @@ export function formatCompactDateTime(date: Date): string {
 
 /**
  * 짧은 날짜 포맷 (M월 D일)
- * @example "1월 15일"
+ * 한글로 자연스러운 날짜 표시가 필요할 때 사용
+ * @param date - 포맷할 날짜 (null 가능)
+ * @returns "M월 D일" 형식 문자열 또는 null
+ * @example formatShortDate(new Date('2024-01-15')) // "1월 15일"
  */
 export function formatShortDate(date: Date | null): string | null {
   if (!date) return null;
@@ -238,7 +282,10 @@ export function formatShortDate(date: Date | null): string | null {
 
 /**
  * 연도 포함 날짜 포맷 (YYYY년 M월 D일)
- * @example "2024년 1월 15일"
+ * 테이블, 목록에서 연도를 포함한 정확한 날짜 표시 시 사용
+ * @param date - 포맷할 날짜 (null 가능)
+ * @returns "YYYY년 M월 D일" 형식 문자열 또는 "-"
+ * @example formatDateWithYear(new Date('2024-01-15')) // "2024년 1월 15일"
  */
 export function formatDateWithYear(date: Date | null): string {
   if (!date) return '-';
@@ -251,7 +298,10 @@ export function formatDateWithYear(date: Date | null): string {
 
 /**
  * 전체 날짜+시간 포맷 (YYYY년 M월 D일 HH:mm)
- * @example "2024년 1월 15일 14:30"
+ * 상세 페이지 등에서 날짜와 시간을 모두 표시할 때 사용
+ * @param date - 포맷할 날짜 (null 가능)
+ * @returns "YYYY년 M월 D일 HH:mm" 형식 문자열 또는 null
+ * @example formatFullDateTime(new Date('2024-01-15T14:30:00')) // "2024년 1월 15일 14:30"
  */
 export function formatFullDateTime(date: Date | null): string | null {
   if (!date) return null;
@@ -267,7 +317,10 @@ export function formatFullDateTime(date: Date | null): string | null {
 
 /**
  * ISO 날짜 키 포맷 (YYYY-MM-DD)
- * @example "2024-01-15"
+ * 내부 비교, Map 키 등에 사용 (UI 표시용 X)
+ * @param date - 포맷할 날짜
+ * @returns "YYYY-MM-DD" 형식 문자열
+ * @example formatDateKey(new Date('2024-01-15')) // "2024-01-15"
  */
 export function formatDateKey(date: Date): string {
   return date.toISOString().split('T')[0];
@@ -275,7 +328,10 @@ export function formatDateKey(date: Date): string {
 
 /**
  * 간단한 날짜 표시 포맷 (M/D)
- * @example "1/15"
+ * 간트 차트 헤더, 캘린더 등 최소 공간에서 사용
+ * @param date - 포맷할 날짜
+ * @returns "M/D" 형식 문자열
+ * @example formatDateDisplay(new Date('2024-01-15')) // "1/15"
  */
 export function formatDateDisplay(date: Date): string {
   return `${date.getMonth() + 1}/${date.getDate()}`;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -111,6 +111,16 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     [router, pathname, searchParams],
   );
 
+  // fetchInvites와 setTelegramStatus를 ref로 관리하여 useEffect 의존성에서 제외
+  const fetchInvitesRef = useRef(fetchInvites);
+  const setTelegramStatusRef = useRef(setTelegramStatus);
+  
+  // 최신 함수 참조 유지
+  useEffect(() => {
+    fetchInvitesRef.current = fetchInvites;
+    setTelegramStatusRef.current = setTelegramStatus;
+  }, [fetchInvites, setTelegramStatus]);
+
   useEffect(() => {
     if (!session?.user?.accessToken) {
       setError('인증이 필요합니다. 다시 로그인해주세요.');
@@ -157,17 +167,17 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           setCanManageInvites(canInvite);
 
           if (canInvite) {
-            await fetchInvites();
+            await fetchInvitesRef.current();
           }
         } else {
           setCanManageInvites(isMasterUser);
           if (isMasterUser) {
-            await fetchInvites();
+            await fetchInvitesRef.current();
           }
         }
 
         // 텔레그램 데이터 처리
-        setTelegramStatus(telegramResult?.data ?? null);
+        setTelegramStatusRef.current(telegramResult?.data ?? null);
 
         // taskStatus에 따라 태스크를 컬럼별로 분류
         const classifiedTasks: Record<ColumnKey, Task[]> = {
@@ -196,7 +206,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     };
 
     fetchTeamData();
-  }, [teamId, teamIdNum, session?.user?.accessToken, session?.user?.userId, fetchInvites, setTelegramStatus]);
+  }, [teamId, teamIdNum, session?.user?.accessToken, session?.user?.userId]);
 
   // 모든 태스크를 하나의 배열로 합침
   const allTasks = useMemo(

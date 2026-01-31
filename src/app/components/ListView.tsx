@@ -3,10 +3,12 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from '../types/task';
-import { getDeadlineStatus, getDeadlineLabel, deadlineStyles, formatDateWithYear } from '../utils/taskUtils';
-import { getStatusMeta, STATUS_COMPLETED } from '../config/taskStatusConfig';
+import { deadlineStyles, formatDateWithYear, getTaskDeadlineInfo } from '../utils/taskUtils';
+import { getStatusMeta } from '../config/taskStatusConfig';
 import { EmptyState } from '../teams/components';
 import { ChevronUpIcon, ChevronDownIcon } from './Icons';
+import { viewContainerStyles } from '@/styles/teams';
+import { ViewHeader } from './ViewHeader';
 
 type ListViewProps = {
   tasks: Task[];
@@ -101,16 +103,8 @@ export function ListView({ tasks, teamId }: ListViewProps) {
   };
 
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-[0_25px_60px_rgba(15,23,42,0.55)] backdrop-blur-xl">
-      <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <p className="text-[0.7rem] uppercase tracking-[0.4em] text-slate-400">List View</p>
-          <p className="mt-1 text-sm text-slate-500">컬럼 클릭으로 정렬</p>
-        </div>
-        <span className="text-xs font-semibold text-slate-400">
-          {tasks.length} tasks
-        </span>
-      </div>
+    <div className={viewContainerStyles}>
+      <ViewHeader title="List View" subtitle="컬럼 클릭으로 정렬" count={tasks.length} />
 
       {/* 테이블 */}
       <div className="overflow-x-auto">
@@ -165,9 +159,7 @@ export function ListView({ tasks, teamId }: ListViewProps) {
             ) : (
               sortedTasks.map(task => {
                 const statusMeta = getStatusMeta(task.taskStatus);
-                const deadlineStatus = task.taskStatus !== STATUS_COMPLETED ? getDeadlineStatus(task.endAt) : 'normal';
-                const deadlineLabel = getDeadlineLabel(deadlineStatus, task.endAt);
-                const showDeadlineAlert = deadlineStatus === 'overdue' || deadlineStatus === 'today' || deadlineStatus === 'soon';
+                const { status: deadlineStatus, label: deadlineLabel, showAlert: showDeadlineAlert } = getTaskDeadlineInfo(task);
 
                 return (
                   <tr

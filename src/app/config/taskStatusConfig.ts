@@ -172,6 +172,25 @@ export function getStatusBorderClassName(statusKey: number): string {
 }
 
 /**
+ * 상태 키로 배경/테두리 색상 객체 가져오기
+ * GanttChart 등에서 막대 스타일링에 사용
+ */
+export function getStatusColors(statusKey: number): { bg: string; border: string } {
+  const meta = getStatusMeta(statusKey);
+  return { bg: meta.bgClassName, border: meta.borderClassName };
+}
+
+/**
+ * 상태 키로 텍스트 색상 클래스 가져오기
+ * badgeClassName에서 text-* 클래스 추출
+ */
+export function getStatusTextColor(statusKey: number): string {
+  const meta = getStatusMeta(statusKey);
+  const textMatch = meta.badgeClassName.match(/text-(\w+)-\d+/);
+  return textMatch ? `text-${textMatch[1]}-400` : 'text-slate-400';
+}
+
+/**
  * 모든 상태 목록 가져오기 (필터 드롭다운용)
  */
 export function getAllStatuses(): TaskStatusMeta[] {
