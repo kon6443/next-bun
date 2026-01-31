@@ -30,6 +30,8 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: ${{ secrets.REGISTRY_URL }}/sys_next:latest
+          provenance: false
+          sbom: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
