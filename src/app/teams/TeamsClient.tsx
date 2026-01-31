@@ -20,7 +20,9 @@ export default function TeamsClient({
   error,
   isLoading = false,
 }: TeamsClientProps) {
-  const isAuthenticated = !!session;
+  // 세션 존재 여부가 아닌, 실제 유효한 accessToken 존재 여부로 인증 판단
+  // 세션은 있지만 accessToken이 없으면 미인증 상태로 처리
+  const isAuthenticated = !!session?.user?.accessToken;
 
   return (
     <TeamsPageLayout>

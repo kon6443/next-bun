@@ -63,7 +63,13 @@ export const authOptions: NextAuthOptions = {
       }
       return true;
     },
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account, trigger, session }) {
+      // 세션 업데이트 트리거 처리 (닉네임 수정 등)
+      if (trigger === "update" && session?.userName) {
+        token.userName = session.userName;
+        return token;
+      }
+      
       // 카카오 provider인 경우에만 처리
       if (user && account && account.provider === "kakao") {
         // access_token이 없으면 에러 처리
@@ -77,12 +83,15 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          const { userId, loginType, accessToken, tokenType } = await postKakaoSignInUp({
+          const response = await postKakaoSignInUp({
             accessToken: account.access_token,
             kakaoNickname: user.name ?? "",
           });
 
+          const { userId, userName, loginType, accessToken, tokenType } = response.data;
+
           token.userId = userId;
+          token.userName = userName;
           token.loginType = loginType;
           token.accessToken = accessToken;
           token.tokenType = tokenType;
@@ -113,11 +122,10 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       session.user.userId = token.userId;
+      session.user.userName = token.userName;
       session.user.loginType = token.loginType;
       session.user.accessToken = token.accessToken;
       session.user.tokenType = token.tokenType;
-      // 디버깅용 로그 (필요시 주석 해제)
-      // console.log("session:", session);
       return session;
     },
   },

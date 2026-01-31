@@ -4,7 +4,7 @@ declare module "next-auth" {
   interface Session {
     user: {
       userId?: number | null;
-      kakaoNickname?: string | null;
+      userName?: string | null;
       loginType?: string | null;
       accessToken?: string | null;
       tokenType?: string | null;
@@ -15,7 +15,7 @@ declare module "next-auth" {
 declare module "next-auth/jwt" {
   interface JWT {
     userId?: number;
-    kakaoNickname?: string;
+    userName?: string;
     loginType?: string;
     accessToken?: string;
     tokenType?: string;
