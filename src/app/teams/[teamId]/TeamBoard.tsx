@@ -10,7 +10,7 @@ import { ListView } from '../../components/ListView';
 import { CalendarView } from '../../components/CalendarView';
 import { TaskFilters } from '../../components/TaskFilters';
 import { Kanban } from '../../components/Kanban';
-import { Button, ButtonLink, SectionLabel, ErrorAlert, TeamBoardSkeleton, ListViewSkeleton } from '../components';
+import { Button, ButtonLink, SectionLabel, ErrorAlert, TeamBoardSkeleton, ListViewSkeleton, Skeleton } from '../components';
 import type { Task } from '../../types/task';
 import { useTaskFilter, useTelegramLink, useTeamInvite } from '../../hooks';
 import {
@@ -40,7 +40,7 @@ type TeamBoardProps = {
 const validViewModes: ViewMode[] = ['kanban', 'gantt', 'list', 'calendar'];
 
 export default function TeamBoard({ teamId }: TeamBoardProps) {
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -122,6 +122,11 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   }, [fetchInvites, setTelegramStatus]);
 
   useEffect(() => {
+    // 세션이 아직 로딩 중이면 기다림
+    if (sessionStatus === 'loading') {
+      return;
+    }
+
     if (!session?.user?.accessToken) {
       setError('인증이 필요합니다. 다시 로그인해주세요.');
       setIsLoading(false);
@@ -206,7 +211,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     };
 
     fetchTeamData();
-  }, [teamId, teamIdNum, session?.user?.accessToken, session?.user?.userId]);
+  }, [teamId, teamIdNum, session?.user?.accessToken, session?.user?.userId, sessionStatus]);
 
   // 모든 태스크를 하나의 배열로 합침
   const allTasks = useMemo(
@@ -360,7 +365,9 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           <SectionLabel>Team Kanban</SectionLabel>
           <div className="mt-4 flex flex-col gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-white">{isLoading ? '로딩 중...' : teamName || ''}</h1>
+              <h1 className="text-3xl font-bold text-white">
+                {isLoading ? <Skeleton width="200px" height="2rem" /> : teamName || ''}
+              </h1>
               {teamDescription && <p className="mt-2 text-sm text-slate-400">{teamDescription}</p>}
             </div>
             <div className="flex flex-col gap-2">
