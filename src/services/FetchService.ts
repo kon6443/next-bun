@@ -1,3 +1,5 @@
+import { ApiErrorResponse, createApiError } from '@/types/api';
+
 export type HTTPMethodType = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 
 type QueryPrimitive = string | number | boolean | null | undefined;
@@ -19,6 +21,11 @@ type FetchClientOptions = Omit<ExtendedRequestInit, 'headers'> & {
    */
   accessToken?: string;
   tokenType?: string;
+  /**
+   * 에러 발생 시 자동으로 ApiError를 throw할지 여부 (기본: false)
+   * true로 설정하면 response.ok가 false일 때 자동으로 에러 처리
+   */
+  throwOnError?: boolean;
 };
 
 type BackendFetchArgs = Omit<FetchClientOptions, 'body'> & {
@@ -77,6 +84,7 @@ class FetchClient {
       credentials,
       accessToken,
       tokenType,
+      throwOnError,
       ...rest
     } = options ?? {};
 
@@ -109,7 +117,60 @@ class FetchClient {
       window.dispatchEvent(new CustomEvent('backend:unauthorized'));
     }
 
+    // throwOnError 옵션이 true일 때 자동 에러 처리
+    if (throwOnError && !response.ok) {
+      const errorData = await this.parseErrorResponse(response);
+      throw createApiError(errorData, response.status);
+    }
+
     return response;
+  }
+
+  /**
+   * 에러 응답을 파싱하여 ApiErrorResponse 형식으로 반환
+   */
+  private async parseErrorResponse(response: Response): Promise<ApiErrorResponse> {
+    try {
+      const text = await response.text();
+      if (text) {
+        const data = JSON.parse(text);
+        if (data.code && data.message) {
+          return data as ApiErrorResponse;
+        }
+        // code가 없으면 HTTP 상태 코드 기반 기본값
+        return {
+          code: this.getDefaultErrorCode(response.status),
+          message: data.message || data.error || '요청 처리 중 오류가 발생했습니다.',
+          timestamp: new Date().toISOString(),
+        };
+      }
+    } catch {
+      // 파싱 실패
+    }
+    
+    return {
+      code: this.getDefaultErrorCode(response.status),
+      message: '요청 처리 중 오류가 발생했습니다.',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * HTTP 상태 코드를 기본 에러 코드로 매핑
+   */
+  private getDefaultErrorCode(status: number): string {
+    const statusCodeMap: Record<number, string> = {
+      400: 'BAD_REQUEST',
+      401: 'UNAUTHORIZED',
+      403: 'FORBIDDEN',
+      404: 'NOT_FOUND',
+      409: 'CONFLICT',
+      422: 'VALIDATION_ERROR',
+      500: 'INTERNAL_SERVER_ERROR',
+      502: 'BAD_GATEWAY',
+      503: 'SERVICE_UNAVAILABLE',
+    };
+    return statusCodeMap[status] || 'UNKNOWN_ERROR';
   }
 
   private createUrl(endpoint: string) {
