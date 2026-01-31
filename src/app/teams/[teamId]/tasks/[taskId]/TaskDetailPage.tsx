@@ -20,6 +20,8 @@ import {
   TaskForm,
   ErrorAlert,
   SuccessAlert,
+  Skeleton,
+  SkeletonText,
   type TaskFormData,
 } from '../../../components';
 import { StatusDropdown } from '@/app/components/StatusDropdown';
@@ -35,7 +37,7 @@ type TaskDetailPageProps = {
 };
 
 export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) {
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const [taskDetail, setTaskDetail] = useState<TaskDetailResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +62,11 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
 
   const fetchTaskDetail = useCallback(
     async (showLoading = true) => {
+      // 세션이 아직 로딩 중이면 기다림
+      if (sessionStatus === 'loading') {
+        return;
+      }
+
       if (!session?.user?.accessToken) {
         setError('인증이 필요합니다. 다시 로그인해주세요.');
         if (showLoading) setIsLoading(false);
@@ -104,7 +111,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
         }
       }
     },
-    [teamIdNum, taskIdNum, isValidIds, session?.user?.accessToken],
+    [teamIdNum, taskIdNum, isValidIds, session?.user?.accessToken, sessionStatus],
   );
 
   useEffect(() => {
@@ -263,9 +270,54 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
   if (isLoading) {
     return (
       <TeamsPageLayout>
-        <div className={`${cardStyles.section} p-4 text-center text-slate-400`}>
-          태스크 정보를 불러오는 중...
+        {/* 뒤로가기 버튼 스켈레톤 */}
+        <div className='flex items-center justify-between'>
+          <Skeleton width="180px" height="2.5rem" rounded="full" />
         </div>
+
+        {/* 태스크 상세 스켈레톤 */}
+        <section className={`${cardStyles.section} p-4`}>
+          <div className='flex items-start justify-between gap-3 mb-4'>
+            <div className='flex-1 min-w-0 space-y-2'>
+              <Skeleton width="70%" height="1.5rem" />
+              <Skeleton width="100px" height="0.75rem" />
+            </div>
+          </div>
+          <div className='mb-4 rounded-2xl border border-sky-500/30 bg-slate-900/50 p-4'>
+            <SkeletonText lines={3} />
+          </div>
+          <div className='flex flex-wrap items-center gap-x-4 gap-y-2'>
+            <Skeleton width="100px" height="0.75rem" />
+            <Skeleton width="100px" height="0.75rem" />
+            <Skeleton width="100px" height="0.75rem" />
+          </div>
+          <div className='mt-4 pt-4 border-t border-white/5'>
+            <Skeleton width="100%" height="2.5rem" rounded="lg" />
+          </div>
+        </section>
+
+        {/* 댓글 섹션 스켈레톤 */}
+        <section className={`${cardStyles.section} p-4`}>
+          <div className='flex items-center gap-2 mb-4'>
+            <Skeleton width="1rem" height="1rem" />
+            <Skeleton width="1.5rem" height="0.875rem" />
+          </div>
+          <div className='mb-4 flex gap-2 items-stretch'>
+            <Skeleton width="100%" height="4rem" rounded="xl" className="flex-1" />
+            <Skeleton width="3rem" height="4rem" rounded="xl" />
+          </div>
+          <div className='space-y-4'>
+            {[1, 2].map((i) => (
+              <div key={i} className='rounded-2xl border border-white/10 bg-slate-950/30 p-4'>
+                <div className='flex items-center gap-2 mb-2'>
+                  <Skeleton width="80px" height="0.875rem" />
+                  <Skeleton width="60px" height="0.75rem" />
+                </div>
+                <SkeletonText lines={2} />
+              </div>
+            ))}
+          </div>
+        </section>
       </TeamsPageLayout>
     );
   }
