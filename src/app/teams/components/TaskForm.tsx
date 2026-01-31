@@ -23,7 +23,7 @@ type TaskFormProps = {
 /**
  * 태스크 생성/수정 공통 폼 컴포넌트
  * - mode: "create" | "edit"로 생성/수정 구분
- * - 모바일 반응형 지원
+ * - 모바일 전용 레이아웃
  */
 export function TaskForm({
   mode,
@@ -71,7 +71,7 @@ export function TaskForm({
       : "수정 완료";
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <Input
         id="taskName"
         label="태스크 이름"
@@ -92,7 +92,7 @@ export function TaskForm({
         disabled={isSubmitting}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 overflow-hidden">
+      <div className="grid gap-4 overflow-hidden">
         <DateInput
           id="startAt"
           label="시작일"
@@ -109,7 +109,7 @@ export function TaskForm({
         />
       </div>
 
-      <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-4 pt-2 sm:pt-4">
+      <div className="flex flex-col-reverse justify-end gap-2 pt-2">
         {cancelHref ? (
           <ButtonLink href={cancelHref} variant="secondary">
             취소
