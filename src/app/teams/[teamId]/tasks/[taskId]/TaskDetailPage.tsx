@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
+import toast from 'react-hot-toast';
 import {
   getTaskDetail,
   createTaskComment,
@@ -29,7 +30,14 @@ import { EditIcon, TrashIcon, ClockIcon, CalendarIcon, CommentIcon, SendIcon } f
 import { formatCompactDateTime } from '@/app/utils/taskUtils';
 import type { TaskStatusKey } from '@/app/config/taskStatusConfig';
 import { cardStyles } from '@/styles/teams';
-import { useTeamTaskId } from '@/app/hooks';
+import { useTeamTaskId, useTeamSocket, useTeamSocketEvents } from '@/app/hooks';
+import type {
+  TaskUpdatedPayload,
+  TaskStatusChangedPayload,
+  CommentCreatedPayload,
+  CommentUpdatedPayload,
+  CommentDeletedPayload,
+} from '@/types/socket';
 
 type TaskDetailPageProps = {
   teamId: string;
@@ -59,6 +67,127 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
 
   // 댓글 목록 (taskDetail에서 직접 참조)
   const comments = taskDetail?.comments ?? [];
+
+  // ===== WebSocket 연결 =====
+  const { socket } = useTeamSocket(teamIdNum, session?.user?.accessToken);
+
+  // Socket 이벤트 핸들러: 태스크 수정
+  const handleSocketTaskUpdated = useCallback(
+    (payload: TaskUpdatedPayload) => {
+      // 다른 태스크의 이벤트는 무시
+      if (payload.taskId !== taskIdNum) return;
+
+      setTaskDetail(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          ...(payload.taskName !== undefined && { taskName: payload.taskName }),
+          ...(payload.taskDescription !== undefined && { taskDescription: payload.taskDescription }),
+          ...(payload.startAt !== undefined && { startAt: payload.startAt ? new Date(payload.startAt) : null }),
+          ...(payload.endAt !== undefined && { endAt: payload.endAt ? new Date(payload.endAt) : null }),
+        };
+      });
+      toast.success('태스크 정보가 업데이트되었습니다.');
+    },
+    [taskIdNum],
+  );
+
+  // Socket 이벤트 핸들러: 태스크 상태 변경
+  const handleSocketTaskStatusChanged = useCallback(
+    (payload: TaskStatusChangedPayload) => {
+      if (payload.taskId !== taskIdNum) return;
+
+      setTaskDetail(prev => {
+        if (!prev) return prev;
+        return { ...prev, taskStatus: payload.newStatus };
+      });
+      toast.success('태스크 상태가 변경되었습니다.');
+    },
+    [taskIdNum],
+  );
+
+  // Socket 이벤트 핸들러: 댓글 생성
+  const handleSocketCommentCreated = useCallback(
+    (payload: CommentCreatedPayload) => {
+      if (payload.taskId !== taskIdNum) return;
+
+      const newComment: TaskComment = {
+        commentId: payload.commentId,
+        teamId: payload.teamId,
+        taskId: payload.taskId,
+        userId: payload.userId,
+        userName: payload.userName,
+        commentContent: payload.commentContent,
+        status: 1,
+        mdfdAt: null,
+        crtdAt: new Date(payload.crtdAt),
+      };
+
+      setTaskDetail(prev => {
+        if (!prev) return prev;
+        return { ...prev, comments: [...prev.comments, newComment] };
+      });
+      toast.success('새 댓글이 추가되었습니다.');
+    },
+    [taskIdNum],
+  );
+
+  // Socket 이벤트 핸들러: 댓글 수정
+  const handleSocketCommentUpdated = useCallback(
+    (payload: CommentUpdatedPayload) => {
+      if (payload.taskId !== taskIdNum) return;
+
+      setTaskDetail(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          comments: prev.comments.map(comment =>
+            comment.commentId === payload.commentId
+              ? {
+                  ...comment,
+                  commentContent: payload.commentContent,
+                  mdfdAt: new Date(payload.mdfdAt),
+                }
+              : comment,
+          ),
+        };
+      });
+      toast.success('댓글이 수정되었습니다.');
+    },
+    [taskIdNum],
+  );
+
+  // Socket 이벤트 핸들러: 댓글 삭제
+  const handleSocketCommentDeleted = useCallback(
+    (payload: CommentDeletedPayload) => {
+      if (payload.taskId !== taskIdNum) return;
+
+      setTaskDetail(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          comments: prev.comments.map(comment =>
+            comment.commentId === payload.commentId ? { ...comment, status: 0 } : comment,
+          ),
+        };
+      });
+      toast.success('댓글이 삭제되었습니다.');
+    },
+    [taskIdNum],
+  );
+
+  // Socket 이벤트 리스너 등록
+  useTeamSocketEvents(
+    socket,
+    {
+      onTaskUpdated: handleSocketTaskUpdated,
+      onTaskStatusChanged: handleSocketTaskStatusChanged,
+      onCommentCreated: handleSocketCommentCreated,
+      onCommentUpdated: handleSocketCommentUpdated,
+      onCommentDeleted: handleSocketCommentDeleted,
+    },
+    session?.user?.userId,
+  );
 
   const fetchTaskDetail = useCallback(
     async (showLoading = true) => {
