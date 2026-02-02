@@ -13,7 +13,7 @@ import { Kanban } from '../../components/Kanban';
 import { SectionLabel, ErrorAlert, TeamBoardSkeleton, ListViewSkeleton, Skeleton, FAB, IconButton } from '../components';
 import { EditIcon, UserGroupIcon, PlusIcon } from '../../components/Icons';
 import type { Task } from '../../types/task';
-import { useTaskFilter, useTelegramLink, useTeamInvite } from '../../hooks';
+import { useTaskFilter, useTelegramLink, useTeamInvite, useTeamSocket, useTeamSocketEvents } from '../../hooks';
 import {
   getTeamTasks,
   updateTaskStatus,
@@ -24,6 +24,12 @@ import {
 import { teamsPageBackground, cardStyles, layoutStyles, MOBILE_MAX_WIDTH } from '@/styles/teams';
 import { STATUS_TO_COLUMN, type ColumnKey } from '../../config/taskStatusConfig';
 import { TeamManagementSection, InviteModal, ViewModeToggle, type ViewMode } from './components';
+import type {
+  TaskCreatedPayload,
+  TaskUpdatedPayload,
+  TaskStatusChangedPayload,
+  TaskActiveStatusChangedPayload,
+} from '@/types/socket';
 
 // taskStatus를 ColumnKey로 매핑
 const taskStatusToColumn: Record<number, ColumnKey | undefined> = {
@@ -93,6 +99,145 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     handleCreateInvite,
     fetchInvites,
   } = useTeamInvite(teamIdNum, session?.user?.accessToken);
+
+  // ===== WebSocket 연결 =====
+  const { socket } = useTeamSocket(teamIdNum, session?.user?.accessToken);
+
+  // Socket 이벤트 핸들러 (useCallback으로 메모이제이션)
+  const handleSocketTaskCreated = useCallback(
+    (payload: TaskCreatedPayload) => {
+      // 새 태스크를 해당 컬럼에 추가
+      const columnKey = taskStatusToColumn[payload.taskStatus] || 'todo';
+
+      // 작성자 이름을 팀 멤버 목록에서 찾기
+      const creator = members.find(m => m.userId === payload.createdBy);
+      const userName = creator?.userName ?? '알 수 없음';
+
+      const newTask: Task = {
+        taskId: payload.taskId,
+        teamId: payload.teamId,
+        taskName: payload.taskName,
+        taskDescription: payload.taskDescription,
+        taskStatus: payload.taskStatus,
+        actStatus: payload.actStatus,
+        startAt: payload.startAt ? new Date(payload.startAt) : null,
+        endAt: payload.endAt ? new Date(payload.endAt) : null,
+        crtdBy: payload.createdBy,
+        crtdAt: new Date(),
+        userName,
+      };
+
+      if (payload.actStatus === 1) {
+        setTasks(prev => ({
+          ...prev,
+          [columnKey]: [...prev[columnKey], newTask],
+        }));
+        toast.success('새 태스크가 추가되었습니다.');
+      }
+    },
+    [members],
+  );
+
+  const handleSocketTaskUpdated = useCallback((payload: TaskUpdatedPayload) => {
+    setTasks(prev => {
+      const newTasks = { ...prev };
+      // 모든 컬럼에서 해당 태스크 찾아서 업데이트
+      for (const columnKey of Object.keys(newTasks) as ColumnKey[]) {
+        const taskIndex = newTasks[columnKey].findIndex(t => t.taskId === payload.taskId);
+        if (taskIndex !== -1) {
+          newTasks[columnKey] = newTasks[columnKey].map(task =>
+            task.taskId === payload.taskId
+              ? {
+                  ...task,
+                  ...(payload.taskName !== undefined && { taskName: payload.taskName }),
+                  ...(payload.taskDescription !== undefined && { taskDescription: payload.taskDescription }),
+                  ...(payload.startAt !== undefined && { startAt: payload.startAt ? new Date(payload.startAt) : null }),
+                  ...(payload.endAt !== undefined && { endAt: payload.endAt ? new Date(payload.endAt) : null }),
+                }
+              : task,
+          );
+          break;
+        }
+      }
+      return newTasks;
+    });
+    toast.success('태스크가 수정되었습니다.');
+  }, []);
+
+  const handleSocketTaskStatusChanged = useCallback((payload: TaskStatusChangedPayload) => {
+    const newColumnKey = taskStatusToColumn[payload.newStatus];
+    if (!newColumnKey) return;
+
+    setTasks(prev => {
+      let movedTask: Task | undefined;
+      let sourceColumnKey: ColumnKey | undefined;
+
+      // 모든 컬럼에서 태스크 찾기
+      for (const columnKey of Object.keys(prev) as ColumnKey[]) {
+        const foundTask = prev[columnKey].find(t => t.taskId === payload.taskId);
+        if (foundTask) {
+          movedTask = foundTask;
+          sourceColumnKey = columnKey;
+          break;
+        }
+      }
+
+      // 태스크를 찾지 못했으면 변경 없음
+      if (!movedTask || !sourceColumnKey) {
+        return prev;
+      }
+
+      // 같은 컬럼 내 이동이면 상태값만 업데이트
+      if (sourceColumnKey === newColumnKey) {
+        return {
+          ...prev,
+          [sourceColumnKey]: prev[sourceColumnKey].map(task =>
+            task.taskId === payload.taskId
+              ? { ...task, taskStatus: payload.newStatus }
+              : task,
+          ),
+        };
+      }
+
+      // 다른 컬럼으로 이동: 불변성을 유지하며 업데이트
+      const updatedTask = { ...movedTask, taskStatus: payload.newStatus };
+
+      return {
+        ...prev,
+        // 원본 컬럼에서 제거 (filter로 새 배열 생성)
+        [sourceColumnKey]: prev[sourceColumnKey].filter(t => t.taskId !== payload.taskId),
+        // 대상 컬럼에 추가 (spread로 새 배열 생성)
+        [newColumnKey]: [...prev[newColumnKey], updatedTask],
+      };
+    });
+    toast.success('태스크 상태가 변경되었습니다.');
+  }, []);
+
+  const handleSocketTaskActiveStatusChanged = useCallback((payload: TaskActiveStatusChangedPayload) => {
+    // actStatus가 0(비활성)으로 변경되면 목록에서 제거
+    if (payload.newActStatus === 0) {
+      setTasks(prev => {
+        const newTasks = { ...prev };
+        for (const columnKey of Object.keys(newTasks) as ColumnKey[]) {
+          newTasks[columnKey] = newTasks[columnKey].filter(t => t.taskId !== payload.taskId);
+        }
+        return newTasks;
+      });
+      toast.success('태스크가 비활성화되었습니다.');
+    }
+  }, []);
+
+  // Socket 이벤트 리스너 등록
+  useTeamSocketEvents(
+    socket,
+    {
+      onTaskCreated: handleSocketTaskCreated,
+      onTaskUpdated: handleSocketTaskUpdated,
+      onTaskStatusChanged: handleSocketTaskStatusChanged,
+      onTaskActiveStatusChanged: handleSocketTaskActiveStatusChanged,
+    },
+    session?.user?.userId,
+  );
 
   // viewMode는 URL 쿼리에서 파생
   const viewMode = getViewModeFromQuery();
