@@ -759,3 +759,53 @@ export async function deleteTelegramLink(teamId: number, accessToken: string): P
     default: '텔레그램 연동 해제 실패',
   });
 }
+
+// ==================== 멤버 역할 관리 API ====================
+
+export type UpdateMemberRoleRequest = {
+  newRole: 'MANAGER' | 'MEMBER';
+};
+
+export type MemberRoleChangeData = {
+  teamId: number;
+  userId: number;
+  userName: string | null;
+  previousRole: string;
+  newRole: string;
+};
+
+export type UpdateMemberRoleResponse = {
+  code: 'SUCCESS';
+  message: string;
+  data: MemberRoleChangeData;
+};
+
+/**
+ * 팀 멤버 역할 변경
+ * - MASTER: 본인 제외 모든 멤버를 MANAGER/MEMBER로 변경 가능
+ * - MANAGER: MEMBER를 MANAGER로 승격 가능
+ */
+export async function updateMemberRole(
+  teamId: number,
+  userId: number,
+  request: UpdateMemberRoleRequest,
+  accessToken: string,
+): Promise<UpdateMemberRoleResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'PATCH',
+    endpoint: `/api/v1/teams/${teamId}/users/${userId}/role`,
+    accessToken,
+    body: request,
+  });
+
+  if (!response.ok) {
+    await handleApiError(response, {
+      400: '역할 변경 요청이 올바르지 않습니다.',
+      403: '역할을 변경할 권한이 없습니다.',
+      404: '팀 멤버를 찾을 수 없습니다.',
+      default: '역할 변경 실패',
+    });
+  }
+
+  return response.json();
+}

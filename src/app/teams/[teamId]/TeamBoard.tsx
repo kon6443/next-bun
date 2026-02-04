@@ -19,16 +19,23 @@ import {
   updateTaskStatus,
   getTeamUsers,
   getTelegramStatus,
+  updateMemberRole,
   type TeamUserResponse,
 } from '@/services/teamService';
 import { teamsPageBackground, cardStyles, layoutStyles, MOBILE_MAX_WIDTH } from '@/styles/teams';
 import { STATUS_TO_COLUMN, type ColumnKey } from '../../config/taskStatusConfig';
-import { TeamManagementSection, InviteModal, ViewModeToggle, type ViewMode } from './components';
+import { TeamManagementSection, InviteModal, RoleChangeModal, ViewModeToggle, OnlineUsers, type ViewMode } from './components';
+import { ROLES } from '../../config/roleConfig';
 import type {
   TaskCreatedPayload,
   TaskUpdatedPayload,
   TaskStatusChangedPayload,
   TaskActiveStatusChangedPayload,
+  OnlineUserInfo,
+  UserJoinedPayload,
+  UserLeftPayload,
+  OnlineUsersPayload,
+  MemberRoleChangedPayload,
 } from '@/types/socket';
 
 // taskStatus를 ColumnKey로 매핑
@@ -76,6 +83,12 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [canManageInvites, setCanManageInvites] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState<OnlineUserInfo[]>([]);
+
+  // 역할 변경 모달 상태
+  const [showRoleChangeModal, setShowRoleChangeModal] = useState(false);
+  const [roleChangeTarget, setRoleChangeTarget] = useState<TeamUserResponse | null>(null);
+  const [isChangingRole, setIsChangingRole] = useState(false);
 
   // 커스텀 훅으로 분리된 로직
   const {
@@ -227,6 +240,99 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     }
   }, []);
 
+  // 온라인 유저 접속 이벤트
+  const handleUserJoined = useCallback((payload: UserJoinedPayload) => {
+    setOnlineUsers(prev => {
+      const existingIndex = prev.findIndex(u => u.userId === payload.userId);
+      if (existingIndex >= 0) {
+        // 기존 유저 업데이트 (다중 탭 접속)
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          connectionCount: payload.connectionCount,
+        };
+        return updated;
+      } else {
+        // 새 유저 추가
+        return [...prev, {
+          userId: payload.userId,
+          userName: payload.userName,
+          connectionCount: payload.connectionCount,
+        }];
+      }
+    });
+    // 첫 접속일 때만 토스트 표시 (다중 탭 아닌 경우)
+    if (payload.connectionCount === 1) {
+      toast(`${payload.userName}님이 접속했습니다`, {
+        icon: '🟢',
+        duration: 2000,
+        style: {
+          background: '#1e293b',
+          color: '#e2e8f0',
+          border: '1px solid rgba(16, 185, 129, 0.2)',
+        },
+      });
+    }
+  }, []);
+
+  // 온라인 유저 퇴장 이벤트
+  const handleUserLeft = useCallback((payload: UserLeftPayload) => {
+    setOnlineUsers(prev => {
+      if (payload.connectionCount === 0) {
+        // 완전히 오프라인 → 목록에서 제거
+        return prev.filter(u => u.userId !== payload.userId);
+      } else {
+        // 다중 탭 중 일부만 종료 → 카운트만 업데이트
+        return prev.map(u =>
+          u.userId === payload.userId
+            ? { ...u, connectionCount: payload.connectionCount }
+            : u
+        );
+      }
+    });
+    // 완전히 오프라인일 때만 토스트 표시
+    if (payload.connectionCount === 0) {
+      toast(`${payload.userName}님이 퇴장했습니다`, {
+        icon: '🔴',
+        duration: 2000,
+        style: {
+          background: '#1e293b',
+          color: '#e2e8f0',
+          border: '1px solid rgba(239, 68, 68, 0.2)',
+        },
+      });
+    }
+  }, []);
+
+  // 온라인 유저 목록 이벤트 (첫 접속 시)
+  const handleOnlineUsers = useCallback((payload: OnlineUsersPayload) => {
+    setOnlineUsers(payload.users);
+  }, []);
+
+  // 멤버 역할 변경 이벤트
+  const handleMemberRoleChanged = useCallback((payload: MemberRoleChangedPayload) => {
+    // 멤버 목록에서 해당 유저의 역할 업데이트
+    setMembers(prev => 
+      prev.map(member => 
+        member.userId === payload.userId
+          ? { ...member, role: payload.newRole }
+          : member
+      )
+    );
+
+    // 토스트 알림
+    const roleLabel = ROLES[payload.newRole as keyof typeof ROLES]?.label || payload.newRole;
+    toast(`${payload.userName || `사용자 ${payload.userId}`}님의 역할이 ${roleLabel}로 변경되었습니다`, {
+      icon: '🔄',
+      duration: 3000,
+      style: {
+        background: '#1e293b',
+        color: '#e2e8f0',
+        border: '1px solid rgba(99, 102, 241, 0.2)',
+      },
+    });
+  }, []);
+
   // Socket 이벤트 리스너 등록
   useTeamSocketEvents(
     socket,
@@ -235,6 +341,10 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       onTaskUpdated: handleSocketTaskUpdated,
       onTaskStatusChanged: handleSocketTaskStatusChanged,
       onTaskActiveStatusChanged: handleSocketTaskActiveStatusChanged,
+      onUserJoined: handleUserJoined,
+      onUserLeft: handleUserLeft,
+      onOnlineUsers: handleOnlineUsers,
+      onMemberRoleChanged: handleMemberRoleChanged,
     },
     session?.user?.userId,
   );
@@ -503,13 +613,68 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     [session?.user?.accessToken, tasks, teamId],
   );
 
+  // 역할 변경 모달 열기
+  const handleOpenRoleChange = useCallback((member: TeamUserResponse) => {
+    setRoleChangeTarget(member);
+    setShowRoleChangeModal(true);
+  }, []);
+
+  // 역할 변경 모달 닫기
+  const handleCloseRoleChange = useCallback(() => {
+    setShowRoleChangeModal(false);
+    setRoleChangeTarget(null);
+  }, []);
+
+  // 역할 변경 처리
+  const handleRoleChange = useCallback(
+    async (newRole: 'MANAGER' | 'MEMBER') => {
+      if (!roleChangeTarget || !session?.user?.accessToken) return;
+
+      setIsChangingRole(true);
+      try {
+        await updateMemberRole(
+          teamIdNum,
+          roleChangeTarget.userId,
+          { newRole },
+          session.user.accessToken,
+        );
+
+        // API 성공 시 로컬 상태 업데이트 (WebSocket 이벤트로도 업데이트되지만 즉시 반영)
+        setMembers(prev =>
+          prev.map(member =>
+            member.userId === roleChangeTarget.userId
+              ? { ...member, role: newRole }
+              : member
+          )
+        );
+
+        toast.success('역할이 변경되었습니다.');
+        handleCloseRoleChange();
+      } catch (err) {
+        console.error('Failed to change role:', err);
+        toast.error(err instanceof Error ? err.message : '역할 변경에 실패했습니다.');
+      } finally {
+        setIsChangingRole(false);
+      }
+    },
+    [roleChangeTarget, session?.user?.accessToken, teamIdNum, handleCloseRoleChange],
+  );
+
+  // 현재 사용자의 역할 가져오기
+  const currentUserMember = members.find(m => m.userId === session?.user?.userId);
+  const currentUserRole = currentUserMember?.role || 'MEMBER';
+
   return (
     <div className={layoutStyles.pageContainer} style={teamsPageBackground}>
       <main className={`${layoutStyles.mainContent} ${MOBILE_MAX_WIDTH}`}>
         {/* 팀 헤더 섹션 */}
         <section className={`${cardStyles.section} p-4`}>
-          <SectionLabel>Team Kanban</SectionLabel>
-          <div className="mt-4">
+          <div className="flex items-center justify-between mb-4">
+            <SectionLabel>Team Kanban</SectionLabel>
+            {/* 온라인 유저 미니뷰 */}
+            <OnlineUsers users={onlineUsers} currentUserId={session?.user?.userId} />
+          </div>
+          <div>
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <h1 className="text-3xl font-bold text-white truncate">
@@ -557,6 +722,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           onCreateTelegramLink={handleCreateTelegramLink}
           onDeleteTelegramLink={handleDeleteTelegramLink}
           onRefreshTelegramStatus={handleRefreshTelegramStatus}
+          onOpenRoleChange={handleOpenRoleChange}
         />
 
         {error && <ErrorAlert message={error} className="text-center" />}
@@ -617,6 +783,24 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         isCreating={isCreatingInvite}
         createdInviteLink={createdInviteLink}
         onClearCreatedLink={() => setCreatedInviteLink(null)}
+      />
+
+      {/* 역할 변경 모달 */}
+      <RoleChangeModal
+        isOpen={showRoleChangeModal}
+        onClose={handleCloseRoleChange}
+        onSubmit={handleRoleChange}
+        isSubmitting={isChangingRole}
+        targetUser={
+          roleChangeTarget
+            ? {
+                userId: roleChangeTarget.userId,
+                userName: roleChangeTarget.userName,
+                currentRole: roleChangeTarget.role,
+              }
+            : null
+        }
+        actorRole={currentUserRole}
       />
 
       {/* FAB: 새 카드 작성 */}
