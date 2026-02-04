@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { SectionLabel, EmptyState } from '../../components';
-import { ChevronUpIcon, ChevronDownIcon, UserIcon, ChartIcon, MailIcon, SendIcon } from '@/app/components/Icons';
-import { getRoleMeta, CURRENT_USER_BADGE_CLASSNAME } from '@/app/config/roleConfig';
+import { ChevronUpIcon, ChevronDownIcon, UserIcon, ChartIcon, MailIcon, SendIcon, EditIcon } from '@/app/components/Icons';
+import { getRoleMeta, CURRENT_USER_BADGE_CLASSNAME, type RoleKey } from '@/app/config/roleConfig';
 import { formatFullDateTime } from '@/app/utils/taskUtils';
 import { TelegramSection } from './TelegramSection';
 import type { TeamUserResponse, TeamInviteResponse, TelegramStatusResponse } from '@/services/teamService';
@@ -36,6 +36,9 @@ type TeamManagementSectionProps = {
   onCreateTelegramLink: () => Promise<void>;
   onDeleteTelegramLink: () => Promise<void>;
   onRefreshTelegramStatus: () => Promise<void>;
+
+  // 역할 변경 관련
+  onOpenRoleChange?: (member: TeamUserResponse) => void;
 };
 
 // 탭 설정 타입
@@ -71,6 +74,7 @@ export function TeamManagementSection({
   onCreateTelegramLink,
   onDeleteTelegramLink,
   onRefreshTelegramStatus,
+  onOpenRoleChange,
 }: TeamManagementSectionProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>('stats');
@@ -79,6 +83,36 @@ export function TeamManagementSection({
     navigator.clipboard.writeText(link).then(() => {
       toast.success('초대 링크가 클립보드에 복사되었습니다.');
     });
+  };
+
+  // 현재 사용자의 역할 가져오기
+  const currentUserMember = members.find(m => m.userId === currentUserId);
+  const currentUserRole = currentUserMember?.role?.toUpperCase() as RoleKey | undefined;
+
+  /**
+   * 특정 멤버의 역할을 변경할 수 있는지 확인
+   * - MASTER: 본인 제외 모든 멤버 변경 가능
+   * - MANAGER: MEMBER만 MANAGER로 승격 가능
+   */
+  const canChangeRole = (targetMember: TeamUserResponse): boolean => {
+    if (!currentUserRole || !onOpenRoleChange) return false;
+    
+    // 본인은 변경 불가
+    if (targetMember.userId === currentUserId) return false;
+
+    const targetRole = targetMember.role?.toUpperCase() as RoleKey;
+
+    // MASTER는 모든 하위 역할 변경 가능
+    if (currentUserRole === 'MASTER') {
+      return targetRole !== 'MASTER';
+    }
+
+    // MANAGER는 MEMBER만 승격 가능
+    if (currentUserRole === 'MANAGER') {
+      return targetRole === 'MEMBER';
+    }
+
+    return false;
   };
 
   // 탭 설정
@@ -171,6 +205,7 @@ export function TeamManagementSection({
                   {members.map(member => {
                     const isCurrentUser = currentUserId === member.userId;
                     const roleMeta = getRoleMeta(member.role);
+                    const showRoleChangeButton = canChangeRole(member);
 
                     return (
                       <div key={member.userId} className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
@@ -185,6 +220,16 @@ export function TeamManagementSection({
                             </div>
                             <p className="mt-2 text-xs text-slate-500">가입일: {formatMemberDate(member.joinedAt)}</p>
                           </div>
+                          {showRoleChangeButton && (
+                            <button
+                              onClick={() => onOpenRoleChange?.(member)}
+                              className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-white/20 hover:bg-white/10"
+                              title="역할 변경"
+                            >
+                              <EditIcon className="h-3.5 w-3.5" />
+                              역할 변경
+                            </button>
+                          )}
                         </div>
                       </div>
                     );

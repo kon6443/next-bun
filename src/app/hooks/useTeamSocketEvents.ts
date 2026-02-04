@@ -11,6 +11,10 @@ import type {
   CommentCreatedPayload,
   CommentUpdatedPayload,
   CommentDeletedPayload,
+  UserJoinedPayload,
+  UserLeftPayload,
+  OnlineUsersPayload,
+  MemberRoleChangedPayload,
 } from '@/types/socket';
 import { TeamSocketEvents } from '@/types/socket';
 
@@ -31,6 +35,14 @@ interface TeamSocketEventHandlers {
   onCommentUpdated?: (payload: CommentUpdatedPayload) => void;
   /** 댓글 삭제 이벤트 핸들러 */
   onCommentDeleted?: (payload: CommentDeletedPayload) => void;
+  /** 유저 접속 이벤트 핸들러 */
+  onUserJoined?: (payload: UserJoinedPayload) => void;
+  /** 유저 퇴장 이벤트 핸들러 */
+  onUserLeft?: (payload: UserLeftPayload) => void;
+  /** 온라인 유저 목록 이벤트 핸들러 */
+  onOnlineUsers?: (payload: OnlineUsersPayload) => void;
+  /** 멤버 역할 변경 이벤트 핸들러 */
+  onMemberRoleChanged?: (payload: MemberRoleChangedPayload) => void;
 }
 
 /**
@@ -148,6 +160,35 @@ export function useTeamSocketEvents(
       handlersRef.current.onCommentDeleted?.(payload);
     };
 
+    // 유저 접속 이벤트 (본인 이벤트도 받음 - 다른 유저가 입장한 것)
+    const handleUserJoined = (payload: UserJoinedPayload) => {
+      console.log('[Socket] 유저 접속:', payload);
+      handlersRef.current.onUserJoined?.(payload);
+    };
+
+    // 유저 퇴장 이벤트
+    const handleUserLeft = (payload: UserLeftPayload) => {
+      console.log('[Socket] 유저 퇴장:', payload);
+      handlersRef.current.onUserLeft?.(payload);
+    };
+
+    // 온라인 유저 목록 이벤트 (접속 시 본인에게만 전송됨)
+    const handleOnlineUsers = (payload: OnlineUsersPayload) => {
+      console.log('[Socket] 온라인 유저 목록:', payload);
+      handlersRef.current.onOnlineUsers?.(payload);
+    };
+
+    // 멤버 역할 변경 이벤트
+    const handleMemberRoleChanged = (payload: MemberRoleChangedPayload) => {
+      // 본인이 변경한 역할은 HTTP 응답으로 처리되므로 스킵
+      if (isSelfTriggered(payload.changedBy)) {
+        console.log('[Socket] 본인 역할 변경 이벤트 스킵:', payload.userId);
+        return;
+      }
+      console.log('[Socket] 멤버 역할 변경:', payload);
+      handlersRef.current.onMemberRoleChanged?.(payload);
+    };
+
     // 이벤트 리스너 등록
     socket.on(TeamSocketEvents.TASK_CREATED, handleTaskCreated);
     socket.on(TeamSocketEvents.TASK_UPDATED, handleTaskUpdated);
@@ -157,6 +198,10 @@ export function useTeamSocketEvents(
     socket.on(TeamSocketEvents.COMMENT_CREATED, handleCommentCreated);
     socket.on(TeamSocketEvents.COMMENT_UPDATED, handleCommentUpdated);
     socket.on(TeamSocketEvents.COMMENT_DELETED, handleCommentDeleted);
+    socket.on(TeamSocketEvents.USER_JOINED, handleUserJoined);
+    socket.on(TeamSocketEvents.USER_LEFT, handleUserLeft);
+    socket.on(TeamSocketEvents.ONLINE_USERS, handleOnlineUsers);
+    socket.on(TeamSocketEvents.MEMBER_ROLE_CHANGED, handleMemberRoleChanged);
 
     // Cleanup: 이벤트 리스너 해제
     return () => {
@@ -168,6 +213,10 @@ export function useTeamSocketEvents(
       socket.off(TeamSocketEvents.COMMENT_CREATED, handleCommentCreated);
       socket.off(TeamSocketEvents.COMMENT_UPDATED, handleCommentUpdated);
       socket.off(TeamSocketEvents.COMMENT_DELETED, handleCommentDeleted);
+      socket.off(TeamSocketEvents.USER_JOINED, handleUserJoined);
+      socket.off(TeamSocketEvents.USER_LEFT, handleUserLeft);
+      socket.off(TeamSocketEvents.ONLINE_USERS, handleOnlineUsers);
+      socket.off(TeamSocketEvents.MEMBER_ROLE_CHANGED, handleMemberRoleChanged);
     };
   }, [socket, isSelfTriggered]);
 }
