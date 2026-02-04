@@ -19,6 +19,14 @@ export const TeamSocketEvents = {
   COMMENT_UPDATED: 'commentUpdated',
   COMMENT_DELETED: 'commentDeleted',
 
+  // Server → Client (온라인 유저)
+  USER_JOINED: 'userJoined',
+  USER_LEFT: 'userLeft',
+  ONLINE_USERS: 'onlineUsers',
+
+  // Server → Client (멤버 역할)
+  MEMBER_ROLE_CHANGED: 'memberRoleChanged',
+
   // 공통
   JOINED_TEAM: 'joinedTeam',
   LEFT_TEAM: 'leftTeam',
@@ -127,6 +135,52 @@ export interface SocketErrorPayload {
   timestamp?: string;
 }
 
+// ===== 온라인 유저 관련 타입 =====
+
+/** 온라인 유저 정보 */
+export interface OnlineUserInfo {
+  userId: number;
+  userName: string;
+  connectionCount: number; // 같은 유저의 접속 수 (다중 탭)
+}
+
+/** 유저 접속 이벤트 */
+export interface UserJoinedPayload {
+  teamId: number;
+  userId: number;
+  userName: string;
+  connectionCount: number;
+  totalOnlineCount: number;
+}
+
+/** 유저 퇴장 이벤트 */
+export interface UserLeftPayload {
+  teamId: number;
+  userId: number;
+  userName: string;
+  connectionCount: number; // 남은 접속 수 (0이면 완전히 오프라인)
+  totalOnlineCount: number;
+}
+
+/** 온라인 유저 목록 */
+export interface OnlineUsersPayload {
+  teamId: number;
+  users: OnlineUserInfo[];
+  totalCount: number;
+}
+
+// ===== 멤버 역할 관련 타입 =====
+
+/** 멤버 역할 변경 이벤트 */
+export interface MemberRoleChangedPayload {
+  teamId: number;
+  userId: number;
+  userName: string | null;
+  previousRole: string;
+  newRole: string;
+  changedBy: number;
+}
+
 // ===== Socket 타입 정의 =====
 
 /** Server → Client 이벤트 타입 맵 */
@@ -139,6 +193,10 @@ export interface ServerToClientEvents {
   [TeamSocketEvents.COMMENT_CREATED]: (payload: CommentCreatedPayload) => void;
   [TeamSocketEvents.COMMENT_UPDATED]: (payload: CommentUpdatedPayload) => void;
   [TeamSocketEvents.COMMENT_DELETED]: (payload: CommentDeletedPayload) => void;
+  [TeamSocketEvents.USER_JOINED]: (payload: UserJoinedPayload) => void;
+  [TeamSocketEvents.USER_LEFT]: (payload: UserLeftPayload) => void;
+  [TeamSocketEvents.ONLINE_USERS]: (payload: OnlineUsersPayload) => void;
+  [TeamSocketEvents.MEMBER_ROLE_CHANGED]: (payload: MemberRoleChangedPayload) => void;
   [TeamSocketEvents.JOINED_TEAM]: (payload: JoinedTeamPayload) => void;
   [TeamSocketEvents.LEFT_TEAM]: (payload: LeftTeamPayload) => void;
   [TeamSocketEvents.ERROR]: (payload: SocketErrorPayload) => void;
