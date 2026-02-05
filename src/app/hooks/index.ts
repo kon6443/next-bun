@@ -11,5 +11,5 @@ export { useTeamData, type UseTeamDataReturn, type TasksByColumn } from './useTe
 export { useSafeNavigation } from './useSafeNavigation';
 
 // Socket 관련 훅
-export { useTeamSocket } from './useTeamSocket';
+// useTeamSocket은 TeamSocketContext로 대체됨 (teams/[teamId]/contexts/TeamSocketContext.tsx)
 export { useTeamSocketEvents } from './useTeamSocketEvents';
