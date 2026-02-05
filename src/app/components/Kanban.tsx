@@ -229,7 +229,7 @@ export function Kanban({ tasksByColumn, onStatusChange, teamId }: KanbanProps) {
           >
             {/* 스와이프 애니메이션 아이콘 */}
             <div className="relative flex items-center justify-center w-24 h-16">
-              <div className="swipe-hint-hand">
+              <div className="animate-[swipeHint_1.5s_ease-in-out_infinite]">
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-sky-400 to-indigo-500 flex items-center justify-center shadow-lg">
                   <ChevronLeftIcon className="w-5 h-5 text-white opacity-80" />
                   <ChevronRightIcon className="w-5 h-5 text-white opacity-80 -ml-2" />
@@ -254,17 +254,6 @@ export function Kanban({ tasksByColumn, onStatusChange, teamId }: KanbanProps) {
         </div>
       )}
 
-      {/* 스와이프 힌트 애니메이션 스타일 */}
-      <style jsx>{`
-        @keyframes swipeHint {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-12px); }
-          75% { transform: translateX(12px); }
-        }
-        .swipe-hint-hand {
-          animation: swipeHint 1.5s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   );
 }

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, Suspense, type JSX } from "react";
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { TeamsPageLayout, SectionLabel, Skeleton } from "@/app/teams/components";
+import { useSafeNavigation } from "@/app/hooks";
 import { cardStyles } from "@/styles/teams";
 import BatteryAnimation from "./components/BatteryAnimation";
 import OrbitAnimation from "./components/OrbitAnimation";
@@ -33,12 +34,11 @@ const inactiveButtonStyle =
   "bg-white/5 text-slate-400 hover:text-white hover:border-white/30";
 
 function TimeMeasurementContent() {
-  const searchParams = useSearchParams();
+  const { searchParams, pathname, getParam } = useSafeNavigation();
   const router = useRouter();
-  const pathname = usePathname();
 
   const getInitialTime = (paramName: string, defaultValue: string) => {
-    const paramValue = searchParams.get(paramName);
+    const paramValue = getParam(paramName);
     return paramValue && /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(paramValue)
       ? paramValue
       : defaultValue;
@@ -101,7 +101,7 @@ function TimeMeasurementContent() {
   }, [startTime, endTime]);
 
   const handleTimeChange = (type: "start" | "end", value: string) => {
-    const params = new URLSearchParams(searchParams);
+    const params = new URLSearchParams(searchParams.toString());
     if (type === "start") {
       setStartTime(value);
       params.set("startTime", value);
