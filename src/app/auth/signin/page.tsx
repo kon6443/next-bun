@@ -2,13 +2,13 @@
 
 import type { CSSProperties } from "react";
 import { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
+import { useSafeNavigation } from "@/app/hooks";
 import { AUTH_LOADING_KEY } from "@/app/components/AuthLoadingOverlay";
 
 function SignInContent() {
-  const searchParams = useSearchParams();
-  const error = searchParams.get("error");
+  const { getParam } = useSafeNavigation();
+  const error = getParam("error") || null;
 
   const handleKakaoLogin = () => {
     // 전역 로딩 오버레이 활성화

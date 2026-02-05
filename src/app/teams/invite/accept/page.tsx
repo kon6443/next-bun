@@ -1,22 +1,23 @@
 "use client";
 
 import { useEffect, useState, Suspense, useCallback } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useSession, signIn } from "next-auth/react";
 import { acceptTeamInvite } from "@/services/teamService";
 import { TeamsCenteredLayout, LoadingSpinnerSimple, Button } from "../../components";
+import { useSafeNavigation } from "@/app/hooks";
 import { cardStyles } from "@/styles/teams";
 import { ApiError } from "@/types/api";
 
 function InviteAcceptContent() {
-  const searchParams = useSearchParams();
+  const { getParam } = useSafeNavigation();
   const router = useRouter();
   const { data: session, status } = useSession();
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const token = searchParams.get("token");
+  const token = getParam("token") || null;
 
   const handleAcceptInvite = useCallback(async () => {
     if (!token || !session?.user?.accessToken) {

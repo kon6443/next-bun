@@ -33,6 +33,29 @@ body {
   }
 }
 
+/* 바텀시트 슬라이드업 애니메이션 */
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* 스와이프 힌트 애니메이션 */
+@keyframes swipeHint {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-12px);
+  }
+  75% {
+    transform: translateX(12px);
+  }
+}
+
 .animate-barLoader {
   animation: barLoader 1s ease-in-out infinite;
 }

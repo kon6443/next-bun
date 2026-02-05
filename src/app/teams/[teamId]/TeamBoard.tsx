@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
-import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 
 import { GanttChart } from '../../components/GanttChart';
@@ -13,7 +13,7 @@ import { Kanban } from '../../components/Kanban';
 import { SectionLabel, ErrorAlert, TeamBoardSkeleton, ListViewSkeleton, Skeleton, FAB, IconButton } from '../components';
 import { EditIcon, UserGroupIcon, PlusIcon } from '../../components/Icons';
 import type { Task } from '../../types/task';
-import { useTaskFilter, useTelegramLink, useTeamInvite, useTeamSocket, useTeamSocketEvents } from '../../hooks';
+import { useTaskFilter, useTelegramLink, useTeamInvite, useTeamSocket, useTeamSocketEvents, useSafeNavigation } from '../../hooks';
 import {
   getTeamTasks,
   updateTaskStatus,
@@ -56,17 +56,16 @@ const validViewModes: ViewMode[] = ['kanban', 'gantt', 'list', 'calendar'];
 export default function TeamBoard({ teamId }: TeamBoardProps) {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const { searchParams, pathname, getParam } = useSafeNavigation();
 
   // URL 쿼리에서 viewMode 읽기
   const getViewModeFromQuery = useCallback((): ViewMode => {
-    const viewParam = searchParams.get('view');
+    const viewParam = getParam('view');
     if (viewParam && validViewModes.includes(viewParam as ViewMode)) {
       return viewParam as ViewMode;
     }
     return 'kanban';
-  }, [searchParams]);
+  }, [getParam]);
 
   const teamIdNum = parseInt(teamId, 10);
 
@@ -89,6 +88,9 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   const [showRoleChangeModal, setShowRoleChangeModal] = useState(false);
   const [roleChangeTarget, setRoleChangeTarget] = useState<TeamUserResponse | null>(null);
   const [isChangingRole, setIsChangingRole] = useState(false);
+
+  // 온라인 유저 모달 상태 (FAB 숨김용)
+  const [isOnlineModalOpen, setIsOnlineModalOpen] = useState(false);
 
   // 커스텀 훅으로 분리된 로직
   const {
@@ -672,7 +674,11 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           <div className="flex items-center justify-between mb-4">
             <SectionLabel>Team Kanban</SectionLabel>
             {/* 온라인 유저 미니뷰 */}
-            <OnlineUsers users={onlineUsers} currentUserId={session?.user?.userId} />
+            <OnlineUsers
+              users={onlineUsers}
+              currentUserId={session?.user?.userId}
+              onModalOpenChange={setIsOnlineModalOpen}
+            />
           </div>
           <div>
             <div className="flex items-start justify-between gap-3">
@@ -803,8 +809,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         actorRole={currentUserRole}
       />
 
-      {/* FAB: 새 카드 작성 */}
-      <FAB href={`/teams/${teamId}/tasks/new`} label="새 카드 작성" />
+      {/* FAB: 새 카드 작성 (온라인 유저 모달이 열려있으면 숨김) */}
+      {!isOnlineModalOpen && <FAB href={`/teams/${teamId}/tasks/new`} label="새 카드 작성" />}
     </div>
   );
 }

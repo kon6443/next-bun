@@ -34,7 +34,7 @@ const navItems: NavItem[] = [
 ];
 
 const BottomNavBar = () => {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '';
 
   return (
     <nav className={styles.nav} aria-label="주요 탐색">
