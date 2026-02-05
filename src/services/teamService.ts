@@ -209,6 +209,7 @@ export type TeamUserResponse = {
   userName: string | null;
   role: string;
   joinedAt: Date;
+  userActStatus: 0 | 1;
 };
 
 export type GetTeamUsersResponse = {
@@ -356,11 +357,17 @@ export async function updateTeam(
 
 /**
  * 팀 멤버 목록 조회
+ * @param status 0: 비활성, 1: 활성, undefined: 전체
  */
-export async function getTeamUsers(teamId: number, accessToken: string): Promise<GetTeamUsersResponse> {
+export async function getTeamUsers(
+  teamId: number,
+  accessToken: string,
+  status?: 0 | 1,
+): Promise<GetTeamUsersResponse> {
+  const queryParams = status !== undefined ? `?status=${status}` : '';
   const response = await fetchServiceInstance.backendFetch({
     method: 'GET',
-    endpoint: `/api/v1/teams/${teamId}/users`,
+    endpoint: `/api/v1/teams/${teamId}/users${queryParams}`,
     accessToken,
   });
 
@@ -804,6 +811,55 @@ export async function updateMemberRole(
       403: '역할을 변경할 권한이 없습니다.',
       404: '팀 멤버를 찾을 수 없습니다.',
       default: '역할 변경 실패',
+    });
+  }
+
+  return response.json();
+}
+
+// ==================== 멤버 상태 관리 API ====================
+
+export type UpdateMemberStatusRequest = {
+  actStatus: 0 | 1;
+};
+
+export type MemberStatusChangeData = {
+  teamId: number;
+  userId: number;
+  userName: string | null;
+  previousStatus: number;
+  newStatus: number;
+};
+
+export type UpdateMemberStatusResponse = {
+  code: 'SUCCESS';
+  message: string;
+  data: MemberStatusChangeData;
+};
+
+/**
+ * 팀 멤버 활성 상태 변경
+ * @param actStatus 0: 비활성화, 1: 활성화
+ */
+export async function updateMemberStatus(
+  teamId: number,
+  userId: number,
+  request: UpdateMemberStatusRequest,
+  accessToken: string,
+): Promise<UpdateMemberStatusResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'PUT',
+    endpoint: `/api/v1/teams/${teamId}/users/${userId}/status`,
+    accessToken,
+    body: request,
+  });
+
+  if (!response.ok) {
+    await handleApiError(response, {
+      400: '상태 변경 요청이 올바르지 않습니다.',
+      403: '상태를 변경할 권한이 없습니다.',
+      404: '팀 멤버를 찾을 수 없습니다.',
+      default: '상태 변경 실패',
     });
   }
 

@@ -15,6 +15,7 @@ import type {
   UserLeftPayload,
   OnlineUsersPayload,
   MemberRoleChangedPayload,
+  MemberStatusChangedPayload,
 } from '@/types/socket';
 import { TeamSocketEvents } from '@/types/socket';
 
@@ -43,6 +44,8 @@ interface TeamSocketEventHandlers {
   onOnlineUsers?: (payload: OnlineUsersPayload) => void;
   /** 멤버 역할 변경 이벤트 핸들러 */
   onMemberRoleChanged?: (payload: MemberRoleChangedPayload) => void;
+  /** 멤버 상태 변경 이벤트 핸들러 */
+  onMemberStatusChanged?: (payload: MemberStatusChangedPayload) => void;
 }
 
 /**
@@ -189,6 +192,17 @@ export function useTeamSocketEvents(
       handlersRef.current.onMemberRoleChanged?.(payload);
     };
 
+    // 멤버 상태 변경 이벤트
+    const handleMemberStatusChanged = (payload: MemberStatusChangedPayload) => {
+      // 본인이 변경한 상태는 HTTP 응답으로 처리되므로 스킵
+      if (isSelfTriggered(payload.changedBy)) {
+        console.log('[Socket] 본인 상태 변경 이벤트 스킵:', payload.userId);
+        return;
+      }
+      console.log('[Socket] 멤버 상태 변경:', payload);
+      handlersRef.current.onMemberStatusChanged?.(payload);
+    };
+
     // 이벤트 리스너 등록
     socket.on(TeamSocketEvents.TASK_CREATED, handleTaskCreated);
     socket.on(TeamSocketEvents.TASK_UPDATED, handleTaskUpdated);
@@ -202,6 +216,7 @@ export function useTeamSocketEvents(
     socket.on(TeamSocketEvents.USER_LEFT, handleUserLeft);
     socket.on(TeamSocketEvents.ONLINE_USERS, handleOnlineUsers);
     socket.on(TeamSocketEvents.MEMBER_ROLE_CHANGED, handleMemberRoleChanged);
+    socket.on(TeamSocketEvents.MEMBER_STATUS_CHANGED, handleMemberStatusChanged);
 
     // Cleanup: 이벤트 리스너 해제
     return () => {
@@ -217,6 +232,7 @@ export function useTeamSocketEvents(
       socket.off(TeamSocketEvents.USER_LEFT, handleUserLeft);
       socket.off(TeamSocketEvents.ONLINE_USERS, handleOnlineUsers);
       socket.off(TeamSocketEvents.MEMBER_ROLE_CHANGED, handleMemberRoleChanged);
+      socket.off(TeamSocketEvents.MEMBER_STATUS_CHANGED, handleMemberStatusChanged);
     };
   }, [socket, isSelfTriggered]);
 }

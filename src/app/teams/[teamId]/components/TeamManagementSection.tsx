@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { SectionLabel, EmptyState } from '../../components';
 import { ChevronUpIcon, ChevronDownIcon, UserIcon, ChartIcon, MailIcon, SendIcon, EditIcon } from '@/app/components/Icons';
@@ -9,6 +9,9 @@ import { formatFullDateTime } from '@/app/utils/taskUtils';
 import { TelegramSection } from './TelegramSection';
 import type { TeamUserResponse, TeamInviteResponse, TelegramStatusResponse } from '@/services/teamService';
 import { cardStyles } from '@/styles/teams';
+
+// 멤버 상태 필터 타입
+type MemberStatusFilter = 'all' | 'active' | 'inactive';
 
 type TeamManagementSectionProps = {
   // 멤버 관련
@@ -39,6 +42,10 @@ type TeamManagementSectionProps = {
 
   // 역할 변경 관련
   onOpenRoleChange?: (member: TeamUserResponse) => void;
+
+  // 상태 변경 관련
+  onToggleMemberStatus?: (member: TeamUserResponse, newStatus: 0 | 1) => Promise<void>;
+  togglingMemberIds?: number[];
 };
 
 // 탭 설정 타입
@@ -75,9 +82,33 @@ export function TeamManagementSection({
   onDeleteTelegramLink,
   onRefreshTelegramStatus,
   onOpenRoleChange,
+  onToggleMemberStatus,
+  togglingMemberIds = [],
 }: TeamManagementSectionProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>('stats');
+  const [memberStatusFilter, setMemberStatusFilter] = useState<MemberStatusFilter>('active');
+
+  // 멤버 필터링
+  const { filteredMembers, activeCount, inactiveCount } = useMemo(() => {
+    const active = members.filter(m => m.userActStatus === 1);
+    const inactive = members.filter(m => m.userActStatus === 0);
+    
+    let filtered: TeamUserResponse[];
+    if (memberStatusFilter === 'active') {
+      filtered = active;
+    } else if (memberStatusFilter === 'inactive') {
+      filtered = inactive;
+    } else {
+      filtered = members;
+    }
+    
+    return {
+      filteredMembers: filtered,
+      activeCount: active.length,
+      inactiveCount: inactive.length,
+    };
+  }, [members, memberStatusFilter]);
 
   const handleCopyInviteLink = (link: string) => {
     navigator.clipboard.writeText(link).then(() => {
@@ -90,29 +121,43 @@ export function TeamManagementSection({
   const currentUserRole = currentUserMember?.role?.toUpperCase() as RoleKey | undefined;
 
   /**
-   * 특정 멤버의 역할을 변경할 수 있는지 확인
-   * - MASTER: 본인 제외 모든 멤버 변경 가능
-   * - MANAGER: MEMBER만 MANAGER로 승격 가능
+   * 특정 멤버를 관리(역할/상태 변경)할 수 있는지 확인
+   * - MASTER: 본인 제외 모든 하위 멤버 관리 가능
+   * - MANAGER: MEMBER만 관리 가능
    */
-  const canChangeRole = (targetMember: TeamUserResponse): boolean => {
-    if (!currentUserRole || !onOpenRoleChange) return false;
+  const canManageMember = (targetMember: TeamUserResponse): boolean => {
+    if (!currentUserRole) return false;
     
-    // 본인은 변경 불가
+    // 본인은 관리 불가
     if (targetMember.userId === currentUserId) return false;
 
     const targetRole = targetMember.role?.toUpperCase() as RoleKey;
 
-    // MASTER는 모든 하위 역할 변경 가능
+    // MASTER는 모든 하위 역할 관리 가능
     if (currentUserRole === 'MASTER') {
       return targetRole !== 'MASTER';
     }
 
-    // MANAGER는 MEMBER만 승격 가능
+    // MANAGER는 MEMBER만 관리 가능
     if (currentUserRole === 'MANAGER') {
       return targetRole === 'MEMBER';
     }
 
     return false;
+  };
+
+  // 역할 변경 가능 여부 (콜백 존재 + 관리 권한)
+  const canChangeRole = (targetMember: TeamUserResponse): boolean => {
+    return !!onOpenRoleChange && canManageMember(targetMember);
+  };
+
+  // 상태 변경 가능 여부 (콜백 존재 + 관리 권한 + MASTER 제외)
+  const canChangeStatus = (targetMember: TeamUserResponse): boolean => {
+    if (!onToggleMemberStatus) return false;
+    const targetRole = targetMember.role?.toUpperCase() as RoleKey;
+    // MASTER의 상태는 변경 불가
+    if (targetRole === 'MASTER') return false;
+    return canManageMember(targetMember);
   };
 
   // 탭 설정
@@ -197,39 +242,119 @@ export function TeamManagementSection({
 
           {/* 멤버 탭 내용 */}
           {activeTab === 'members' && (
-            <div className="mt-4">
-              {members.length === 0 ? (
-                <EmptyState message="멤버 정보를 불러오는 중..." />
+            <div className="mt-4 space-y-4">
+              {/* 서브탭 필터 */}
+              <div className="flex gap-1 rounded-lg border border-white/10 bg-slate-900/50 p-1">
+                <button
+                  onClick={() => setMemberStatusFilter('active')}
+                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                    memberStatusFilter === 'active'
+                      ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                      : 'text-slate-400 hover:text-slate-300'
+                  }`}
+                >
+                  활성 ({activeCount})
+                </button>
+                <button
+                  onClick={() => setMemberStatusFilter('inactive')}
+                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                    memberStatusFilter === 'inactive'
+                      ? 'bg-slate-500/20 text-slate-300 border border-slate-500/30'
+                      : 'text-slate-400 hover:text-slate-300'
+                  }`}
+                >
+                  비활성 ({inactiveCount})
+                </button>
+                <button
+                  onClick={() => setMemberStatusFilter('all')}
+                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                    memberStatusFilter === 'all'
+                      ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                      : 'text-slate-400 hover:text-slate-300'
+                  }`}
+                >
+                  전체 ({members.length})
+                </button>
+              </div>
+
+              {/* 멤버 목록 */}
+              {filteredMembers.length === 0 ? (
+                <EmptyState 
+                  message={
+                    memberStatusFilter === 'inactive' 
+                      ? '비활성화된 멤버가 없습니다.' 
+                      : memberStatusFilter === 'active'
+                        ? '활성 멤버가 없습니다.'
+                        : '멤버 정보를 불러오는 중...'
+                  } 
+                />
               ) : (
                 <div className="grid grid-cols-1 gap-3">
-                  {members.map(member => {
+                  {filteredMembers.map(member => {
                     const isCurrentUser = currentUserId === member.userId;
                     const roleMeta = getRoleMeta(member.role);
-                    const showRoleChangeButton = canChangeRole(member);
+                    const showRoleChangeButton = canChangeRole(member) && member.userActStatus === 1;
+                    const showStatusToggleButton = canChangeStatus(member);
+                    const isToggling = togglingMemberIds.includes(member.userId);
+                    const isInactive = member.userActStatus === 0;
 
                     return (
-                      <div key={member.userId} className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
+                      <div 
+                        key={member.userId} 
+                        className={`rounded-2xl border p-4 transition ${
+                          isInactive 
+                            ? 'border-slate-700/50 bg-slate-950/20 opacity-60' 
+                            : 'border-white/10 bg-slate-950/30'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <p className="text-lg font-semibold text-white">
+                              <p className={`text-lg font-semibold ${isInactive ? 'text-slate-400' : 'text-white'}`}>
                                 {member.userName || `사용자 ${member.userId}`}
                               </p>
                               <span className={roleMeta.className}>{roleMeta.label}</span>
                               {isCurrentUser && <span className={CURRENT_USER_BADGE_CLASSNAME}>나</span>}
+                              {isInactive && (
+                                <span className="rounded-full border border-slate-600/50 bg-slate-700/30 px-2 py-0.5 text-xs font-medium text-slate-400">
+                                  비활성
+                                </span>
+                              )}
                             </div>
                             <p className="mt-2 text-xs text-slate-500">가입일: {formatMemberDate(member.joinedAt)}</p>
                           </div>
-                          {showRoleChangeButton && (
-                            <button
-                              onClick={() => onOpenRoleChange?.(member)}
-                              className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-white/20 hover:bg-white/10"
-                              title="역할 변경"
-                            >
-                              <EditIcon className="h-3.5 w-3.5" />
-                              역할 변경
-                            </button>
-                          )}
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {showRoleChangeButton && (
+                              <button
+                                onClick={() => onOpenRoleChange?.(member)}
+                                className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-white/20 hover:bg-white/10"
+                                title="역할 변경"
+                              >
+                                <EditIcon className="h-3.5 w-3.5" />
+                                역할 변경
+                              </button>
+                            )}
+                            {showStatusToggleButton && (
+                              <button
+                                onClick={() => onToggleMemberStatus?.(member, isInactive ? 1 : 0)}
+                                disabled={isToggling}
+                                className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                                  isInactive
+                                    ? 'border-green-500/30 bg-green-500/10 text-green-400 hover:border-green-500/50 hover:bg-green-500/20'
+                                    : 'border-slate-500/30 bg-slate-500/10 text-slate-400 hover:border-slate-500/50 hover:bg-slate-500/20'
+                                }`}
+                                title={isInactive ? '활성화' : '비활성화'}
+                              >
+                                {isToggling ? (
+                                  <span className="animate-pulse">처리중...</span>
+                                ) : isInactive ? (
+                                  '활성화'
+                                ) : (
+                                  '비활성화'
+                                )}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
