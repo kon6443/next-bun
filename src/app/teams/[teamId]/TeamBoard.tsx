@@ -13,7 +13,8 @@ import { Kanban } from '../../components/Kanban';
 import { SectionLabel, ErrorAlert, TeamBoardSkeleton, ListViewSkeleton, Skeleton, FAB, IconButton } from '../components';
 import { EditIcon, UserGroupIcon, PlusIcon } from '../../components/Icons';
 import type { Task } from '../../types/task';
-import { useTaskFilter, useTelegramLink, useTeamInvite, useTeamSocket, useTeamSocketEvents, useSafeNavigation } from '../../hooks';
+import { useTaskFilter, useTelegramLink, useTeamInvite, useTeamSocketEvents, useSafeNavigation } from '../../hooks';
+import { useTeamSocketContext } from './contexts';
 import {
   getTeamTasks,
   updateTaskStatus,
@@ -31,10 +32,8 @@ import type {
   TaskUpdatedPayload,
   TaskStatusChangedPayload,
   TaskActiveStatusChangedPayload,
-  OnlineUserInfo,
   UserJoinedPayload,
   UserLeftPayload,
-  OnlineUsersPayload,
   MemberRoleChangedPayload,
 } from '@/types/socket';
 
@@ -82,7 +81,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [canManageInvites, setCanManageInvites] = useState(false);
-  const [onlineUsers, setOnlineUsers] = useState<OnlineUserInfo[]>([]);
 
   // 역할 변경 모달 상태
   const [showRoleChangeModal, setShowRoleChangeModal] = useState(false);
@@ -115,8 +113,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     fetchInvites,
   } = useTeamInvite(teamIdNum, session?.user?.accessToken);
 
-  // ===== WebSocket 연결 =====
-  const { socket } = useTeamSocket(teamIdNum, session?.user?.accessToken);
+  // ===== WebSocket (Context에서 관리) =====
+  const { socket, onlineUsers } = useTeamSocketContext();
 
   // Socket 이벤트 핸들러 (useCallback으로 메모이제이션)
   const handleSocketTaskCreated = useCallback(
@@ -242,27 +240,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     }
   }, []);
 
-  // 온라인 유저 접속 이벤트
+  // 온라인 유저 접속 이벤트 (토스트 알림만 - 상태는 Context에서 관리)
   const handleUserJoined = useCallback((payload: UserJoinedPayload) => {
-    setOnlineUsers(prev => {
-      const existingIndex = prev.findIndex(u => u.userId === payload.userId);
-      if (existingIndex >= 0) {
-        // 기존 유저 업데이트 (다중 탭 접속)
-        const updated = [...prev];
-        updated[existingIndex] = {
-          ...updated[existingIndex],
-          connectionCount: payload.connectionCount,
-        };
-        return updated;
-      } else {
-        // 새 유저 추가
-        return [...prev, {
-          userId: payload.userId,
-          userName: payload.userName,
-          connectionCount: payload.connectionCount,
-        }];
-      }
-    });
     // 첫 접속일 때만 토스트 표시 (다중 탭 아닌 경우)
     if (payload.connectionCount === 1) {
       toast(`${payload.userName}님이 접속했습니다`, {
@@ -277,21 +256,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     }
   }, []);
 
-  // 온라인 유저 퇴장 이벤트
+  // 온라인 유저 퇴장 이벤트 (토스트 알림만 - 상태는 Context에서 관리)
   const handleUserLeft = useCallback((payload: UserLeftPayload) => {
-    setOnlineUsers(prev => {
-      if (payload.connectionCount === 0) {
-        // 완전히 오프라인 → 목록에서 제거
-        return prev.filter(u => u.userId !== payload.userId);
-      } else {
-        // 다중 탭 중 일부만 종료 → 카운트만 업데이트
-        return prev.map(u =>
-          u.userId === payload.userId
-            ? { ...u, connectionCount: payload.connectionCount }
-            : u
-        );
-      }
-    });
     // 완전히 오프라인일 때만 토스트 표시
     if (payload.connectionCount === 0) {
       toast(`${payload.userName}님이 퇴장했습니다`, {
@@ -304,11 +270,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         },
       });
     }
-  }, []);
-
-  // 온라인 유저 목록 이벤트 (첫 접속 시)
-  const handleOnlineUsers = useCallback((payload: OnlineUsersPayload) => {
-    setOnlineUsers(payload.users);
   }, []);
 
   // 멤버 역할 변경 이벤트
@@ -335,7 +296,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     });
   }, []);
 
-  // Socket 이벤트 리스너 등록
+  // Socket 이벤트 리스너 등록 (온라인 유저 상태는 Context에서 관리, 여기서는 토스트 등 UI만 처리)
   useTeamSocketEvents(
     socket,
     {
@@ -345,7 +306,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       onTaskActiveStatusChanged: handleSocketTaskActiveStatusChanged,
       onUserJoined: handleUserJoined,
       onUserLeft: handleUserLeft,
-      onOnlineUsers: handleOnlineUsers,
       onMemberRoleChanged: handleMemberRoleChanged,
     },
     session?.user?.userId,

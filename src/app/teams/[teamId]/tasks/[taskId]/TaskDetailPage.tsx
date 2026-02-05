@@ -31,7 +31,8 @@ import { EditIcon, TrashIcon, CommentIcon, SendIcon } from '@/app/components/Ico
 import { formatCompactDateTime } from '@/app/utils/taskUtils';
 import type { TaskStatusKey } from '@/app/config/taskStatusConfig';
 import { cardStyles } from '@/styles/teams';
-import { useTeamTaskId, useTeamSocket, useTeamSocketEvents } from '@/app/hooks';
+import { useTeamTaskId, useTeamSocketEvents } from '@/app/hooks';
+import { useTeamSocketContext } from '../../contexts';
 import type {
   TaskUpdatedPayload,
   TaskStatusChangedPayload,
@@ -69,8 +70,8 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
   // 댓글 목록 (taskDetail에서 직접 참조)
   const comments = taskDetail?.comments ?? [];
 
-  // ===== WebSocket 연결 =====
-  const { socket } = useTeamSocket(teamIdNum, session?.user?.accessToken);
+  // ===== WebSocket (Context에서 관리) =====
+  const { socket } = useTeamSocketContext();
 
   // Socket 이벤트 핸들러: 태스크 수정
   const handleSocketTaskUpdated = useCallback(
