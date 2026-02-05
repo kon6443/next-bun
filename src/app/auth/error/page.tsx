@@ -2,12 +2,12 @@
 
 import type { CSSProperties } from "react";
 import { Suspense, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSafeNavigation } from "@/app/hooks";
 import { clearAuthLoading } from "@/app/components/AuthLoadingOverlay";
 
 function AuthErrorContent() {
-  const searchParams = useSearchParams();
-  const error = searchParams.get("error");
+  const { getParam } = useSafeNavigation();
+  const error = getParam("error");
 
   // 에러 페이지 진입 시 로딩 플래그 제거 (무한 로딩 방지)
   useEffect(() => {

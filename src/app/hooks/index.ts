@@ -8,6 +8,7 @@ export { useClickOutside } from './useClickOutside';
 export { useTelegramLink } from './useTelegramLink';
 export { useTeamInvite } from './useTeamInvite';
 export { useTeamData, type UseTeamDataReturn, type TasksByColumn } from './useTeamData';
+export { useSafeNavigation } from './useSafeNavigation';
 
 // Socket 관련 훅
 export { useTeamSocket } from './useTeamSocket';

@@ -8,6 +8,8 @@ import type { OnlineUserInfo } from '@/types/socket';
 type OnlineUsersProps = {
   users: OnlineUserInfo[];
   currentUserId?: number;
+  /** 모달 열림/닫힘 상태 변경 콜백 (FAB 숨김 처리용) */
+  onModalOpenChange?: (isOpen: boolean) => void;
 };
 
 /**
@@ -22,7 +24,7 @@ type OnlineUsersProps = {
  * - 현재 유저 강조 표시
  * - 다중 탭 접속 시 배지 표시
  */
-export function OnlineUsers({ users, currentUserId }: OnlineUsersProps) {
+export function OnlineUsers({ users, currentUserId, onModalOpenChange }: OnlineUsersProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // 현재 유저를 맨 앞으로, 나머지는 이름순 정렬
@@ -38,8 +40,15 @@ export function OnlineUsers({ users, currentUserId }: OnlineUsersProps) {
   const previewUsers = sortedUsers.slice(0, 4);
   const remainingCount = sortedUsers.length - previewUsers.length;
 
-  const handleOpenModal = useCallback(() => setIsModalOpen(true), []);
-  const handleCloseModal = useCallback(() => setIsModalOpen(false), []);
+  const handleOpenModal = useCallback(() => {
+    setIsModalOpen(true);
+    onModalOpenChange?.(true);
+  }, [onModalOpenChange]);
+
+  const handleCloseModal = useCallback(() => {
+    setIsModalOpen(false);
+    onModalOpenChange?.(false);
+  }, [onModalOpenChange]);
 
   if (sortedUsers.length === 0) {
     return null;
@@ -212,7 +221,7 @@ function OnlineUsersModal({
 
       {/* 바텀시트 */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-[100] animate-slide-up"
+        className="fixed bottom-0 left-0 right-0 z-[100] animate-[slideUp_0.3s_ease-out]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="online-users-title"
@@ -258,20 +267,6 @@ function OnlineUsersModal({
         </div>
       </div>
 
-      {/* 애니메이션 스타일 */}
-      <style jsx>{`
-        @keyframes slide-up {
-          from {
-            transform: translateY(100%);
-          }
-          to {
-            transform: translateY(0);
-          }
-        }
-        .animate-slide-up {
-          animation: slide-up 0.3s ease-out;
-        }
-      `}</style>
     </>
   );
 }
