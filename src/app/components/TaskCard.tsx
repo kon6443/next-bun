@@ -6,7 +6,7 @@ import type { Task } from '../types/task';
 import { getDeadlineStatus, getDeadlineLabel, deadlineStyles, formatCompactDateTime } from '../utils/taskUtils';
 import { type TaskStatusKey, STATUS_COMPLETED, STATUS_CANCELLED } from '../config/taskStatusConfig';
 import { StatusDropdown } from './StatusDropdown';
-import { ClockIcon, CalendarIcon } from './Icons';
+import { DateInfoInline } from '../teams/components';
 
 type TaskCardProps = {
   task: Task;
@@ -19,10 +19,8 @@ export function TaskCard({ task, onStatusChange, teamId }: TaskCardProps) {
   const router = useRouter();
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // 날짜 포맷팅 (태스크 상세와 동일한 포맷: M/D HH:mm)
+  // 마감일 표시용 포맷팅 (상단 배지)
   const endDateStr = endAt ? formatCompactDateTime(endAt) : null;
-  const startDateStr = startAt ? formatCompactDateTime(startAt) : null;
-  const crtdDateStr = formatCompactDateTime(crtdAt);
 
   // 현재 상태 키
   const currentStatusKey = taskStatus as TaskStatusKey;
@@ -98,24 +96,9 @@ export function TaskCard({ task, onStatusChange, teamId }: TaskCardProps) {
         </span>
       </div>
 
-      {/* 날짜 정보: 생성일 · 시작일 → 종료일 (아이콘 사용) */}
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.65rem] text-slate-500">
-        {/* 생성일 */}
-        {crtdDateStr && (
-          <span className="flex items-center gap-1" title="생성일">
-            <ClockIcon className="w-3 h-3" />
-            <span>{crtdDateStr}</span>
-          </span>
-        )}
-        {/* 시작일 → 종료일 */}
-        {(startDateStr || endDateStr) && (
-          <span className="flex items-center gap-1" title={startDateStr && endDateStr ? "시작일 → 종료일" : startDateStr ? "시작일" : "종료일"}>
-            <CalendarIcon className="w-3 h-3" />
-            {startDateStr && <span>{startDateStr}</span>}
-            {startDateStr && endDateStr && <span className="text-slate-600">→</span>}
-            {endDateStr && <span>{endDateStr}</span>}
-          </span>
-        )}
+      {/* 날짜 정보: 생성일 · 시작일 → 종료일 */}
+      <div className="mt-2">
+        <DateInfoInline crtdAt={crtdAt} startAt={startAt} endAt={endAt} size="sm" />
       </div>
 
       {/* 상태 드롭다운 */}

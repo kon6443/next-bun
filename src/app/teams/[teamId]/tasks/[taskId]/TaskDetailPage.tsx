@@ -23,10 +23,11 @@ import {
   SuccessAlert,
   Skeleton,
   SkeletonText,
+  DateInfoInline,
   type TaskFormData,
 } from '../../../components';
 import { StatusDropdown } from '@/app/components/StatusDropdown';
-import { EditIcon, TrashIcon, ClockIcon, CalendarIcon, CommentIcon, SendIcon } from '@/app/components/Icons';
+import { EditIcon, TrashIcon, CommentIcon, SendIcon } from '@/app/components/Icons';
 import { formatCompactDateTime } from '@/app/utils/taskUtils';
 import type { TaskStatusKey } from '@/app/config/taskStatusConfig';
 import { cardStyles } from '@/styles/teams';
@@ -530,31 +531,12 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
             )}
 
             {/* 날짜 정보 (인라인 아이콘) - 순서: 생성일 → 시작일 → 종료일 */}
-            <div className='flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-400'>
-              {/* 생성일 */}
-              <span className='flex items-center gap-1.5' title='생성일'>
-                <ClockIcon className='w-3.5 h-3.5' />
-                <span>{formatCompactDateTime(taskDetail.crtdAt)}</span>
-              </span>
-              {/* 구분자 (시작일 또는 종료일이 있을 때) */}
-              {(taskDetail.startAt || taskDetail.endAt) && <span className='text-slate-600'>·</span>}
-              {/* 시작일 */}
-              {taskDetail.startAt && (
-                <span className='flex items-center gap-1.5' title='시작일'>
-                  <CalendarIcon className='w-3.5 h-3.5' />
-                  <span>{formatCompactDateTime(taskDetail.startAt)}</span>
-                </span>
-              )}
-              {/* 화살표 (시작일과 종료일 모두 있을 때) */}
-              {taskDetail.startAt && taskDetail.endAt && <span className='text-slate-600'>→</span>}
-              {/* 종료일 */}
-              {taskDetail.endAt && (
-                <span className='flex items-center gap-1.5' title='종료일'>
-                  <CalendarIcon className='w-3.5 h-3.5' />
-                  <span>{formatCompactDateTime(taskDetail.endAt)}</span>
-                </span>
-              )}
-            </div>
+            <DateInfoInline
+              crtdAt={taskDetail.crtdAt}
+              startAt={taskDetail.startAt}
+              endAt={taskDetail.endAt}
+              size="md"
+            />
 
             {/* 상태 드롭다운 (하단 배치, 카드 스타일) */}
             <div className='mt-4 pt-4 border-t border-white/5'>

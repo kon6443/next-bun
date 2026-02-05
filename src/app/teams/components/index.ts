@@ -4,6 +4,7 @@ export { Button, ButtonLink } from './Button';
 export { Input, TextArea, DateInput } from './FormInput';
 export { SectionLabel } from './SectionLabel';
 export { DateInfoCard } from './DateInfoCard';
+export { DateInfoInline } from './DateInfoInline';
 export { TaskForm, type TaskFormData } from './TaskForm';
 export { TaskStatusBadge } from './TaskStatusBadge';
 export { Alert, ErrorAlert, SuccessAlert } from './Alert';
