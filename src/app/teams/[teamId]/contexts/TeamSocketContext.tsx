@@ -225,16 +225,13 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
 
   /**
    * Socket 연결 해제
+   * 
+   * 주의: LEAVE_TEAM 이벤트를 별도로 emit하지 않음
+   * - disconnect()가 호출되면 서버의 handleDisconnect에서 모든 정리 작업 수행
+   * - LEAVE_TEAM emit + disconnect()를 동시에 하면 중복 알림 발생
    */
   const disconnectSocket = useCallback(() => {
     if (socketRef.current) {
-      // 팀 room 퇴장
-      if (isConnectedRef.current && currentTeamIdRef.current) {
-        socketRef.current.emit(TeamSocketEvents.LEAVE_TEAM, {
-          teamId: currentTeamIdRef.current,
-        });
-      }
-
       socketRef.current.disconnect();
       socketRef.current = null;
       setSocket(null);
