@@ -24,8 +24,9 @@ export const TeamSocketEvents = {
   USER_LEFT: 'userLeft',
   ONLINE_USERS: 'onlineUsers',
 
-  // Server → Client (멤버 역할)
+  // Server → Client (멤버 역할/상태)
   MEMBER_ROLE_CHANGED: 'memberRoleChanged',
+  MEMBER_STATUS_CHANGED: 'memberStatusChanged',
 
   // 공통
   JOINED_TEAM: 'joinedTeam',
@@ -181,6 +182,16 @@ export interface MemberRoleChangedPayload {
   changedBy: number;
 }
 
+/** 멤버 상태 변경 이벤트 */
+export interface MemberStatusChangedPayload {
+  teamId: number;
+  userId: number;
+  userName: string | null;
+  previousStatus: number;
+  newStatus: number;
+  changedBy: number;
+}
+
 // ===== Socket 타입 정의 =====
 
 /** Server → Client 이벤트 타입 맵 */
@@ -197,6 +208,7 @@ export interface ServerToClientEvents {
   [TeamSocketEvents.USER_LEFT]: (payload: UserLeftPayload) => void;
   [TeamSocketEvents.ONLINE_USERS]: (payload: OnlineUsersPayload) => void;
   [TeamSocketEvents.MEMBER_ROLE_CHANGED]: (payload: MemberRoleChangedPayload) => void;
+  [TeamSocketEvents.MEMBER_STATUS_CHANGED]: (payload: MemberStatusChangedPayload) => void;
   [TeamSocketEvents.JOINED_TEAM]: (payload: JoinedTeamPayload) => void;
   [TeamSocketEvents.LEFT_TEAM]: (payload: LeftTeamPayload) => void;
   [TeamSocketEvents.ERROR]: (payload: SocketErrorPayload) => void;

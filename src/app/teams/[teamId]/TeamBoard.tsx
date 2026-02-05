@@ -21,6 +21,7 @@ import {
   getTeamUsers,
   getTelegramStatus,
   updateMemberRole,
+  updateMemberStatus,
   type TeamUserResponse,
 } from '@/services/teamService';
 import { teamsPageBackground, cardStyles, layoutStyles, MOBILE_MAX_WIDTH } from '@/styles/teams';
@@ -35,6 +36,7 @@ import type {
   UserJoinedPayload,
   UserLeftPayload,
   MemberRoleChangedPayload,
+  MemberStatusChangedPayload,
 } from '@/types/socket';
 
 // taskStatus를 ColumnKey로 매핑
@@ -86,6 +88,9 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   const [showRoleChangeModal, setShowRoleChangeModal] = useState(false);
   const [roleChangeTarget, setRoleChangeTarget] = useState<TeamUserResponse | null>(null);
   const [isChangingRole, setIsChangingRole] = useState(false);
+
+  // 멤버 상태 토글 상태
+  const [togglingMemberIds, setTogglingMemberIds] = useState<number[]>([]);
 
   // 온라인 유저 모달 상태 (FAB 숨김용)
   const [isOnlineModalOpen, setIsOnlineModalOpen] = useState(false);
@@ -296,6 +301,18 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     });
   }, []);
 
+  // 멤버 상태 변경 이벤트 (토스트 없이 상태만 업데이트)
+  const handleMemberStatusChanged = useCallback((payload: MemberStatusChangedPayload) => {
+    // 멤버 목록에서 해당 유저의 상태 업데이트
+    setMembers(prev => 
+      prev.map(member => 
+        member.userId === payload.userId
+          ? { ...member, userActStatus: payload.newStatus as 0 | 1 }
+          : member
+      )
+    );
+  }, []);
+
   // Socket 이벤트 리스너 등록 (온라인 유저 상태는 Context에서 관리, 여기서는 토스트 등 UI만 처리)
   useTeamSocketEvents(
     socket,
@@ -307,6 +324,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       onUserJoined: handleUserJoined,
       onUserLeft: handleUserLeft,
       onMemberRoleChanged: handleMemberRoleChanged,
+      onMemberStatusChanged: handleMemberStatusChanged,
     },
     session?.user?.userId,
   );
@@ -622,6 +640,40 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     [roleChangeTarget, session?.user?.accessToken, teamIdNum, handleCloseRoleChange],
   );
 
+  // 멤버 상태 토글 처리
+  const handleToggleMemberStatus = useCallback(
+    async (member: TeamUserResponse, newStatus: 0 | 1) => {
+      if (!session?.user?.accessToken) return;
+
+      setTogglingMemberIds(prev => [...prev, member.userId]);
+      try {
+        await updateMemberStatus(
+          teamIdNum,
+          member.userId,
+          { actStatus: newStatus },
+          session.user.accessToken,
+        );
+
+        // API 성공 시 로컬 상태 업데이트
+        setMembers(prev =>
+          prev.map(m =>
+            m.userId === member.userId
+              ? { ...m, userActStatus: newStatus }
+              : m
+          )
+        );
+
+        toast.success(newStatus === 1 ? '멤버가 활성화되었습니다.' : '멤버가 비활성화되었습니다.');
+      } catch (err) {
+        console.error('Failed to toggle member status:', err);
+        toast.error(err instanceof Error ? err.message : '상태 변경에 실패했습니다.');
+      } finally {
+        setTogglingMemberIds(prev => prev.filter(id => id !== member.userId));
+      }
+    },
+    [session?.user?.accessToken, teamIdNum],
+  );
+
   // 현재 사용자의 역할 가져오기
   const currentUserMember = members.find(m => m.userId === session?.user?.userId);
   const currentUserRole = currentUserMember?.role || 'MEMBER';
@@ -689,6 +741,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           onDeleteTelegramLink={handleDeleteTelegramLink}
           onRefreshTelegramStatus={handleRefreshTelegramStatus}
           onOpenRoleChange={handleOpenRoleChange}
+          onToggleMemberStatus={handleToggleMemberStatus}
+          togglingMemberIds={togglingMemberIds}
         />
 
         {error && <ErrorAlert message={error} className="text-center" />}
