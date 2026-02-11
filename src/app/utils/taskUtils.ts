@@ -10,14 +10,16 @@ export type PeriodFilter = 'all' | 'today' | 'thisWeek' | 'thisMonth' | 'overdue
 // 상태 필터 타입
 export type StatusFilter = 'all' | 1 | 2 | 3 | 4 | 5;
 
-// 마감일 상태 계산
+// 마감일 상태 계산 (endAt은 UTC, "오늘"은 로컬 기준)
 export function getDeadlineStatus(endAt: Date | null): DeadlineStatus {
   if (!endAt) return 'none';
 
   const now = new Date();
   const end = new Date(endAt);
+  // "오늘"은 사용자의 로컬 타임존 기준
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const endDate = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  // endAt의 날짜는 UTC 컴포넌트에서 추출 (타임존 변환 방지)
+  const endDate = new Date(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
 
   const diffDays = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
@@ -96,12 +98,12 @@ export function getTaskDeadlineInfo(task: Task): TaskDeadlineInfo {
   return { status, label, showAlert };
 }
 
-// 오늘로부터의 일수 계산
+// 오늘로부터의 일수 계산 (date는 UTC, "오늘"은 로컬 기준)
 function getDaysFromNow(date: Date): number {
   const now = new Date();
   const target = new Date(date);
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const targetDate = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+  const targetDate = new Date(target.getUTCFullYear(), target.getUTCMonth(), target.getUTCDate());
   return Math.ceil((targetDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
@@ -181,8 +183,9 @@ export function filterByPeriod(tasks: Task[], period: PeriodFilter): Task[] {
     if (!task.endAt && period !== 'overdue') return false;
 
     const endDate = task.endAt ? new Date(task.endAt) : null;
+    // endAt의 날짜는 UTC 컴포넌트에서 추출 (타임존 변환 방지)
     const endDateOnly = endDate
-      ? new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate())
+      ? new Date(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate())
       : null;
 
     switch (period) {
@@ -251,17 +254,17 @@ export function getUniqueAssignees(tasks: Task[]): { id: number; name: string }[
  */
 
 /**
- * 컴팩트 날짜+시간 포맷 (M/D HH:mm)
+ * 컴팩트 날짜+시간 포맷 (M/D HH:mm) - UTC 기준
  * 카드, 목록 등 좁은 공간에서 날짜와 시간을 함께 표시할 때 사용
  * @param date - 포맷할 날짜
  * @returns "M/D HH:mm" 형식 문자열
- * @example formatCompactDateTime(new Date('2024-01-15T14:30:00')) // "1/15 14:30"
+ * @example formatCompactDateTime(new Date('2024-01-15T14:30:00Z')) // "1/15 14:30"
  */
 export function formatCompactDateTime(date: Date): string {
   const d = new Date(date);
-  const hours = d.getHours().toString().padStart(2, '0');
-  const minutes = d.getMinutes().toString().padStart(2, '0');
-  return `${d.getMonth() + 1}/${d.getDate()} ${hours}:${minutes}`;
+  const hours = d.getUTCHours().toString().padStart(2, '0');
+  const minutes = d.getUTCMinutes().toString().padStart(2, '0');
+  return `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${hours}:${minutes}`;
 }
 
 /**
@@ -277,6 +280,7 @@ export function formatShortDate(date: Date | null): string | null {
   return d.toLocaleDateString('ko-KR', {
     month: 'short',
     day: 'numeric',
+    timeZone: 'UTC',
   });
 }
 
@@ -293,6 +297,7 @@ export function formatDateWithYear(date: Date | null): string {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
+    timeZone: 'UTC',
   });
 }
 
@@ -312,6 +317,7 @@ export function formatFullDateTime(date: Date | null): string | null {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
+    timeZone: 'UTC',
   });
 }
 
@@ -334,5 +340,5 @@ export function formatDateKey(date: Date): string {
  * @example formatDateDisplay(new Date('2024-01-15')) // "1/15"
  */
 export function formatDateDisplay(date: Date): string {
-  return `${date.getMonth() + 1}/${date.getDate()}`;
+  return `${date.getUTCMonth() + 1}/${date.getUTCDate()}`;
 }
