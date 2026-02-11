@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from '../types/task';
 import { formatDateKey, getTaskDeadlineInfo, type DeadlineStatus } from '../utils/taskUtils';
-import { normalizeDate, generateCalendarGrid, splitIntoWeeks, WEEKDAYS_KO, isWeekend as isWeekendDate } from '../utils/dateUtils';
+import { normalizeDate, generateCalendarGrid, splitIntoWeeks, WEEKDAYS_KO, isWeekend as isWeekendDate, getTodayKey } from '../utils/dateUtils';
 import { getStatusBgClassName, getStatusBorderClassName } from '../config/taskStatusConfig';
 import { viewContainerStyles } from '@/styles/teams';
 import { CloseIcon } from './Icons';
@@ -234,8 +234,8 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
     return tasks.filter(task => !task.startAt && !task.endAt);
   }, [tasks]);
 
-  // 오늘 날짜 키
-  const todayKey = formatDateKey(new Date());
+  // 오늘 날짜 키 (로컬 타임존 기준)
+  const todayKey = getTodayKey();
 
   // 이전/다음 달 이동
   const goToPrevMonth = () => {
@@ -330,7 +330,7 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
                   const dayTasks = singleDayTasksByDate.get(dateKey) || [];
                   const isToday = dateKey === todayKey;
                   const isWeekend = isWeekendDate(date);
-                  const isCurrentMonth = date.getMonth() === month;
+                  const isCurrentMonth = date.getUTCMonth() === month;
 
                   return (
                     <div
@@ -345,14 +345,14 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
                           className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs ${
                             isToday
                               ? 'bg-sky-500 font-bold text-white'
-                              : date.getDay() === 0
+                              : date.getUTCDay() === 0
                                 ? 'text-red-400'
-                                : date.getDay() === 6
+                                : date.getUTCDay() === 6
                                   ? 'text-sky-400'
                                   : 'text-slate-400'
                           }`}
                         >
-                          {date.getDate()}
+                          {date.getUTCDate()}
                         </span>
                         {/* +n more 버튼 - 태스크가 2개 초과하거나 멀티데이 바가 있을 때 */}
                         {(dayTasks.length > 2 || (hasMoreBars && dayIdx === 6)) && (
@@ -483,7 +483,7 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
           {/* 팝오버 헤더 */}
           <div className="sticky top-0 flex items-center justify-between border-b border-white/10 bg-slate-800/95 px-3 py-2">
             <span className="text-sm font-semibold text-white">
-              {popover.date ? `${popover.date.getMonth() + 1}월 ${popover.date.getDate()}일` : ''}
+              {popover.date ? `${popover.date.getUTCMonth() + 1}월 ${popover.date.getUTCDate()}일` : ''}
             </span>
             <button
               onClick={() => setPopover(prev => ({ ...prev, isOpen: false }))}

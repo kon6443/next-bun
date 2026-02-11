@@ -59,12 +59,13 @@ type TabConfig = {
   visible: boolean;
 };
 
-// 날짜 포맷 헬퍼 함수
+// 날짜 포맷 헬퍼 함수 (UTC 기준)
 function formatMemberDate(date: Date) {
   return new Date(date).toLocaleDateString('ko-KR', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
+    timeZone: 'UTC',
   });
 }
 
