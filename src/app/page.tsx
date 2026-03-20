@@ -11,6 +11,9 @@ const timeMeasurementHref = baseDomain
 const teamsPath = "/teams";
 const teamsHref = baseDomain ? `${baseDomain}${teamsPath}` : teamsPath;
 
+const fishingPath = "/fishing";
+const fishingHref = baseDomain ? `${baseDomain}${fishingPath}` : fishingPath;
+
 export default function Home() {
   return (
     <TeamsPageLayout>
@@ -33,6 +36,16 @@ export default function Home() {
           <div className="mt-6">
             <ButtonLink href={teamsHref} fullWidth>
               팀 보드 열기
+            </ButtonLink>
+          </div>
+        </section>
+        {/* 낚시 게임 섹션 */}
+        <section className={`${cardStyles.section} p-4 text-center`}>
+          <SectionLabel>Fishing Game</SectionLabel>
+          <p className="mt-2 text-sm text-slate-400">방치형 낚시 미니게임</p>
+          <div className="mt-6">
+            <ButtonLink href={fishingHref} fullWidth>
+              🎣 낚시하러 가기
             </ButtonLink>
           </div>
         </section>
