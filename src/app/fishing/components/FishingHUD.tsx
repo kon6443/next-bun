@@ -19,6 +19,7 @@ interface FishingHUDProps {
   onChallengeTap: () => void;
   onCancel: () => void;
   onOpenInventory: () => void;
+  onToggleChat: () => void;
 }
 
 export default function FishingHUD({
@@ -36,15 +37,19 @@ export default function FishingHUD({
   onChallengeTap,
   onCancel,
   onOpenInventory,
+  onToggleChat,
 }: FishingHUDProps) {
   return (
     <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 10 }}>
-      {/* 맵 이름 (우측 상단, 나가기 버튼과 겹치지 않도록) */}
+      {/* 맵 이름 (우측 상단) */}
       <div className="absolute top-3 right-3">
         <div className="bg-slate-900/70 rounded-xl px-3 py-1.5 border border-slate-700/50">
           <span className="text-xs text-slate-300">{mapName}</span>
         </div>
       </div>
+
+      {/* PC 키보드 힌트 (터치 미지원 기기에서만 표시) */}
+      <KeyboardHint fishingState={fishingState} hasNearbyPoint={!!nearbyPoint} />
 
       {/* 상태별 UI */}
       {fishingState === 'idle' && nearbyPoint && (
@@ -66,9 +71,16 @@ export default function FishingHUD({
         />
       )}
 
-      {/* 하단 인벤토리 버튼 */}
+      {/* 하단 버튼 그룹 */}
       {(fishingState === 'idle' || fishingState === 'waiting') && (
-        <div className="absolute bottom-6 right-4 pointer-events-auto">
+        <div className="absolute bottom-6 right-4 flex flex-col gap-2 pointer-events-auto">
+          <button
+            onClick={onToggleChat}
+            className="bg-slate-800/80 border border-slate-600/50 rounded-xl
+                       px-4 py-2.5 text-slate-300 text-sm active:scale-95 transition-transform"
+          >
+            💬 채팅
+          </button>
           <button
             onClick={onOpenInventory}
             className="relative bg-slate-800/80 border border-slate-600/50 rounded-xl
@@ -83,6 +95,45 @@ export default function FishingHUD({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── 키보드 힌트 (PC 전용) ───────────────────────────────
+
+function KeyboardHint({ fishingState, hasNearbyPoint }: { fishingState: FishingState; hasNearbyPoint: boolean }) {
+  // 터치 디바이스 감지 (간단한 휴리스틱)
+  if (typeof window !== 'undefined' && 'ontouchstart' in window) return null;
+
+  let hint = '';
+  switch (fishingState) {
+    case 'idle':
+      hint = hasNearbyPoint
+        ? 'WASD 이동 · Space 낚시 · Enter 채팅'
+        : 'WASD 이동 · Enter 채팅';
+      break;
+    case 'waiting':
+      hint = 'Space 취소';
+      break;
+    case 'bite':
+      hint = 'Space 챌린지!';
+      break;
+    case 'challenge':
+      hint = 'Space 잡기!';
+      break;
+    case 'success':
+    case 'fail':
+      hint = 'Space 확인';
+      break;
+    default:
+      return null;
+  }
+
+  return (
+    <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
+      <div className="bg-slate-900/60 rounded-lg px-3 py-1 border border-slate-700/30">
+        <span className="text-[10px] text-slate-500">{hint}</span>
+      </div>
     </div>
   );
 }
@@ -121,7 +172,7 @@ function WaitingIndicator({ progress, onCancel }: { progress: number; onCancel: 
         <p className="text-xs text-slate-400 mb-2">입질 대기 중...</p>
         <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden">
           <div
-            className="h-full bg-cyan-500 rounded-full transition-all duration-300"
+            className="h-full bg-cyan-500 rounded-full"
             style={{ width: `${progress * 100}%` }}
           />
         </div>

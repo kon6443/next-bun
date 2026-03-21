@@ -70,6 +70,29 @@ body {
   display: none; /* Chrome, Safari, Opera */
 }
 
+/* 게임 내 다크 스크롤바 (채팅, 인벤토리 등) */
+.scrollbar-game {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: rgba(100, 116, 139, 0.3) transparent;
+}
+
+.scrollbar-game::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scrollbar-game::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-game::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.3);
+  border-radius: 4px;
+}
+
+.scrollbar-game::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.5);
+}
+
 /* 모바일 칸반 스와이프 컨테이너 */
 .mobile-kanban-container {
   scroll-snap-type: x mandatory;
