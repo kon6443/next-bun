@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { CaughtFish } from '../types/fish';
 import { GRADE_COLORS, GRADE_NAMES } from '../config/constants';
 import { formatWeight } from '../utils/format';
@@ -14,9 +14,12 @@ interface InventoryPanelProps {
 export default function InventoryPanel({ inventory, isOpen, onClose }: InventoryPanelProps) {
   const [selectedFish, setSelectedFish] = useState<CaughtFish | null>(null);
 
-  if (!isOpen) return null;
+  const sorted = useMemo(
+    () => [...inventory].sort((a, b) => b.caughtAt - a.caughtAt),
+    [inventory],
+  );
 
-  const sorted = [...inventory].sort((a, b) => b.caughtAt - a.caughtAt);
+  if (!isOpen) return null;
 
   return (
     <div className="absolute inset-0 z-30 pointer-events-auto">
@@ -42,7 +45,7 @@ export default function InventoryPanel({ inventory, isOpen, onClose }: Inventory
         </div>
 
         {/* 물고기 목록 */}
-        <div className="p-3 overflow-y-auto" style={{ maxHeight: 'calc(60vh - 56px)' }}>
+        <div className="p-3 overflow-y-auto scrollbar-game" style={{ maxHeight: 'calc(60vh - 56px)' }}>
           {inventory.length === 0 ? (
             <p className="text-center text-slate-600 py-8 text-sm">
               아직 잡은 물고기가 없습니다

@@ -10,26 +10,68 @@ import {
   ANIM_BITE_ROD_WOBBLE_SPEED,
   ANIM_BITE_LINE_WOBBLE_SPEED,
   ANIM_BITE_BOBBER_SPEED,
+  BUBBLE_DURATION,
+  BUBBLE_FADE_START,
+  BUBBLE_MAX_WIDTH,
+  BUBBLE_FONT_SIZE,
+  BUBBLE_PADDING,
+  BUBBLE_OFFSET_Y,
 } from '../config/constants';
+
+/** 말풍선 데이터 */
+export interface SpeechBubble {
+  text: string;
+  createdAt: number; // totalTime 기준
+}
+
+/** 뷰포트에 보이는 월드 좌표 범위 */
+interface ViewBounds {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+function getViewBounds(camera: Camera, screenWidth: number, screenHeight: number): ViewBounds {
+  return {
+    left: camera.x,
+    right: camera.x + screenWidth,
+    top: camera.y,
+    bottom: camera.y + screenHeight,
+  };
+}
 
 // ─── 카메라 ──────────────────────────────────────────────
 
-/** 카메라 위치 계산 (캐릭터 중심, 맵 경계 클램핑) */
+/** 카메라 위치 계산 (캐릭터 중심, 뷰포트 > 맵이면 센터링) */
 export function updateCamera(
   player: Player,
   map: GameMap,
   screenWidth: number,
   screenHeight: number,
 ): Camera {
-  return {
-    x: Math.max(0, Math.min(player.position.x - screenWidth / 2, map.width - screenWidth)),
-    y: Math.max(0, Math.min(player.position.y - screenHeight / 2, map.height - screenHeight)),
-  };
+  let cx: number;
+  let cy: number;
+
+  if (screenWidth >= map.width) {
+    // 뷰포트가 맵보다 넓으면 맵을 가운데 배치
+    cx = -(screenWidth - map.width) / 2;
+  } else {
+    cx = Math.max(0, Math.min(player.position.x - screenWidth / 2, map.width - screenWidth));
+  }
+
+  if (screenHeight >= map.height) {
+    cy = -(screenHeight - map.height) / 2;
+  } else {
+    cy = Math.max(0, Math.min(player.position.y - screenHeight / 2, map.height - screenHeight));
+  }
+
+  return { x: cx, y: cy };
 }
 
 // ─── 맵 렌더링 ──────────────────────────────────────────
 
-/** 맵 전체 렌더링 (카메라 transform 포함) */
+/** 맵 전체 렌더링 (뷰포트 전체를 채움) */
 export function renderMap(
   ctx: CanvasRenderingContext2D,
   map: GameMap,
@@ -38,49 +80,54 @@ export function renderMap(
   screenHeight: number,
   time: number,
 ) {
+  const view = getViewBounds(camera, screenWidth, screenHeight);
+
   ctx.save();
   ctx.translate(-camera.x, -camera.y);
 
-  renderSky(ctx, map, time);
-  renderWater(ctx, map, time);
-  renderShore(ctx, map);
-  renderGround(ctx, map, time);
+  renderSky(ctx, map, view, time);
+  renderWater(ctx, map, view, time);
+  renderShore(ctx, map, view);
+  renderGround(ctx, map, view, time);
   renderTrees(ctx, map.waterLineY);
   renderFishingPoints(ctx, map.fishingPoints, time);
 
   ctx.restore();
 }
 
-function renderSky(ctx: CanvasRenderingContext2D, map: GameMap, time: number) {
-  const { colors, waterLineY, width } = map;
+function renderSky(ctx: CanvasRenderingContext2D, map: GameMap, view: ViewBounds, time: number) {
+  const { colors, waterLineY } = map;
 
-  const skyGrad = ctx.createLinearGradient(0, 0, 0, waterLineY);
+  const skyGrad = ctx.createLinearGradient(0, view.top, 0, waterLineY);
   skyGrad.addColorStop(0, '#5b9bd5');
   skyGrad.addColorStop(1, colors.sky);
   ctx.fillStyle = skyGrad;
-  ctx.fillRect(0, 0, width, waterLineY);
+  ctx.fillRect(view.left, view.top, view.right - view.left, waterLineY - view.top);
 
-  // 구름
+  // 구름 (뷰포트 범위에 맞춤)
+  const cloudWidth = view.right - view.left + 400;
   ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-  const cloudOffset = (time * ANIM_CLOUD_SPEED) % (width + 200);
-  drawCloud(ctx, cloudOffset - 100, 50, 60);
-  drawCloud(ctx, (cloudOffset + 400) % (width + 200) - 100, 80, 45);
-  drawCloud(ctx, (cloudOffset + 750) % (width + 200) - 100, 35, 50);
+  const cloudOffset = (time * ANIM_CLOUD_SPEED) % (cloudWidth + 200);
+  const cloudBase = view.left - 200;
+  drawCloud(ctx, cloudBase + cloudOffset, 50, 60);
+  drawCloud(ctx, cloudBase + (cloudOffset + 400) % (cloudWidth + 200), 80, 45);
+  drawCloud(ctx, cloudBase + (cloudOffset + 750) % (cloudWidth + 200), 35, 50);
 }
 
-function renderWater(ctx: CanvasRenderingContext2D, map: GameMap, time: number) {
-  const { colors, waterLineY, width } = map;
+function renderWater(ctx: CanvasRenderingContext2D, map: GameMap, view: ViewBounds, time: number) {
+  const { colors, waterLineY } = map;
 
   const waterGrad = ctx.createLinearGradient(0, waterLineY, 0, waterLineY + 80);
   waterGrad.addColorStop(0, colors.water);
   waterGrad.addColorStop(1, colors.waterDeep);
   ctx.fillStyle = waterGrad;
-  ctx.fillRect(0, waterLineY - 10, width, 80);
+  ctx.fillRect(view.left, waterLineY - 10, view.right - view.left, 80);
 
-  // 반짝임
+  // 반짝임 (뷰포트 전체)
   ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-  for (let i = 0; i < 12; i++) {
-    const wx = (i * 100 + Math.sin(time * ANIM_WATER_SPARKLE_SPEED + i) * 15) % width;
+  const sparkleSpan = view.right - view.left;
+  for (let i = 0; i < 16; i++) {
+    const wx = view.left + ((i * 80 + Math.sin(time * ANIM_WATER_SPARKLE_SPEED + i) * 15) % sparkleSpan);
     const wy = waterLineY + 10 + Math.sin(time * ANIM_WATER_SPARKLE_Y_SPEED + i * 0.7) * 8;
     ctx.beginPath();
     ctx.ellipse(wx, wy, 12 + Math.sin(time + i) * 4, 2, 0, 0, Math.PI * 2);
@@ -88,33 +135,34 @@ function renderWater(ctx: CanvasRenderingContext2D, map: GameMap, time: number) 
   }
 }
 
-function renderShore(ctx: CanvasRenderingContext2D, map: GameMap) {
-  const { colors, waterLineY, width } = map;
+function renderShore(ctx: CanvasRenderingContext2D, map: GameMap, view: ViewBounds) {
+  const { colors, waterLineY } = map;
 
   const shoreGrad = ctx.createLinearGradient(0, waterLineY + 55, 0, waterLineY + 80);
   shoreGrad.addColorStop(0, '#c8b88a');
   shoreGrad.addColorStop(1, colors.ground);
   ctx.fillStyle = shoreGrad;
-  ctx.fillRect(0, waterLineY + 55, width, 25);
+  ctx.fillRect(view.left, waterLineY + 55, view.right - view.left, 25);
 }
 
-function renderGround(ctx: CanvasRenderingContext2D, map: GameMap, time: number) {
-  const { colors, waterLineY, width, height } = map;
+function renderGround(ctx: CanvasRenderingContext2D, map: GameMap, view: ViewBounds, time: number) {
+  const { colors, waterLineY } = map;
 
-  const groundGrad = ctx.createLinearGradient(0, waterLineY + 80, 0, height);
+  const groundGrad = ctx.createLinearGradient(0, waterLineY + 80, 0, view.bottom);
   groundGrad.addColorStop(0, colors.ground);
   groundGrad.addColorStop(0.4, colors.groundDark);
   groundGrad.addColorStop(1, '#4a7a2e');
   ctx.fillStyle = groundGrad;
-  ctx.fillRect(0, waterLineY + 80, width, height - waterLineY - 80);
+  ctx.fillRect(view.left, waterLineY + 80, view.right - view.left, view.bottom - waterLineY - 80);
 
-  // 풀 디테일
+  // 풀 디테일 (뷰포트 범위 내만)
   ctx.strokeStyle = colors.grass;
   ctx.lineWidth = 2;
-  for (let i = 0; i < 30; i++) {
-    const gx = (i * 42 + 15) % width;
+  const grassSpan = view.right - view.left;
+  for (let i = 0; i < 40; i++) {
+    const gx = view.left + ((i * 42 + 15) % grassSpan);
     const gy = waterLineY + 90 + (i % 5) * 60;
-    if (gy < height - 20) {
+    if (gy < view.bottom && gy > waterLineY + 80) {
       drawGrass(ctx, gx, gy, time, i);
     }
   }
@@ -243,7 +291,6 @@ function renderPlayerHead(ctx: CanvasRenderingContext2D, x: number, bodyTop: num
   ctx.arc(x, bodyTop + 8, 10, 0, Math.PI * 2);
   ctx.fill();
 
-  // 눈
   ctx.fillStyle = '#333';
   if (direction === 'left') {
     ctx.beginPath();
@@ -306,7 +353,6 @@ function renderFishingRod(
   }
   ctx.stroke();
 
-  // 낚싯줄 + 찌
   const hasLine = state === 'waiting' || state === 'bite' || state === 'challenge';
   if (hasLine) {
     renderFishingLine(ctx, x, y, rodDir, state, time);
@@ -330,7 +376,6 @@ function renderFishingLine(
   ctx.lineTo(x + 40 * rodDir + lineWobble, y - 45);
   ctx.stroke();
 
-  // 찌
   ctx.fillStyle = '#ff4444';
   ctx.beginPath();
   const bobberY = state === 'bite' ? y - 45 + Math.sin(time * ANIM_BITE_BOBBER_SPEED) * 4 : y - 45;
@@ -338,9 +383,100 @@ function renderFishingLine(
   ctx.fill();
 }
 
+// ─── 말풍선 렌더링 ──────────────────────────────────────
+
+/** 캐릭터 머리 위 말풍선 렌더링 */
+export function renderSpeechBubble(
+  ctx: CanvasRenderingContext2D,
+  player: Player,
+  camera: Camera,
+  bubble: SpeechBubble | null,
+  currentTime: number,
+) {
+  if (!bubble) return;
+
+  const elapsed = currentTime - bubble.createdAt;
+  if (elapsed >= BUBBLE_DURATION) return;
+
+  // 페이드아웃 알파
+  const alpha = elapsed < BUBBLE_FADE_START
+    ? 0.85
+    : 0.85 * (1 - (elapsed - BUBBLE_FADE_START) / (BUBBLE_DURATION - BUBBLE_FADE_START));
+
+  ctx.save();
+  ctx.translate(-camera.x, -camera.y);
+
+  const { x, y } = player.position;
+  const bubbleY = y - player.height / 2 - BUBBLE_OFFSET_Y;
+
+  ctx.font = `${BUBBLE_FONT_SIZE}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // 텍스트 줄바꿈 처리
+  const lines = wrapText(ctx, bubble.text, BUBBLE_MAX_WIDTH - BUBBLE_PADDING * 2);
+  const lineHeight = BUBBLE_FONT_SIZE + 3;
+  const textHeight = lines.length * lineHeight;
+  const textWidth = Math.min(
+    BUBBLE_MAX_WIDTH,
+    Math.max(...lines.map((l) => ctx.measureText(l).width)) + BUBBLE_PADDING * 2,
+  );
+
+  const boxW = textWidth;
+  const boxH = textHeight + BUBBLE_PADDING * 2;
+  const boxX = x - boxW / 2;
+  const boxY = bubbleY - boxH;
+
+  // 말풍선 배경 (둥근 사각형)
+  ctx.fillStyle = `rgba(15, 23, 42, ${alpha * 0.8})`;
+  roundRect(ctx, boxX, boxY, boxW, boxH, 8);
+  ctx.fill();
+
+  // 테두리
+  ctx.strokeStyle = `rgba(148, 163, 184, ${alpha * 0.4})`;
+  ctx.lineWidth = 1;
+  roundRect(ctx, boxX, boxY, boxW, boxH, 8);
+  ctx.stroke();
+
+  // 꼬리 (삼각형)
+  ctx.fillStyle = `rgba(15, 23, 42, ${alpha * 0.8})`;
+  ctx.beginPath();
+  ctx.moveTo(x - 5, boxY + boxH);
+  ctx.lineTo(x, boxY + boxH + 6);
+  ctx.lineTo(x + 5, boxY + boxH);
+  ctx.closePath();
+  ctx.fill();
+
+  // 텍스트
+  ctx.fillStyle = `rgba(226, 232, 240, ${alpha})`;
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], x, boxY + BUBBLE_PADDING + lineHeight * (i + 0.5));
+  }
+
+  ctx.restore();
+}
+
+/** 텍스트를 maxWidth에 맞게 줄바꿈 */
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const lines: string[] = [];
+  let current = '';
+
+  for (const char of text) {
+    const test = current + char;
+    if (ctx.measureText(test).width > maxWidth && current.length > 0) {
+      lines.push(current);
+      current = char;
+    } else {
+      current = test;
+    }
+  }
+  if (current) lines.push(current);
+
+  return lines.length > 0 ? lines : [''];
+}
+
 // ─── 공용 렌더링 유틸 ───────────────────────────────────
 
-/** 둥근 사각형 path 생성 (fill/stroke는 호출측에서) */
 function roundRect(
   ctx: CanvasRenderingContext2D,
   x: number,

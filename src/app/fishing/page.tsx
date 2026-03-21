@@ -8,7 +8,7 @@ import { RIVER_FISH } from './data/fish';
 const GameCanvas = dynamic(() => import('./components/GameCanvas'), {
   ssr: false,
   loading: () => (
-    <div className="flex items-center justify-center h-full">
+    <div className="flex items-center justify-center h-full bg-slate-900">
       <p className="text-slate-500 text-sm">게임 로딩 중...</p>
     </div>
   ),
@@ -16,7 +16,8 @@ const GameCanvas = dynamic(() => import('./components/GameCanvas'), {
 
 export default function FishingPage() {
   return (
-    <div className="w-full h-full relative">
+    <div className="fixed inset-0 w-screen h-screen overflow-hidden bg-slate-900">
+      {/* 뒤로가기 버튼 */}
       <div className="absolute top-3 left-3 z-40">
         <Link
           href="/"

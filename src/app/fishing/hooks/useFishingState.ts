@@ -113,16 +113,8 @@ export function useFishingState(fishPool: Fish[]) {
     });
   }, []);
 
-  const dismiss = useCallback(() => {
-    setCtx((prev) => ({
-      ...prev,
-      state: 'idle',
-      currentFish: null,
-      currentPoint: null,
-    }));
-  }, []);
-
-  const cancelFishing = useCallback(() => {
+  /** 낚시 종료 (성공/실패 확인, 대기 취소 모두 동일) */
+  const resetFishing = useCallback(() => {
     setCtx((prev) => ({
       ...prev,
       state: 'idle',
@@ -150,7 +142,10 @@ export function useFishingState(fishPool: Fish[]) {
             biteTimerRef.current = 0;
             return { ...prev, state: 'bite', waitProgress: 1, biteTimeLeft: 1 };
           }
-          return { ...prev, waitProgress: progress };
+          // 1% 미만의 변화는 무시하여 불필요한 리렌더 방지
+          const rounded = Math.round(progress * 100) / 100;
+          if (rounded === prev.waitProgress) return prev;
+          return { ...prev, waitProgress: rounded };
         }
 
         case 'bite': {
@@ -184,8 +179,7 @@ export function useFishingState(fishPool: Fish[]) {
     startFishing,
     onBiteTap,
     onChallengeTap,
-    dismiss,
-    cancelFishing,
+    resetFishing,
     updateFishing,
   };
 }
