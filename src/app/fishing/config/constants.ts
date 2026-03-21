@@ -46,6 +46,14 @@ export const ANIM_BITE_ROD_WOBBLE_SPEED = 15;
 export const ANIM_BITE_LINE_WOBBLE_SPEED = 12;
 export const ANIM_BITE_BOBBER_SPEED = 10;
 
+// ─── 말풍선 ──────────────────────────────────────────────
+export const BUBBLE_DURATION = 4;        // 말풍선 표시 시간 (초)
+export const BUBBLE_FADE_START = 3;      // 페이드아웃 시작 시점 (초)
+export const BUBBLE_MAX_WIDTH = 120;     // 말풍선 최대 너비 (px)
+export const BUBBLE_FONT_SIZE = 10;      // 말풍선 폰트 크기 (px)
+export const BUBBLE_PADDING = 6;         // 말풍선 패딩 (px)
+export const BUBBLE_OFFSET_Y = 30;       // 캐릭터 머리 위 간격 (px)
+
 // ─── 등급별 색상 ─────────────────────────────────────────
 export const GRADE_COLORS: Record<FishGrade, string> = {
   common: '#9ca3af',
