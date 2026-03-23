@@ -58,6 +58,8 @@ const SOCKET_CONFIG = {
   reconnectDelay: 1000,
   /** 연결 타임아웃 (ms) */
   timeout: 10000,
+  /** 연결 디바운스 딜레이 (ms) - 빠른 새로고침 시 고스트 소켓 방지 */
+  connectDebounce: 300,
 } as const;
 
 // ===== Provider 컴포넌트 =====
@@ -80,6 +82,8 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
   // Refs (cleanup 및 최신 상태 참조용)
   const socketRef = useRef<TeamSocket | null>(null);
   const isConnectedRef = useRef(false);
+  const isConnectingRef = useRef(false);
+  const connectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentTeamIdRef = useRef(teamId);
 
   // teamId 변경 추적
@@ -88,34 +92,14 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
   }, [teamId]);
 
   /**
-   * Socket 연결 초기화
+   * 실제 소켓 연결 생성 (디바운스 후 호출됨)
    */
-  const initializeSocket = useCallback(() => {
-    const accessToken = session?.user?.accessToken;
-
-    // 이미 연결되어 있으면 스킵
+  const createSocket = useCallback((accessToken: string) => {
+    // 디바운스 대기 중 상태가 변했을 수 있으므로 다시 체크
     if (socketRef.current?.connected) {
+      isConnectingRef.current = false;
       return;
     }
-
-    // 세션 로딩 중이면 대기
-    if (sessionStatus === 'loading') {
-      return;
-    }
-
-    // 토큰 없으면 연결하지 않음
-    if (!accessToken) {
-      setError('인증 토큰이 필요합니다.');
-      return;
-    }
-
-    // 유효하지 않은 teamId면 연결하지 않음
-    if (!teamId || isNaN(teamId) || teamId <= 0) {
-      setError('유효하지 않은 팀 ID입니다.');
-      return;
-    }
-
-    setError(null);
 
     // Socket.io 연결 생성
     const newSocket = io(`${SOCKET_URL}/teams`, {
@@ -127,11 +111,14 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
       reconnectionAttempts: SOCKET_CONFIG.reconnectAttempts,
       reconnectionDelay: SOCKET_CONFIG.reconnectDelay,
       timeout: SOCKET_CONFIG.timeout,
+      // 새로고침/탭 닫기 시 underlying transport를 즉시 닫음 (고스트 소켓 방지)
+      closeOnBeforeunload: true,
     }) as TeamSocket;
 
     // 연결 성공
     newSocket.on('connect', () => {
       console.log('[TeamSocket] 연결 성공:', newSocket.id);
+      isConnectingRef.current = false;
       setIsConnected(true);
       isConnectedRef.current = true;
       setError(null);
@@ -149,6 +136,7 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
     // 연결 해제
     newSocket.on('disconnect', (reason) => {
       console.log('[TeamSocket] 연결 해제:', reason);
+      isConnectingRef.current = false;
       setIsConnected(false);
       isConnectedRef.current = false;
     });
@@ -156,6 +144,7 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
     // 연결 에러
     newSocket.on('connect_error', (err) => {
       console.error('[TeamSocket] 연결 에러:', err.message);
+      isConnectingRef.current = false;
       setError(`연결 실패: ${err.message}`);
       setIsConnected(false);
       isConnectedRef.current = false;
@@ -221,16 +210,68 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
     // ref와 state 모두 업데이트
     socketRef.current = newSocket;
     setSocket(newSocket);
-  }, [teamId, session?.user?.accessToken, sessionStatus]);
+  }, [teamId]);
+
+  /**
+   * Socket 연결 초기화 (디바운스 적용)
+   *
+   * 빠른 새로고침 시 이전 타이머가 취소되어 소켓이 생성되지 않음.
+   * 페이지가 안정화된 후에만 실제 연결이 수행됨.
+   */
+  const initializeSocket = useCallback(() => {
+    const accessToken = session?.user?.accessToken;
+
+    // 이미 연결되어 있거나 연결 진행 중이면 스킵
+    if (socketRef.current?.connected || isConnectingRef.current) {
+      return;
+    }
+
+    // 세션 로딩 중이면 대기
+    if (sessionStatus === 'loading') {
+      return;
+    }
+
+    // 토큰 없으면 연결하지 않음
+    if (!accessToken) {
+      setError('인증 토큰이 필요합니다.');
+      return;
+    }
+
+    // 유효하지 않은 teamId면 연결하지 않음
+    if (!teamId || isNaN(teamId) || teamId <= 0) {
+      setError('유효하지 않은 팀 ID입니다.');
+      return;
+    }
+
+    setError(null);
+    isConnectingRef.current = true;
+
+    // 이전 대기 중인 연결 타이머 취소
+    if (connectTimerRef.current) {
+      clearTimeout(connectTimerRef.current);
+    }
+
+    // 디바운스: 페이지가 안정화된 후에만 실제 소켓 생성
+    connectTimerRef.current = setTimeout(() => {
+      connectTimerRef.current = null;
+      createSocket(accessToken);
+    }, SOCKET_CONFIG.connectDebounce);
+  }, [teamId, session?.user?.accessToken, sessionStatus, createSocket]);
 
   /**
    * Socket 연결 해제
-   * 
+   *
    * 주의: LEAVE_TEAM 이벤트를 별도로 emit하지 않음
    * - disconnect()가 호출되면 서버의 handleDisconnect에서 모든 정리 작업 수행
    * - LEAVE_TEAM emit + disconnect()를 동시에 하면 중복 알림 발생
    */
   const disconnectSocket = useCallback(() => {
+    // 대기 중인 연결 타이머 취소
+    if (connectTimerRef.current) {
+      clearTimeout(connectTimerRef.current);
+      connectTimerRef.current = null;
+    }
+    isConnectingRef.current = false;
     if (socketRef.current) {
       socketRef.current.disconnect();
       socketRef.current = null;
