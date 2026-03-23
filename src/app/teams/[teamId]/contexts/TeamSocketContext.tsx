@@ -210,6 +210,7 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
     // ref와 state 모두 업데이트
     socketRef.current = newSocket;
     setSocket(newSocket);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- teamId triggers reconnection via dependency chain
   }, [teamId]);
 
   /**

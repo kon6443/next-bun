@@ -475,6 +475,124 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
   return lines.length > 0 ? lines : [''];
 }
 
+// ─── 다른 플레이어 렌더링 ─────────────────────────────────
+
+/** OtherPlayer와 동일한 최소 타입 (순환 import 방지) */
+interface OtherPlayerRender {
+  userId: number;
+  userName: string;
+  x: number;
+  y: number;
+  direction: 'left' | 'right';
+  fishingState?: string;
+}
+
+/** 다른 플레이어들을 캔버스에 렌더링 */
+export function renderOtherPlayers(
+  ctx: CanvasRenderingContext2D,
+  players: OtherPlayerRender[],
+  camera: Camera,
+  time: number,
+) {
+  ctx.save();
+  ctx.translate(-camera.x, -camera.y);
+
+  for (const p of players) {
+    renderOtherPlayer(ctx, p, time);
+  }
+
+  ctx.restore();
+}
+
+function renderOtherPlayer(
+  ctx: CanvasRenderingContext2D,
+  p: OtherPlayerRender,
+  time: number,
+) {
+  const pw = 24;
+  const ph = 36;
+  const bodyTop = p.y - ph / 2;
+
+  // 그림자
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y + ph / 2 + 2, pw / 2, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 반투명 효과 (다른 유저임을 구분)
+  ctx.globalAlpha = 0.8;
+
+  // 몸통 (다른 색상 — 녹색 계열)
+  ctx.fillStyle = '#5ab06a';
+  roundRect(ctx, p.x - pw / 2, bodyTop + 10, pw, ph - 10, 4);
+  ctx.fill();
+
+  // 머리
+  ctx.fillStyle = '#ffd4a0';
+  ctx.beginPath();
+  ctx.arc(p.x, bodyTop + 8, 10, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 눈
+  ctx.fillStyle = '#333';
+  if (p.direction === 'left') {
+    ctx.beginPath();
+    ctx.arc(p.x - 4, bodyTop + 6, 2, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.beginPath();
+    ctx.arc(p.x + 4, bodyTop + 6, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 다리
+  ctx.fillStyle = '#3a3a5c';
+  ctx.fillRect(p.x - 6, p.y + ph / 2 - 4, 5, 8);
+  ctx.fillRect(p.x + 1, p.y + ph / 2 - 4, 5, 8);
+
+  // 낚시 중이면 낚싯대 표시
+  if (p.fishingState && p.fishingState !== 'idle') {
+    const rodDir = p.direction === 'left' ? -1 : 1;
+    ctx.strokeStyle = '#8B4513';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(p.x + 8 * rodDir, bodyTop + 15);
+    const tipWobble = p.fishingState === 'bite' ? Math.sin(time * ANIM_BITE_ROD_WOBBLE_SPEED) * 5 : 0;
+    ctx.lineTo(p.x + 35 * rodDir, bodyTop + 15 - 25 + tipWobble);
+    ctx.stroke();
+
+    // 줄 + 찌
+    if (p.fishingState === 'waiting' || p.fishingState === 'bite' || p.fishingState === 'challenge') {
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(p.x + 35 * rodDir, bodyTop + 15 - 25);
+      ctx.lineTo(p.x + 40 * rodDir, bodyTop + 15 - 45);
+      ctx.stroke();
+
+      ctx.fillStyle = '#ff4444';
+      ctx.beginPath();
+      ctx.arc(p.x + 40 * rodDir, bodyTop + 15 - 45, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.globalAlpha = 1.0;
+
+  // 이름표
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+
+  const nameWidth = ctx.measureText(p.userName).width + 8;
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
+  roundRect(ctx, p.x - nameWidth / 2, bodyTop - 18, nameWidth, 14, 4);
+  ctx.fill();
+
+  ctx.fillStyle = '#a5f3fc';
+  ctx.fillText(p.userName, p.x, bodyTop - 5);
+}
+
 // ─── 공용 렌더링 유틸 ───────────────────────────────────
 
 function roundRect(

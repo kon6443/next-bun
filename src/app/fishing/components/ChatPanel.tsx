@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import type { FishingSocket, ChatReceivedPayload, CatchNotificationPayload } from '@/types/fishingSocket';
+import { FishingSocketEvents } from '@/types/fishingSocket';
 
 interface ChatMessage {
   id: string;
@@ -14,27 +16,20 @@ interface ChatPanelProps {
   isOpen: boolean;
   onClose: () => void;
   onSendMessage: (text: string) => void;
+  socket?: FishingSocket | null;
+  currentUserId?: number;
 }
 
-const SYSTEM_MESSAGES: ChatMessage[] = [
-  {
-    id: 'sys-1',
-    sender: '시스템',
-    text: '평화로운 강가에 오신 것을 환영합니다!',
-    timestamp: Date.now() - 60000,
-    isSystem: true,
-  },
-  {
-    id: 'sys-2',
-    sender: '시스템',
-    text: '채팅 기능은 추후 멀티플레이어 업데이트에서 활성화됩니다.',
-    timestamp: Date.now() - 30000,
-    isSystem: true,
-  },
-];
+const SYSTEM_WELCOME: ChatMessage = {
+  id: 'sys-1',
+  sender: '시스템',
+  text: '평화로운 강가에 오신 것을 환영합니다!',
+  timestamp: Date.now() - 60000,
+  isSystem: true,
+};
 
-export default function ChatPanel({ isOpen, onClose, onSendMessage }: ChatPanelProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>(SYSTEM_MESSAGES);
+export default function ChatPanel({ isOpen, onClose, onSendMessage, socket, currentUserId }: ChatPanelProps) {
+  const [messages, setMessages] = useState<ChatMessage[]>([SYSTEM_WELCOME]);
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -58,6 +53,55 @@ export default function ChatPanel({ isOpen, onClose, onSendMessage }: ChatPanelP
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [isOpen, messages.length]);
+
+  // 소켓 채팅/낚시 알림 수신
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleChatReceived = (payload: ChatReceivedPayload) => {
+      // 본인이 보낸 메시지는 이미 로컬에서 추가했으므로 스킵
+      if (currentUserId && payload.userId === currentUserId) return;
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `remote-${payload.timestamp}-${payload.userId}`,
+          sender: payload.userName,
+          text: payload.message,
+          timestamp: Date.now(),
+        },
+      ]);
+    };
+
+    const handleCatchNotification = (payload: CatchNotificationPayload) => {
+      const gradeEmojis: Record<string, string> = {
+        common: '',
+        uncommon: '✨',
+        rare: '💎',
+        epic: '🔥',
+        legendary: '👑',
+      };
+      const emoji = gradeEmojis[payload.grade] ?? '';
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `catch-${payload.timestamp}-${payload.userId}`,
+          sender: '시스템',
+          text: `${payload.userName}님이 ${emoji}${payload.fishName}을(를) 잡았습니다!`,
+          timestamp: Date.now(),
+          isSystem: true,
+        },
+      ]);
+    };
+
+    socket.on(FishingSocketEvents.CHAT_RECEIVED, handleChatReceived);
+    socket.on(FishingSocketEvents.CATCH_NOTIFICATION, handleCatchNotification);
+
+    return () => {
+      socket.off(FishingSocketEvents.CHAT_RECEIVED, handleChatReceived);
+      socket.off(FishingSocketEvents.CATCH_NOTIFICATION, handleCatchNotification);
+    };
+  }, [socket, currentUserId]);
 
   const handleSend = useCallback(() => {
     const text = input.trim();
