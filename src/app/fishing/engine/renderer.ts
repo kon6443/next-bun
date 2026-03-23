@@ -593,6 +593,73 @@ function renderOtherPlayer(
   ctx.fillText(p.userName, p.x, bodyTop - 5);
 }
 
+// ─── 다른 유저 말풍선 렌더링 ─────────────────────────────
+
+/** 다른 유저 머리 위 말풍선 렌더링 */
+export function renderOtherPlayerBubble(
+  ctx: CanvasRenderingContext2D,
+  player: OtherPlayerRender,
+  camera: Camera,
+  bubble: SpeechBubble,
+  currentTime: number,
+) {
+  const elapsed = currentTime - bubble.createdAt;
+  if (elapsed >= BUBBLE_DURATION) return;
+
+  const alpha = elapsed < BUBBLE_FADE_START
+    ? 0.85
+    : 0.85 * (1 - (elapsed - BUBBLE_FADE_START) / (BUBBLE_DURATION - BUBBLE_FADE_START));
+
+  ctx.save();
+  ctx.translate(-camera.x, -camera.y);
+
+  const ph = 36; // 다른 유저 캐릭터 높이 (renderOtherPlayer와 동일)
+  const bubbleY = player.y - ph / 2 - BUBBLE_OFFSET_Y;
+
+  ctx.font = `${BUBBLE_FONT_SIZE}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const lines = wrapText(ctx, bubble.text, BUBBLE_MAX_WIDTH - BUBBLE_PADDING * 2);
+  const lineHeight = BUBBLE_FONT_SIZE + 3;
+  const textHeight = lines.length * lineHeight;
+  const textWidth = Math.min(
+    BUBBLE_MAX_WIDTH,
+    Math.max(...lines.map((l) => ctx.measureText(l).width)) + BUBBLE_PADDING * 2,
+  );
+
+  const boxW = textWidth;
+  const boxH = textHeight + BUBBLE_PADDING * 2;
+  const boxX = player.x - boxW / 2;
+  const boxY = bubbleY - boxH;
+
+  ctx.fillStyle = `rgba(15, 23, 42, ${alpha * 0.8})`;
+  roundRect(ctx, boxX, boxY, boxW, boxH, 8);
+  ctx.fill();
+
+  ctx.strokeStyle = `rgba(148, 163, 184, ${alpha * 0.4})`;
+  ctx.lineWidth = 1;
+  roundRect(ctx, boxX, boxY, boxW, boxH, 8);
+  ctx.stroke();
+
+  // 꼬리
+  ctx.fillStyle = `rgba(15, 23, 42, ${alpha * 0.8})`;
+  ctx.beginPath();
+  ctx.moveTo(player.x - 5, boxY + boxH);
+  ctx.lineTo(player.x, boxY + boxH + 6);
+  ctx.lineTo(player.x + 5, boxY + boxH);
+  ctx.closePath();
+  ctx.fill();
+
+  // 텍스트
+  ctx.fillStyle = `rgba(226, 232, 240, ${alpha})`;
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], player.x, boxY + BUBBLE_PADDING + lineHeight * (i + 0.5));
+  }
+
+  ctx.restore();
+}
+
 // ─── 공용 렌더링 유틸 ───────────────────────────────────
 
 function roundRect(

@@ -6,8 +6,10 @@ import { useGameLoop } from '../hooks/useGameLoop';
 import { usePlayerMovement } from '../hooks/usePlayerMovement';
 import { useFishingState } from '../hooks/useFishingState';
 import { useKeyboardInput } from '../hooks/useKeyboardInput';
-import { renderMap, renderPlayer, renderSpeechBubble, renderOtherPlayers, updateCamera } from '../engine/renderer';
+import { renderMap, renderPlayer, renderSpeechBubble, renderOtherPlayers, renderOtherPlayerBubble, updateCamera } from '../engine/renderer';
 import type { SpeechBubble } from '../engine/renderer';
+import type { ChatReceivedPayload } from '@/types/fishingSocket';
+import { FishingSocketEvents } from '@/types/fishingSocket';
 import { findNearbyFishingPoint } from '../engine/collision';
 import type { GameMap, Camera, FishingPoint } from '../types/game';
 import type { Fish } from '../types/fish';
@@ -80,6 +82,8 @@ export default function GameCanvas({ map, fishPool }: GameCanvasProps) {
 
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  /** 다른 유저 말풍선 (userId → SpeechBubble) */
+  const otherBubblesRef = useRef<Map<number, SpeechBubble>>(new Map());
 
   const prevNearbyIdRef = useRef<string | null>(null);
 
@@ -158,6 +162,14 @@ export default function GameCanvas({ map, fishPool }: GameCanvasProps) {
     // 다른 유저 렌더링 (본인 뒤에)
     if (otherPlayersArray.length > 0) {
       renderOtherPlayers(ctx, otherPlayersArray, cameraRef.current, totalTime);
+
+      // 다른 유저 말풍선 렌더링
+      for (const p of otherPlayersArray) {
+        const bubble = otherBubblesRef.current.get(p.userId);
+        if (bubble) {
+          renderOtherPlayerBubble(ctx, p, cameraRef.current, bubble, totalTime);
+        }
+      }
     }
 
     renderPlayer(ctx, playerRef.current, cameraRef.current, fishingStateRef.current, totalTime);
@@ -239,6 +251,25 @@ export default function GameCanvas({ map, fishPool }: GameCanvasProps) {
     socketCtxRef.current?.emitFishingState('idle');
   }, [resetFishing]);
 
+  // 다른 유저 채팅 수신 → 말풍선 생성
+  useEffect(() => {
+    const sock = socketCtx?.socket;
+    if (!sock) return;
+
+    const handleChatReceived = (payload: ChatReceivedPayload) => {
+      if (session?.user?.userId && payload.userId === session.user.userId) return;
+      otherBubblesRef.current.set(payload.userId, {
+        text: payload.message,
+        createdAt: totalTimeRef.current,
+      });
+    };
+
+    sock.on(FishingSocketEvents.CHAT_RECEIVED, handleChatReceived);
+    return () => {
+      sock.off(FishingSocketEvents.CHAT_RECEIVED, handleChatReceived);
+    };
+  }, [socketCtx?.socket, session?.user?.userId]);
+
   // 낚시 성공 시 결과를 소켓으로 emit
   useEffect(() => {
     if (fishingCtx.state === 'success' && fishingCtx.lastCatch && socketCtx) {
@@ -253,6 +284,7 @@ export default function GameCanvas({ map, fishPool }: GameCanvasProps) {
   const handleOpenInventory = useCallback(() => setInventoryOpen(true), []);
   const handleCloseInventory = useCallback(() => setInventoryOpen(false), []);
   const handleToggleChat = useCallback(() => setChatOpen((v) => !v), []);
+  const handleCloseChat = useCallback(() => setChatOpen(false), []);
 
   const handleSendMessage = useCallback((text: string) => {
     bubbleRef.current = { text, createdAt: totalTimeRef.current };
@@ -304,7 +336,7 @@ export default function GameCanvas({ map, fishPool }: GameCanvasProps) {
 
       <ChatPanel
         isOpen={chatOpen}
-        onClose={handleToggleChat}
+        onClose={handleCloseChat}
         onSendMessage={handleSendMessage}
         socket={socketCtx?.socket}
         currentUserId={session?.user?.userId}
