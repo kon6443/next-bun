@@ -126,7 +126,7 @@ export default function ChatPanel({ isOpen, onClose, onSendMessage, socket, curr
     (e: React.KeyboardEvent) => {
       // 채팅 input 안에서는 게임 키 전파 방지
       e.stopPropagation();
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
         e.preventDefault();
         handleSend();
       }
