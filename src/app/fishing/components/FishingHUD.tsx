@@ -14,6 +14,8 @@ interface FishingHUDProps {
   challengeGauge: number;
   challengeZone: [number, number];
   inventoryCount: number;
+  onlineCount: number;
+  isConnected: boolean;
   onStartFishing: () => void;
   onBiteTap: () => void;
   onChallengeTap: () => void;
@@ -32,6 +34,8 @@ export default function FishingHUD({
   challengeGauge,
   challengeZone,
   inventoryCount,
+  onlineCount,
+  isConnected,
   onStartFishing,
   onBiteTap,
   onChallengeTap,
@@ -41,11 +45,17 @@ export default function FishingHUD({
 }: FishingHUDProps) {
   return (
     <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 10 }}>
-      {/* 맵 이름 (우측 상단) */}
-      <div className="absolute top-3 right-3">
+      {/* 맵 이름 + 온라인 유저 수 (우측 상단) */}
+      <div className="absolute top-3 right-3 flex flex-col items-end gap-1.5">
         <div className="bg-slate-900/70 rounded-xl px-3 py-1.5 border border-slate-700/50">
           <span className="text-xs text-slate-300">{mapName}</span>
         </div>
+        {isConnected && (
+          <div className="bg-slate-900/70 rounded-xl px-3 py-1.5 border border-slate-700/50 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+            <span className="text-xs text-slate-400">{onlineCount}명 접속 중</span>
+          </div>
+        )}
       </div>
 
       {/* PC 키보드 힌트 (터치 미지원 기기에서만 표시) */}

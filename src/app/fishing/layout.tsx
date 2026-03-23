@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { FishingSocketWrapper } from './contexts/FishingSocketWrapper';
 
 export const metadata: Metadata = {
   title: '낚시 게임',
@@ -18,7 +19,9 @@ export default function FishingLayout({
           display: none !important;
         }
       `}</style>
-      {children}
+      <FishingSocketWrapper>
+        {children}
+      </FishingSocketWrapper>
     </div>
   );
 }
