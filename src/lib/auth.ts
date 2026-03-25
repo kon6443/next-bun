@@ -34,20 +34,6 @@ export const authOptions: NextAuthOptions = {
     signIn: "/auth/signin",
     error: "/auth/error",
   },
-  // events: {
-  //   async signIn({ user, account }) {
-  //     // 카카오 로그인 성공 시 로깅 (디버깅용, 필요시 주석 해제)
-  //     // if (account?.provider === "kakao") {
-  //     //   console.log("Kakao sign in successful", {
-  //     //     userId: user.id,
-  //     //     email: user.email,
-  //     //     name: user.name,
-  //     //   });
-  //     // }
-  //   },
-  // },
-  // debug: process.env.NODE_ENV === "development",
-
   callbacks: {
     async signIn({ account }) {
       // 카카오 provider인 경우 account와 access_token 확인
@@ -95,8 +81,6 @@ export const authOptions: NextAuthOptions = {
           token.loginType = loginType;
           token.accessToken = accessToken;
           token.tokenType = tokenType;
-          // 디버깅용 로그 (필요시 주석 해제)
-          // console.log("token:", token);
         } catch (err) {
           console.error("Error during login/signup:", err);
           const errorMessage = err instanceof Error ? err.message : "로그인 처리 중 오류가 발생했습니다.";
