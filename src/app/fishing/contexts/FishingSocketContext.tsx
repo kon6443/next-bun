@@ -131,7 +131,6 @@ export function FishingSocketProvider({ children, mapId }: FishingSocketProvider
 
     // 연결 성공
     newSocket.on('connect', () => {
-      console.log('[FishingSocket] 연결 성공:', newSocket.id);
       isConnectingRef.current = false;
       setIsConnected(true);
       setError(null);
@@ -140,9 +139,7 @@ export function FishingSocketProvider({ children, mapId }: FishingSocketProvider
       newSocket.emit(
         FishingSocketEvents.JOIN_MAP,
         { mapId: currentMapIdRef.current },
-        (response) => {
-          console.log('[FishingSocket] 맵 참가 완료:', response);
-
+        () => {
           // 접속 즉시 초기 위치 emit (다른 유저에게 보이도록)
           newSocket.emit(FishingSocketEvents.MOVE, {
             x: 400,
@@ -154,8 +151,7 @@ export function FishingSocketProvider({ children, mapId }: FishingSocketProvider
     });
 
     // 연결 해제
-    newSocket.on('disconnect', (reason) => {
-      console.log('[FishingSocket] 연결 해제:', reason);
+    newSocket.on('disconnect', () => {
       isConnectingRef.current = false;
       setIsConnected(false);
     });
@@ -176,13 +172,11 @@ export function FishingSocketProvider({ children, mapId }: FishingSocketProvider
 
     // 온라인 유저 목록 (접속 시 서버에서 전송)
     newSocket.on(FishingSocketEvents.ONLINE_USERS, (payload) => {
-      console.log('[FishingSocket] 온라인 유저 목록:', payload);
       setOnlineUsers(payload.users);
     });
 
     // 유저 접속
     newSocket.on(FishingSocketEvents.USER_JOINED, (payload) => {
-      console.log('[FishingSocket] 유저 접속:', payload);
       setOnlineUsers((prev) => {
         const idx = prev.findIndex((u) => u.userId === payload.userId);
         if (idx >= 0) {
@@ -204,7 +198,6 @@ export function FishingSocketProvider({ children, mapId }: FishingSocketProvider
 
     // 유저 퇴장
     newSocket.on(FishingSocketEvents.USER_LEFT, (payload) => {
-      console.log('[FishingSocket] 유저 퇴장:', payload);
       if (payload.connectionCount === 0) {
         setOnlineUsers((prev) => prev.filter((u) => u.userId !== payload.userId));
         setOtherPlayers((prev) => {
@@ -223,7 +216,6 @@ export function FishingSocketProvider({ children, mapId }: FishingSocketProvider
 
     // 초기 플레이어 위치 목록 (본인 제외)
     newSocket.on(FishingSocketEvents.PLAYER_POSITIONS, (payload) => {
-      console.log('[FishingSocket] 플레이어 위치:', payload);
       const now = Date.now();
       const myId = currentUserIdRef.current;
       setOtherPlayers((prev) => {
