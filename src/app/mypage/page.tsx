@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useSession, signIn, signOut } from "next-auth/react";
-import { AUTH_LOADING_KEY } from "@/app/components/AuthLoadingOverlay";
+import { useSession, signOut } from "next-auth/react";
 import { MypageSkeleton } from "@/app/teams/components";
 import { updateUserProfile } from "@/services/userService";
+import { startKakaoLogin } from "@/app/auth/shared";
 
 // 공통 스타일 상수
 const CARD_STYLES = "w-full max-w-[430px] bg-gradient-to-br from-slate-900/95 to-slate-900/75 border border-slate-400/25 rounded-[28px] p-11 shadow-[0_35px_65px_rgba(2,6,23,0.75)] text-center";
@@ -19,11 +19,7 @@ export default function Mypage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleKakaoLogin = () => {
-    // 전역 로딩 오버레이 활성화
-    sessionStorage.setItem(AUTH_LOADING_KEY, "true");
-    signIn("kakao");
-  };
+  const handleKakaoLogin = () => startKakaoLogin();
 
   const handleEditClick = () => {
     setNewUserName(user?.userName ?? "");
@@ -149,12 +145,20 @@ export default function Mypage() {
               </button>
             </div>
           ) : (
-            <button
-              onClick={() => signOut()}
-              className={`${BASE_BUTTON_STYLES} gap-1 bg-gradient-to-r from-blue-500/35 to-indigo-500/40 text-slate-100 shadow-[0_18px_35px_rgba(59,130,246,0.35)]`}
-            >
-              로그아웃
-            </button>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => signOut()}
+                className={`${BASE_BUTTON_STYLES} gap-1 bg-gradient-to-r from-blue-500/35 to-indigo-500/40 text-slate-100 shadow-[0_18px_35px_rgba(59,130,246,0.35)]`}
+              >
+                로그아웃
+              </button>
+              <button
+                onClick={() => startKakaoLogin({ prompt: "login" })}
+                className={`${BASE_BUTTON_STYLES} bg-slate-700/40 text-slate-400 text-sm shadow-none`}
+              >
+                다른 계정으로 로그인
+              </button>
+            </div>
           )}
         </section>
       </div>

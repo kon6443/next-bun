@@ -13,7 +13,7 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.KAKAO_CLIENT_ID || "",
       clientSecret: process.env.KAKAO_CLIENT_SECRET || "",
       httpOptions: {
-        timeout: 10000, // 10초로 타임아웃 설정 (기본값 3500ms에서 증가)
+        timeout: 10000,
       },
     }),
     // GoogleProvider({
