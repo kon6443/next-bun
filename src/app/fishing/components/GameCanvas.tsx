@@ -116,8 +116,7 @@ export default function GameCanvas({ map, fishPool }: GameCanvasProps) {
       setChatOpen(true);
     }
     if (input.escapePressed) {
-      setChatOpen(false);
-      setInventoryOpen(false);
+      closePanels();
     }
 
     updateFishing(deltaTime);
@@ -176,18 +175,37 @@ export default function GameCanvas({ map, fishPool }: GameCanvasProps) {
     renderSpeechBubble(ctx, playerRef.current, cameraRef.current, bubbleRef.current, totalTime);
   });
 
-  /** Space 키 → 현재 상태에 맞는 액션 (ref에서 최신 상태 읽기) */
+  /** 모든 오버레이 패널 닫기 */
+  const closePanels = useCallback(() => {
+    setChatOpen(false);
+    setInventoryOpen(false);
+  }, []);
+
+  /** 낚시 시작 공통 로직 (키보드 Space / HUD 버튼 공용) */
+  const beginCasting = useCallback((point: FishingPoint) => {
+    closePanels();
+    playerRef.current = { ...playerRef.current, isMoving: false, targetPosition: null, fishingState: 'casting' };
+    startFishing(point);
+    socketCtxRef.current?.emitFishingState('casting', point.id);
+  }, [startFishing, closePanels]);
+
+  /** 낚시 종료 → idle 복귀 */
+  const handleDismiss = useCallback(() => {
+    playerRef.current = resetPlayerToIdle(playerRef.current);
+    resetFishing();
+    socketCtxRef.current?.emitFishingState('idle');
+  }, [resetFishing]);
+
+  /** Space 키 → 현재 상태에 맞는 액션 */
   const handleKeyboardAction = useCallback(() => {
     const state = fishingStateRef.current;
-    const nearby = nearbyPointRef.current;
 
     switch (state) {
-      case 'idle':
-        if (nearby) {
-          playerRef.current = { ...playerRef.current, isMoving: false, targetPosition: null, fishingState: 'casting' };
-          startFishing(nearby);
-        }
+      case 'idle': {
+        const nearby = nearbyPointRef.current;
+        if (nearby) beginCasting(nearby);
         break;
+      }
       case 'bite':
         onBiteTap();
         socketCtxRef.current?.emitFishingState('challenge');
@@ -195,17 +213,13 @@ export default function GameCanvas({ map, fishPool }: GameCanvasProps) {
       case 'challenge':
         onChallengeTap();
         break;
+      case 'waiting':
       case 'success':
       case 'fail':
-        playerRef.current = resetPlayerToIdle(playerRef.current);
-        resetFishing();
-        break;
-      case 'waiting':
-        playerRef.current = resetPlayerToIdle(playerRef.current);
-        resetFishing();
+        handleDismiss();
         break;
     }
-  }, [startFishing, onBiteTap, onChallengeTap, resetFishing]);
+  }, [beginCasting, onBiteTap, onChallengeTap, handleDismiss]);
 
   const handleCanvasInteraction = useCallback(
     (clientX: number, clientY: number) => {
@@ -239,17 +253,8 @@ export default function GameCanvas({ map, fishPool }: GameCanvasProps) {
 
   const handleStartFishing = useCallback(() => {
     const nearby = nearbyPointRef.current;
-    if (!nearby) return;
-    playerRef.current = { ...playerRef.current, isMoving: false, targetPosition: null, fishingState: 'casting' };
-    startFishing(nearby);
-    socketCtxRef.current?.emitFishingState('casting', nearby.id);
-  }, [startFishing]);
-
-  const handleDismiss = useCallback(() => {
-    playerRef.current = resetPlayerToIdle(playerRef.current);
-    resetFishing();
-    socketCtxRef.current?.emitFishingState('idle');
-  }, [resetFishing]);
+    if (nearby) beginCasting(nearby);
+  }, [beginCasting]);
 
   // 다른 유저 채팅 수신 → 말풍선 생성
   useEffect(() => {
@@ -282,9 +287,7 @@ export default function GameCanvas({ map, fishPool }: GameCanvasProps) {
   }, [fishingCtx.state, fishingCtx.lastCatch, socketCtx]);
 
   const handleOpenInventory = useCallback(() => setInventoryOpen(true), []);
-  const handleCloseInventory = useCallback(() => setInventoryOpen(false), []);
   const handleToggleChat = useCallback(() => setChatOpen((v) => !v), []);
-  const handleCloseChat = useCallback(() => setChatOpen(false), []);
 
   const handleSendMessage = useCallback((text: string) => {
     bubbleRef.current = { text, createdAt: totalTimeRef.current };
@@ -331,12 +334,12 @@ export default function GameCanvas({ map, fishPool }: GameCanvasProps) {
       <InventoryPanel
         inventory={fishingCtx.inventory}
         isOpen={inventoryOpen}
-        onClose={handleCloseInventory}
+        onClose={closePanels}
       />
 
       <ChatPanel
         isOpen={chatOpen}
-        onClose={handleCloseChat}
+        onClose={closePanels}
         onSendMessage={handleSendMessage}
         socket={socketCtx?.socket}
         currentUserId={session?.user?.userId}

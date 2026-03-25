@@ -19,21 +19,29 @@ export function clampToWalkable(pos: Position, map: GameMap, playerWidth: number
   };
 }
 
+/** 두 점 사이 거리의 제곱 (비교 전용 — sqrt 불필요) */
+function distanceSq(a: Position, b: Position): number {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return dx * dx + dy * dy;
+}
+
 /** 가장 가까운 낚시 포인트 찾기 (범위 내) */
 export function findNearbyFishingPoint(
   player: Player,
   map: GameMap,
 ): FishingPoint | null {
   let closest: FishingPoint | null = null;
-  let closestDist = Infinity;
+  let closestDistSq = Infinity;
 
   for (const point of map.fishingPoints) {
-    const dist = distance(player.position, point.position);
+    const dSq = distanceSq(player.position, point.position);
     const detectRange = point.radius + FISHING_POINT_DETECT_OFFSET;
+    const detectRangeSq = detectRange * detectRange;
 
-    if (dist <= detectRange && dist < closestDist) {
+    if (dSq <= detectRangeSq && dSq < closestDistSq) {
       closest = point;
-      closestDist = dist;
+      closestDistSq = dSq;
     }
   }
 

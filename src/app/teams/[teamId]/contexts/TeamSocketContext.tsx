@@ -117,7 +117,6 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
 
     // 연결 성공
     newSocket.on('connect', () => {
-      console.log('[TeamSocket] 연결 성공:', newSocket.id);
       isConnectingRef.current = false;
       setIsConnected(true);
       isConnectedRef.current = true;
@@ -127,15 +126,11 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
       newSocket.emit(
         TeamSocketEvents.JOIN_TEAM,
         { teamId: currentTeamIdRef.current },
-        (response) => {
-          console.log('[TeamSocket] 팀 참가 완료:', response);
-        }
       );
     });
 
     // 연결 해제
-    newSocket.on('disconnect', (reason) => {
-      console.log('[TeamSocket] 연결 해제:', reason);
+    newSocket.on('disconnect', () => {
       isConnectingRef.current = false;
       setIsConnected(false);
       isConnectedRef.current = false;
@@ -158,13 +153,11 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
 
     // 온라인 유저 목록 이벤트 (첫 접속 시 서버에서 전송)
     newSocket.on(TeamSocketEvents.ONLINE_USERS, (payload) => {
-      console.log('[TeamSocket] 온라인 유저 목록:', payload);
       setOnlineUsers(payload.users);
     });
 
     // 유저 접속 이벤트
     newSocket.on(TeamSocketEvents.USER_JOINED, (payload) => {
-      console.log('[TeamSocket] 유저 접속:', payload);
       setOnlineUsers((prev) => {
         const existingIndex = prev.findIndex((u) => u.userId === payload.userId);
         if (existingIndex >= 0) {
@@ -191,7 +184,6 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
 
     // 유저 퇴장 이벤트
     newSocket.on(TeamSocketEvents.USER_LEFT, (payload) => {
-      console.log('[TeamSocket] 유저 퇴장:', payload);
       setOnlineUsers((prev) => {
         if (payload.connectionCount === 0) {
           // 완전히 오프라인 → 목록에서 제거

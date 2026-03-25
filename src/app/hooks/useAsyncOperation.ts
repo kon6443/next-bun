@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 type UseAsyncOperationResult<T> = {
   isLoading: boolean;
@@ -27,6 +27,13 @@ export function useAsyncOperation<T = void>(
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const onSuccessRef = useRef(onSuccess);
+  const onErrorRef = useRef(onError);
+  const defaultErrorMessageRef = useRef(defaultErrorMessage);
+  onSuccessRef.current = onSuccess;
+  onErrorRef.current = onError;
+  defaultErrorMessageRef.current = defaultErrorMessage;
+
   const execute = useCallback(
     async (operation: () => Promise<T>): Promise<T | null> => {
       setIsLoading(true);
@@ -34,19 +41,19 @@ export function useAsyncOperation<T = void>(
 
       try {
         const result = await operation();
-        onSuccess?.(result);
+        onSuccessRef.current?.(result);
         return result;
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : defaultErrorMessage;
+        const errorMessage = err instanceof Error ? err.message : defaultErrorMessageRef.current;
         setError(errorMessage);
-        onError?.(err instanceof Error ? err : new Error(errorMessage));
+        onErrorRef.current?.(err instanceof Error ? err : new Error(errorMessage));
         console.error('useAsyncOperation error:', err);
         return null;
       } finally {
         setIsLoading(false);
       }
     },
-    [onSuccess, onError, defaultErrorMessage],
+    [],
   );
 
   const reset = useCallback(() => {
