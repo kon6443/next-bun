@@ -41,7 +41,7 @@ export default function RootLayout({
                 color: '#e2e8f0',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
                 borderRadius: '12px',
-                backdropFilter: 'blur(8px)',
+                boxShadow: '0 4px 24px rgba(0, 0, 0, 0.4)',
               },
               success: {
                 iconTheme: {

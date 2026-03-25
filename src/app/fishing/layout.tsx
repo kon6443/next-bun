@@ -1,9 +1,16 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { FishingSocketWrapper } from './contexts/FishingSocketWrapper';
 
 export const metadata: Metadata = {
   title: '낚시 게임',
   description: '방치형 멀티플레이어 낚시 미니게임',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function FishingLayout({
