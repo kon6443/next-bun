@@ -83,7 +83,10 @@ export default function FishingHUD({
 
       {/* 하단 버튼 그룹 */}
       {(fishingState === 'idle' || fishingState === 'waiting') && (
-        <div className="absolute bottom-6 right-4 flex flex-col gap-2 pointer-events-auto">
+        <div
+          className="absolute right-4 flex flex-col gap-2 pointer-events-auto"
+          style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}
+        >
           <button
             onClick={onToggleChat}
             className="bg-slate-800/80 border border-slate-600/50 rounded-xl
@@ -140,7 +143,10 @@ function KeyboardHint({ fishingState, hasNearbyPoint }: { fishingState: FishingS
   }
 
   return (
-    <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
+    <div
+      className="absolute left-1/2 -translate-x-1/2"
+      style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}
+    >
       <div className="bg-slate-900/60 rounded-lg px-3 py-1 border border-slate-700/30">
         <span className="text-[10px] text-slate-500">{hint}</span>
       </div>
@@ -198,20 +204,32 @@ function WaitingIndicator({ progress, onCancel }: { progress: number; onCancel: 
 }
 
 function BiteButton({ biteTimeLeft, onTap }: { biteTimeLeft: number; onTap: () => void }) {
+  // 시간에 따른 긴박감: 여유(>50%) → 주의(20~50%) → 위급(<20%)
+  const urgent = biteTimeLeft < 0.2;
+  const warning = biteTimeLeft < 0.5;
+
+  const bgColor = urgent ? 'bg-red-700/95' : warning ? 'bg-red-600/95' : 'bg-red-600/90';
+  const borderColor = urgent ? 'border-red-300' : 'border-red-400';
+  const barColor = urgent ? 'bg-red-400' : warning ? 'bg-orange-400' : 'bg-green-400';
+  const shadowStyle = urgent
+    ? { boxShadow: '0 0 40px rgba(239, 68, 68, 0.6)' }
+    : {};
+
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-auto">
       <button
         onClick={onTap}
-        className="relative w-40 h-40 rounded-full bg-red-600/90 active:scale-90
-                   border-4 border-red-400 shadow-2xl shadow-red-900/80
-                   flex flex-col items-center justify-center transition-transform
-                   animate-bounce"
+        className={`relative w-40 h-40 rounded-full ${bgColor} active:scale-90
+                   border-4 ${borderColor} shadow-2xl shadow-red-900/80
+                   flex flex-col items-center justify-center transition-all
+                   animate-bounce`}
+        style={shadowStyle}
       >
         <span className="text-3xl">🐟</span>
         <span className="text-white font-bold text-lg mt-1">입질!</span>
         <div className="absolute -bottom-8 w-32 h-1.5 bg-slate-700 rounded-full overflow-hidden">
           <div
-            className="h-full bg-red-500 rounded-full"
+            className={`h-full ${barColor} rounded-full transition-colors`}
             style={{ width: `${biteTimeLeft * 100}%` }}
           />
         </div>
@@ -231,6 +249,8 @@ function ChallengeUI({
   zone: [number, number];
   onTap: () => void;
 }) {
+  const inZone = gauge >= zone[0] && gauge <= zone[1];
+
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-auto">
       <div className="flex flex-col items-center gap-4">
@@ -246,17 +266,31 @@ function ChallengeUI({
         )}
 
         {/* 타이밍 바 */}
-        <div className="w-64 h-10 bg-slate-800 rounded-xl border border-slate-600 relative overflow-hidden">
+        <div
+          className="w-64 h-10 bg-slate-800 rounded-xl border relative overflow-hidden transition-colors"
+          style={{
+            borderColor: inZone ? 'rgb(74, 222, 128)' : 'rgb(71, 85, 105)',
+            boxShadow: inZone ? '0 0 16px rgba(74, 222, 128, 0.3)' : 'none',
+          }}
+        >
           <div
-            className="absolute top-0 h-full bg-green-500/40 border-x border-green-400"
+            className="absolute top-0 h-full border-x transition-colors"
             style={{
               left: `${zone[0] * 100}%`,
               width: `${(zone[1] - zone[0]) * 100}%`,
+              backgroundColor: inZone ? 'rgba(74, 222, 128, 0.5)' : 'rgba(74, 222, 128, 0.25)',
+              borderColor: inZone ? 'rgb(74, 222, 128)' : 'rgb(34, 197, 94)',
             }}
           />
           <div
-            className="absolute top-0 h-full w-1.5 bg-yellow-400 rounded-full shadow-lg shadow-yellow-500/50"
-            style={{ left: `${gauge * 100}%` }}
+            className="absolute top-0 h-full w-1.5 rounded-full shadow-lg transition-colors"
+            style={{
+              left: `${gauge * 100}%`,
+              backgroundColor: inZone ? 'rgb(74, 222, 128)' : 'rgb(250, 204, 21)',
+              boxShadow: inZone
+                ? '0 0 8px rgba(74, 222, 128, 0.8)'
+                : '0 0 8px rgba(250, 204, 21, 0.5)',
+            }}
           />
         </div>
 

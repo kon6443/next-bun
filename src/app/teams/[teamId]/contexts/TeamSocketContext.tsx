@@ -147,8 +147,8 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
 
     // 서버 에러 이벤트
     newSocket.on(TeamSocketEvents.ERROR, (payload) => {
-      console.error('[TeamSocket] 서버 에러:', payload);
-      setError(payload.message);
+      console.warn('[TeamSocket] 서버 에러:', payload);
+      if (payload.message) setError(payload.message);
     });
 
     // 온라인 유저 목록 이벤트 (첫 접속 시 서버에서 전송)

@@ -51,7 +51,7 @@ export default function InventoryPanel({ inventory, isOpen, onClose }: Inventory
               아직 잡은 물고기가 없습니다
             </p>
           ) : (
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
               {sorted.map((fish) => {
                 const color = GRADE_COLORS[fish.grade];
                 const isSelected = selectedFish?.id === fish.id;
