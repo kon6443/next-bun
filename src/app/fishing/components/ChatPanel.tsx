@@ -31,26 +31,45 @@ const SYSTEM_WELCOME: ChatMessage = {
 export default function ChatPanel({ isOpen, onClose, onSendMessage, socket, currentUserId }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([SYSTEM_WELCOME]);
   const [input, setInput] = useState('');
+  const [hasNewMessage, setHasNewMessage] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isNearBottomRef = useRef(true);
+  const prevMessageCountRef = useRef(messages.length);
 
-  // 채팅 열릴 때 input 자동 포커스
+  /** 스크롤이 하단 근처인지 체크 */
+  const checkNearBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return true;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+  }, []);
+
+  // 채팅 열릴 때 input 자동 포커스 + 스크롤
   useEffect(() => {
     if (isOpen) {
-      // 다음 프레임에 포커스 (렌더 완료 후)
       requestAnimationFrame(() => {
         inputRef.current?.focus();
       });
       if (scrollRef.current) {
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
       }
+      isNearBottomRef.current = true;
+      setHasNewMessage(false);
     }
   }, [isOpen]);
 
-  // 메시지 추가 시 스크롤
+  // 메시지 추가 시: 하단 근처면 자동 스크롤, 아니면 알림 표시
   useEffect(() => {
-    if (isOpen && scrollRef.current) {
+    if (!isOpen || messages.length <= prevMessageCountRef.current) {
+      prevMessageCountRef.current = messages.length;
+      return;
+    }
+    prevMessageCountRef.current = messages.length;
+
+    if (isNearBottomRef.current && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    } else {
+      setHasNewMessage(true);
     }
   }, [isOpen, messages.length]);
 
@@ -122,6 +141,19 @@ export default function ChatPanel({ isOpen, onClose, onSendMessage, socket, curr
     inputRef.current?.focus();
   }, [input, onSendMessage]);
 
+  const handleScroll = useCallback(() => {
+    isNearBottomRef.current = checkNearBottom();
+    if (isNearBottomRef.current) setHasNewMessage(false);
+  }, [checkNearBottom]);
+
+  const scrollToBottom = useCallback(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+    setHasNewMessage(false);
+    isNearBottomRef.current = true;
+  }, []);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       // 채팅 input 안에서는 게임 키 전파 방지
@@ -147,8 +179,9 @@ export default function ChatPanel({ isOpen, onClose, onSendMessage, socket, curr
 
       {/* 채팅 패널 */}
       <div
-        className="absolute bottom-16 left-3 w-72 max-h-80 flex flex-col
+        className="absolute left-3 w-72 max-h-80 flex flex-col
                    bg-slate-900/90 border border-slate-700/50 rounded-xl overflow-hidden"
+        style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}
       >
         <div className="flex items-center justify-between px-3 py-2 border-b border-slate-700/50">
           <span className="text-xs text-slate-300 font-medium">채팅</span>
@@ -160,19 +193,36 @@ export default function ChatPanel({ isOpen, onClose, onSendMessage, socket, curr
           </button>
         </div>
 
-        <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-game p-2 space-y-1.5 min-h-[120px] max-h-[200px]">
-          {messages.map((msg) => (
-            <div key={msg.id} className={msg.isSystem ? 'text-center' : ''}>
-              {msg.isSystem ? (
-                <span className="text-[10px] text-slate-500 italic">{msg.text}</span>
-              ) : (
-                <div>
-                  <span className="text-[10px] text-cyan-400 font-medium">{msg.sender}</span>
-                  <span className="text-[10px] text-slate-400 ml-1.5">{msg.text}</span>
-                </div>
-              )}
-            </div>
-          ))}
+        <div className="relative">
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            className="flex-1 overflow-y-auto scrollbar-game p-2 space-y-1.5 min-h-[120px] max-h-[200px]"
+          >
+            {messages.map((msg) => (
+              <div key={msg.id} className={msg.isSystem ? 'text-center' : ''}>
+                {msg.isSystem ? (
+                  <span className="text-[10px] text-slate-500 italic">{msg.text}</span>
+                ) : (
+                  <div>
+                    <span className="text-[10px] text-cyan-400 font-medium">{msg.sender}</span>
+                    <span className="text-[10px] text-slate-400 ml-1.5">{msg.text}</span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {hasNewMessage && (
+            <button
+              onClick={scrollToBottom}
+              className="absolute bottom-1 left-1/2 -translate-x-1/2
+                         bg-cyan-600 text-white text-[10px] px-2.5 py-1 rounded-full
+                         shadow-lg shadow-cyan-900/50 animate-pulse"
+            >
+              ↓ 새 메시지
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5 p-2 border-t border-slate-700/50">

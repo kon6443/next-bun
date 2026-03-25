@@ -67,6 +67,8 @@ export function useKeyboardInput() {
       const dir = resolveDir(e.code, e.key, kc);
 
       if (dir) {
+        // 새 방향 입력 시 다른 방향 해제 (한글 IME에서 keyUp 누락 방지)
+        pressed.current = { up: false, down: false, left: false, right: false };
         pressed.current[dir] = true;
         e.preventDefault();
         return;
@@ -93,8 +95,6 @@ export function useKeyboardInput() {
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
-      // keyup은 IME가 끝난 후이므로 keyCode가 정상값일 수 있음
-      // 하지만 안전하게 code/key도 같이 체크
       const dir = resolveDir(e.code, e.key, e.keyCode);
       if (dir) {
         pressed.current[dir] = false;
@@ -118,7 +118,6 @@ export function useKeyboardInput() {
   const consumeInput = useCallback((): KeyboardState => {
     const { up, down, left, right } = pressed.current;
 
-    // 마지막 방향 우선이 아닌, 단일 방향만 반환 (동시 입력 시 우선순위)
     let direction: Direction | null = null;
     if (right) direction = 'right';
     if (left) direction = 'left';

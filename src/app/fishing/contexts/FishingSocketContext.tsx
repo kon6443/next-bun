@@ -166,8 +166,8 @@ export function FishingSocketProvider({ children, mapId }: FishingSocketProvider
 
     // 서버 에러
     newSocket.on(FishingSocketEvents.ERROR, (payload) => {
-      console.error('[FishingSocket] 서버 에러:', payload);
-      setError(payload.message);
+      console.warn('[FishingSocket] 서버 에러:', payload);
+      if (payload.message) setError(payload.message);
     });
 
     // 온라인 유저 목록 (접속 시 서버에서 전송)
