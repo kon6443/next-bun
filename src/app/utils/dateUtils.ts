@@ -100,9 +100,11 @@ export function buildTaskDatetime(
 /**
  * ISO datetime 또는 Date → 날짜(YYYY-MM-DD) + 시간(HH:MM) 분리
  */
-export function parseTaskDatetime(value: Date | string | null): { date: string; time: string } {
+export function parseTaskDatetime(value: Date | string | null | undefined): { date: string; time: string } {
   if (!value) return { date: '', time: '' };
-  const iso = value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+  const d = value instanceof Date ? value : new Date(value);
+  if (isNaN(d.getTime())) return { date: '', time: '' };
+  const iso = d.toISOString();
   return {
     date: iso.split('T')[0],
     time: iso.slice(11, 16),
