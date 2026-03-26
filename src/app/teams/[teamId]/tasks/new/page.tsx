@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { createTask } from "@/services/teamService";
+import { buildTaskDatetime } from "@/app/utils/dateUtils";
 import {
   TeamsPageLayout,
   ButtonLink,
@@ -21,13 +22,15 @@ type CreateTaskPageProps = {
 export default function CreateTaskPage({ params }: CreateTaskPageProps) {
   const { data: session } = useSession();
   const router = useRouter();
-  const [teamId, setTeamId] = useState<string>("");
+  const [teamId, setTeamId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     params.then((p) => setTeamId(p.teamId));
   }, [params]);
+
+  const isPageReady = teamId !== null;
 
   const handleSubmit = async (data: TaskFormData) => {
     if (!session?.user?.accessToken) {
@@ -39,7 +42,7 @@ export default function CreateTaskPage({ params }: CreateTaskPageProps) {
     setError(null);
 
     try {
-      const teamIdNum = parseInt(teamId, 10);
+      const teamIdNum = parseInt(teamId ?? "", 10);
       if (isNaN(teamIdNum)) {
         throw new Error("유효하지 않은 팀 ID입니다.");
       }
@@ -49,8 +52,8 @@ export default function CreateTaskPage({ params }: CreateTaskPageProps) {
         {
           taskName: data.taskName,
           taskDescription: data.taskDescription,
-          startAt: data.startAt ? `${data.startAt}T00:00:00` : null,
-          endAt: data.endAt ? `${data.endAt}T23:59:59` : null,
+          startAt: buildTaskDatetime(data.startAt, data.startAtTime, 'start'),
+          endAt: buildTaskDatetime(data.endAt, data.endAtTime, 'end'),
         },
         session.user.accessToken
       );
@@ -67,14 +70,14 @@ export default function CreateTaskPage({ params }: CreateTaskPageProps) {
   };
 
   const handleCancel = () => {
-    router.push(`/teams/${teamId || ""}`);
+    router.push(`/teams/${teamId ?? ""}`);
   };
 
   return (
     <TeamsPageLayout>
       {/* 헤더 */}
       <div className="flex items-center justify-between">
-        <ButtonLink href={`/teams/${teamId || ""}`} variant="secondary">
+        <ButtonLink href={`/teams/${teamId ?? ""}`} variant="secondary">
           ← 팀 보드로 돌아가기
         </ButtonLink>
       </div>
@@ -94,8 +97,8 @@ export default function CreateTaskPage({ params }: CreateTaskPageProps) {
           mode="create"
           onSubmit={handleSubmit}
           onCancel={handleCancel}
-          cancelHref={`/teams/${teamId || ""}`}
-          isSubmitting={isSubmitting}
+          cancelHref={`/teams/${teamId ?? ""}`}
+          isSubmitting={isSubmitting || !isPageReady}
         />
       </section>
     </TeamsPageLayout>
