@@ -295,7 +295,7 @@ export default function GameCanvas({ map, fishPool }: GameCanvasProps) {
   }, []);
 
   return (
-    <div className="relative w-full h-full overflow-hidden" style={{ touchAction: 'none' }}>
+    <div id="fishing-shake-root" className="relative w-full h-full overflow-hidden" style={{ touchAction: 'none' }}>
       <canvas
         ref={canvasRef}
         className="block w-full h-full"
