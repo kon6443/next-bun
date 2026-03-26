@@ -13,6 +13,7 @@ import {
   type TaskDetailResponse,
 } from '@/services/teamService';
 import type { TaskComment } from '@/app/types/task';
+import { buildTaskDatetime, parseTaskDatetime, DEFAULT_START_TIME, DEFAULT_END_TIME } from '@/app/utils/dateUtils';
 import {
   TeamsPageLayout,
   Button,
@@ -294,8 +295,8 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
         {
           taskName: data.taskName,
           taskDescription: data.taskDescription,
-          startAt: data.startAt ? `${data.startAt}T00:00:00` : null,
-          endAt: data.endAt ? `${data.endAt}T23:59:59` : null,
+          startAt: buildTaskDatetime(data.startAt, data.startAtTime, 'start'),
+          endAt: buildTaskDatetime(data.endAt, data.endAtTime, 'end'),
         },
         session.user.accessToken,
       );
@@ -492,8 +493,10 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
               initialData={{
                 taskName: taskDetail.taskName,
                 taskDescription: taskDetail.taskDescription || '',
-                startAt: taskDetail.startAt ? new Date(taskDetail.startAt).toISOString().split('T')[0] : '',
-                endAt: taskDetail.endAt ? new Date(taskDetail.endAt).toISOString().split('T')[0] : '',
+                startAt: parseTaskDatetime(taskDetail.startAt).date,
+                endAt: parseTaskDatetime(taskDetail.endAt).date,
+                startAtTime: parseTaskDatetime(taskDetail.startAt).time || DEFAULT_START_TIME,
+                endAtTime: parseTaskDatetime(taskDetail.endAt).time || DEFAULT_END_TIME,
               }}
               onSubmit={handleUpdateTask}
               onCancel={handleCancelEdit}
@@ -510,16 +513,14 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
                   {taskDetail.userName || `사용자 ${taskDetail.crtdBy}`}
                 </span>
               </div>
-              {currentUserId === taskDetail.crtdBy && (
-                <button
-                  onClick={handleStartEdit}
-                  disabled={isUpdatingTask}
-                  className='p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition disabled:opacity-50'
-                  title='수정'
-                >
-                  <EditIcon className='w-5 h-5' />
-                </button>
-              )}
+              <button
+                onClick={handleStartEdit}
+                disabled={isUpdatingTask}
+                className='p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition disabled:opacity-50'
+                title='수정'
+              >
+                <EditIcon className='w-5 h-5' />
+              </button>
             </div>
 
             {/* 본문 */}

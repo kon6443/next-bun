@@ -92,3 +92,61 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
 );
 
 DateInput.displayName = "DateInput";
+
+type TimeInputProps = {
+  label: string;
+  id?: string;
+  value?: string;
+  onChange?: (e: { target: { value: string } }) => void;
+  disabled?: boolean;
+};
+
+const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
+
+const selectStyles =
+  "rounded-xl border border-white/10 bg-slate-900/60 text-white focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20 px-2 py-3 appearance-none text-center";
+
+/**
+ * 시간 입력 컴포넌트 (24시간 형식, HH:MM)
+ * 시/분 select로 구성하여 브라우저 로케일에 무관하게 24시간 형식 보장
+ */
+export function TimeInput({ label, id, value = "00:00", onChange, disabled }: TimeInputProps) {
+  const [hour, minute] = (value || "00:00").split(":");
+
+  const handleChange = (h: string, m: string) => {
+    onChange?.({ target: { value: `${h}:${m}` } });
+  };
+
+  return (
+    <div className="min-w-0">
+      <label htmlFor={id} className={labelStyles}>
+        {label}
+      </label>
+      <div className="flex items-center gap-1">
+        <select
+          id={id}
+          value={hour}
+          onChange={(e) => handleChange(e.target.value, minute)}
+          disabled={disabled}
+          className={`${selectStyles} w-14`}
+        >
+          {HOURS.map((h) => (
+            <option key={h} value={h}>{h}시</option>
+          ))}
+        </select>
+        <span className="text-slate-500 text-sm">:</span>
+        <select
+          value={minute}
+          onChange={(e) => handleChange(hour, e.target.value)}
+          disabled={disabled}
+          className={`${selectStyles} w-14`}
+        >
+          {MINUTES.map((m) => (
+            <option key={m} value={m}>{m}분</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
