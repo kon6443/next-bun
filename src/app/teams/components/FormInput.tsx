@@ -112,7 +112,9 @@ const selectStyles =
  * 시/분 select로 구성하여 브라우저 로케일에 무관하게 24시간 형식 보장
  */
 export function TimeInput({ label, id, value = "00:00", onChange, disabled }: TimeInputProps) {
-  const [hour, minute] = (value || "00:00").split(":");
+  const parts = (value || "00:00").split(":");
+  const hour = parts[0] ?? "00";
+  const minute = parts[1] ?? "00";
 
   const handleChange = (h: string, m: string) => {
     onChange?.({ target: { value: `${h}:${m}` } });
