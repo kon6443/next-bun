@@ -1,14 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Input, TextArea, DateInput } from "./FormInput";
+import { Input, TextArea, DateInput, TimeInput } from "./FormInput";
 import { Button, ButtonLink } from "./Button";
+import { DEFAULT_START_TIME, DEFAULT_END_TIME } from "@/app/utils/dateUtils";
 
 export type TaskFormData = {
   taskName: string;
   taskDescription: string;
   startAt: string;
   endAt: string;
+  startAtTime: string;
+  endAtTime: string;
 };
 
 type TaskFormProps = {
@@ -39,6 +42,8 @@ export function TaskForm({
   );
   const [startAt, setStartAt] = useState(initialData?.startAt || "");
   const [endAt, setEndAt] = useState(initialData?.endAt || "");
+  const [startAtTime, setStartAtTime] = useState(initialData?.startAtTime || DEFAULT_START_TIME);
+  const [endAtTime, setEndAtTime] = useState(initialData?.endAtTime || DEFAULT_END_TIME);
 
   // initialData가 변경되면 폼 상태 업데이트 (편집 모드 진입 시)
   useEffect(() => {
@@ -47,6 +52,8 @@ export function TaskForm({
       setTaskDescription(initialData.taskDescription);
       setStartAt(initialData.startAt);
       setEndAt(initialData.endAt);
+      setStartAtTime(initialData.startAtTime || DEFAULT_START_TIME);
+      setEndAtTime(initialData.endAtTime || DEFAULT_END_TIME);
     }
   }, [initialData]);
 
@@ -57,6 +64,8 @@ export function TaskForm({
       taskDescription: taskDescription.trim(),
       startAt,
       endAt,
+      startAtTime,
+      endAtTime,
     });
   };
 
@@ -93,20 +102,38 @@ export function TaskForm({
       />
 
       <div className="grid gap-4 overflow-hidden">
-        <DateInput
-          id="startAt"
-          label="시작일"
-          value={startAt}
-          onChange={(e) => setStartAt(e.target.value)}
-          disabled={isSubmitting}
-        />
-        <DateInput
-          id="endAt"
-          label="종료일"
-          value={endAt}
-          onChange={(e) => setEndAt(e.target.value)}
-          disabled={isSubmitting}
-        />
+        <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
+          <DateInput
+            id="startAt"
+            label="시작일"
+            value={startAt}
+            onChange={(e) => setStartAt(e.target.value)}
+            disabled={isSubmitting}
+          />
+          <TimeInput
+            id="startAtTime"
+            label="시작 시간"
+            value={startAtTime}
+            onChange={(e) => setStartAtTime(e.target.value)}
+            disabled={isSubmitting || !startAt}
+          />
+        </div>
+        <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
+          <DateInput
+            id="endAt"
+            label="종료일"
+            value={endAt}
+            onChange={(e) => setEndAt(e.target.value)}
+            disabled={isSubmitting}
+          />
+          <TimeInput
+            id="endAtTime"
+            label="종료 시간"
+            value={endAtTime}
+            onChange={(e) => setEndAtTime(e.target.value)}
+            disabled={isSubmitting || !endAt}
+          />
+        </div>
       </div>
 
       <div className="flex flex-col-reverse justify-end gap-2 pt-2">
