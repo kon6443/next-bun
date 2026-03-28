@@ -3,11 +3,12 @@
 import { useState, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { SectionLabel, EmptyState } from '../../components';
-import { ChevronUpIcon, ChevronDownIcon, UserIcon, ChartIcon, MailIcon, SendIcon, EditIcon } from '@/app/components/Icons';
+import { ChevronUpIcon, ChevronDownIcon, UserIcon, ChartIcon, MailIcon, SendIcon, EditIcon, DiscordIcon } from '@/app/components/Icons';
 import { getRoleMeta, CURRENT_USER_BADGE_CLASSNAME, type RoleKey } from '@/app/config/roleConfig';
 import { formatFullDateTime } from '@/app/utils/taskUtils';
 import { TelegramSection } from './TelegramSection';
-import type { TeamUserResponse, TeamInviteResponse, TelegramStatusResponse } from '@/services/teamService';
+import { DiscordSection } from './DiscordSection';
+import type { TeamUserResponse, TeamInviteResponse, TelegramStatusResponse, DiscordStatusResponse } from '@/services/teamService';
 import { cardStyles } from '@/styles/teams';
 
 // 멤버 상태 필터 타입
@@ -40,6 +41,15 @@ type TeamManagementSectionProps = {
   onDeleteTelegramLink: () => Promise<void>;
   onRefreshTelegramStatus: () => Promise<void>;
 
+  // 디스코드 관련
+  discordStatus: DiscordStatusResponse | null;
+  isLoadingDiscord: boolean;
+  isSavingDiscordWebhook: boolean;
+  isDeletingDiscordWebhook: boolean;
+  onSaveDiscordWebhook: (webhookUrl: string) => Promise<void>;
+  onDeleteDiscordWebhook: () => Promise<void>;
+  onRefreshDiscordStatus: () => Promise<void>;
+
   // 역할 변경 관련
   onOpenRoleChange?: (member: TeamUserResponse) => void;
 
@@ -49,7 +59,7 @@ type TeamManagementSectionProps = {
 };
 
 // 탭 설정 타입
-type TabKey = 'members' | 'stats' | 'invites' | 'telegram';
+type TabKey = 'members' | 'stats' | 'invites' | 'telegram' | 'discord';
 
 type TabConfig = {
   key: TabKey;
@@ -82,6 +92,13 @@ export function TeamManagementSection({
   onCreateTelegramLink,
   onDeleteTelegramLink,
   onRefreshTelegramStatus,
+  discordStatus,
+  isLoadingDiscord,
+  isSavingDiscordWebhook,
+  isDeletingDiscordWebhook,
+  onSaveDiscordWebhook,
+  onDeleteDiscordWebhook,
+  onRefreshDiscordStatus,
   onOpenRoleChange,
   onToggleMemberStatus,
   togglingMemberIds = [],
@@ -188,6 +205,13 @@ export function TeamManagementSection({
       key: 'telegram',
       label: '텔레그램',
       icon: <SendIcon className="w-3.5 h-3.5" />,
+      count: null,
+      visible: canManageInvites,
+    },
+    {
+      key: 'discord',
+      label: '디스코드',
+      icon: <DiscordIcon className="w-3.5 h-3.5" />,
       count: null,
       visible: canManageInvites,
     },
@@ -479,6 +503,21 @@ export function TeamManagementSection({
                 onCreateLink={onCreateTelegramLink}
                 onDeleteLink={onDeleteTelegramLink}
                 onRefreshStatus={onRefreshTelegramStatus}
+              />
+            </div>
+          )}
+
+          {/* 디스코드 탭 내용 */}
+          {activeTab === 'discord' && (
+            <div className="mt-4">
+              <DiscordSection
+                discordStatus={discordStatus}
+                isLoading={isLoadingDiscord}
+                isSaving={isSavingDiscordWebhook}
+                isDeleting={isDeletingDiscordWebhook}
+                onSaveWebhook={onSaveDiscordWebhook}
+                onDeleteWebhook={onDeleteDiscordWebhook}
+                onRefreshStatus={onRefreshDiscordStatus}
               />
             </div>
           )}
