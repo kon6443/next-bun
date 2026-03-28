@@ -13,13 +13,14 @@ import { Kanban } from '../../components/Kanban';
 import { SectionLabel, ErrorAlert, TeamBoardSkeleton, ListViewSkeleton, Skeleton, FAB, IconButton } from '../components';
 import { EditIcon, UserGroupIcon, PlusIcon, QuestionMarkIcon } from '../../components/Icons';
 import type { Task } from '../../types/task';
-import { useTaskFilter, useTelegramLink, useTeamInvite, useTeamSocketEvents, useSafeNavigation } from '../../hooks';
+import { useTaskFilter, useTelegramLink, useDiscordLink, useTeamInvite, useTeamSocketEvents, useSafeNavigation } from '../../hooks';
 import { useTeamSocketContext } from './contexts';
 import {
   getTeamTasks,
   updateTaskStatus,
   getTeamUsers,
   getTelegramStatus,
+  getDiscordStatus,
   updateMemberRole,
   updateMemberStatus,
   type TeamUserResponse,
@@ -109,6 +110,17 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     handleDeleteLink: handleDeleteTelegramLink,
     handleRefreshStatus: handleRefreshTelegramStatus,
   } = useTelegramLink(teamIdNum, session?.user?.accessToken);
+
+  const {
+    discordStatus,
+    isLoading: isLoadingDiscord,
+    isSaving: isSavingDiscordWebhook,
+    isDeleting: isDeletingDiscordWebhook,
+    setDiscordStatus,
+    handleSaveWebhook: handleSaveDiscordWebhook,
+    handleDeleteWebhook: handleDeleteDiscordWebhook,
+    handleRefreshStatus: handleRefreshDiscordStatus,
+  } = useDiscordLink(teamIdNum, session?.user?.accessToken);
 
   const {
     invites,
@@ -350,15 +362,12 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     [router, pathname, searchParams],
   );
 
-  // fetchInvites와 setTelegramStatus를 ref로 관리하여 useEffect 의존성에서 제외
+  // fetchInvites를 ref로 관리하여 useEffect 의존성에서 제외
   const fetchInvitesRef = useRef(fetchInvites);
-  const setTelegramStatusRef = useRef(setTelegramStatus);
-  
-  // 최신 함수 참조 유지
+
   useEffect(() => {
     fetchInvitesRef.current = fetchInvites;
-    setTelegramStatusRef.current = setTelegramStatus;
-  }, [fetchInvites, setTelegramStatus]);
+  }, [fetchInvites]);
 
   useEffect(() => {
     // 세션이 아직 로딩 중이면 기다림
@@ -383,7 +392,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         const currentUserId = session.user.userId;
 
         // Promise.all로 독립적인 API들을 병렬 호출
-        const [tasksResponse, membersResult, telegramResult] = await Promise.all([
+        const [tasksResponse, membersResult, telegramResult, discordResult] = await Promise.all([
           getTeamTasks(teamIdNum, session.user.accessToken),
           getTeamUsers(teamIdNum, session.user.accessToken).catch(err => {
             console.error('Failed to fetch team members:', err);
@@ -391,6 +400,10 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           }),
           getTelegramStatus(teamIdNum, session.user.accessToken).catch(err => {
             console.error('Failed to fetch telegram status:', err);
+            return null;
+          }),
+          getDiscordStatus(teamIdNum, session.user.accessToken).catch(err => {
+            console.error('Failed to fetch discord status:', err);
             return null;
           }),
         ]);
@@ -421,7 +434,10 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         }
 
         // 텔레그램 데이터 처리
-        setTelegramStatusRef.current(telegramResult?.data ?? null);
+        setTelegramStatus(telegramResult?.data ?? null);
+
+        // 디스코드 데이터 처리
+        setDiscordStatus(discordResult?.data ?? null);
 
         // taskStatus에 따라 태스크를 컬럼별로 분류
         const classifiedTasks: Record<ColumnKey, Task[]> = {
@@ -760,6 +776,13 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           onCreateTelegramLink={handleCreateTelegramLink}
           onDeleteTelegramLink={handleDeleteTelegramLink}
           onRefreshTelegramStatus={handleRefreshTelegramStatus}
+          discordStatus={discordStatus}
+          isLoadingDiscord={isLoadingDiscord}
+          isSavingDiscordWebhook={isSavingDiscordWebhook}
+          isDeletingDiscordWebhook={isDeletingDiscordWebhook}
+          onSaveDiscordWebhook={handleSaveDiscordWebhook}
+          onDeleteDiscordWebhook={handleDeleteDiscordWebhook}
+          onRefreshDiscordStatus={handleRefreshDiscordStatus}
           onOpenRoleChange={handleOpenRoleChange}
           onToggleMemberStatus={handleToggleMemberStatus}
           togglingMemberIds={togglingMemberIds}

@@ -767,6 +767,87 @@ export async function deleteTelegramLink(teamId: number, accessToken: string): P
   });
 }
 
+// ==================== 디스코드 연동 API ====================
+
+export type DiscordStatusResponse = {
+  isLinked: boolean;
+  webhookUrl: string | null;
+};
+
+export type GetDiscordStatusResponse = {
+  code: 'SUCCESS';
+  message: string;
+  data: DiscordStatusResponse;
+};
+
+/**
+ * 디스코드 Webhook URL 저장
+ */
+export async function saveDiscordWebhook(
+  teamId: number,
+  webhookUrl: string,
+  accessToken: string,
+): Promise<void> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'POST',
+    endpoint: `/api/v1/teams/${teamId}/discord/webhook`,
+    accessToken,
+    body: { webhookUrl },
+  });
+
+  if (response.ok) return;
+
+  await handleApiError(response, {
+    400: '유효하지 않은 디스코드 Webhook URL입니다.',
+    403: '팀 리더 또는 매니저만 디스코드 연동을 할 수 있습니다.',
+    404: '팀을 찾을 수 없습니다.',
+    default: '디스코드 Webhook 저장 실패',
+  });
+}
+
+/**
+ * 디스코드 연동 상태 조회
+ */
+export async function getDiscordStatus(
+  teamId: number,
+  accessToken: string,
+): Promise<GetDiscordStatusResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'GET',
+    endpoint: `/api/v1/teams/${teamId}/discord/status`,
+    accessToken,
+  });
+
+  if (!response.ok) {
+    await handleApiError(response, {
+      403: '팀 멤버만 접근할 수 있습니다.',
+      404: '팀을 찾을 수 없습니다.',
+      default: '디스코드 연동 상태 조회 실패',
+    });
+  }
+
+  return response.json();
+}
+
+/**
+ * 디스코드 연동 해제
+ */
+export async function deleteDiscordWebhook(teamId: number, accessToken: string): Promise<void> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'DELETE',
+    endpoint: `/api/v1/teams/${teamId}/discord/webhook`,
+    accessToken,
+  });
+
+  if (response.ok) return;
+
+  await handleApiError(response, {
+    403: '팀 리더 또는 매니저만 디스코드 연동을 해제할 수 있습니다.',
+    404: '팀을 찾을 수 없습니다.',
+    default: '디스코드 연동 해제 실패',
+  });
+}
+
 // ==================== 멤버 역할 관리 API ====================
 
 export type UpdateMemberRoleRequest = {

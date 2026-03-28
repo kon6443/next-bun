@@ -8,7 +8,7 @@ import {
   deleteTelegramLink,
   type TelegramStatusResponse,
 } from '@/services/teamService';
-import { ApiError } from '@/types/api';
+import { extractErrorMessage } from '@/app/utils/errorUtils';
 
 export type UseTelegramLinkReturn = {
   telegramStatus: TelegramStatusResponse | null;
@@ -23,7 +23,6 @@ export type UseTelegramLinkReturn = {
 
 /**
  * 텔레그램 연동 관리 훅
- * TeamBoard에서 텔레그램 관련 로직을 분리
  */
 export function useTelegramLink(
   teamId: number,
@@ -34,7 +33,6 @@ export function useTelegramLink(
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // 텔레그램 연동 링크 생성
   const handleCreateLink = useCallback(async () => {
     if (!accessToken) return;
 
@@ -53,19 +51,13 @@ export function useTelegramLink(
       });
       toast.success('텔레그램 연동 링크가 생성되었습니다.');
     } catch (err) {
-      const errorMessage = err instanceof ApiError 
-        ? err.message 
-        : err instanceof Error 
-          ? err.message 
-          : '텔레그램 연동 링크 생성에 실패했습니다.';
-      toast.error(errorMessage);
+      toast.error(extractErrorMessage(err, '텔레그램 연동 링크 생성에 실패했습니다.'));
       console.error('Failed to create telegram link:', err);
     } finally {
       setIsCreating(false);
     }
   }, [accessToken, teamId]);
 
-  // 텔레그램 연동 해제
   const handleDeleteLink = useCallback(async () => {
     if (!accessToken) return;
 
@@ -83,19 +75,13 @@ export function useTelegramLink(
 
       toast.success('텔레그램 연동이 해제되었습니다.');
     } catch (err) {
-      const errorMessage = err instanceof ApiError 
-        ? err.message 
-        : err instanceof Error 
-          ? err.message 
-          : '텔레그램 연동 해제에 실패했습니다.';
-      toast.error(errorMessage);
+      toast.error(extractErrorMessage(err, '텔레그램 연동 해제에 실패했습니다.'));
       console.error('Failed to delete telegram link:', err);
     } finally {
       setIsDeleting(false);
     }
   }, [accessToken, teamId]);
 
-  // 텔레그램 상태 새로고침
   const handleRefreshStatus = useCallback(async () => {
     if (!accessToken) return;
 

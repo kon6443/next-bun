@@ -6,6 +6,7 @@ export { useMediaQuery } from './useMediaQuery';
 export { useTaskFilter } from './useTaskFilter';
 export { useClickOutside } from './useClickOutside';
 export { useTelegramLink } from './useTelegramLink';
+export { useDiscordLink } from './useDiscordLink';
 export { useTeamInvite } from './useTeamInvite';
 export { useTeamData, type UseTeamDataReturn, type TasksByColumn } from './useTeamData';
 export { useSafeNavigation } from './useSafeNavigation';
