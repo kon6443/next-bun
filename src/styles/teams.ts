@@ -36,7 +36,7 @@ export const layoutStyles = {
   /** 페이지 루트 컨테이너 */
   pageContainer: "relative min-h-screen overflow-hidden text-slate-100",
   /** 메인 컨텐츠 영역 (모바일 최적화) */
-  mainContent: "relative z-10 mx-auto flex flex-col gap-6 px-4 pb-24 pt-12",
+  mainContent: "relative z-10 mx-auto flex flex-col gap-3 sm:gap-6 px-4 pb-24 pt-6 sm:pt-12",
 } as const;
 
 /**

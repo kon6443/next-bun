@@ -177,7 +177,7 @@ export function Kanban({ tasksByColumn, onStatusChange, teamId }: KanbanProps) {
                 <div 
                   className="overflow-y-auto pr-1"
                   style={{ 
-                    maxHeight: 'calc(100vh - var(--kanban-header-height, 350px) - var(--bottom-nav-height, 80px))'
+                    maxHeight: 'calc(100vh - var(--kanban-header-height, 280px) - var(--bottom-nav-height, 80px))'
                   }}
                 >
                   <div className="space-y-3 pb-4">
