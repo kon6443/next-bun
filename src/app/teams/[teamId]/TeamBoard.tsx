@@ -11,7 +11,7 @@ import { CalendarView } from '../../components/CalendarView';
 import { TaskFilters } from '../../components/TaskFilters';
 import { Kanban } from '../../components/Kanban';
 import { SectionLabel, ErrorAlert, TeamBoardSkeleton, ListViewSkeleton, Skeleton, FAB, IconButton } from '../components';
-import { EditIcon, UserGroupIcon, PlusIcon } from '../../components/Icons';
+import { EditIcon, UserGroupIcon, PlusIcon, QuestionMarkIcon } from '../../components/Icons';
 import type { Task } from '../../types/task';
 import { useTaskFilter, useTelegramLink, useTeamInvite, useTeamSocketEvents, useSafeNavigation } from '../../hooks';
 import { useTeamSocketContext } from './contexts';
@@ -26,7 +26,7 @@ import {
 } from '@/services/teamService';
 import { teamsPageBackground, cardStyles, layoutStyles, MOBILE_MAX_WIDTH } from '@/styles/teams';
 import { STATUS_TO_COLUMN, type ColumnKey } from '../../config/taskStatusConfig';
-import { TeamManagementSection, InviteModal, RoleChangeModal, ViewModeToggle, OnlineUsers, type ViewMode } from './components';
+import { TeamManagementSection, InviteModal, RoleChangeModal, ViewModeToggle, OnlineUsers, TutorialGuide, hasSeenTutorial, markTutorialSeen, type ViewMode } from './components';
 import { ROLES } from '../../config/roleConfig';
 import type {
   TaskCreatedPayload,
@@ -94,6 +94,9 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
   // 온라인 유저 모달 상태 (FAB 숨김용)
   const [isOnlineModalOpen, setIsOnlineModalOpen] = useState(false);
+
+  // 튜토리얼 가이드 상태
+  const [showTutorial, setShowTutorial] = useState(false);
 
   // 커스텀 훅으로 분리된 로직
   const {
@@ -563,7 +566,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
       // API 호출
       try {
-        const teamIdNum = parseInt(teamId, 10);
         await updateTaskStatus(teamIdNum, taskId, newStatus, session.user.accessToken);
         toast.success('상태가 변경되었습니다.');
       } catch (err) {
@@ -674,6 +676,18 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     [session?.user?.accessToken, teamIdNum],
   );
 
+  // 첫 방문 시 튜토리얼 자동 표시
+  useEffect(() => {
+    if (!isLoading && !error && !hasSeenTutorial()) {
+      setShowTutorial(true);
+    }
+  }, [isLoading, error]);
+
+  const handleCloseTutorial = useCallback(() => {
+    setShowTutorial(false);
+    markTutorialSeen();
+  }, []);
+
   // 현재 사용자의 역할 가져오기
   const currentUserMember = members.find(m => m.userId === session?.user?.userId);
   const currentUserRole = currentUserMember?.role || 'MEMBER';
@@ -720,6 +734,12 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                   label="팀 수정"
                   variant="outlined"
                   href={`/teams/${teamId}/edit`}
+                />
+                <IconButton
+                  icon={QuestionMarkIcon}
+                  label="사용 가이드"
+                  variant="ghost"
+                  onClick={() => setShowTutorial(true)}
                 />
               </div>
             </div>
@@ -822,6 +842,9 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         }
         actorRole={currentUserRole}
       />
+
+      {/* 튜토리얼 가이드 */}
+      <TutorialGuide isOpen={showTutorial} onClose={handleCloseTutorial} />
 
       {/* FAB: 새 카드 작성 (온라인 유저 모달이 열려있으면 숨김) */}
       {!isOnlineModalOpen && <FAB href={`/teams/${teamId}/tasks/new`} label="새 카드 작성" />}
