@@ -5,15 +5,12 @@ import type { Task } from '../types/task';
 import { TaskCard } from './TaskCard';
 import { getWorkflowStatuses, STATUS_TO_COLUMN, type ColumnKey } from '../config/taskStatusConfig';
 import { EmptyState } from '../teams/components';
-import { ChevronLeftIcon, ChevronRightIcon } from './Icons';
 
 type KanbanProps = {
   tasksByColumn: Record<ColumnKey, Task[]>;
   onStatusChange: (taskId: number, newStatus: number) => Promise<void>;
   teamId: string;
 };
-
-const SWIPE_HINT_STORAGE_KEY = 'kanban-swipe-hint-shown';
 
 /**
  * 탭 기반 칸반 보드 컴포넌트
@@ -22,43 +19,15 @@ const SWIPE_HINT_STORAGE_KEY = 'kanban-swipe-hint-shown';
 export function Kanban({ tasksByColumn, onStatusChange, teamId }: KanbanProps) {
   // 워크플로우 상태만 가져오기 (칸반 보드에 표시되는 상태)
   const workflowStatuses = getWorkflowStatuses();
-  
+
   const [activeColumnIndex, setActiveColumnIndex] = useState(0);
-  const [showSwipeHint, setShowSwipeHint] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
-
-  // 첫 방문 시 스와이프 힌트 표시
-  useEffect(() => {
-    // localStorage 체크는 클라이언트에서만 실행
-    const hasSeenHint = localStorage.getItem(SWIPE_HINT_STORAGE_KEY);
-    if (!hasSeenHint) {
-      // 잠시 후 힌트 애니메이션 시작
-      const timer = setTimeout(() => {
-        setShowSwipeHint(true);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, []);
-
-  // 스와이프 힌트 닫기 및 localStorage에 저장
-  const dismissSwipeHint = useCallback(() => {
-    setShowSwipeHint(false);
-    localStorage.setItem(SWIPE_HINT_STORAGE_KEY, 'true');
-  }, []);
-
-  // 상태 키를 컬럼 키로 매핑 (config에서 가져옴)
-  const statusKeyToColumnKey = STATUS_TO_COLUMN;
 
   // 탭 클릭 시 해당 컬럼으로 스크롤
   const scrollToColumn = useCallback((index: number) => {
     const container = scrollContainerRef.current;
     if (!container) return;
-
-    // 스와이프 힌트가 있으면 닫기
-    if (showSwipeHint) {
-      dismissSwipeHint();
-    }
 
     isScrollingRef.current = true;
     const columnWidth = container.offsetWidth;
@@ -73,7 +42,7 @@ export function Kanban({ tasksByColumn, onStatusChange, teamId }: KanbanProps) {
     }, 300);
 
     setActiveColumnIndex(index);
-  }, [showSwipeHint, dismissSwipeHint]);
+  }, []);
 
   // 스크롤 이벤트로 현재 활성 컬럼 감지
   useEffect(() => {
@@ -82,11 +51,6 @@ export function Kanban({ tasksByColumn, onStatusChange, teamId }: KanbanProps) {
 
     const handleScroll = () => {
       if (isScrollingRef.current) return;
-
-      // 스와이프 힌트가 있으면 닫기 (사용자가 직접 스와이프 함)
-      if (showSwipeHint) {
-        dismissSwipeHint();
-      }
 
       const columnWidth = container.offsetWidth;
       const scrollLeft = container.scrollLeft;
@@ -99,7 +63,7 @@ export function Kanban({ tasksByColumn, onStatusChange, teamId }: KanbanProps) {
 
     container.addEventListener('scroll', handleScroll, { passive: true });
     return () => container.removeEventListener('scroll', handleScroll);
-  }, [activeColumnIndex, workflowStatuses.length, showSwipeHint, dismissSwipeHint]);
+  }, [activeColumnIndex, workflowStatuses.length]);
 
   return (
     <div className="flex flex-col h-full">
@@ -108,7 +72,7 @@ export function Kanban({ tasksByColumn, onStatusChange, teamId }: KanbanProps) {
         <div className="flex gap-2 w-full rounded-2xl border border-white/10 bg-slate-950/50 p-1.5">
           {workflowStatuses.map((status, index) => {
             const isActive = index === activeColumnIndex;
-            const columnKey = statusKeyToColumnKey[status.key];
+            const columnKey = STATUS_TO_COLUMN[status.key];
             const taskCount = tasksByColumn[columnKey]?.length || 0;
 
             return (
@@ -146,7 +110,7 @@ export function Kanban({ tasksByColumn, onStatusChange, teamId }: KanbanProps) {
       >
         <div className="flex h-full" style={{ width: `${workflowStatuses.length * 100}%` }}>
           {workflowStatuses.map((status) => {
-            const columnKey = statusKeyToColumnKey[status.key];
+            const columnKey = STATUS_TO_COLUMN[status.key];
             const tasks = tasksByColumn[columnKey] || [];
 
             return (
@@ -216,43 +180,6 @@ export function Kanban({ tasksByColumn, onStatusChange, teamId }: KanbanProps) {
           />
         ))}
       </div>
-
-      {/* 스와이프 힌트 오버레이 */}
-      {showSwipeHint && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-          onClick={dismissSwipeHint}
-        >
-          <div 
-            className="flex flex-col items-center gap-4 p-6 rounded-2xl bg-slate-800/90 border border-white/10 shadow-2xl max-w-xs mx-4 animate-in zoom-in-95 duration-300"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* 스와이프 애니메이션 아이콘 */}
-            <div className="relative flex items-center justify-center w-24 h-16">
-              <div className="animate-[swipeHint_1.5s_ease-in-out_infinite]">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-sky-400 to-indigo-500 flex items-center justify-center shadow-lg">
-                  <ChevronLeftIcon className="w-5 h-5 text-white opacity-80" />
-                  <ChevronRightIcon className="w-5 h-5 text-white opacity-80 -ml-2" />
-                </div>
-              </div>
-            </div>
-            
-            {/* 힌트 텍스트 */}
-            <div className="text-center">
-              <p className="text-sm font-semibold text-white">좌우로 스와이프하세요</p>
-              <p className="text-xs text-slate-400 mt-1">다른 상태의 태스크를 볼 수 있어요</p>
-            </div>
-
-            {/* 확인 버튼 */}
-            <button
-              onClick={dismissSwipeHint}
-              className="w-full mt-2 px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white text-sm font-semibold transition-colors"
-            >
-              확인
-            </button>
-          </div>
-        </div>
-      )}
 
     </div>
   );
