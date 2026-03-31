@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { CheckIcon, RefreshIcon, DiscordIcon } from '@/app/components/Icons';
+import { ConfirmModal } from '@/app/components/ConfirmModal';
 import type { DiscordStatusResponse } from '@/services/teamService';
 
 type DiscordSectionProps = {
@@ -11,7 +12,10 @@ type DiscordSectionProps = {
   isSaving: boolean;
   isDeleting: boolean;
   onSaveWebhook: (webhookUrl: string) => Promise<void>;
-  onDeleteWebhook: () => Promise<void>;
+  onDeleteWebhook: () => void;
+  showDeleteConfirm: boolean;
+  onConfirmDelete: () => Promise<void>;
+  onCancelDelete: () => void;
   onRefreshStatus: () => Promise<void>;
 };
 
@@ -22,6 +26,9 @@ export function DiscordSection({
   isDeleting,
   onSaveWebhook,
   onDeleteWebhook,
+  showDeleteConfirm,
+  onConfirmDelete,
+  onCancelDelete,
   onRefreshStatus,
 }: DiscordSectionProps) {
   const [webhookUrl, setWebhookUrl] = useState('');
@@ -52,50 +59,62 @@ export function DiscordSection({
   // 연동 완료 상태
   if (discordStatus?.isLinked && discordStatus.webhookUrl) {
     return (
-      <div className="rounded-2xl border border-green-500/30 bg-green-500/10 p-4">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500/20">
-            <CheckIcon className="w-5 h-5 text-green-400" />
+      <>
+        <div className="rounded-2xl border border-green-500/30 bg-green-500/10 p-4">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500/20">
+              <CheckIcon className="w-5 h-5 text-green-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-green-400">디스코드 연동 완료</p>
+              <p className="text-xs text-slate-400">팀 알림이 디스코드 채널로 전송됩니다.</p>
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-semibold text-green-400">디스코드 연동 완료</p>
-            <p className="text-xs text-slate-400">팀 알림이 디스코드 채널로 전송됩니다.</p>
+          <div className="mb-4 rounded-lg border border-white/5 bg-slate-900/50 p-3">
+            <p className="text-xs text-slate-500 mb-1">Webhook URL</p>
+            <p className="text-xs font-mono text-slate-300 break-all">
+              {discordStatus.webhookUrl.length > 60
+                ? `${discordStatus.webhookUrl.slice(0, 60)}...`
+                : discordStatus.webhookUrl}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleCopyUrl(discordStatus.webhookUrl!)}
+              className="flex-1 rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-xs font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10"
+            >
+              URL 복사
+            </button>
+            <button
+              onClick={onRefreshStatus}
+              disabled={isLoading}
+              className="rounded-lg border border-white/20 bg-white/5 px-3 py-2.5 text-xs font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10 disabled:opacity-50"
+              title="상태 새로고침"
+            >
+              <RefreshIcon className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="mt-3">
+            <button
+              onClick={onDeleteWebhook}
+              disabled={isDeleting}
+              className="w-full rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-xs font-semibold text-red-400 transition hover:bg-red-500/20 disabled:opacity-50"
+            >
+              {isDeleting ? '해제 중...' : '연동 해제'}
+            </button>
           </div>
         </div>
-        <div className="mb-4 rounded-lg border border-white/5 bg-slate-900/50 p-3">
-          <p className="text-xs text-slate-500 mb-1">Webhook URL</p>
-          <p className="text-xs font-mono text-slate-300 break-all">
-            {discordStatus.webhookUrl.length > 60
-              ? `${discordStatus.webhookUrl.slice(0, 60)}...`
-              : discordStatus.webhookUrl}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => handleCopyUrl(discordStatus.webhookUrl!)}
-            className="flex-1 rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-xs font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10"
-          >
-            URL 복사
-          </button>
-          <button
-            onClick={onRefreshStatus}
-            disabled={isLoading}
-            className="rounded-lg border border-white/20 bg-white/5 px-3 py-2.5 text-xs font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/10 disabled:opacity-50"
-            title="상태 새로고침"
-          >
-            <RefreshIcon className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="mt-3">
-          <button
-            onClick={onDeleteWebhook}
-            disabled={isDeleting}
-            className="w-full rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-xs font-semibold text-red-400 transition hover:bg-red-500/20 disabled:opacity-50"
-          >
-            {isDeleting ? '해제 중...' : '연동 해제'}
-          </button>
-        </div>
-      </div>
+        <ConfirmModal
+          isOpen={showDeleteConfirm}
+          onClose={onCancelDelete}
+          onConfirm={onConfirmDelete}
+          title="디스코드 연동 해제"
+          message="디스코드 연동을 해제하시겠습니까? 연동 해제 후에는 디스코드로 팀 알림을 받을 수 없습니다."
+          confirmLabel="연동 해제"
+          variant="danger"
+          isLoading={isDeleting}
+        />
+      </>
     );
   }
 

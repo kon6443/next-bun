@@ -15,9 +15,12 @@ export type UseDiscordLinkReturn = {
   isLoading: boolean;
   isSaving: boolean;
   isDeleting: boolean;
+  showDeleteConfirm: boolean;
   setDiscordStatus: (status: DiscordStatusResponse | null) => void;
   handleSaveWebhook: (webhookUrl: string) => Promise<void>;
-  handleDeleteWebhook: () => Promise<void>;
+  requestDeleteWebhook: () => void;
+  confirmDeleteWebhook: () => Promise<void>;
+  cancelDeleteWebhook: () => void;
   handleRefreshStatus: () => Promise<void>;
 };
 
@@ -32,6 +35,7 @@ export function useDiscordLink(
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handleSaveWebhook = useCallback(async (webhookUrl: string) => {
     if (!accessToken) return;
@@ -53,11 +57,16 @@ export function useDiscordLink(
     }
   }, [accessToken, teamId]);
 
-  const handleDeleteWebhook = useCallback(async () => {
-    if (!accessToken) return;
+  const requestDeleteWebhook = useCallback(() => {
+    setShowDeleteConfirm(true);
+  }, []);
 
-    const confirmed = window.confirm('디스코드 연동을 해제하시겠습니까?\n연동 해제 후에는 디스코드로 팀 알림을 받을 수 없습니다.');
-    if (!confirmed) return;
+  const cancelDeleteWebhook = useCallback(() => {
+    setShowDeleteConfirm(false);
+  }, []);
+
+  const confirmDeleteWebhook = useCallback(async () => {
+    if (!accessToken) return;
 
     setIsDeleting(true);
     try {
@@ -74,6 +83,7 @@ export function useDiscordLink(
       console.error('Failed to delete discord webhook:', err);
     } finally {
       setIsDeleting(false);
+      setShowDeleteConfirm(false);
     }
   }, [accessToken, teamId]);
 
@@ -96,9 +106,12 @@ export function useDiscordLink(
     isLoading,
     isSaving,
     isDeleting,
+    showDeleteConfirm,
     setDiscordStatus,
     handleSaveWebhook,
-    handleDeleteWebhook,
+    requestDeleteWebhook,
+    confirmDeleteWebhook,
+    cancelDeleteWebhook,
     handleRefreshStatus,
   };
 }

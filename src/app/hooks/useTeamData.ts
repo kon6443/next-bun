@@ -46,8 +46,11 @@ export type UseTeamDataReturn = {
   isLoadingTelegram: boolean;
   isCreatingTelegramLink: boolean;
   isDeletingTelegramLink: boolean;
+  showTelegramDeleteConfirm: boolean;
   handleCreateTelegramLink: () => Promise<void>;
-  handleDeleteTelegramLink: () => Promise<void>;
+  requestDeleteTelegramLink: () => void;
+  confirmDeleteTelegramLink: () => Promise<void>;
+  cancelDeleteTelegramLink: () => void;
   handleRefreshTelegramStatus: () => Promise<void>;
   
   // 초대
@@ -88,9 +91,12 @@ export function useTeamData(teamId: string): UseTeamDataReturn {
     isLoading: isLoadingTelegram,
     isCreating: isCreatingTelegramLink,
     isDeleting: isDeletingTelegramLink,
+    showDeleteConfirm: showTelegramDeleteConfirm,
     setTelegramStatus,
     handleCreateLink: handleCreateTelegramLink,
-    handleDeleteLink: handleDeleteTelegramLink,
+    requestDeleteLink: requestDeleteTelegramLink,
+    confirmDeleteLink: confirmDeleteTelegramLink,
+    cancelDeleteLink: cancelDeleteTelegramLink,
     handleRefreshStatus: handleRefreshTelegramStatus,
   } = useTelegramLink(teamIdNum, session?.user?.accessToken);
 
@@ -303,8 +309,11 @@ export function useTeamData(teamId: string): UseTeamDataReturn {
     isLoadingTelegram,
     isCreatingTelegramLink,
     isDeletingTelegramLink,
+    showTelegramDeleteConfirm,
     handleCreateTelegramLink,
-    handleDeleteTelegramLink,
+    requestDeleteTelegramLink,
+    confirmDeleteTelegramLink,
+    cancelDeleteTelegramLink,
     handleRefreshTelegramStatus,
     invites,
     showInviteModal,

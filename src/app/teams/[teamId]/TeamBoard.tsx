@@ -18,6 +18,7 @@ import { useTeamSocketContext } from './contexts';
 import {
   getTeamTasks,
   updateTaskStatus,
+  updateTaskActiveStatus,
   getTeamUsers,
   getTelegramStatus,
   getDiscordStatus,
@@ -27,7 +28,7 @@ import {
 } from '@/services/teamService';
 import { teamsPageBackground, cardStyles, layoutStyles, MOBILE_MAX_WIDTH } from '@/styles/teams';
 import { STATUS_TO_COLUMN, type ColumnKey } from '../../config/taskStatusConfig';
-import { TeamManagementSection, InviteModal, RoleChangeModal, ViewModeToggle, OnlineUsers, TutorialGuide, hasSeenTutorial, markTutorialSeen, type ViewMode } from './components';
+import { TeamManagementSection, InviteModal, RoleChangeModal, ViewModeToggle, OnlineUsers, TutorialGuide, hasSeenTutorial, markTutorialSeen, type ViewMode, type DataTab } from './components';
 import { ROLES } from '../../config/roleConfig';
 import type {
   TaskCreatedPayload,
@@ -96,6 +97,10 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   // 온라인 유저 모달 상태 (FAB 숨김용)
   const [isOnlineModalOpen, setIsOnlineModalOpen] = useState(false);
 
+  // 데이터 탭: 활성 / 보관함
+  const [dataTab, setDataTab] = useState<DataTab>('active');
+  const [archiveCount, setArchiveCount] = useState(0);
+
   // 튜토리얼 가이드 상태
   const [showTutorial, setShowTutorial] = useState(false);
 
@@ -105,9 +110,12 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     isLoading: isLoadingTelegram,
     isCreating: isCreatingTelegramLink,
     isDeleting: isDeletingTelegramLink,
+    showDeleteConfirm: showTelegramDeleteConfirm,
     setTelegramStatus,
     handleCreateLink: handleCreateTelegramLink,
-    handleDeleteLink: handleDeleteTelegramLink,
+    requestDeleteLink: requestDeleteTelegramLink,
+    confirmDeleteLink: confirmDeleteTelegramLink,
+    cancelDeleteLink: cancelDeleteTelegramLink,
     handleRefreshStatus: handleRefreshTelegramStatus,
   } = useTelegramLink(teamIdNum, session?.user?.accessToken);
 
@@ -116,9 +124,12 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     isLoading: isLoadingDiscord,
     isSaving: isSavingDiscordWebhook,
     isDeleting: isDeletingDiscordWebhook,
+    showDeleteConfirm: showDiscordDeleteConfirm,
     setDiscordStatus,
     handleSaveWebhook: handleSaveDiscordWebhook,
-    handleDeleteWebhook: handleDeleteDiscordWebhook,
+    requestDeleteWebhook: requestDeleteDiscordWebhook,
+    confirmDeleteWebhook: confirmDeleteDiscordWebhook,
+    cancelDeleteWebhook: cancelDeleteDiscordWebhook,
     handleRefreshStatus: handleRefreshDiscordStatus,
   } = useDiscordLink(teamIdNum, session?.user?.accessToken);
 
@@ -132,6 +143,17 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     handleCreateInvite,
     fetchInvites,
   } = useTeamInvite(teamIdNum, session?.user?.accessToken);
+
+  // 로컬 상태에서 태스크 제거 (보관/복원/소켓 이벤트 공통)
+  const removeTaskFromLocal = useCallback((taskId: number) => {
+    setTasks(prev => {
+      const newTasks = { ...prev };
+      for (const columnKey of Object.keys(newTasks) as ColumnKey[]) {
+        newTasks[columnKey] = newTasks[columnKey].filter(t => t.taskId !== taskId);
+      }
+      return newTasks;
+    });
+  }, []);
 
   // ===== WebSocket (Context에서 관리) =====
   const { socket, onlineUsers } = useTeamSocketContext();
@@ -155,6 +177,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         actStatus: payload.actStatus,
         startAt: payload.startAt ? new Date(payload.startAt) : null,
         endAt: payload.endAt ? new Date(payload.endAt) : null,
+        completedAt: null,
         crtdBy: payload.createdBy,
         crtdAt: new Date(),
         userName,
@@ -220,20 +243,22 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         return prev;
       }
 
+      const completedAt = payload.completedAt ? new Date(payload.completedAt) : null;
+
       // 같은 컬럼 내 이동이면 상태값만 업데이트
       if (sourceColumnKey === newColumnKey) {
         return {
           ...prev,
           [sourceColumnKey]: prev[sourceColumnKey].map(task =>
             task.taskId === payload.taskId
-              ? { ...task, taskStatus: payload.newStatus }
+              ? { ...task, taskStatus: payload.newStatus, completedAt }
               : task,
           ),
         };
       }
 
       // 다른 컬럼으로 이동: 불변성을 유지하며 업데이트
-      const updatedTask = { ...movedTask, taskStatus: payload.newStatus };
+      const updatedTask = { ...movedTask, taskStatus: payload.newStatus, completedAt };
 
       return {
         ...prev,
@@ -247,18 +272,11 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   }, []);
 
   const handleSocketTaskActiveStatusChanged = useCallback((payload: TaskActiveStatusChangedPayload) => {
-    // actStatus가 0(비활성)으로 변경되면 목록에서 제거
     if (payload.newActStatus === 0) {
-      setTasks(prev => {
-        const newTasks = { ...prev };
-        for (const columnKey of Object.keys(newTasks) as ColumnKey[]) {
-          newTasks[columnKey] = newTasks[columnKey].filter(t => t.taskId !== payload.taskId);
-        }
-        return newTasks;
-      });
+      removeTaskFromLocal(payload.taskId);
       toast.success('태스크가 비활성화되었습니다.');
     }
-  }, []);
+  }, [removeTaskFromLocal]);
 
   // 온라인 유저 접속 이벤트 (토스트 알림만 - 상태는 Context에서 관리)
   const handleUserJoined = useCallback((payload: UserJoinedPayload) => {
@@ -369,11 +387,36 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     fetchInvitesRef.current = fetchInvites;
   }, [fetchInvites]);
 
-  useEffect(() => {
-    // 세션이 아직 로딩 중이면 기다림
-    if (sessionStatus === 'loading') {
-      return;
+  // 태스크 분류 공통 함수
+  const classifyTasks = useCallback((taskList: Task[]) => {
+    const classified: Record<ColumnKey, Task[]> = {
+      todo: [], inProgress: [], done: [], onHold: [], cancelled: [],
+    };
+    taskList.forEach(task => {
+      const columnKey = taskStatusToColumn[task.taskStatus] || 'todo';
+      classified[columnKey].push(task);
+    });
+    return classified;
+  }, []);
+
+  // 태스크 목록 조회 + 보관함 카운트 갱신 공통 함수
+  const fetchAndSetTasks = useCallback(async (accessToken: string, tab: DataTab) => {
+    const actStatusParam = tab === 'archive' ? 0 : 1;
+    const tasksResponse = await getTeamTasks(teamIdNum, accessToken, actStatusParam);
+    setTasks(classifyTasks(tasksResponse.data.tasks));
+
+    if (tab === 'active') {
+      getTeamTasks(teamIdNum, accessToken, 0)
+        .then(res => setArchiveCount(res.data.tasks.length))
+        .catch(() => setArchiveCount(0));
     }
+
+    return tasksResponse;
+  }, [teamIdNum, classifyTasks]);
+
+  // 초기 로딩: 팀 정보 + 멤버 + 통합 + 태스크 (페이지 진입 시 1회)
+  useEffect(() => {
+    if (sessionStatus === 'loading') return;
 
     if (!session?.user?.accessToken) {
       setError('인증이 필요합니다. 다시 로그인해주세요.');
@@ -391,9 +434,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
         const currentUserId = session.user.userId;
 
-        // Promise.all로 독립적인 API들을 병렬 호출
         const [tasksResponse, membersResult, telegramResult, discordResult] = await Promise.all([
-          getTeamTasks(teamIdNum, session.user.accessToken),
+          fetchAndSetTasks(session.user.accessToken, dataTab),
           getTeamUsers(teamIdNum, session.user.accessToken).catch(err => {
             console.error('Failed to fetch team members:', err);
             return null;
@@ -408,54 +450,25 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           }),
         ]);
 
-        // 태스크 데이터 처리
         setTeamName(tasksResponse.data.team.teamName);
         setTeamDescription(tasksResponse.data.team.teamDescription || '');
 
         const isMasterUser = Boolean(currentUserId && tasksResponse.data.team.leaderId === currentUserId);
 
-        // 멤버 데이터 처리
         if (membersResult) {
           setMembers(membersResult.data);
-
           const currentUserMember = membersResult.data.find(m => m.userId === currentUserId);
           const userRole = currentUserMember?.role?.toUpperCase().trim();
           const canInvite = userRole === 'MASTER' || userRole === 'MANAGER';
           setCanManageInvites(canInvite);
-
-          if (canInvite) {
-            await fetchInvitesRef.current();
-          }
+          if (canInvite) await fetchInvitesRef.current();
         } else {
           setCanManageInvites(isMasterUser);
-          if (isMasterUser) {
-            await fetchInvitesRef.current();
-          }
+          if (isMasterUser) await fetchInvitesRef.current();
         }
 
-        // 텔레그램 데이터 처리
         setTelegramStatus(telegramResult?.data ?? null);
-
-        // 디스코드 데이터 처리
         setDiscordStatus(discordResult?.data ?? null);
-
-        // taskStatus에 따라 태스크를 컬럼별로 분류
-        const classifiedTasks: Record<ColumnKey, Task[]> = {
-          todo: [],
-          inProgress: [],
-          done: [],
-          onHold: [],
-          cancelled: [],
-        };
-
-        tasksResponse.data.tasks.forEach(task => {
-          if (task.actStatus === 1) {
-            const columnKey = taskStatusToColumn[task.taskStatus] || 'todo';
-            classifiedTasks[columnKey].push(task);
-          }
-        });
-
-        setTasks(classifiedTasks);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : '태스크 목록을 불러오는데 실패했습니다.';
         setError(errorMessage);
@@ -466,7 +479,33 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     };
 
     fetchTeamData();
-  }, [teamId, teamIdNum, session?.user?.accessToken, session?.user?.userId, sessionStatus]);
+  }, [teamId, teamIdNum, session?.user?.accessToken, session?.user?.userId, sessionStatus]); // dataTab 제외: 탭 전환은 아래 별도 useEffect
+
+  // 데이터 탭 전환 시 태스크만 재조회 (멤버/통합 재호출 불필요)
+  const isInitialMount = useRef(true);
+  useEffect(() => {
+    // 초기 마운트 시에는 위 useEffect에서 이미 호출하므로 스킵
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    if (!session?.user?.accessToken || isNaN(teamIdNum)) return;
+
+    const fetchTasksOnly = async () => {
+      setIsLoading(true);
+      try {
+        await fetchAndSetTasks(session.user.accessToken, dataTab);
+      } catch (err) {
+        console.error('Failed to fetch tasks:', err);
+        toast.error('태스크 목록 조회에 실패했습니다.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTasksOnly();
+  }, [dataTab, teamIdNum, session?.user?.accessToken, fetchAndSetTasks]);
 
   // 모든 태스크를 하나의 배열로 합침
   const allTasks = useMemo(
@@ -692,6 +731,42 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     [session?.user?.accessToken, teamIdNum],
   );
 
+  // 보관함에서 태스크 복원 (활성으로 전환)
+  const handleRestore = useCallback(
+    async (taskId: number) => {
+      if (!session?.user?.accessToken) return;
+
+      try {
+        await updateTaskActiveStatus(teamIdNum, taskId, 1, session.user.accessToken);
+        removeTaskFromLocal(taskId);
+        setArchiveCount(prev => Math.max(0, prev - 1));
+        toast.success('태스크가 활성으로 복원되었습니다.');
+      } catch (err) {
+        console.error('Failed to restore task:', err);
+        toast.error(err instanceof Error ? err.message : '태스크 복원에 실패했습니다.');
+      }
+    },
+    [session?.user?.accessToken, teamIdNum],
+  );
+
+  // 활성 태스크를 보관함으로 이동
+  const handleArchive = useCallback(
+    async (taskId: number) => {
+      if (!session?.user?.accessToken) return;
+
+      try {
+        await updateTaskActiveStatus(teamIdNum, taskId, 0, session.user.accessToken);
+        removeTaskFromLocal(taskId);
+        setArchiveCount(prev => prev + 1);
+        toast.success('보관함으로 이동되었습니다.');
+      } catch (err) {
+        console.error('Failed to archive task:', err);
+        toast.error(err instanceof Error ? err.message : '보관함 이동에 실패했습니다.');
+      }
+    },
+    [session?.user?.accessToken, teamIdNum],
+  );
+
   // 첫 방문 시 튜토리얼 자동 표시
   useEffect(() => {
     if (!isLoading && !error && !hasSeenTutorial()) {
@@ -774,14 +849,20 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           isCreatingTelegramLink={isCreatingTelegramLink}
           isDeletingTelegramLink={isDeletingTelegramLink}
           onCreateTelegramLink={handleCreateTelegramLink}
-          onDeleteTelegramLink={handleDeleteTelegramLink}
+          onDeleteTelegramLink={requestDeleteTelegramLink}
+          showTelegramDeleteConfirm={showTelegramDeleteConfirm}
+          onConfirmDeleteTelegramLink={confirmDeleteTelegramLink}
+          onCancelDeleteTelegramLink={cancelDeleteTelegramLink}
           onRefreshTelegramStatus={handleRefreshTelegramStatus}
           discordStatus={discordStatus}
           isLoadingDiscord={isLoadingDiscord}
           isSavingDiscordWebhook={isSavingDiscordWebhook}
           isDeletingDiscordWebhook={isDeletingDiscordWebhook}
           onSaveDiscordWebhook={handleSaveDiscordWebhook}
-          onDeleteDiscordWebhook={handleDeleteDiscordWebhook}
+          onDeleteDiscordWebhook={requestDeleteDiscordWebhook}
+          showDiscordDeleteConfirm={showDiscordDeleteConfirm}
+          onConfirmDeleteDiscordWebhook={confirmDeleteDiscordWebhook}
+          onCancelDeleteDiscordWebhook={cancelDeleteDiscordWebhook}
           onRefreshDiscordStatus={handleRefreshDiscordStatus}
           onOpenRoleChange={handleOpenRoleChange}
           onToggleMemberStatus={handleToggleMemberStatus}
@@ -821,18 +902,24 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           </div>
         )}
 
-        {/* 보기 전환 버튼 */}
-        <ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+        {/* 데이터 탭 + 보기 전환 버튼 */}
+        <ViewModeToggle
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          dataTab={dataTab}
+          onDataTabChange={setDataTab}
+          archiveCount={archiveCount}
+        />
 
         {/* 뷰 렌더링 - 로딩 시 스켈레톤 표시 */}
         {isLoading ? (
           viewMode === 'list' ? <ListViewSkeleton /> : <TeamBoardSkeleton />
         ) : viewMode === 'kanban' ? (
-          <Kanban tasksByColumn={filteredTasksByColumn} onStatusChange={handleStatusChange} teamId={teamId} />
+          <Kanban tasksByColumn={filteredTasksByColumn} onStatusChange={handleStatusChange} teamId={teamId} isArchiveView={dataTab === 'archive'} onRestore={handleRestore} onArchive={dataTab === 'active' ? handleArchive : undefined} />
         ) : viewMode === 'gantt' ? (
           <GanttChart tasks={filteredTasks} teamId={teamId} />
         ) : viewMode === 'list' ? (
-          <ListView tasks={filteredTasks} teamId={teamId} />
+          <ListView tasks={filteredTasks} teamId={teamId} isArchiveView={dataTab === 'archive'} onRestore={handleRestore} />
         ) : (
           <CalendarView tasks={filteredTasks} teamId={teamId} />
         )}

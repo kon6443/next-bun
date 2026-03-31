@@ -69,6 +69,7 @@ export interface TaskStatusChangedPayload {
   teamId: number;
   oldStatus: number;
   newStatus: number;
+  completedAt: string | null;
   updatedBy: number;
 }
 

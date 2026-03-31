@@ -10,6 +10,7 @@ import {
   deleteTaskComment,
   updateTask,
   updateTaskStatus,
+  updateTaskActiveStatus,
   type TaskDetailResponse,
 } from '@/services/teamService';
 import type { TaskComment } from '@/app/types/task';
@@ -28,7 +29,8 @@ import {
   type TaskFormData,
 } from '../../../components';
 import { StatusDropdown } from '@/app/components/StatusDropdown';
-import { EditIcon, TrashIcon, CommentIcon, SendIcon } from '@/app/components/Icons';
+import { ConfirmModal } from '@/app/components/ConfirmModal';
+import { EditIcon, TrashIcon, CommentIcon, SendIcon, ArchiveIcon, RestoreIcon } from '@/app/components/Icons';
 import { formatCompactDateTime } from '@/app/utils/taskUtils';
 import type { TaskStatusKey } from '@/app/config/taskStatusConfig';
 import { cardStyles } from '@/styles/teams';
@@ -64,6 +66,8 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
   const [isCreatingComment, setIsCreatingComment] = useState(false);
   const [isUpdatingComment, setIsUpdatingComment] = useState(false);
   const [isDeletingComment, setIsDeletingComment] = useState(false);
+  const [isArchiving, setIsArchiving] = useState(false);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
 
   // useTeamTaskId 훅으로 ID 파싱 통합
   const { teamIdNum, taskIdNum, isValid: isValidIds } = useTeamTaskId(teamId, taskId);
@@ -102,7 +106,11 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
 
       setTaskDetail(prev => {
         if (!prev) return prev;
-        return { ...prev, taskStatus: payload.newStatus };
+        return {
+          ...prev,
+          taskStatus: payload.newStatus,
+          completedAt: payload.completedAt ? new Date(payload.completedAt) : null,
+        };
       });
       toast.success('태스크 상태가 변경되었습니다.');
     },
@@ -377,7 +385,6 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
 
   const handleDeleteComment = async (commentId: number) => {
     if (!session?.user?.accessToken || !isValidIds) return;
-    if (!confirm('댓글을 삭제하시겠습니까?')) return;
 
     setIsDeletingComment(true);
     setError(null);
@@ -396,6 +403,26 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
       console.error('Failed to delete comment:', { err, commentId, teamIdNum, taskIdNum });
     } finally {
       setIsDeletingComment(false);
+    }
+  };
+
+  // 태스크 활성 상태 변경 (보관/복원)
+  const handleToggleArchive = async () => {
+    if (!session?.user?.accessToken || !taskDetail || !isValidIds || isArchiving) return;
+
+    const isCurrentlyActive = taskDetail.actStatus === 1;
+
+    setIsArchiving(true);
+    try {
+      const newActStatus = isCurrentlyActive ? 0 : 1;
+      await updateTaskActiveStatus(teamIdNum, taskIdNum, newActStatus, session.user.accessToken);
+      await fetchTaskDetail(false);
+      toast.success(isCurrentlyActive ? '보관함으로 이동되었습니다.' : '활성으로 복원되었습니다.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '상태 변경에 실패했습니다.');
+    } finally {
+      setIsArchiving(false);
+      setShowArchiveConfirm(false);
     }
   };
 
@@ -540,13 +567,33 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
               size="md"
             />
 
-            {/* 상태 드롭다운 (하단 배치, 카드 스타일) */}
+            {/* 상태 드롭다운 + 보관/복원 (한 줄) */}
             <div className='mt-4 pt-4 border-t border-white/5'>
-              <StatusDropdown
-                currentStatus={taskDetail.taskStatus as TaskStatusKey}
-                onStatusChange={handleStatusChange}
-                disabled={isStatusUpdating}
-              />
+              <div className='flex items-center gap-2'>
+                <div className='flex-1'>
+                  <StatusDropdown
+                    currentStatus={taskDetail.taskStatus as TaskStatusKey}
+                    onStatusChange={handleStatusChange}
+                    disabled={isStatusUpdating}
+                  />
+                </div>
+                <button
+                  onClick={() => taskDetail.actStatus === 1 ? setShowArchiveConfirm(true) : handleToggleArchive()}
+                  disabled={isArchiving}
+                  title={taskDetail.actStatus === 1 ? '보관함으로 이동' : '활성으로 복원'}
+                  className={`p-2 rounded-lg transition disabled:opacity-50 ${
+                    taskDetail.actStatus === 1
+                      ? 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                      : 'text-emerald-400 hover:bg-emerald-500/10'
+                  }`}
+                >
+                  {taskDetail.actStatus === 1 ? (
+                    <ArchiveIcon className='w-5 h-5' />
+                  ) : (
+                    <RestoreIcon className='w-5 h-5' />
+                  )}
+                </button>
+              </div>
               {isStatusUpdating && (
                 <div className='mt-2 text-center'>
                   <span className='text-xs text-sky-400 animate-pulse'>상태 변경 중...</span>
@@ -680,6 +727,20 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
           )}
         </div>
       </section>
+
+      {/* 보관 확인 모달 */}
+      {taskDetail && (
+        <ConfirmModal
+          isOpen={showArchiveConfirm}
+          onClose={() => setShowArchiveConfirm(false)}
+          onConfirm={handleToggleArchive}
+          title="보관함으로 이동"
+          message={`"${taskDetail.taskName}" 태스크를 보관함으로 이동하시겠습니까? 보관함 탭에서 다시 복원할 수 있습니다.`}
+          confirmLabel="보관함으로 이동"
+          isLoading={isArchiving}
+        />
+      )}
+
     </TeamsPageLayout>
   );
 }
