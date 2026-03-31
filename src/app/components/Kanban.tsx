@@ -10,13 +10,16 @@ type KanbanProps = {
   tasksByColumn: Record<ColumnKey, Task[]>;
   onStatusChange: (taskId: number, newStatus: number) => Promise<void>;
   teamId: string;
+  isArchiveView?: boolean;
+  onRestore?: (taskId: number) => Promise<void>;
+  onArchive?: (taskId: number) => Promise<void>;
 };
 
 /**
  * 탭 기반 칸반 보드 컴포넌트
  * PC/모바일 모두에서 동일한 UX 제공 (스와이프 또는 탭 클릭으로 컬럼 전환)
  */
-export function Kanban({ tasksByColumn, onStatusChange, teamId }: KanbanProps) {
+export function Kanban({ tasksByColumn, onStatusChange, teamId, isArchiveView, onRestore, onArchive }: KanbanProps) {
   // 워크플로우 상태만 가져오기 (칸반 보드에 표시되는 상태)
   const workflowStatuses = getWorkflowStatuses();
 
@@ -154,6 +157,9 @@ export function Kanban({ tasksByColumn, onStatusChange, teamId }: KanbanProps) {
                           task={task}
                           onStatusChange={onStatusChange}
                           teamId={teamId}
+                          isArchiveView={isArchiveView}
+                          onRestore={onRestore}
+                          onArchive={onArchive}
                         />
                       ))
                     )}

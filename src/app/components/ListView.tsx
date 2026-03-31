@@ -13,12 +13,14 @@ import { ViewHeader } from './ViewHeader';
 type ListViewProps = {
   tasks: Task[];
   teamId: string;
+  isArchiveView?: boolean;
+  onRestore?: (taskId: number) => Promise<void>;
 };
 
 type SortKey = 'taskName' | 'taskStatus' | 'userName' | 'startAt' | 'endAt' | 'crtdAt';
 type SortOrder = 'asc' | 'desc';
 
-export function ListView({ tasks, teamId }: ListViewProps) {
+export function ListView({ tasks, teamId, isArchiveView, onRestore }: ListViewProps) {
   const router = useRouter();
   const [sortKey, setSortKey] = useState<SortKey>('crtdAt');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
@@ -147,12 +149,17 @@ export function ListView({ tasks, teamId }: ListViewProps) {
               >
                 생성일 <SortIcon columnKey="crtdAt" />
               </th>
+              {isArchiveView && (
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400">
+                  복원
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
             {sortedTasks.length === 0 ? (
               <tr>
-                <td colSpan={6}>
+                <td colSpan={isArchiveView ? 7 : 6}>
                   <EmptyState message="표시할 태스크가 없습니다" variant="minimal" />
                 </td>
               </tr>
@@ -201,6 +208,19 @@ export function ListView({ tasks, teamId }: ListViewProps) {
                     <td className="px-4 py-3 text-sm text-slate-400">
                       {formatDateWithYear(task.crtdAt)}
                     </td>
+                    {isArchiveView && onRestore && (
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRestore(task.taskId);
+                          }}
+                          className="px-2.5 py-1 rounded-lg text-[10px] font-medium transition bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                        >
+                          복원
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 );
               })

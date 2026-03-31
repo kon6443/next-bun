@@ -99,6 +99,7 @@ export type TeamTaskResponse = {
   actStatus: number;
   startAt: Date | null;
   endAt: Date | null;
+  completedAt: Date | null;
   crtdAt: Date;
   crtdBy: number;
   userName: string | null;
@@ -146,6 +147,7 @@ export type TaskDetailResponse = {
   actStatus: number;
   startAt: Date | null;
   endAt: Date | null;
+  completedAt: Date | null;
   crtdAt: Date;
   crtdBy: number;
   userName: string | null;
@@ -393,10 +395,15 @@ export async function getTeamUsers(
 /**
  * 팀 태스크 목록 조회
  */
-export async function getTeamTasks(teamId: number, accessToken: string): Promise<GetTeamTasksResponse> {
+export async function getTeamTasks(
+  teamId: number,
+  accessToken: string,
+  actStatus?: number,
+): Promise<GetTeamTasksResponse> {
+  const params = actStatus !== undefined ? `?actStatus=${actStatus}` : '';
   const response = await fetchServiceInstance.backendFetch({
     method: 'GET',
-    endpoint: `/api/v1/teams/${teamId}/tasks`,
+    endpoint: `/api/v1/teams/${teamId}/tasks${params}`,
     accessToken,
   });
 
@@ -486,6 +493,32 @@ export async function updateTaskStatus(
     await handleApiError(response, {
       403: '팀 멤버만 태스크 상태를 변경할 수 있습니다.',
       default: '태스크 상태 변경 실패',
+    });
+  }
+
+  return response.json();
+}
+
+/**
+ * 태스크 활성 상태 변경 (활성/비활성 토글)
+ */
+export async function updateTaskActiveStatus(
+  teamId: number,
+  taskId: number,
+  actStatus: number,
+  accessToken: string,
+): Promise<UpdateTaskStatusResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'PUT',
+    endpoint: `/api/v1/teams/${teamId}/tasks/${taskId}/active-status`,
+    accessToken,
+    body: { actStatus },
+  });
+
+  if (!response.ok) {
+    await handleApiError(response, {
+      403: '팀 멤버만 태스크 활성 상태를 변경할 수 있습니다.',
+      default: '태스크 활성 상태 변경 실패',
     });
   }
 

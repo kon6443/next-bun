@@ -38,7 +38,10 @@ type TeamManagementSectionProps = {
   isCreatingTelegramLink: boolean;
   isDeletingTelegramLink: boolean;
   onCreateTelegramLink: () => Promise<void>;
-  onDeleteTelegramLink: () => Promise<void>;
+  onDeleteTelegramLink: () => void;
+  showTelegramDeleteConfirm: boolean;
+  onConfirmDeleteTelegramLink: () => Promise<void>;
+  onCancelDeleteTelegramLink: () => void;
   onRefreshTelegramStatus: () => Promise<void>;
 
   // 디스코드 관련
@@ -47,7 +50,10 @@ type TeamManagementSectionProps = {
   isSavingDiscordWebhook: boolean;
   isDeletingDiscordWebhook: boolean;
   onSaveDiscordWebhook: (webhookUrl: string) => Promise<void>;
-  onDeleteDiscordWebhook: () => Promise<void>;
+  onDeleteDiscordWebhook: () => void;
+  showDiscordDeleteConfirm: boolean;
+  onConfirmDeleteDiscordWebhook: () => Promise<void>;
+  onCancelDeleteDiscordWebhook: () => void;
   onRefreshDiscordStatus: () => Promise<void>;
 
   // 역할 변경 관련
@@ -91,6 +97,9 @@ export function TeamManagementSection({
   isDeletingTelegramLink,
   onCreateTelegramLink,
   onDeleteTelegramLink,
+  showTelegramDeleteConfirm,
+  onConfirmDeleteTelegramLink,
+  onCancelDeleteTelegramLink,
   onRefreshTelegramStatus,
   discordStatus,
   isLoadingDiscord,
@@ -98,6 +107,9 @@ export function TeamManagementSection({
   isDeletingDiscordWebhook,
   onSaveDiscordWebhook,
   onDeleteDiscordWebhook,
+  showDiscordDeleteConfirm,
+  onConfirmDeleteDiscordWebhook,
+  onCancelDeleteDiscordWebhook,
   onRefreshDiscordStatus,
   onOpenRoleChange,
   onToggleMemberStatus,
@@ -502,6 +514,9 @@ export function TeamManagementSection({
                 isDeletingLink={isDeletingTelegramLink}
                 onCreateLink={onCreateTelegramLink}
                 onDeleteLink={onDeleteTelegramLink}
+                showDeleteConfirm={showTelegramDeleteConfirm}
+                onConfirmDelete={onConfirmDeleteTelegramLink}
+                onCancelDelete={onCancelDeleteTelegramLink}
                 onRefreshStatus={onRefreshTelegramStatus}
               />
             </div>
@@ -517,6 +532,9 @@ export function TeamManagementSection({
                 isDeleting={isDeletingDiscordWebhook}
                 onSaveWebhook={onSaveDiscordWebhook}
                 onDeleteWebhook={onDeleteDiscordWebhook}
+                showDeleteConfirm={showDiscordDeleteConfirm}
+                onConfirmDelete={onConfirmDeleteDiscordWebhook}
+                onCancelDelete={onCancelDeleteDiscordWebhook}
                 onRefreshStatus={onRefreshDiscordStatus}
               />
             </div>

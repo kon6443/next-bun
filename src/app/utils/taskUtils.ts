@@ -1,6 +1,24 @@
 import type { Task } from '../types/task';
 import { STATUS_COMPLETED, STATUS_CANCELLED } from '../config/taskStatusConfig';
 
+/** 자동 아카이브 대기 일수 (백엔드와 동기화) */
+const AUTO_ARCHIVE_DAYS = 14;
+
+/**
+ * completedAt 기반 자동 아카이브까지 남은 일수 계산
+ * @returns 남은 일수 (null이면 아카이브 대상 아님)
+ */
+export function getArchiveDaysLeft(task: Task): number | null {
+  if (!task.completedAt) return null;
+  if (task.taskStatus !== STATUS_COMPLETED && task.taskStatus !== STATUS_CANCELLED) return null;
+
+  const completed = new Date(task.completedAt);
+  const now = new Date();
+  const diffMs = completed.getTime() + AUTO_ARCHIVE_DAYS * 24 * 60 * 60 * 1000 - now.getTime();
+  const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  return Math.max(0, daysLeft);
+}
+
 // 마감일 상태 타입
 export type DeadlineStatus = 'overdue' | 'today' | 'soon' | 'normal' | 'none';
 
