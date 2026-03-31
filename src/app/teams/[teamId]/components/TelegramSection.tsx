@@ -2,6 +2,7 @@
 
 import toast from 'react-hot-toast';
 import { ClockIcon, SendIcon, RefreshIcon, CheckIcon } from '@/app/components/Icons';
+import { ConfirmModal } from '@/app/components/ConfirmModal';
 import { formatFullDateTime } from '@/app/utils/taskUtils';
 import type { TelegramStatusResponse } from '@/services/teamService';
 
@@ -11,7 +12,10 @@ type TelegramSectionProps = {
   isCreatingLink: boolean;
   isDeletingLink: boolean;
   onCreateLink: () => Promise<void>;
-  onDeleteLink: () => Promise<void>;
+  onDeleteLink: () => void;
+  showDeleteConfirm: boolean;
+  onConfirmDelete: () => Promise<void>;
+  onCancelDelete: () => void;
   onRefreshStatus: () => Promise<void>;
 };
 
@@ -22,6 +26,9 @@ export function TelegramSection({
   isDeletingLink,
   onCreateLink,
   onDeleteLink,
+  showDeleteConfirm,
+  onConfirmDelete,
+  onCancelDelete,
   onRefreshStatus,
 }: TelegramSectionProps) {
   const handleCopyLink = (link: string) => {
@@ -41,28 +48,40 @@ export function TelegramSection({
   // 연동 완료 상태
   if (telegramStatus?.isLinked) {
     return (
-      <div className="rounded-2xl border border-green-500/30 bg-green-500/10 p-4">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500/20">
-            <CheckIcon className="w-5 h-5 text-green-400" />
+      <>
+        <div className="rounded-2xl border border-green-500/30 bg-green-500/10 p-4">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500/20">
+              <CheckIcon className="w-5 h-5 text-green-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-green-400">텔레그램 연동 완료</p>
+              <p className="text-xs text-slate-400">팀 알림이 텔레그램 그룹으로 전송됩니다.</p>
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-semibold text-green-400">텔레그램 연동 완료</p>
-            <p className="text-xs text-slate-400">팀 알림이 텔레그램 그룹으로 전송됩니다.</p>
+          <div className="mb-4 rounded-lg border border-white/5 bg-slate-900/50 p-3">
+            <p className="text-xs text-slate-500 mb-1">Chat ID</p>
+            <p className="text-sm font-mono text-slate-300">{telegramStatus.chatId}</p>
           </div>
+          <button
+            onClick={onDeleteLink}
+            disabled={isDeletingLink}
+            className="w-full rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-xs font-semibold text-red-400 transition hover:bg-red-500/20 disabled:opacity-50"
+          >
+            {isDeletingLink ? '해제 중...' : '연동 해제'}
+          </button>
         </div>
-        <div className="mb-4 rounded-lg border border-white/5 bg-slate-900/50 p-3">
-          <p className="text-xs text-slate-500 mb-1">Chat ID</p>
-          <p className="text-sm font-mono text-slate-300">{telegramStatus.chatId}</p>
-        </div>
-        <button
-          onClick={onDeleteLink}
-          disabled={isDeletingLink}
-          className="w-full rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-xs font-semibold text-red-400 transition hover:bg-red-500/20 disabled:opacity-50"
-        >
-          {isDeletingLink ? '해제 중...' : '연동 해제'}
-        </button>
-      </div>
+        <ConfirmModal
+          isOpen={showDeleteConfirm}
+          onClose={onCancelDelete}
+          onConfirm={onConfirmDelete}
+          title="텔레그램 연동 해제"
+          message="텔레그램 연동을 해제하시겠습니까? 연동 해제 후에는 팀 알림을 받을 수 없습니다."
+          confirmLabel="연동 해제"
+          variant="danger"
+          isLoading={isDeletingLink}
+        />
+      </>
     );
   }
 

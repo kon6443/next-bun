@@ -15,9 +15,12 @@ export type UseTelegramLinkReturn = {
   isLoading: boolean;
   isCreating: boolean;
   isDeleting: boolean;
+  showDeleteConfirm: boolean;
   setTelegramStatus: (status: TelegramStatusResponse | null) => void;
   handleCreateLink: () => Promise<void>;
-  handleDeleteLink: () => Promise<void>;
+  requestDeleteLink: () => void;
+  confirmDeleteLink: () => Promise<void>;
+  cancelDeleteLink: () => void;
   handleRefreshStatus: () => Promise<void>;
 };
 
@@ -32,6 +35,7 @@ export function useTelegramLink(
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handleCreateLink = useCallback(async () => {
     if (!accessToken) return;
@@ -58,11 +62,16 @@ export function useTelegramLink(
     }
   }, [accessToken, teamId]);
 
-  const handleDeleteLink = useCallback(async () => {
-    if (!accessToken) return;
+  const requestDeleteLink = useCallback(() => {
+    setShowDeleteConfirm(true);
+  }, []);
 
-    const confirmed = window.confirm('텔레그램 연동을 해제하시겠습니까?\n연동 해제 후에는 팀 알림을 받을 수 없습니다.');
-    if (!confirmed) return;
+  const cancelDeleteLink = useCallback(() => {
+    setShowDeleteConfirm(false);
+  }, []);
+
+  const confirmDeleteLink = useCallback(async () => {
+    if (!accessToken) return;
 
     setIsDeleting(true);
     try {
@@ -79,6 +88,7 @@ export function useTelegramLink(
       console.error('Failed to delete telegram link:', err);
     } finally {
       setIsDeleting(false);
+      setShowDeleteConfirm(false);
     }
   }, [accessToken, teamId]);
 
@@ -101,9 +111,12 @@ export function useTelegramLink(
     isLoading,
     isCreating,
     isDeleting,
+    showDeleteConfirm,
     setTelegramStatus,
     handleCreateLink,
-    handleDeleteLink,
+    requestDeleteLink,
+    confirmDeleteLink,
+    cancelDeleteLink,
     handleRefreshStatus,
   };
 }

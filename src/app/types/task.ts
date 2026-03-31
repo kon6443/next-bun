@@ -7,6 +7,7 @@ export type Task = {
   actStatus: number;
   startAt: Date | null;
   endAt: Date | null;
+  completedAt: Date | null;
   crtdAt: Date;
   crtdBy: number;
   userName: string | null;
@@ -33,6 +34,7 @@ export type TaskDetail = {
   actStatus: number;
   startAt: Date | null;
   endAt: Date | null;
+  completedAt: Date | null;
   crtdAt: Date;
   crtdBy: number;
   userName: string | null;
