@@ -92,7 +92,7 @@ export default function Mypage() {
             환영합니다
           </p>
           
-          {/* 이름 (수정 모드) */}
+          {/* 이름 + 수정 */}
           {isEditing ? (
             <div className="mb-3">
               <input
@@ -107,13 +107,20 @@ export default function Mypage() {
               <p className="text-xs text-slate-500 mt-1">{newUserName.length}/20</p>
             </div>
           ) : (
-            <h1 
-              className="text-[2.15rem] font-bold text-slate-200 mb-3 cursor-pointer hover:text-blue-400 transition-colors"
-              onClick={handleEditClick}
-              title="클릭하여 닉네임 수정"
-            >
-              {displayName}
-            </h1>
+            <div className="mb-3">
+              <h1 className="text-[2.15rem] font-bold text-slate-200">
+                {displayName}
+              </h1>
+              <button
+                onClick={handleEditClick}
+                className="mt-1.5 inline-flex items-center gap-1 text-xs text-slate-500 hover:text-blue-400 transition-colors"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+                닉네임 수정
+              </button>
+            </div>
           )}
           
           {/* 에러 메시지 */}
