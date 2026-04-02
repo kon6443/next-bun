@@ -7,7 +7,7 @@ import { updateUserProfile } from "@/services/userService";
 import { startKakaoLogin } from "@/app/auth/shared";
 
 // 공통 스타일 상수
-const CARD_STYLES = "w-full max-w-[430px] bg-gradient-to-br from-slate-900/95 to-slate-900/75 border border-slate-400/25 rounded-[28px] p-11 shadow-[0_35px_65px_rgba(2,6,23,0.75)] text-center";
+const CARD_STYLES = "w-full max-w-[430px] bg-gradient-to-br from-slate-900/95 to-slate-900/75 border border-slate-400/25 rounded-[28px] p-6 sm:p-11 shadow-[0_35px_65px_rgba(2,6,23,0.75)] text-center";
 const BASE_BUTTON_STYLES = "w-full rounded-full border-none py-4 px-5 text-base font-semibold cursor-pointer transition-all duration-150 hover:scale-[1.02] hover:brightness-110 flex items-center justify-center";
 
 export default function Mypage() {
@@ -65,7 +65,7 @@ export default function Mypage() {
   // 로딩 상태: 스켈레톤 UI 표시
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center p-8 bg-gradient-radial from-blue-500/30 via-transparent to-transparent bg-[var(--background)]">
+      <div className="min-h-screen flex items-center justify-center p-4 sm:p-8 bg-gradient-radial from-blue-500/30 via-transparent to-transparent bg-[var(--background)]">
         <MypageSkeleton />
       </div>
     );
@@ -78,7 +78,7 @@ export default function Mypage() {
     const displayName = user?.userName ?? `사용자${user?.userId}`;
     
     return (
-      <div className="min-h-screen flex items-center justify-center p-8 mypage-bg">
+      <div className="min-h-screen flex items-center justify-center p-4 sm:p-8 mypage-bg">
         <section className={CARD_STYLES}>
           {/* 아바타 */}
           <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-600/20 to-indigo-500/20 flex items-center justify-center">
@@ -174,7 +174,7 @@ export default function Mypage() {
 
   // 미인증 상태
   return (
-    <div className="min-h-screen flex items-center justify-center p-8 mypage-bg">
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-8 mypage-bg">
       <section className={CARD_STYLES}>
         {/* 안내 메시지 */}
         <p className="uppercase tracking-[0.35em] text-[0.72rem] font-semibold text-slate-400 mb-2">

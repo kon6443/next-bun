@@ -47,7 +47,7 @@ export function DateInfoInline({
   const hasDateRange = startDateStr || endDateStr;
 
   return (
-    <div className={`w-full flex flex-wrap items-center justify-between gap-y-2 ${styles.container}`}>
+    <div className={`w-full flex flex-wrap items-center gap-x-2 gap-y-1 ${styles.container}`}>
       {/* 생성일 */}
       <span className={`flex items-center ${styles.iconGap}`} title="생성일">
         <ClockIcon className={styles.icon} />

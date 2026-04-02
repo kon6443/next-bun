@@ -102,7 +102,7 @@ export function TaskForm({
       />
 
       <div className="grid gap-4 overflow-hidden">
-        <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 sm:items-end">
           <DateInput
             id="startAt"
             label="시작일"
@@ -118,7 +118,7 @@ export function TaskForm({
             disabled={isSubmitting || !startAt}
           />
         </div>
-        <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 sm:items-end">
           <DateInput
             id="endAt"
             label="종료일"

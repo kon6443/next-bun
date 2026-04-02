@@ -106,7 +106,7 @@ export default function TeamsLanding() {
           <p className="mt-3 text-lg text-slate-400">
             칸반 보드, 실시간 협업, 팀원 초대까지. 무료로 시작하세요.
           </p>
-          <div className="mt-6 flex justify-center gap-3">
+          <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
             <LoginButton variant="primary">카카오로 시작하기</LoginButton>
             <Link
               href="/fishing"
