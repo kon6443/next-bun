@@ -146,7 +146,7 @@ export function TaskFilters({
             <select
               value={assigneeId ?? ''}
               onChange={e => onAssigneeChange(e.target.value === '' ? null : Number(e.target.value))}
-              className="flex-1 px-3 py-2.5 rounded-lg border border-white/10 bg-slate-900/50 text-xs text-slate-200 focus:outline-none"
+              className="flex-1 max-w-full box-border px-3 py-2.5 rounded-lg border border-white/10 bg-slate-900/50 text-xs text-slate-200 focus:outline-none"
             >
               <option value="">모든 담당자</option>
               {assignees.map(a => (

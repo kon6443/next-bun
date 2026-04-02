@@ -22,7 +22,7 @@ export function ViewHeader({ title, subtitle, count, actions }: ViewHeaderProps)
     <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
       <div>
         <p className="text-[0.7rem] uppercase tracking-[0.4em] text-slate-400">{title}</p>
-        <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+        <p className="mt-1 text-sm text-slate-400">{subtitle}</p>
       </div>
       <div className="flex items-center gap-3">
         {actions}

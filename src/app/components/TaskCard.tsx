@@ -154,7 +154,7 @@ export function TaskCard({ task, onStatusChange, teamId, isArchiveView, onRestor
                 }}
                 disabled={isUpdating}
                 title="활성으로 복원"
-                className="p-2 rounded-lg text-emerald-400 hover:bg-emerald-500/10 transition disabled:opacity-50"
+                className="p-2.5 rounded-lg text-emerald-400 hover:bg-emerald-500/10 transition disabled:opacity-50"
               >
                 <RestoreIcon className="w-4 h-4" />
               </button>
@@ -166,7 +166,7 @@ export function TaskCard({ task, onStatusChange, teamId, isArchiveView, onRestor
                 }}
                 disabled={isUpdating}
                 title="보관함으로 이동"
-                className="p-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-white/5 transition disabled:opacity-50"
+                className="p-2.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-white/5 transition disabled:opacity-50"
               >
                 <ArchiveIcon className="w-4 h-4" />
               </button>

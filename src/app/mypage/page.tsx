@@ -7,7 +7,7 @@ import { updateUserProfile } from "@/services/userService";
 import { startKakaoLogin } from "@/app/auth/shared";
 
 // 공통 스타일 상수
-const CARD_STYLES = "w-full max-w-[430px] bg-gradient-to-br from-slate-900/95 to-slate-900/75 border border-slate-400/25 rounded-[28px] p-6 sm:p-11 shadow-[0_35px_65px_rgba(2,6,23,0.75)] text-center";
+const CARD_STYLES = "w-full max-w-[430px] bg-slate-900/85 border border-slate-400/25 rounded-[28px] p-6 sm:p-11 shadow-[0_35px_65px_rgba(2,6,23,0.75)] text-center";
 const BASE_BUTTON_STYLES = "w-full rounded-full border-none py-4 px-5 text-base font-semibold cursor-pointer transition-all duration-150 hover:scale-[1.02] hover:brightness-110 flex items-center justify-center";
 
 export default function Mypage() {
@@ -88,7 +88,7 @@ export default function Mypage() {
           </div>
           
           {/* 환영 메시지 */}
-          <p className="uppercase tracking-[0.35em] text-[0.72rem] font-semibold text-slate-400 mb-2">
+          <p className="uppercase tracking-[0.35em] text-xs font-semibold text-slate-400 mb-2">
             환영합니다
           </p>
           
@@ -108,7 +108,7 @@ export default function Mypage() {
             </div>
           ) : (
             <div className="mb-3">
-              <h1 className="text-[2.15rem] font-bold text-slate-200">
+              <h1 className="text-3xl font-bold text-slate-200">
                 {displayName}
               </h1>
               <button
@@ -125,7 +125,7 @@ export default function Mypage() {
           
           {/* 에러 메시지 */}
           {error && (
-            <p className="text-sm text-red-400 mb-3">{error}</p>
+            <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-sm text-red-400 mb-3">{error}</div>
           )}
           
           {/* 사용자 번호 */}
@@ -177,12 +177,12 @@ export default function Mypage() {
     <div className="min-h-screen flex items-center justify-center p-4 sm:p-8 mypage-bg">
       <section className={CARD_STYLES}>
         {/* 안내 메시지 */}
-        <p className="uppercase tracking-[0.35em] text-[0.72rem] font-semibold text-slate-400 mb-2">
+        <p className="uppercase tracking-[0.35em] text-xs font-semibold text-slate-400 mb-2">
           회원 전용 공간
         </p>
         
         {/* 제목 */}
-        <h1 className="text-[2.15rem] font-bold text-slate-200 mb-3">
+        <h1 className="text-3xl font-bold text-slate-200 mb-3">
           로그인이 필요해요
         </h1>
         

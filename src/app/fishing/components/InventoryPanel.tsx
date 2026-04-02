@@ -38,7 +38,7 @@ export default function InventoryPanel({ inventory, isOpen, onClose }: Inventory
           </h2>
           <button
             onClick={onClose}
-            className="text-slate-500 hover:text-slate-300 text-lg"
+            className="flex items-center justify-center h-9 w-9 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-white/5 text-lg transition"
           >
             ✕
           </button>
@@ -47,9 +47,11 @@ export default function InventoryPanel({ inventory, isOpen, onClose }: Inventory
         {/* 물고기 목록 */}
         <div className="p-3 overflow-y-auto scrollbar-game" style={{ maxHeight: 'calc(60vh - 56px)' }}>
           {inventory.length === 0 ? (
-            <p className="text-center text-slate-600 py-8 text-sm">
-              아직 잡은 물고기가 없습니다
-            </p>
+            <div className="text-center py-8">
+              <p className="text-2xl mb-2">🎣</p>
+              <p className="text-sm text-slate-500">아직 잡은 물고기가 없습니다</p>
+              <p className="text-xs text-slate-600 mt-1">낚시 포인트 근처에서 캐스팅해보세요</p>
+            </div>
           ) : (
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
               {sorted.map((fish) => {

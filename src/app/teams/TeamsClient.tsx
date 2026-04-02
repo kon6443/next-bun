@@ -103,7 +103,7 @@ function TeamList({ teams }: { teams: TeamSummary[] }) {
         <Link
           key={team.teamId}
           href={`/teams/${team.teamId}`}
-          className="group flex flex-col rounded-2xl border border-white/10 bg-slate-950/40 p-4 shadow-[0_20px_40px_rgba(2,6,23,0.55)] transition hover:border-white/30"
+          className="group flex flex-col rounded-2xl border border-white/10 bg-slate-950/40 p-4 shadow-[0_20px_40px_rgba(2,6,23,0.55)] transition hover:border-white/30 hover:bg-slate-900/80"
         >
           <div className="flex items-center justify-between">
             <SectionLabel spacing="tight" color="subtle">

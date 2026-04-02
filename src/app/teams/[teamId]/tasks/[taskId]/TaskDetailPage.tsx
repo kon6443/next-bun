@@ -680,7 +680,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
                 ) : (
                   <div>
                     {/* 댓글 헤더: 닉네임 · 시간 (수정됨) + 아이콘 버튼 - 한 줄 */}
-                    <div className='flex items-center justify-between'>
+                    <div className='flex flex-wrap items-center justify-between gap-y-1'>
                       <div className='flex items-center gap-2'>
                         <span className='font-semibold text-sm text-white'>
                           {comment.userName || `사용자 ${comment.userId}`}
