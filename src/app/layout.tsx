@@ -40,6 +40,9 @@ export const metadata: Metadata = {
   manifest: '/manifest.webmanifest',
   verification: {
     google: 'aS0wYGCo4WvVRFt4PNL7sqOGZqUWYYJGFwRoKwxaNc0',
+    other: {
+      'naver-site-verification': ['cf623bdd01d1cc717e31e0de3392e2e2ac9f143b'],
+    },
   },
 };
 
