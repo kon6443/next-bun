@@ -42,6 +42,15 @@ function getDifficultyBar(difficulty: number): string {
   return '■'.repeat(filled) + '□'.repeat(5 - filled);
 }
 
+const breadcrumbJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: '낚시 게임', item: `${SITE_CONFIG.url}/fishing` },
+    { '@type': 'ListItem', position: 2, name: '도감' },
+  ],
+};
+
 export default function FishingGuidePage() {
   const fishByGrade = GRADE_ORDER.map((grade) => ({
     grade,
@@ -52,6 +61,10 @@ export default function FishingGuidePage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
       <div className="mx-auto max-w-2xl px-4 pb-24 pt-12">
         {/* 헤더 */}
         <header className="mb-8">
