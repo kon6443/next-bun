@@ -181,7 +181,7 @@ function TimeMeasurementContent() {
       {timeLeft && !isTimeToGoHome && (
         <section className={`${cardStyles.section} p-4 text-center`}>
           <p className="text-xs uppercase tracking-widest text-slate-400">남은 시간</p>
-          <p className="mt-2 text-4xl font-mono tracking-widest text-white">
+          <p className="mt-2 text-3xl sm:text-4xl font-mono tracking-wider sm:tracking-widest text-white">
             {formatTime(timeLeft.hours)}:{formatTime(timeLeft.minutes)}:
             {formatTime(timeLeft.seconds)}
           </p>

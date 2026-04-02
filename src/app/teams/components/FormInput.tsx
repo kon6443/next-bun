@@ -131,7 +131,7 @@ export function TimeInput({ label, id, value = "00:00", onChange, disabled }: Ti
           value={hour}
           onChange={(e) => handleChange(e.target.value, minute)}
           disabled={disabled}
-          className={`${selectStyles} w-14`}
+          className={`${selectStyles} w-14 sm:w-16`}
         >
           {HOURS.map((h) => (
             <option key={h} value={h}>{h}시</option>
@@ -142,7 +142,7 @@ export function TimeInput({ label, id, value = "00:00", onChange, disabled }: Ti
           value={minute}
           onChange={(e) => handleChange(hour, e.target.value)}
           disabled={disabled}
-          className={`${selectStyles} w-14`}
+          className={`${selectStyles} w-14 sm:w-16`}
         >
           {MINUTES.map((m) => (
             <option key={m} value={m}>{m}분</option>

@@ -103,16 +103,16 @@ export default async function FishDetailPage({ params }: PageProps) {
 
         {/* 헤더 */}
         <header className="mb-8">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             <div
-              className="flex h-16 w-16 items-center justify-center rounded-2xl text-3xl"
+              className="flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-2xl text-2xl sm:text-3xl"
               style={{ backgroundColor: fish.color + '33' }}
             >
               🐟
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-3xl font-bold">{fish.name}</h1>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl sm:text-3xl font-bold">{fish.name}</h1>
                 <span
                   className="rounded-full px-3 py-1 text-sm font-medium"
                   style={{
