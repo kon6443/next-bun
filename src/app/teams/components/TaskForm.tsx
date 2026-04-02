@@ -101,7 +101,7 @@ export function TaskForm({
         disabled={isSubmitting}
       />
 
-      <div className="grid gap-4 overflow-hidden">
+      <div className="grid gap-4">
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 sm:items-end">
           <DateInput
             id="startAt"
