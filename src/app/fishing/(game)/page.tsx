@@ -2,10 +2,10 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { RIVER_MAP } from './data/maps';
-import { RIVER_FISH } from './data/fish';
+import { RIVER_MAP } from '../data/maps';
+import { RIVER_FISH } from '../data/fish';
 
-const GameCanvas = dynamic(() => import('./components/GameCanvas'), {
+const GameCanvas = dynamic(() => import('../components/GameCanvas'), {
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center h-full bg-slate-900">
@@ -16,7 +16,7 @@ const GameCanvas = dynamic(() => import('./components/GameCanvas'), {
 
 export default function FishingPage() {
   return (
-    <div className="fixed inset-0 w-screen h-screen overflow-hidden bg-slate-900">
+    <div className="w-full h-full bg-slate-900">
       {/* 뒤로가기 버튼 */}
       <div className="absolute top-3 left-3 z-40">
         <Link
