@@ -105,7 +105,7 @@ function InviteCreateForm({
         <select
           value={expiresInDays}
           onChange={e => setExpiresInDays(Number(e.target.value))}
-          className="w-full rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2 text-xs text-slate-200 focus:border-white/20 focus:outline-none"
+          className="w-full max-w-full box-border appearance-none rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2 text-xs text-slate-200 focus:border-white/20 focus:outline-none"
         >
           {Array.from({ length: 3 }, (_, i) => i + 1).map(days => (
             <option key={days} value={days}>
@@ -123,7 +123,7 @@ function InviteCreateForm({
           value={usageMaxCnt}
           onChange={e => setUsageMaxCnt(e.target.value === '' ? '' : Number(e.target.value))}
           min={1}
-          className="w-full rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2 text-xs text-slate-200 focus:border-white/20 focus:outline-none"
+          className="w-full max-w-full box-border appearance-none rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2 text-xs text-slate-200 focus:border-white/20 focus:outline-none"
           placeholder="최대 사용 횟수"
         />
         <p className="mt-1 text-xs text-slate-500">최대 사용 횟수를 지정하지 않으면 기본값이 적용됩니다.</p>

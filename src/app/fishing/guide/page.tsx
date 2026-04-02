@@ -59,7 +59,7 @@ export default function FishingGuidePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
-      <div className="mx-auto max-w-2xl px-4 pb-24 pt-12">
+      <div className="mx-auto max-w-2xl px-4 pb-16 sm:pb-24 pt-12">
         {/* 헤더 */}
         <header className="mb-8">
           <nav className="mb-4 text-sm text-slate-400">
@@ -69,7 +69,7 @@ export default function FishingGuidePage() {
             <span className="mx-2">/</span>
             <span className="text-slate-200">도감</span>
           </nav>
-          <h1 className="text-3xl font-bold">낚시 도감</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold">낚시 도감</h1>
           <p className="mt-2 text-slate-400">
             총 {RIVER_FISH.length}종의 민물고기를 만나보세요.
             등급이 높을수록 출현 확률이 낮고, 챌린지 난이도가 올라갑니다.
@@ -78,7 +78,7 @@ export default function FishingGuidePage() {
 
         {/* 등급별 섹션 */}
         {fishByGrade.map(({ grade, fish }) => (
-          <section key={grade} className="mb-10">
+          <section key={grade} className="mb-12">
             <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold">
               <span
                 className="inline-block h-3 w-3 rounded-full"
@@ -122,15 +122,15 @@ export default function FishingGuidePage() {
 
                     <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-slate-400">
                       <div>
-                        <span className="block text-slate-500">크기</span>
+                        <span className="block text-slate-400">크기</span>
                         {f.minSize}~{f.maxSize}cm
                       </div>
                       <div>
-                        <span className="block text-slate-500">출현율</span>
+                        <span className="block text-slate-400">출현율</span>
                         {catchPercent}%
                       </div>
                       <div>
-                        <span className="block text-slate-500">난이도</span>
+                        <span className="block text-slate-400">난이도</span>
                         <span className="font-mono text-[10px]">{getDifficultyBar(f.difficulty)}</span>
                         {' '}{getDifficultyLabel(f.difficulty)}
                       </div>
