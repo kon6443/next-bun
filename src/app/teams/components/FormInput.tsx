@@ -75,7 +75,7 @@ type DateInputProps = {
 export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
   ({ label, id, ...props }, ref) => {
     return (
-      <div className="min-w-0">
+      <div className="min-w-0 w-full overflow-hidden">
         <label htmlFor={id} className={labelStyles}>
           {label}
         </label>
@@ -83,7 +83,7 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
           ref={ref}
           id={id}
           type="date"
-          className={`${baseInputStyles} w-full px-4 py-3`}
+          className={`${baseInputStyles} w-full max-w-full box-border appearance-none px-4 py-3`}
           {...props}
         />
       </div>
