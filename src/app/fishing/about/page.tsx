@@ -82,7 +82,7 @@ export default function FishingAboutPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
 
-      <div className="mx-auto max-w-2xl px-4 pb-24 pt-12">
+      <div className="mx-auto max-w-2xl px-4 pb-16 sm:pb-24 pt-12">
         {/* 브레드크럼 */}
         <nav className="mb-6 text-sm text-slate-400">
           <Link href="/fishing" className="hover:text-sky-400 transition-colors">낚시 게임</Link>
@@ -92,7 +92,7 @@ export default function FishingAboutPage() {
 
         {/* 히어로 */}
         <header className="mb-12 text-center">
-          <h1 className="text-4xl font-bold">낚시 게임</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold">낚시 게임</h1>
           <p className="mt-3 text-lg text-slate-400">
             브라우저에서 바로 즐기는 방치형 멀티플레이어 낚시
           </p>

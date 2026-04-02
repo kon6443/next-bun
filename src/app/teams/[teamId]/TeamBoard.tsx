@@ -12,6 +12,7 @@ import { TaskFilters } from '../../components/TaskFilters';
 import { Kanban } from '../../components/Kanban';
 import { SectionLabel, ErrorAlert, TeamBoardSkeleton, ListViewSkeleton, Skeleton, FAB, IconButton } from '../components';
 import { EditIcon, UserGroupIcon, PlusIcon, QuestionMarkIcon } from '../../components/Icons';
+import { DropdownMenu } from './components/DropdownMenu';
 import type { Task } from '../../types/task';
 import { useTaskFilter, useTelegramLink, useDiscordLink, useTeamInvite, useTeamSocketEvents, useSafeNavigation } from '../../hooks';
 import { useTeamSocketContext } from './contexts';
@@ -812,26 +813,11 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                   variant="outlined"
                   href={`/teams/${teamId}/tasks/new`}
                 />
-                {canManageInvites && (
-                  <IconButton
-                    icon={UserGroupIcon}
-                    label="팀 초대"
-                    variant="outlined"
-                    onClick={() => setShowInviteModal(true)}
-                  />
-                )}
-                <IconButton
-                  icon={EditIcon}
-                  label="팀 수정"
-                  variant="outlined"
-                  href={`/teams/${teamId}/edit`}
-                />
-                <IconButton
-                  icon={QuestionMarkIcon}
-                  label="사용 가이드"
-                  variant="ghost"
-                  onClick={() => setShowTutorial(true)}
-                />
+                <DropdownMenu items={[
+                  { label: '팀 초대', icon: UserGroupIcon, onClick: () => setShowInviteModal(true), show: canManageInvites },
+                  { label: '팀 수정', icon: EditIcon, href: `/teams/${teamId}/edit` },
+                  { label: '사용 가이드', icon: QuestionMarkIcon, onClick: () => setShowTutorial(true) },
+                ]} />
               </div>
             </div>
           </div>

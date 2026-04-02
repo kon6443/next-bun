@@ -91,7 +91,7 @@ export default async function FishDetailPage({ params }: PageProps) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
 
-      <div className="mx-auto max-w-2xl px-4 pb-24 pt-12">
+      <div className="mx-auto max-w-2xl px-4 pb-16 sm:pb-24 pt-12">
         {/* 브레드크럼 */}
         <nav className="mb-6 text-sm text-slate-400">
           <Link href="/fishing" className="hover:text-sky-400 transition-colors">낚시 게임</Link>
@@ -102,7 +102,7 @@ export default async function FishDetailPage({ params }: PageProps) {
         </nav>
 
         {/* 헤더 */}
-        <header className="mb-8">
+        <header className="mb-10">
           <div className="flex items-center gap-3 sm:gap-4">
             <div
               className="flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-2xl text-2xl sm:text-3xl"
@@ -129,23 +129,23 @@ export default async function FishDetailPage({ params }: PageProps) {
         </header>
 
         {/* 기본 정보 */}
-        <section className="mb-8 rounded-2xl border border-slate-700/50 bg-slate-900/60 p-6">
+        <section className="mb-10 rounded-2xl border border-slate-700/50 bg-slate-900/60 p-6">
           <h2 className="mb-4 text-lg font-semibold">기본 정보</h2>
           <dl className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <dt className="text-slate-500">크기 범위</dt>
+              <dt className="text-slate-400">크기 범위</dt>
               <dd className="mt-0.5 font-medium">{fish.minSize}~{fish.maxSize}cm</dd>
             </div>
             <div>
-              <dt className="text-slate-500">무게 범위</dt>
+              <dt className="text-slate-400">무게 범위</dt>
               <dd className="mt-0.5 font-medium">{getWeightRange(fish)}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">출현 확률</dt>
+              <dt className="text-slate-400">출현 확률</dt>
               <dd className="mt-0.5 font-medium">{catchPercent}%</dd>
             </div>
             <div>
-              <dt className="text-slate-500">등급</dt>
+              <dt className="text-slate-400">등급</dt>
               <dd className="mt-0.5 font-medium" style={{ color: GRADE_COLORS[fish.grade] }}>
                 {GRADE_NAMES[fish.grade]}
               </dd>
@@ -154,7 +154,7 @@ export default async function FishDetailPage({ params }: PageProps) {
         </section>
 
         {/* 챌린지 난이도 */}
-        <section className="mb-8 rounded-2xl border border-slate-700/50 bg-slate-900/60 p-6">
+        <section className="mb-10 rounded-2xl border border-slate-700/50 bg-slate-900/60 p-6">
           <h2 className="mb-4 text-lg font-semibold">챌린지 난이도</h2>
           <div className="mb-3">
             <div className="flex justify-between text-sm">
@@ -180,7 +180,7 @@ export default async function FishDetailPage({ params }: PageProps) {
         </section>
 
         {/* 낚시 팁 */}
-        <section className="mb-8 rounded-2xl border border-slate-700/50 bg-slate-900/60 p-6">
+        <section className="mb-10 rounded-2xl border border-slate-700/50 bg-slate-900/60 p-6">
           <h2 className="mb-4 text-lg font-semibold">낚시 팁</h2>
           <ul className="space-y-2 text-sm text-slate-300">
             {fish.difficulty >= 0.7 && (

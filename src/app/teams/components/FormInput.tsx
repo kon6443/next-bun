@@ -1,7 +1,7 @@
 import { forwardRef } from "react";
 
 const baseInputStyles =
-  "w-full rounded-xl border border-white/10 bg-slate-900/60 text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20";
+  "w-full rounded-xl border border-white/10 bg-slate-900/60 text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20 disabled:cursor-not-allowed";
 
 const labelStyles = "mb-2 block text-sm font-semibold text-slate-300";
 

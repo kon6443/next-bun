@@ -97,7 +97,7 @@ const descriptionStyle: CSSProperties = {
 };
 
 const errorBoxStyle: CSSProperties = {
-  background: "rgba(239,68,68,0.1)",
+  background: "rgba(239,68,68,0.2)",
   border: "1px solid rgba(239,68,68,0.3)",
   borderRadius: "12px",
   padding: "1rem",

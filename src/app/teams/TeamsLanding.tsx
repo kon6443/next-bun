@@ -97,10 +97,10 @@ export default function TeamsLanding() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
 
-      <div className="mx-auto max-w-2xl px-4 pb-24 pt-12">
+      <div className="mx-auto max-w-2xl px-4 pb-16 sm:pb-24 pt-12">
         {/* 히어로 */}
         <header className="mb-12 text-center">
-          <h1 className="text-4xl font-bold">
+          <h1 className="text-3xl sm:text-4xl font-bold">
             팀 프로젝트, 한곳에서 관리하세요
           </h1>
           <p className="mt-3 text-lg text-slate-400">
@@ -124,7 +124,7 @@ export default function TeamsLanding() {
             {features.map((feature) => (
               <div
                 key={feature.title}
-                className="rounded-2xl border border-slate-700/50 bg-slate-900/60 p-5"
+                className="rounded-2xl border border-slate-700/50 bg-slate-900/60 p-5 transition-colors hover:border-sky-500/30"
               >
                 <h3 className="font-semibold">{feature.title}</h3>
                 <p className="mt-1 text-sm text-slate-400">{feature.desc}</p>

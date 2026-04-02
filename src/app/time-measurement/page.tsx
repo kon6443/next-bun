@@ -23,11 +23,11 @@ type AnimationType = "battery" | "orbit" | "wave" | "ring";
 
 /** 공통 입력 스타일 */
 const inputStyles =
-  "w-full rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3 text-base font-mono text-white focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20";
+  "w-full max-w-full box-border appearance-none rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3 text-base font-mono text-white focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20";
 
 /** 애니메이션 버튼 스타일 */
 const baseButtonStyle =
-  "flex-1 rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-center transition-all duration-200";
+  "flex-1 rounded-full border border-white/10 px-4 py-2.5 text-sm font-semibold text-center transition-all duration-200 focus-visible:ring-2 focus-visible:ring-sky-500/50 focus-visible:outline-none";
 const activeButtonStyle =
   "bg-gradient-to-r from-indigo-500 to-sky-500 text-white shadow-lg shadow-sky-500/30 border-transparent";
 const inactiveButtonStyle =

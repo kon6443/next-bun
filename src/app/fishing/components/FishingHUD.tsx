@@ -161,9 +161,9 @@ function StartFishingButton({ onStart }: { onStart: () => void }) {
     <div className="absolute bottom-28 left-1/2 -translate-x-1/2 pointer-events-auto">
       <button
         onClick={onStart}
-        className="bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold
-                   px-6 py-3 rounded-2xl shadow-lg shadow-blue-900/50
-                   border border-blue-400/30 transition-all text-sm"
+        className="bg-sky-600 hover:bg-sky-500 active:scale-95 text-white font-bold
+                   px-6 py-3 rounded-2xl shadow-lg shadow-sky-900/50
+                   border border-sky-400/30 transition-all text-sm"
       >
         🎣 낚시 시작
       </button>
