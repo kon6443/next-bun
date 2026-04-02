@@ -40,6 +40,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     ...fishPages,
     {
+      url: `${SITE_CONFIG.url}/teams`,
+      lastModified: LAST_UPDATED,
+      changeFrequency: 'monthly',
+      priority: 0.9,
+    },
+    {
       url: `${SITE_CONFIG.url}/time-measurement`,
       lastModified: LAST_UPDATED,
       changeFrequency: 'monthly',

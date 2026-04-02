@@ -5,3 +5,12 @@ export function formatWeight(weightInGrams: number): string {
   }
   return `${weightInGrams}g`;
 }
+
+/** 난이도 수치(0~1)를 한국어 레이블로 변환 */
+export function getDifficultyLabel(difficulty: number): string {
+  if (difficulty <= 0.15) return '매우 쉬움';
+  if (difficulty <= 0.3) return '쉬움';
+  if (difficulty <= 0.5) return '보통';
+  if (difficulty <= 0.7) return '어려움';
+  return '매우 어려움';
+}

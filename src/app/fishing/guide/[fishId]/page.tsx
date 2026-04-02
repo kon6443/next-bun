@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { RIVER_FISH } from '../../data/fish';
 import { GRADE_COLORS, GRADE_NAMES } from '../../config/constants';
 import { SITE_CONFIG } from '../../../config/siteConfig';
+import { getDifficultyLabel } from '../../utils/format';
 import PublicFooter from '../../../components/PublicFooter';
 
 interface PageProps {
@@ -37,15 +38,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       locale: SITE_CONFIG.locale,
     },
     keywords: [fish.name, '낚시', '민물고기', GRADE_NAMES[fish.grade], '낚시 도감'],
+    alternates: { canonical: `/fishing/guide/${fish.id}` },
   };
-}
-
-function getDifficultyLabel(difficulty: number): string {
-  if (difficulty <= 0.15) return '매우 쉬움';
-  if (difficulty <= 0.3) return '쉬움';
-  if (difficulty <= 0.5) return '보통';
-  if (difficulty <= 0.7) return '어려움';
-  return '매우 어려움';
 }
 
 function getWeightRange(fish: { minSize: number; maxSize: number; baseWeight: number }) {

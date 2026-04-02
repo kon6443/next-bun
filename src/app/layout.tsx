@@ -24,6 +24,9 @@ export const metadata: Metadata = {
   },
   description: `${SITE_CONFIG.description} ${SITE_CONFIG.name}에서 시작하세요.`,
   metadataBase: new URL(SITE_CONFIG.url),
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
     type: 'website',
     locale: SITE_CONFIG.locale,
