@@ -76,11 +76,25 @@ export default async function FishDetailPage({ params }: PageProps) {
     publisher: { '@type': 'Organization', name: SITE_CONFIG.name },
   };
 
+  const breadcrumbJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: '낚시 게임', item: `${SITE_CONFIG.url}/fishing` },
+      { '@type': 'ListItem', position: 2, name: '도감', item: `${SITE_CONFIG.url}/fishing/guide` },
+      { '@type': 'ListItem', position: 3, name: fish.name },
+    ],
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
 
       <div className="mx-auto max-w-2xl px-4 pb-24 pt-12">

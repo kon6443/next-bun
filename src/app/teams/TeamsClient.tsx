@@ -142,17 +142,39 @@ function EmptyTeamList() {
   );
 }
 
-/** 로그인 유도 컴포넌트 */
+/** 로그인 유도 + 서비스 소개 컴포넌트 */
 function LoginPrompt() {
   return (
-    <div className={`${cardStyles.dashedContainer} px-6 py-14 text-center`}>
-      <p className="text-base font-semibold text-white">
-        팀 목록을 보려면 로그인해 주세요.
-      </p>
-      <p className="mt-2 text-sm text-slate-400">
-        로그인하지 않은 상태에서는 팀 목록이 비어 있습니다.
-      </p>
-      <LoginButton variant="primary" size="sm" className="mt-6" />
+    <div className="space-y-6">
+      {/* 로그인 CTA */}
+      <div className={`${cardStyles.dashedContainer} px-6 py-10 text-center`}>
+        <p className="text-base font-semibold text-white">
+          팀 목록을 보려면 로그인해 주세요.
+        </p>
+        <p className="mt-2 text-sm text-slate-400">
+          카카오 로그인으로 간편하게 시작하세요.
+        </p>
+        <LoginButton variant="primary" size="sm" className="mt-6" />
+      </div>
+
+      {/* 서비스 소개 */}
+      <div className="space-y-3">
+        <p className="text-xs uppercase tracking-widest text-slate-500">주요 기능</p>
+        {[
+          { title: '칸반 보드', desc: '태스크를 드래그 앤 드롭으로 관리하세요.' },
+          { title: '실시간 협업', desc: '팀원의 변경사항이 즉시 반영됩니다.' },
+          { title: '캘린더 뷰', desc: '일정 기반으로 태스크를 한눈에 파악하세요.' },
+          { title: '팀원 초대', desc: '링크 하나로 팀원을 초대할 수 있습니다.' },
+        ].map((feature) => (
+          <div
+            key={feature.title}
+            className="rounded-xl border border-white/5 bg-slate-950/40 px-4 py-3"
+          >
+            <p className="text-sm font-medium text-white">{feature.title}</p>
+            <p className="mt-0.5 text-xs text-slate-500">{feature.desc}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
