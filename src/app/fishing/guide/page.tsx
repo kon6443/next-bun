@@ -4,6 +4,7 @@ import { RIVER_FISH } from '../data/fish';
 import { GRADE_COLORS, GRADE_NAMES } from '../config/constants';
 import { SITE_CONFIG } from '../../config/siteConfig';
 import type { FishGrade } from '../types/fish';
+import { getDifficultyLabel } from '../utils/format';
 import TeamsPromoBanner from './TeamsPromoBanner';
 import PublicFooter from '../../components/PublicFooter';
 
@@ -17,6 +18,7 @@ export const metadata: Metadata = {
     locale: SITE_CONFIG.locale,
   },
   keywords: ['낚시 도감', '민물고기 도감', '낚시 게임 공략', '물고기 종류', '방치형 낚시'],
+  alternates: { canonical: '/fishing/guide' },
 };
 
 const GRADE_ORDER: FishGrade[] = ['legendary', 'epic', 'rare', 'uncommon', 'common'];
@@ -28,14 +30,6 @@ const GRADE_BG: Record<FishGrade, string> = {
   epic: 'bg-purple-900/30 border-purple-700/30',
   legendary: 'bg-amber-900/30 border-amber-700/30',
 };
-
-function getDifficultyLabel(difficulty: number): string {
-  if (difficulty <= 0.15) return '매우 쉬움';
-  if (difficulty <= 0.3) return '쉬움';
-  if (difficulty <= 0.5) return '보통';
-  if (difficulty <= 0.7) return '어려움';
-  return '매우 어려움';
-}
 
 function getDifficultyBar(difficulty: number): string {
   const filled = Math.round(difficulty * 5);

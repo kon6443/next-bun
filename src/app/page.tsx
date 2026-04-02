@@ -1,7 +1,16 @@
 import { TeamsPageLayout, SectionLabel, ButtonLink } from "./teams/components";
 import { cardStyles } from "@/styles/teams";
+import { SITE_CONFIG } from "./config/siteConfig";
 
 const baseDomain = process.env.NEXT_PUBLIC_DOMAIN?.replace(/\/$/, "") ?? "";
+
+const siteJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: SITE_CONFIG.name,
+  url: SITE_CONFIG.url,
+  description: SITE_CONFIG.description,
+};
 
 const timeMeasurementPath = "/time-measurement";
 const timeMeasurementHref = baseDomain
@@ -17,6 +26,10 @@ const fishingHref = baseDomain ? `${baseDomain}${fishingPath}` : fishingPath;
 export default function Home() {
   return (
     <TeamsPageLayout>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }}
+      />
       <div className="flex flex-col gap-6">
         {/* Time Tracker 섹션 */}
         <section className={`${cardStyles.section} p-4 text-center`}>
