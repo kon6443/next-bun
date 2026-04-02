@@ -55,6 +55,15 @@ const faqJsonLd = {
   })),
 };
 
+const breadcrumbJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: '낚시 게임', item: `${SITE_CONFIG.url}/fishing` },
+    { '@type': 'ListItem', position: 2, name: '소개' },
+  ],
+};
+
 const gradeStats = (['common', 'uncommon', 'rare', 'epic', 'legendary'] as const).map((grade) => ({
   grade,
   count: RIVER_FISH.filter((f) => f.grade === grade).length,
@@ -66,6 +75,10 @@ export default function FishingAboutPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
 
       <div className="mx-auto max-w-2xl px-4 pb-24 pt-12">
