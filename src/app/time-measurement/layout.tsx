@@ -10,7 +10,8 @@ export const metadata: Metadata = {
     type: 'website',
     locale: SITE_CONFIG.locale,
   },
-  keywords: ['타이머', '시간 측정', '온라인 타이머', '카운트다운', '시각 타이머'],
+  keywords: ['타이머', '시간 측정', '온라인 타이머', '카운트다운', '시각 타이머', '뽀모도로', '집중 타이머', '스톱워치'],
+  alternates: { canonical: '/time-measurement' },
 };
 
 export default function TimeMeasurementLayout({ children }: { children: React.ReactNode }) {

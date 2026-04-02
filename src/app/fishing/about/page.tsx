@@ -16,6 +16,7 @@ export const metadata: Metadata = {
     locale: SITE_CONFIG.locale,
   },
   keywords: ['웹 낚시 게임', '브라우저 게임', '방치형 게임', '멀티플레이어', '무료 낚시 게임'],
+  alternates: { canonical: '/fishing/about' },
 };
 
 // Schema.org FAQPage 구조화 데이터

@@ -20,7 +20,8 @@ export const metadata: Metadata = {
     title: `낚시 게임 | ${SITE_CONFIG.name}`,
     description: FISHING_DESC,
   },
-  keywords: ['낚시 게임', '웹 낚시', '온라인 낚시', '방치형 게임', '미니게임', '멀티플레이어 낚시'],
+  keywords: ['낚시 게임', '웹 낚시', '온라인 낚시', '방치형 게임', '미니게임', '멀티플레이어 낚시', '브라우저 게임', '무료 낚시', '웹 게임'],
+  alternates: { canonical: '/fishing' },
 };
 
 export default function FishingLayout({
