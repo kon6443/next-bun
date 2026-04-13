@@ -104,7 +104,7 @@ export default function Mypage() {
                 placeholder="닉네임 입력"
                 autoFocus
               />
-              <p className="text-xs text-slate-500 mt-1">{newUserName.length}/20</p>
+              <p className="text-xs text-slate-400 mt-1">{newUserName.length}/20</p>
             </div>
           ) : (
             <div className="mb-3">

@@ -178,7 +178,7 @@ export function ListView({ tasks, teamId, isArchiveView, onRestore }: ListViewPr
                       <div className="max-w-[200px]">
                         <p className="truncate text-sm font-medium text-slate-200">{task.taskName}</p>
                         {task.taskDescription && (
-                          <p className="mt-0.5 truncate text-xs text-slate-500">{task.taskDescription}</p>
+                          <p className="mt-0.5 truncate text-xs text-slate-400">{task.taskDescription}</p>
                         )}
                       </div>
                     </td>
@@ -230,7 +230,7 @@ export function ListView({ tasks, teamId, isArchiveView, onRestore }: ListViewPr
       </div>
 
       {/* 결과 카운트 */}
-      <div className="mt-4 text-right text-xs text-slate-500">
+      <div className="mt-4 text-right text-xs text-slate-400">
         {sortedTasks.length}개 태스크
       </div>
     </div>

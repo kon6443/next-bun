@@ -162,7 +162,7 @@ export default function FishResultModal({ type, fish, onDismiss }: FishResultMod
         <div className="relative bg-slate-900/95 border border-slate-700/50 rounded-2xl p-6 mx-6 max-w-xs w-full text-center animate-fadeIn">
           <p className="text-4xl mb-3">💨</p>
           <p className="text-slate-300 text-lg font-bold mb-1">물고기가 도망갔습니다!</p>
-          <p className="text-slate-500 text-sm mb-4">다음엔 꼭 잡아봅시다...</p>
+          <p className="text-slate-400 text-sm mb-4">다음엔 꼭 잡아봅시다...</p>
           <button
             onClick={onDismiss}
             className="bg-slate-700 hover:bg-slate-600 text-slate-200 px-6 py-2.5 rounded-xl text-sm font-medium transition-colors"
@@ -259,11 +259,11 @@ export default function FishResultModal({ type, fish, onDismiss }: FishResultMod
           {/* 스탯 */}
           <div className="flex justify-center gap-6 mb-4">
             <div>
-              <p className="text-xs text-slate-500">크기</p>
+              <p className="text-xs text-slate-400">크기</p>
               <p className="text-lg font-bold text-slate-200">{fish.size}cm</p>
             </div>
             <div>
-              <p className="text-xs text-slate-500">무게</p>
+              <p className="text-xs text-slate-400">무게</p>
               <p className="text-lg font-bold text-slate-200">{formatWeight(fish.weight)}</p>
             </div>
           </div>

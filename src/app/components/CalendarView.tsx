@@ -261,7 +261,7 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
       <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <p className="text-[0.7rem] uppercase tracking-[0.4em] text-slate-400">Calendar</p>
-          <p className="mt-1 text-sm text-slate-500">마감일 기준 표시</p>
+          <p className="mt-1 text-sm text-slate-400">마감일 기준 표시</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -452,7 +452,7 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
       {/* 날짜 미지정 태스크 */}
       {tasksWithoutDate.length > 0 && (
         <div className="mt-6">
-          <p className="mb-3 text-xs font-semibold text-slate-500">날짜 미지정 ({tasksWithoutDate.length})</p>
+          <p className="mb-3 text-xs font-semibold text-slate-400">날짜 미지정 ({tasksWithoutDate.length})</p>
           <div className="flex flex-wrap gap-2">
             {tasksWithoutDate.map(task => (
               <div
@@ -497,7 +497,7 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
           {/* 태스크 목록 */}
           <div className="p-2 space-y-1.5">
             {popover.tasks.length === 0 ? (
-              <p className="text-center text-xs text-slate-500 py-4">태스크가 없습니다</p>
+              <p className="text-center text-xs text-slate-400 py-4">태스크가 없습니다</p>
             ) : (
               popover.tasks.map(task => {
                 const { status: deadlineStatus } = getTaskDeadlineInfo(task);
