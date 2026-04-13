@@ -122,7 +122,7 @@ export function TaskCard({ task, onStatusChange, teamId, isArchiveView, onRestor
 
         {/* 담당자 */}
         <div className="mt-3 flex items-center justify-between">
-          <span className="text-xs text-slate-500 truncate max-w-[60%]">
+          <span className="text-xs text-slate-400 truncate max-w-[60%]">
             {userName || `사용자 ${crtdBy}`}
           </span>
         </div>

@@ -116,7 +116,7 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
                     }`}
                     style={{ width: cellWidth }}
                   >
-                    <span className={`text-[10px] ${isTodayDate ? 'font-bold text-sky-400' : 'text-slate-500'}`}>
+                    <span className={`text-[10px] ${isTodayDate ? 'font-bold text-sky-400' : 'text-slate-400'}`}>
                       {formatDateDisplay(date)}
                     </span>
                   </div>
@@ -201,7 +201,7 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
           {sortedTasks.withoutStartDate.length > 0 && (
             <div className="mt-4">
               <div className="mb-2 px-3">
-                <span className="text-xs font-semibold text-slate-500">날짜 미지정</span>
+                <span className="text-xs font-semibold text-slate-400">날짜 미지정</span>
               </div>
               {sortedTasks.withoutStartDate.map(task => {
                 const colors = getStatusColors(task.taskStatus);

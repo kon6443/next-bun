@@ -9,7 +9,7 @@ const GameCanvas = dynamic(() => import('../components/GameCanvas'), {
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center h-full bg-slate-900">
-      <p className="text-slate-500 text-sm">게임 로딩 중...</p>
+      <p className="text-slate-400 text-sm">게임 로딩 중...</p>
     </div>
   ),
 });

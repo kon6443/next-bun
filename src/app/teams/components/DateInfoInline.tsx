@@ -14,7 +14,7 @@ type DateInfoInlineProps = {
 
 const sizeStyles = {
   sm: {
-    container: "text-[0.65rem] text-slate-500",
+    container: "text-[0.65rem] text-slate-400",
     icon: "w-3 h-3",
     iconGap: "gap-1",
     divider: "text-slate-600",

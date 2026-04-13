@@ -71,7 +71,7 @@ export function DiscordSection({
             </div>
           </div>
           <div className="mb-4 rounded-lg border border-white/5 bg-slate-900/50 p-3">
-            <p className="text-xs text-slate-500 mb-1">Webhook URL</p>
+            <p className="text-xs text-slate-400 mb-1">Webhook URL</p>
             <p className="text-xs font-mono text-slate-300 break-all">
               {discordStatus.webhookUrl.length > 60
                 ? `${discordStatus.webhookUrl.slice(0, 60)}...`
@@ -138,7 +138,7 @@ export function DiscordSection({
           value={webhookUrl}
           onChange={(e) => setWebhookUrl(e.target.value)}
           placeholder="https://discord.com/api/webhooks/..."
-          className="w-full rounded-lg border border-white/20 bg-slate-900/50 px-4 py-2.5 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-indigo-500/50 transition"
+          className="w-full rounded-lg border border-white/20 bg-slate-900/50 px-4 py-2.5 text-base text-slate-200 placeholder-slate-500 outline-none focus:border-indigo-500/50 transition"
         />
       </div>
       <button

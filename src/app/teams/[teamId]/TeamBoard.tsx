@@ -883,7 +883,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
         {/* 필터 결과 표시 */}
         {hasActiveFilters && (
-          <div className="text-xs text-slate-500 mt-2">
+          <div className="text-xs text-slate-400 mt-2">
             {filteredTasks.length}개 태스크 표시 중 (전체 {allTasks.length}개)
           </div>
         )}

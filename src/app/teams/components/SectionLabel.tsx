@@ -2,7 +2,7 @@ type SectionLabelProps = {
   children: React.ReactNode;
   /** 자간 간격: tight(0.4em), normal(0.6em), wide(0.7em) */
   spacing?: "tight" | "normal" | "wide";
-  /** 텍스트 색상: muted(slate-400), subtle(slate-500) */
+  /** 텍스트 색상: muted(slate-400), subtle(slate-400) */
   color?: "muted" | "subtle";
 };
 
@@ -14,7 +14,7 @@ const spacingStyles = {
 
 const colorStyles = {
   muted: "text-slate-400",
-  subtle: "text-slate-500",
+  subtle: "text-slate-400",
 } as const;
 
 /**

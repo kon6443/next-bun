@@ -51,7 +51,7 @@ export function InviteModal({
           <div>
             <p className="mb-4 text-sm text-slate-400">초대 링크가 생성되었습니다!</p>
             <div className="mb-4 rounded-lg bg-slate-950/50 border border-white/5 p-3">
-              <p className="mb-2 text-xs text-slate-500">초대 링크:</p>
+              <p className="mb-2 text-xs text-slate-400">초대 링크:</p>
               <p className="break-all text-xs text-slate-300 font-mono">{createdInviteLink}</p>
             </div>
             <button
@@ -105,7 +105,7 @@ function InviteCreateForm({
         <select
           value={expiresInDays}
           onChange={e => setExpiresInDays(Number(e.target.value))}
-          className="w-full max-w-full box-border appearance-none rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2 text-xs text-slate-200 focus:border-white/20 focus:outline-none"
+          className="w-full max-w-full box-border appearance-none rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2 text-base text-slate-200 focus:border-white/20 focus:outline-none"
         >
           {Array.from({ length: 3 }, (_, i) => i + 1).map(days => (
             <option key={days} value={days}>
@@ -113,7 +113,7 @@ function InviteCreateForm({
             </option>
           ))}
         </select>
-        <p className="mt-1 text-xs text-slate-500">일 단위로만 선택할 수 있어요. (1~3일)</p>
+        <p className="mt-1 text-xs text-slate-400">일 단위로만 선택할 수 있어요. (1~3일)</p>
       </div>
 
       <div>
@@ -123,10 +123,10 @@ function InviteCreateForm({
           value={usageMaxCnt}
           onChange={e => setUsageMaxCnt(e.target.value === '' ? '' : Number(e.target.value))}
           min={1}
-          className="w-full max-w-full box-border appearance-none rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2 text-xs text-slate-200 focus:border-white/20 focus:outline-none"
+          className="w-full max-w-full box-border appearance-none rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2 text-base text-slate-200 focus:border-white/20 focus:outline-none"
           placeholder="최대 사용 횟수"
         />
-        <p className="mt-1 text-xs text-slate-500">최대 사용 횟수를 지정하지 않으면 기본값이 적용됩니다.</p>
+        <p className="mt-1 text-xs text-slate-400">최대 사용 횟수를 지정하지 않으면 기본값이 적용됩니다.</p>
       </div>
 
       <div className="flex gap-2 pt-3">
