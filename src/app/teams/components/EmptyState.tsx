@@ -46,7 +46,7 @@ export function EmptyState({
       )}
       <p className="text-sm font-medium text-slate-400">{message}</p>
       {description && (
-        <p className="mt-1 text-xs text-slate-500">{description}</p>
+        <p className="mt-1 text-xs text-slate-400">{description}</p>
       )}
       {action && <div className="mt-4">{action}</div>}
     </div>

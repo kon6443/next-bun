@@ -113,7 +113,7 @@ export function TutorialGuide({ isOpen, onClose }: TutorialGuideProps) {
           </div>
 
           {/* 스텝 카운터 */}
-          <span className="text-xs text-slate-500 mb-2">
+          <span className="text-xs text-slate-400 mb-2">
             {currentStep + 1} / {STEPS.length}
           </span>
 

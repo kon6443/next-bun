@@ -132,7 +132,7 @@ export function Kanban({ tasksByColumn, onStatusChange, teamId, isArchiveView, o
                     />
                     <div>
                       <p className="text-sm font-semibold text-white">{status.label}</p>
-                      <p className="text-xs text-slate-500">{status.description}</p>
+                      <p className="text-xs text-slate-400">{status.description}</p>
                     </div>
                   </div>
                   <span className="text-xs font-semibold text-slate-400">

@@ -148,7 +148,7 @@ function KeyboardHint({ fishingState, hasNearbyPoint }: { fishingState: FishingS
       style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}
     >
       <div className="bg-slate-900/60 rounded-lg px-3 py-1 border border-slate-700/30">
-        <span className="text-[10px] text-slate-500">{hint}</span>
+        <span className="text-[10px] text-slate-400">{hint}</span>
       </div>
     </div>
   );

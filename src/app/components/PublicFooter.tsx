@@ -3,7 +3,7 @@ import { SITE_CONFIG } from '../config/siteConfig';
 
 export default function PublicFooter() {
   return (
-    <footer className="border-t border-slate-800 bg-slate-950 px-4 py-8 text-sm text-slate-500">
+    <footer className="border-t border-slate-800 bg-slate-950 px-4 py-8 text-sm text-slate-400">
       <div className="mx-auto flex max-w-2xl flex-col items-center gap-4">
         <nav className="flex flex-wrap justify-center gap-x-6 gap-y-2">
           <Link href="/" className="hover:text-slate-300 transition-colors">홈</Link>

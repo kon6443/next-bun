@@ -239,7 +239,7 @@ export function TeamManagementSection({
           <SectionLabel>Team Management</SectionLabel>
           <div className="flex items-center gap-2">
             {visibleTabs.map(tab => (
-              <span key={tab.key} className="flex items-center gap-1 text-xs text-slate-500" title={tab.label}>
+              <span key={tab.key} className="flex items-center gap-1 text-xs text-slate-400" title={tab.label}>
                 {tab.icon}
                 {tab.count !== null && tab.count}
               </span>
@@ -358,7 +358,7 @@ export function TeamManagementSection({
                                 </span>
                               )}
                             </div>
-                            <p className="mt-2 text-xs text-slate-500">가입일: {formatMemberDate(member.joinedAt)}</p>
+                            <p className="mt-2 text-xs text-slate-400">가입일: {formatMemberDate(member.joinedAt)}</p>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             {showRoleChangeButton && (
@@ -426,7 +426,7 @@ export function TeamManagementSection({
                     >
                       {stat.value}
                     </p>
-                    <p className="mt-1 text-sm text-slate-500">{stat.helper}</p>
+                    <p className="mt-1 text-sm text-slate-400">{stat.helper}</p>
                   </div>
                 ))}
               </div>
@@ -482,7 +482,7 @@ export function TeamManagementSection({
                             </div>
                             {isActive && (
                               <div className="mt-3 rounded-lg border border-white/5 bg-slate-900/50 p-3">
-                                <p className="mb-1 text-xs text-slate-500">초대 링크:</p>
+                                <p className="mb-1 text-xs text-slate-400">초대 링크:</p>
                                 <p className="break-all font-mono text-xs text-slate-300">{inviteUrl}</p>
                               </div>
                             )}

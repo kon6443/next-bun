@@ -49,7 +49,7 @@ export default function InventoryPanel({ inventory, isOpen, onClose }: Inventory
           {inventory.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-2xl mb-2">🎣</p>
-              <p className="text-sm text-slate-500">아직 잡은 물고기가 없습니다</p>
+              <p className="text-sm text-slate-400">아직 잡은 물고기가 없습니다</p>
               <p className="text-xs text-slate-600 mt-1">낚시 포인트 근처에서 캐스팅해보세요</p>
             </div>
           ) : (

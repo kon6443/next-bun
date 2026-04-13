@@ -536,7 +536,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
             <div className='flex items-start justify-between gap-3 mb-4'>
               <div className='flex-1 min-w-0'>
                 <h1 className='text-xl font-bold text-white break-words'>{taskDetail.taskName}</h1>
-                <span className='mt-1 block text-xs text-slate-500'>
+                <span className='mt-1 block text-xs text-slate-400'>
                   {taskDetail.userName || `사용자 ${taskDetail.crtdBy}`}
                 </span>
               </div>
@@ -626,7 +626,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
             value={newComment}
             onChange={e => setNewComment(e.target.value)}
             placeholder='댓글을 입력하세요...'
-            className='flex-1 resize-none rounded-xl border border-white/10 bg-slate-900/60 p-3 text-sm text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20'
+            className='flex-1 resize-none rounded-xl border border-white/10 bg-slate-900/60 p-3 text-base text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20'
             rows={2}
           />
           <button
@@ -642,7 +642,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
         {/* 댓글 목록 */}
         <div className='space-y-4'>
           {comments.length === 0 ? (
-            <div className='rounded-2xl border border-dashed border-slate-600/80 px-4 py-10 text-center text-sm text-slate-500'>
+            <div className='rounded-2xl border border-dashed border-slate-600/80 px-4 py-10 text-center text-sm text-slate-400'>
               아직 댓글이 없습니다. 첫 댓글을 작성해보세요!
             </div>
           ) : (
@@ -656,7 +656,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
                     <textarea
                       value={editingContent}
                       onChange={e => setEditingContent(e.target.value)}
-                      className='w-full resize-none rounded-xl border border-white/10 bg-slate-900/60 p-3 text-sm text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20'
+                      className='w-full resize-none rounded-xl border border-white/10 bg-slate-900/60 p-3 text-base text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20'
                       rows={3}
                     />
                     <div className='mt-4 flex justify-end gap-2'>
@@ -685,11 +685,11 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
                         <span className='font-semibold text-sm text-white'>
                           {comment.userName || `사용자 ${comment.userId}`}
                         </span>
-                        <span className='text-xs text-slate-500'>·</span>
-                        <span className='text-xs text-slate-500'>
+                        <span className='text-xs text-slate-400'>·</span>
+                        <span className='text-xs text-slate-400'>
                           {formatCompactDateTime(comment.crtdAt)}
                         </span>
-                        {comment.mdfdAt && <span className='text-xs text-slate-500'>(수정됨)</span>}
+                        {comment.mdfdAt && <span className='text-xs text-slate-400'>(수정됨)</span>}
                       </div>
                       {currentUserId === comment.userId && comment.status !== 0 && (
                         <div className='flex items-center gap-1'>
@@ -714,7 +714,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
                     </div>
                     {/* 댓글 내용 */}
                     {comment.status === 0 ? (
-                      <p className='mt-2 text-sm italic text-slate-500'>삭제된 댓글입니다.</p>
+                      <p className='mt-2 text-sm italic text-slate-400'>삭제된 댓글입니다.</p>
                     ) : (
                       <p className='mt-2 text-sm leading-relaxed text-slate-300 whitespace-pre-wrap'>
                         {comment.commentContent}

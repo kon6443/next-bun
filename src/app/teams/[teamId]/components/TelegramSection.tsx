@@ -60,7 +60,7 @@ export function TelegramSection({
             </div>
           </div>
           <div className="mb-4 rounded-lg border border-white/5 bg-slate-900/50 p-3">
-            <p className="text-xs text-slate-500 mb-1">Chat ID</p>
+            <p className="text-xs text-slate-400 mb-1">Chat ID</p>
             <p className="text-sm font-mono text-slate-300">{telegramStatus.chatId}</p>
           </div>
           <button
@@ -99,7 +99,7 @@ export function TelegramSection({
           </div>
         </div>
         <div className="mb-4 rounded-lg border border-white/5 bg-slate-900/50 p-3">
-          <p className="text-xs text-slate-500 mb-1">연동 링크</p>
+          <p className="text-xs text-slate-400 mb-1">연동 링크</p>
           <a
             href={telegramStatus.pendingLink.deepLink}
             target="_blank"
@@ -110,7 +110,7 @@ export function TelegramSection({
           </a>
         </div>
         <div className="mb-4 text-xs text-slate-400">
-          <span className="text-slate-500">만료:</span>{' '}
+          <span className="text-slate-400">만료:</span>{' '}
           {formatFullDateTime(new Date(telegramStatus.pendingLink.endAt))}
         </div>
         <div className="flex gap-2">

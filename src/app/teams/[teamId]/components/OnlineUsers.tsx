@@ -178,7 +178,7 @@ function OnlineUserListItem({
           )}
         </p>
         {user.connectionCount > 1 && (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-400">
             {user.connectionCount}개 기기에서 접속 중
           </p>
         )}
