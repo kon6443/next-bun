@@ -7,7 +7,7 @@ Next.js 15 App Router + Bun 팀 협업/태스크 관리 웹앱.
 
 ## Conventions
 - 한국어 UI (라벨, 에러 메시지, 토스트 모두 한국어)
-- 날짜: UTC 저장, UTC 표시 (타임존 변환 절대 하지 않음)
+- 날짜: UTC 저장, 로컬 표시 (DB는 UTC, 브라우저에서 로컬 타임존으로 변환하여 표시)
 - iOS Safari: `backdrop-filter:blur()` 사용 금지 → `box-shadow`로 대체
 - glass-morphism: `bg-slate-800/50 border-slate-700/50`
 - 태스크 상태 추가/변경 시 `src/app/config/taskStatusConfig.ts` 참조

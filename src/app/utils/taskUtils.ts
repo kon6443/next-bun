@@ -36,8 +36,7 @@ export function getDeadlineStatus(endAt: Date | null): DeadlineStatus {
   const end = new Date(endAt);
   // "오늘"은 사용자의 로컬 타임존 기준
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  // endAt의 날짜는 UTC 컴포넌트에서 추출 (타임존 변환 방지)
-  const endDate = new Date(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
+  const endDate = new Date(end.getFullYear(), end.getMonth(), end.getDate());
 
   const diffDays = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
@@ -121,7 +120,7 @@ function getDaysFromNow(date: Date): number {
   const now = new Date();
   const target = new Date(date);
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const targetDate = new Date(target.getUTCFullYear(), target.getUTCMonth(), target.getUTCDate());
+  const targetDate = new Date(target.getFullYear(), target.getMonth(), target.getDate());
   return Math.ceil((targetDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
@@ -201,9 +200,8 @@ export function filterByPeriod(tasks: Task[], period: PeriodFilter): Task[] {
     if (!task.endAt && period !== 'overdue') return false;
 
     const endDate = task.endAt ? new Date(task.endAt) : null;
-    // endAt의 날짜는 UTC 컴포넌트에서 추출 (타임존 변환 방지)
     const endDateOnly = endDate
-      ? new Date(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate())
+      ? new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate())
       : null;
 
     switch (period) {
@@ -280,9 +278,9 @@ export function getUniqueAssignees(tasks: Task[]): { id: number; name: string }[
  */
 export function formatCompactDateTime(date: Date): string {
   const d = new Date(date);
-  const hours = d.getUTCHours().toString().padStart(2, '0');
-  const minutes = d.getUTCMinutes().toString().padStart(2, '0');
-  return `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${hours}:${minutes}`;
+  const hours = d.getHours().toString().padStart(2, '0');
+  const minutes = d.getMinutes().toString().padStart(2, '0');
+  return `${d.getMonth() + 1}/${d.getDate()} ${hours}:${minutes}`;
 }
 
 /**
@@ -298,7 +296,6 @@ export function formatShortDate(date: Date | null): string | null {
   return d.toLocaleDateString('ko-KR', {
     month: 'short',
     day: 'numeric',
-    timeZone: 'UTC',
   });
 }
 
@@ -315,7 +312,6 @@ export function formatDateWithYear(date: Date | null): string {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
-    timeZone: 'UTC',
   });
 }
 
@@ -335,7 +331,6 @@ export function formatFullDateTime(date: Date | null): string | null {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-    timeZone: 'UTC',
   });
 }
 
@@ -347,7 +342,10 @@ export function formatFullDateTime(date: Date | null): string | null {
  * @example formatDateKey(new Date('2024-01-15')) // "2024-01-15"
  */
 export function formatDateKey(date: Date): string {
-  return date.toISOString().split('T')[0];
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 /**
@@ -358,5 +356,5 @@ export function formatDateKey(date: Date): string {
  * @example formatDateDisplay(new Date('2024-01-15')) // "1/15"
  */
 export function formatDateDisplay(date: Date): string {
-  return `${date.getUTCMonth() + 1}/${date.getUTCDate()}`;
+  return `${date.getMonth() + 1}/${date.getDate()}`;
 }
