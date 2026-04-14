@@ -330,7 +330,7 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
                   const dayTasks = singleDayTasksByDate.get(dateKey) || [];
                   const isToday = dateKey === todayKey;
                   const isWeekend = isWeekendDate(date);
-                  const isCurrentMonth = date.getUTCMonth() === month;
+                  const isCurrentMonth = date.getMonth() === month;
 
                   return (
                     <div
@@ -345,14 +345,14 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
                           className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs ${
                             isToday
                               ? 'bg-sky-500 font-bold text-white'
-                              : date.getUTCDay() === 0
+                              : date.getDay() === 0
                                 ? 'text-red-400'
-                                : date.getUTCDay() === 6
+                                : date.getDay() === 6
                                   ? 'text-sky-400'
                                   : 'text-slate-400'
                           }`}
                         >
-                          {date.getUTCDate()}
+                          {date.getDate()}
                         </span>
                         {/* +n more 버튼 - 태스크가 2개 초과하거나 멀티데이 바가 있을 때 */}
                         {(dayTasks.length > 2 || (hasMoreBars && dayIdx === 6)) && (
@@ -483,7 +483,7 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
           {/* 팝오버 헤더 */}
           <div className="sticky top-0 flex items-center justify-between border-b border-white/10 bg-slate-800/95 px-3 py-2">
             <span className="text-sm font-semibold text-white">
-              {popover.date ? `${popover.date.getUTCMonth() + 1}월 ${popover.date.getUTCDate()}일` : ''}
+              {popover.date ? `${popover.date.getMonth() + 1}월 ${popover.date.getDate()}일` : ''}
             </span>
             <button
               onClick={() => setPopover(prev => ({ ...prev, isOpen: false }))}

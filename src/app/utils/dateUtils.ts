@@ -2,14 +2,13 @@
  * 날짜 관련 유틸리티 함수
  * GanttChart, CalendarView 등에서 공통으로 사용
  *
- * 모든 날짜는 UTC 기준으로 처리됩니다.
- * DB에서 UTC로 저장된 날짜를 로컬 타임존 변환 없이 정확히 표시하기 위함입니다.
+ * DB에서 UTC로 저장된 날짜를 브라우저 로컬 타임존으로 변환하여 표시합니다.
  */
 
 // ==================== 날짜 계산 함수 ====================
 
 /**
- * 두 날짜 사이의 일수 계산 (UTC 기준)
+ * 두 날짜 사이의 일수 계산 (로컬 기준)
  * @param start 시작 날짜
  * @param end 종료 날짜
  * @returns 일수 (음수 가능)
@@ -17,49 +16,49 @@
 export function daysBetween(start: Date, end: Date): number {
   const s = new Date(start);
   const e = new Date(end);
-  const startTime = Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate());
-  const endTime = Date.UTC(e.getUTCFullYear(), e.getUTCMonth(), e.getUTCDate());
+  const startTime = new Date(s.getFullYear(), s.getMonth(), s.getDate()).getTime();
+  const endTime = new Date(e.getFullYear(), e.getMonth(), e.getDate()).getTime();
   return Math.ceil((endTime - startTime) / (1000 * 60 * 60 * 24));
 }
 
 /**
- * 날짜 범위 생성 (UTC 기준, start ~ end 포함)
+ * 날짜 범위 생성 (로컬 기준, start ~ end 포함)
  * @param start 시작 날짜
  * @param end 종료 날짜
- * @returns Date 배열 (UTC 자정 기준)
+ * @returns Date 배열 (로컬 자정 기준)
  */
 export function generateDateRange(start: Date, end: Date): Date[] {
   const dates: Date[] = [];
   const current = new Date(start);
-  current.setUTCHours(0, 0, 0, 0);
+  current.setHours(0, 0, 0, 0);
   const endDate = new Date(end);
-  endDate.setUTCHours(0, 0, 0, 0);
+  endDate.setHours(0, 0, 0, 0);
 
   while (current <= endDate) {
     dates.push(new Date(current));
-    current.setUTCDate(current.getUTCDate() + 1);
+    current.setDate(current.getDate() + 1);
   }
   return dates;
 }
 
 /**
- * 날짜를 UTC 자정(00:00:00)으로 정규화
+ * 날짜를 로컬 자정(00:00:00)으로 정규화
  * @param date 정규화할 날짜
- * @returns UTC 자정으로 설정된 새 Date 객체
+ * @returns 로컬 자정으로 설정된 새 Date 객체
  */
 export function normalizeDate(date: Date): Date {
   const normalized = new Date(date);
-  normalized.setUTCHours(0, 0, 0, 0);
+  normalized.setHours(0, 0, 0, 0);
   return normalized;
 }
 
 /**
- * 로컬 "오늘"을 UTC 자정 Date 객체로 반환
+ * 로컬 "오늘"을 자정 Date 객체로 반환
  * 캘린더/간트 차트에서 "오늘" 기준 날짜 생성 시 사용
  */
-export function getLocalTodayAsUTC(): Date {
+export function getToday(): Date {
   const now = new Date();
-  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
 /**
@@ -82,9 +81,9 @@ export const DEFAULT_START_TIME = '00:00';
 export const DEFAULT_END_TIME = '23:59';
 
 /**
- * 날짜(YYYY-MM-DD) + 시간(HH:MM) → ISO datetime 문자열 조합 (UTC)
+ * 날짜(YYYY-MM-DD) + 시간(HH:MM) → ISO datetime 문자열 조합
+ * 브라우저가 로컬(KST)로 해석 후 UTC 변환하여 ISO 문자열로 반환
  * 시작일: 초는 항상 :00, 종료일: 초는 항상 :59
- * Z suffix 필수 — 백엔드가 new Date()로 파싱할 때 서버 타임존 무관하게 UTC 보장
  */
 export function buildTaskDatetime(
   date: string,
@@ -94,64 +93,68 @@ export function buildTaskDatetime(
   if (!date) return null;
   const t = time || (type === 'start' ? DEFAULT_START_TIME : DEFAULT_END_TIME);
   const seconds = type === 'start' ? '00' : '59';
-  return `${date}T${t}:${seconds}Z`;
+  return new Date(`${date}T${t}:${seconds}`).toISOString();
 }
 
 /**
- * ISO datetime 또는 Date → 날짜(YYYY-MM-DD) + 시간(HH:MM) 분리
+ * ISO datetime 또는 Date → 날짜(YYYY-MM-DD) + 시간(HH:MM) 분리 (로컬 기준)
  */
 export function parseTaskDatetime(value: Date | string | null | undefined): { date: string; time: string } {
   if (!value) return { date: '', time: '' };
   const d = value instanceof Date ? value : new Date(value);
   if (isNaN(d.getTime())) return { date: '', time: '' };
-  const iso = d.toISOString();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
   return {
-    date: iso.split('T')[0],
-    time: iso.slice(11, 16),
+    date: `${year}-${month}-${day}`,
+    time: `${hours}:${minutes}`,
   };
 }
 
 // ==================== 캘린더 관련 함수 ====================
 
 /**
- * 월의 첫 날과 마지막 날 계산 (UTC 기준)
+ * 월의 첫 날과 마지막 날 계산 (로컬 기준)
  * @param year 연도
  * @param month 월 (0-11)
  */
 export function getMonthDays(year: number, month: number): { firstDay: Date; lastDay: Date } {
-  const firstDay = new Date(Date.UTC(year, month, 1));
-  const lastDay = new Date(Date.UTC(year, month + 1, 0));
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
   return { firstDay, lastDay };
 }
 
 /**
- * 캘린더 그리드 생성 (6주 = 42일 고정, UTC 기준)
+ * 캘린더 그리드 생성 (6주 = 42일 고정, 로컬 기준)
  * @param year 연도
  * @param month 월 (0-11)
- * @returns Date 배열 (이전달, 현재달, 다음달 날짜 포함, 모두 UTC 자정)
+ * @returns Date 배열 (이전달, 현재달, 다음달 날짜 포함, 모두 로컬 자정)
  */
 export function generateCalendarGrid(year: number, month: number): Date[] {
   const { firstDay, lastDay } = getMonthDays(year, month);
-  const startDayOfWeek = firstDay.getUTCDay();
-  const daysInMonth = lastDay.getUTCDate();
+  const startDayOfWeek = firstDay.getDay();
+  const daysInMonth = lastDay.getDate();
 
   const grid: Date[] = [];
 
   // 이전 달의 날짜
-  const prevMonthLastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const prevMonthLastDay = new Date(year, month, 0).getDate();
   for (let i = startDayOfWeek - 1; i >= 0; i--) {
-    grid.push(new Date(Date.UTC(year, month - 1, prevMonthLastDay - i)));
+    grid.push(new Date(year, month - 1, prevMonthLastDay - i));
   }
 
   // 현재 달의 날짜
   for (let day = 1; day <= daysInMonth; day++) {
-    grid.push(new Date(Date.UTC(year, month, day)));
+    grid.push(new Date(year, month, day));
   }
 
   // 다음 달의 날짜 (6주 고정)
   let nextDay = 1;
   while (grid.length < 42) {
-    grid.push(new Date(Date.UTC(year, month + 1, nextDay++)));
+    grid.push(new Date(year, month + 1, nextDay++));
   }
 
   return grid;
@@ -176,26 +179,26 @@ export function splitIntoWeeks<T>(grid: T[]): T[][] {
 export const WEEKDAYS_KO = ['일', '월', '화', '수', '목', '금', '토'] as const;
 
 /**
- * 주말 여부 확인 (UTC 기준)
+ * 주말 여부 확인 (로컬 기준)
  * @param date Date 객체
  * @returns 주말(토, 일)이면 true
  */
 export function isWeekend(date: Date): boolean {
-  const day = date.getUTCDay();
+  const day = date.getDay();
   return day === 0 || day === 6;
 }
 
 /**
  * 오늘인지 확인
- * 입력 날짜의 UTC 날짜가 로컬 "오늘"과 같은지 비교
- * @param date 확인할 날짜 (UTC 기준)
+ * 입력 날짜의 로컬 날짜가 로컬 "오늘"과 같은지 비교
+ * @param date 확인할 날짜
  * @returns 오늘이면 true
  */
 export function isToday(date: Date): boolean {
   const now = new Date();
   return (
-    date.getUTCFullYear() === now.getFullYear() &&
-    date.getUTCMonth() === now.getMonth() &&
-    date.getUTCDate() === now.getDate()
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
   );
 }
