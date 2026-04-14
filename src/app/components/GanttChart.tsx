@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from '../types/task';
 import { deadlineStyles, formatDateDisplay, getTaskDeadlineInfo } from '../utils/taskUtils';
-import { daysBetween, generateDateRange, isToday, isWeekend, getLocalTodayAsUTC } from '../utils/dateUtils';
+import { daysBetween, generateDateRange, isToday, isWeekend, getToday } from '../utils/dateUtils';
 import { getStatusMeta, getStatusColors, getStatusTextColor } from '../config/taskStatusConfig';
 import { EmptyState } from '../teams/components';
 import { viewContainerStyles } from '@/styles/teams';
@@ -36,9 +36,9 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
     const allTasks = sortedTasks.withStartDate;
     if (allTasks.length === 0) {
       // 기본값: 오늘부터 14일 (로컬 "오늘"을 UTC 자정으로 변환)
-      const today = getLocalTodayAsUTC();
+      const today = getToday();
       const twoWeeksLater = new Date(today);
-      twoWeeksLater.setUTCDate(today.getUTCDate() + 13);
+      twoWeeksLater.setDate(today.getDate() + 13);
       return generateDateRange(today, twoWeeksLater);
     }
 
@@ -55,13 +55,13 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
     });
 
     // 앞뒤로 여유 추가 (3일씩, UTC 기준)
-    minDate.setUTCDate(minDate.getUTCDate() - 3);
-    maxDate.setUTCDate(maxDate.getUTCDate() + 3);
+    minDate.setDate(minDate.getDate() - 3);
+    maxDate.setDate(maxDate.getDate() + 3);
 
     // 최소 14일 보장
     const days = daysBetween(minDate, maxDate);
     if (days < 14) {
-      maxDate.setUTCDate(maxDate.getUTCDate() + (14 - days));
+      maxDate.setDate(maxDate.getDate() + (14 - days));
     }
 
     return generateDateRange(minDate, maxDate);
@@ -183,7 +183,7 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
                             width: Math.max(barStyle.width - 4, 20),
                           }}
                           onClick={() => handleTaskClick(task.taskId)}
-                          title={`${task.taskName}\n${task.startAt ? new Date(task.startAt).toLocaleDateString('ko-KR', { timeZone: 'UTC' }) : ''} ~ ${task.endAt ? new Date(task.endAt).toLocaleDateString('ko-KR', { timeZone: 'UTC' }) : ''}`}
+                          title={`${task.taskName}\n${task.startAt ? new Date(task.startAt).toLocaleDateString('ko-KR') : ''} ~ ${task.endAt ? new Date(task.endAt).toLocaleDateString('ko-KR') : ''}`}
                         >
                           <span className="absolute inset-0 flex items-center justify-center overflow-hidden px-2 text-[10px] font-semibold text-white drop-shadow truncate">
                             {task.taskName}
