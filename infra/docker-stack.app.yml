@@ -1,0 +1,46 @@
+version: '3.9'
+
+services:
+  app:
+    image: ${REGISTRY_URL}/prod_next:${IMAGE_TAG}
+    networks:
+      - sys_default
+    env_file:
+      - /home/ubuntu/desktop/deploy/sys/config/env/.env
+    ports:
+      - target: 3000
+        published: 23000
+        mode: ingress
+    healthcheck:
+      test:
+        - CMD
+        - bun
+        - -e
+        - "fetch('http://localhost:3000/api/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      replicas: 20
+      placement:
+        constraints:
+          - node.labels.prod_next == 1
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+        monitor: 10s
+        max_failure_ratio: 0
+      rollback_config:
+        parallelism: 1
+        order: start-first
+        failure_action: pause
+        monitor: 5s
+        max_failure_ratio: 0
+      restart_policy:
+        condition: on-failure
+
+networks:
+  sys_default:
+    external: true
