@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -20,26 +24,42 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Set short SHA
+        id: sha
+        run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+
       - name: Build and Push arm64 image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ${{ secrets.REGISTRY_URL }}/sys_next:latest
+          tags: ${{ secrets.REGISTRY_URL }}/prod_next:${{ steps.sha.outputs.short }}
           provenance: false
           sbom: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Deploy via SSH to Docker Swarm
+      - name: Rsync stack YAML to Swarm manager
+        run: |
+          echo "${{ secrets.SWARM_MANAGER_SSH_KEY }}" > /tmp/ssh_key
+          chmod 600 /tmp/ssh_key
+          rsync -avz \
+            -e "ssh -i /tmp/ssh_key -o StrictHostKeyChecking=no" \
+            infra/docker-stack.app.yml \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_SERVER }}:/home/ubuntu/desktop/deploy/infra/prod_next.yml
+          rm /tmp/ssh_key
+
+      - name: Deploy stack via SSH
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.DEPLOY_SERVER }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
           script: |
-            ENV_PATH="/home/ubuntu/desktop/deploy/sys/config/env/.env"
-            docker service update \
-            --with-registry-auth \
-            $(grep -vE '^#|^$' $ENV_PATH | awk '{print "--env-add", $0}') \
-            --image ${{ secrets.REGISTRY_URL }}/sys_next:latest sys_next
+            export REGISTRY_URL=${{ secrets.REGISTRY_URL }}
+            export IMAGE_TAG=${{ steps.sha.outputs.short }}
+            docker stack deploy \
+              -c /home/ubuntu/desktop/deploy/infra/prod_next.yml \
+              --with-registry-auth \
+              prod_next
+            docker stack services prod_next
