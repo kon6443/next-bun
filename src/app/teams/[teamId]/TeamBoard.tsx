@@ -100,7 +100,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
   // 데이터 탭: 활성 / 보관함
   const [dataTab, setDataTab] = useState<DataTab>('active');
-  const [archiveCount, setArchiveCount] = useState(0);
 
   // 튜토리얼 가이드 상태
   const [showTutorial, setShowTutorial] = useState(false);
@@ -155,6 +154,26 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       return newTasks;
     });
   }, []);
+
+  // 태스크 분류 공통 함수
+  const classifyTasks = useCallback((taskList: Task[]) => {
+    const classified: Record<ColumnKey, Task[]> = {
+      todo: [], inProgress: [], done: [], onHold: [], cancelled: [],
+    };
+    taskList.forEach(task => {
+      const columnKey = taskStatusToColumn[task.taskStatus] || 'todo';
+      classified[columnKey].push(task);
+    });
+    return classified;
+  }, []);
+
+  // 태스크 목록 조회 (현재 탭 API 1회만 호출)
+  const fetchAndSetTasks = useCallback(async (accessToken: string, tab: DataTab) => {
+    const actStatusParam = tab === 'archive' ? 0 : 1;
+    const tasksResponse = await getTeamTasks(teamIdNum, accessToken, actStatusParam);
+    setTasks(classifyTasks(tasksResponse.data.tasks));
+    return tasksResponse;
+  }, [teamIdNum, classifyTasks]);
 
   // ===== WebSocket (Context에서 관리) =====
   const { socket, onlineUsers } = useTeamSocketContext();
@@ -272,12 +291,42 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     toast.success('태스크 상태가 변경되었습니다.');
   }, []);
 
-  const handleSocketTaskActiveStatusChanged = useCallback((payload: TaskActiveStatusChangedPayload) => {
-    if (payload.newActStatus === 0) {
-      removeTaskFromLocal(payload.taskId);
-      toast.success('태스크가 비활성화되었습니다.');
-    }
-  }, [removeTaskFromLocal]);
+  // 연속 active-status 이벤트에 대한 리페치 debounce (서버 부하 방지)
+  const activeStatusRefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (activeStatusRefetchTimerRef.current) clearTimeout(activeStatusRefetchTimerRef.current);
+  }, []);
+
+  const handleSocketTaskActiveStatusChanged = useCallback(
+    (payload: TaskActiveStatusChangedPayload) => {
+      const currentTabActStatus = dataTab === 'active' ? 1 : 0;
+      const nowMatchesCurrentTab = payload.newActStatus === currentTabActStatus;
+
+      if (nowMatchesCurrentTab) {
+        // 현재 탭에 새로 포함되어야 할 태스크: 전체 객체가 필요하므로 리페치 (debounce)
+        if (activeStatusRefetchTimerRef.current) {
+          clearTimeout(activeStatusRefetchTimerRef.current);
+        }
+        activeStatusRefetchTimerRef.current = setTimeout(() => {
+          if (!session?.user?.accessToken) return;
+          fetchAndSetTasks(session.user.accessToken, dataTab).catch(err => {
+            console.error('Failed to refresh tasks on active-status change:', err);
+            toast.error('태스크 목록 갱신에 실패했습니다.');
+          });
+        }, 300);
+      } else {
+        // 현재 탭에서 벗어난 태스크: 로컬 제거
+        removeTaskFromLocal(payload.taskId);
+      }
+
+      // 토스트 id 지정 → 연속 이벤트 시 스팸 없이 마지막 내용만 표시
+      toast.success(
+        payload.newActStatus === 0 ? '태스크가 보관되었습니다.' : '태스크가 복원되었습니다.',
+        { id: 'task-active-status' },
+      );
+    },
+    [dataTab, removeTaskFromLocal, session?.user?.accessToken, fetchAndSetTasks],
+  );
 
   // 온라인 유저 접속 이벤트 (토스트 알림만 - 상태는 Context에서 관리)
   const handleUserJoined = useCallback((payload: UserJoinedPayload) => {
@@ -387,33 +436,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   useEffect(() => {
     fetchInvitesRef.current = fetchInvites;
   }, [fetchInvites]);
-
-  // 태스크 분류 공통 함수
-  const classifyTasks = useCallback((taskList: Task[]) => {
-    const classified: Record<ColumnKey, Task[]> = {
-      todo: [], inProgress: [], done: [], onHold: [], cancelled: [],
-    };
-    taskList.forEach(task => {
-      const columnKey = taskStatusToColumn[task.taskStatus] || 'todo';
-      classified[columnKey].push(task);
-    });
-    return classified;
-  }, []);
-
-  // 태스크 목록 조회 + 보관함 카운트 갱신 공통 함수
-  const fetchAndSetTasks = useCallback(async (accessToken: string, tab: DataTab) => {
-    const actStatusParam = tab === 'archive' ? 0 : 1;
-    const tasksResponse = await getTeamTasks(teamIdNum, accessToken, actStatusParam);
-    setTasks(classifyTasks(tasksResponse.data.tasks));
-
-    if (tab === 'active') {
-      getTeamTasks(teamIdNum, accessToken, 0)
-        .then(res => setArchiveCount(res.data.tasks.length))
-        .catch(() => setArchiveCount(0));
-    }
-
-    return tasksResponse;
-  }, [teamIdNum, classifyTasks]);
 
   // 초기 로딩: 팀 정보 + 멤버 + 통합 + 태스크 (페이지 진입 시 1회)
   useEffect(() => {
@@ -740,7 +762,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       try {
         await updateTaskActiveStatus(teamIdNum, taskId, 1, session.user.accessToken);
         removeTaskFromLocal(taskId);
-        setArchiveCount(prev => Math.max(0, prev - 1));
         toast.success('태스크가 활성으로 복원되었습니다.');
       } catch (err) {
         console.error('Failed to restore task:', err);
@@ -758,7 +779,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       try {
         await updateTaskActiveStatus(teamIdNum, taskId, 0, session.user.accessToken);
         removeTaskFromLocal(taskId);
-        setArchiveCount(prev => prev + 1);
         toast.success('보관함으로 이동되었습니다.');
       } catch (err) {
         console.error('Failed to archive task:', err);
@@ -894,7 +914,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           onViewModeChange={setViewMode}
           dataTab={dataTab}
           onDataTabChange={setDataTab}
-          archiveCount={archiveCount}
         />
 
         {/* 뷰 렌더링 - 로딩 시 스켈레톤 표시 */}
