@@ -10,7 +10,6 @@ type ViewModeToggleProps = {
   onViewModeChange: (mode: ViewMode) => void;
   dataTab: DataTab;
   onDataTabChange: (tab: DataTab) => void;
-  archiveCount?: number;
 };
 
 const viewModeConfig = [
@@ -25,7 +24,7 @@ const dataTabConfig: { key: DataTab; label: string; icon?: typeof ArchiveIcon }[
   { key: 'archive', label: '보관함', icon: ArchiveIcon },
 ];
 
-export function ViewModeToggle({ viewMode, onViewModeChange, dataTab, onDataTabChange, archiveCount }: ViewModeToggleProps) {
+export function ViewModeToggle({ viewMode, onViewModeChange, dataTab, onDataTabChange }: ViewModeToggleProps) {
   return (
     <div className="flex items-center justify-between mb-4">
       {/* 데이터 탭: 활성 / 보관함 */}
@@ -42,11 +41,6 @@ export function ViewModeToggle({ viewMode, onViewModeChange, dataTab, onDataTabC
           >
             {Icon && <Icon className="w-3.5 h-3.5" />}
             {label}
-            {key === 'archive' && archiveCount !== undefined && archiveCount > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-slate-700 text-slate-300">
-                {archiveCount}
-              </span>
-            )}
           </button>
         ))}
       </div>
