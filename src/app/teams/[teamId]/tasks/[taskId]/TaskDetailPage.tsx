@@ -32,13 +32,14 @@ import { StatusDropdown } from '@/app/components/StatusDropdown';
 import { ConfirmModal } from '@/app/components/ConfirmModal';
 import { EditIcon, TrashIcon, CommentIcon, SendIcon, ArchiveIcon, RestoreIcon } from '@/app/components/Icons';
 import { formatCompactDateTime } from '@/app/utils/taskUtils';
-import type { TaskStatusKey } from '@/app/config/taskStatusConfig';
+import { getStatusBorderClassName, type TaskStatusKey } from '@/app/config/taskStatusConfig';
 import { cardStyles } from '@/styles/teams';
 import { useTeamTaskId, useTeamSocketEvents } from '@/app/hooks';
 import { useTeamSocketContext } from '../../contexts';
 import type {
   TaskUpdatedPayload,
   TaskStatusChangedPayload,
+  TaskActiveStatusChangedPayload,
   CommentCreatedPayload,
   CommentUpdatedPayload,
   CommentDeletedPayload,
@@ -113,6 +114,20 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
         };
       });
       toast.success('태스크 상태가 변경되었습니다.');
+    },
+    [taskIdNum],
+  );
+
+  // Socket 이벤트 핸들러: 태스크 활성 상태 변경 (보관/복원)
+  const handleSocketTaskActiveStatusChanged = useCallback(
+    (payload: TaskActiveStatusChangedPayload) => {
+      if (payload.taskId !== taskIdNum) return;
+
+      setTaskDetail(prev => {
+        if (!prev) return prev;
+        return { ...prev, actStatus: payload.newActStatus };
+      });
+      toast.success(payload.newActStatus === 0 ? '태스크가 보관함으로 이동되었습니다.' : '태스크가 활성으로 복원되었습니다.');
     },
     [taskIdNum],
   );
@@ -193,6 +208,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
     {
       onTaskUpdated: handleSocketTaskUpdated,
       onTaskStatusChanged: handleSocketTaskStatusChanged,
+      onTaskActiveStatusChanged: handleSocketTaskActiveStatusChanged,
       onCommentCreated: handleSocketCommentCreated,
       onCommentUpdated: handleSocketCommentUpdated,
       onCommentDeleted: handleSocketCommentDeleted,
@@ -508,7 +524,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
       </div>
 
       {/* 태스크 상세 정보 */}
-      <section className={`${cardStyles.section} p-4`}>
+      <section className={`rounded-3xl border ${getStatusBorderClassName(taskDetail.taskStatus)} bg-slate-900/80 p-4 transition-colors`}>
         {isEditing ? (
           <>
             <div className='mb-4'>
@@ -535,7 +551,26 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
             {/* 헤더: 제목 + 작성자 + 수정 아이콘 */}
             <div className='flex items-start justify-between gap-3 mb-4'>
               <div className='flex-1 min-w-0'>
-                <h1 className='text-xl font-bold text-white break-words'>{taskDetail.taskName}</h1>
+                <div className='flex items-center gap-2 flex-wrap'>
+                  <h1 className='text-xl font-bold text-white break-words'>{taskDetail.taskName}</h1>
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap ${
+                      taskDetail.actStatus === 1
+                        ? 'border-white/10 bg-slate-800/60 text-slate-200'
+                        : 'border-slate-500/30 bg-slate-800/40 text-slate-400'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block w-1.5 h-1.5 rounded-full ${
+                        taskDetail.actStatus === 1
+                          ? 'bg-emerald-400 animate-pulse'
+                          : 'bg-slate-500'
+                      }`}
+                      aria-hidden='true'
+                    />
+                    {taskDetail.actStatus === 1 ? '활성' : '보관함'}
+                  </span>
+                </div>
                 <span className='mt-1 block text-xs text-slate-400'>
                   {taskDetail.userName || `사용자 ${taskDetail.crtdBy}`}
                 </span>
