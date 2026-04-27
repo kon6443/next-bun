@@ -10,7 +10,7 @@ import { ListView } from '../../components/ListView';
 import { CalendarView } from '../../components/CalendarView';
 import { TaskFilters } from '../../components/TaskFilters';
 import { Kanban } from '../../components/Kanban';
-import { SectionLabel, ErrorAlert, TeamBoardSkeleton, ListViewSkeleton, Skeleton, FAB, IconButton } from '../components';
+import { TeamsPageLayout, SectionLabel, ErrorAlert, TeamBoardSkeleton, ListViewSkeleton, Skeleton, FAB, IconButton } from '../components';
 import { EditIcon, UserGroupIcon, PlusIcon, QuestionMarkIcon } from '../../components/Icons';
 import { DropdownMenu } from './components/DropdownMenu';
 import type { Task } from '../../types/task';
@@ -27,7 +27,7 @@ import {
   updateMemberStatus,
   type TeamUserResponse,
 } from '@/services/teamService';
-import { teamsPageBackground, cardStyles, layoutStyles, MOBILE_MAX_WIDTH } from '@/styles/teams';
+import { cardStyles } from '@/styles/teams';
 import { STATUS_TO_COLUMN, type ColumnKey } from '../../config/taskStatusConfig';
 import { TeamManagementSection, InviteModal, RoleChangeModal, ViewModeToggle, OnlineUsers, TutorialGuide, hasSeenTutorial, markTutorialSeen, type ViewMode, type DataTab } from './components';
 import { ROLES } from '../../config/roleConfig';
@@ -805,8 +805,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   const currentUserRole = currentUserMember?.role || 'MEMBER';
 
   return (
-    <div className={layoutStyles.pageContainer} style={teamsPageBackground}>
-      <main className={`${layoutStyles.mainContent} ${MOBILE_MAX_WIDTH}`}>
+    <>
+      <TeamsPageLayout hasFab>
         {/* 팀 헤더 섹션 */}
         <section className={`${cardStyles.section} p-4`}>
           <div className="flex items-center justify-between mb-4">
@@ -928,7 +928,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         ) : (
           <CalendarView tasks={filteredTasks} teamId={teamId} />
         )}
-      </main>
+      </TeamsPageLayout>
 
       {/* 초대 링크 생성 모달 */}
       <InviteModal
@@ -963,6 +963,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
       {/* FAB: 새 카드 작성 (온라인 유저 모달이 열려있으면 숨김) */}
       {!isOnlineModalOpen && <FAB href={`/teams/${teamId}/tasks/new`} label="새 카드 작성" />}
-    </div>
+    </>
   );
 }
