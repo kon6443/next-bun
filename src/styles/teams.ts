@@ -31,12 +31,20 @@ export const MOBILE_MAX_WIDTH = "max-w-lg";
 
 /**
  * 페이지 레이아웃 기본 클래스
+ *
+ * mainContent 의 pb-* 는 TeamsPageLayout 의 hasFab prop 에서 결정한다.
+ * - hasFab=false: pb-24 (BottomNavBar 만 회피)
+ * - hasFab=true : pb-52 (FAB 영역까지 회피)
  */
 export const layoutStyles = {
   /** 페이지 루트 컨테이너 */
   pageContainer: "relative min-h-screen overflow-hidden text-slate-100",
-  /** 메인 컨텐츠 영역 (모바일 최적화) */
-  mainContent: "relative z-10 mx-auto flex flex-col gap-3 sm:gap-6 px-4 pb-24 pt-6 sm:pt-12",
+  /** 메인 컨텐츠 영역 (모바일 최적화) — pb 는 TeamsPageLayout 에서 적용 */
+  mainContent: "relative z-10 mx-auto flex flex-col gap-3 sm:gap-6 px-4 pt-6 sm:pt-12",
+  /** FAB 미사용 페이지 하단 패딩 (BottomNavBar 회피) */
+  bottomPaddingDefault: "pb-24",
+  /** FAB 사용 페이지 하단 패딩 (FAB 영역 + BottomNavBar 회피) */
+  bottomPaddingWithFab: "pb-52",
 } as const;
 
 /**
