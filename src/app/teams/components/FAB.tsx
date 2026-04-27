@@ -12,33 +12,36 @@ type FABProps = {
   disabled?: boolean;
 };
 
+const fabWrapperStyles =
+  'pointer-events-none fixed inset-x-0 bottom-36 z-50 mx-auto flex max-w-lg justify-end px-4';
+
 const fabStyles =
-  'fixed bottom-24 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 text-white shadow-lg shadow-sky-500/40 transition hover:brightness-110 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed';
+  'pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 text-white shadow-lg shadow-sky-500/40 transition hover:brightness-110 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed';
 
 /**
  * FAB (Floating Action Button) 컴포넌트
- * - 화면 우하단 고정
- * - BottomNavBar 위에 위치 (bottom-24)
+ * - 모바일 레이아웃(max-w-lg) 우하단에 정렬
+ * - BottomNavBar 위에 위치 (bottom-36)
  * - 주요 액션용 (새 카드 작성, 팀 생성 등)
  */
 export function FAB({ href, onClick, label = '추가', disabled = false }: FABProps) {
-  if (href) {
-    return (
-      <Link href={href} className={fabStyles} aria-label={label}>
-        <PlusIcon className='w-6 h-6' />
-      </Link>
-    );
-  }
-
   return (
-    <button
-      type='button'
-      onClick={onClick}
-      disabled={disabled}
-      className={fabStyles}
-      aria-label={label}
-    >
-      <PlusIcon className='w-6 h-6' />
-    </button>
+    <div className={fabWrapperStyles} aria-hidden={disabled ? 'true' : undefined}>
+      {href ? (
+        <Link href={href} className={fabStyles} aria-label={label}>
+          <PlusIcon className='w-6 h-6' />
+        </Link>
+      ) : (
+        <button
+          type='button'
+          onClick={onClick}
+          disabled={disabled}
+          className={fabStyles}
+          aria-label={label}
+        >
+          <PlusIcon className='w-6 h-6' />
+        </button>
+      )}
+    </div>
   );
 }

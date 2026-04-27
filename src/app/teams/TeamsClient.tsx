@@ -27,7 +27,7 @@ export default function TeamsClient({
 
   return (
     <>
-      <TeamsPageLayout>
+      <TeamsPageLayout hasFab={isAuthenticated}>
         {/* 헤더 섹션 */}
         <section className={`${cardStyles.section} p-4`}>
           {isLoading ? (
