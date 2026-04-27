@@ -34,7 +34,7 @@ export function ConfirmModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="relative z-10 w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900 p-6">
+      <div className="relative z-10 w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900 p-4 sm:p-6">
         <button
           onClick={onClose}
           disabled={isLoading}
@@ -44,10 +44,10 @@ export function ConfirmModal({
           <CloseIcon className="w-5 h-5" />
         </button>
 
-        <h3 className="mb-3 text-lg font-bold text-white">{title}</h3>
-        <p className="mb-6 text-sm leading-relaxed text-slate-400">{message}</p>
+        <h3 className="mb-3 pr-8 text-lg font-bold text-white break-words">{title}</h3>
+        <p className="mb-6 text-sm leading-relaxed text-slate-400 break-words">{message}</p>
 
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <button
             onClick={onConfirm}
             disabled={isLoading}
