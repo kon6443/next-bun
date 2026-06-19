@@ -6,6 +6,7 @@ export const TeamSocketEvents = {
   // Client → Server
   JOIN_TEAM: 'joinTeam',
   LEAVE_TEAM: 'leaveTeam',
+  CHAT_MESSAGE: 'chatMessage',
 
   // Server → Client (태스크)
   TASK_CREATED: 'taskCreated',
@@ -27,6 +28,9 @@ export const TeamSocketEvents = {
   // Server → Client (멤버 역할/상태)
   MEMBER_ROLE_CHANGED: 'memberRoleChanged',
   MEMBER_STATUS_CHANGED: 'memberStatusChanged',
+
+  // Server → Client (채팅)
+  CHAT_RECEIVED: 'chatReceived',
 
   // 공통
   JOINED_TEAM: 'joinedTeam',
@@ -193,6 +197,34 @@ export interface MemberStatusChangedPayload {
   changedBy: number;
 }
 
+// ===== 채팅 관련 타입 =====
+
+/**
+ * 채팅 메시지 전송 페이로드 (Client → Server)
+ *
+ * teamId는 보내지 않음 — 서버가 소켓에 캐싱된 teamId로 room을 식별한다.
+ * clientMsgId는 클라이언트가 생성한 메시지 식별자 (낙관적 업데이트 / 추후 저장 dedup 키).
+ */
+export interface ChatMessagePayload {
+  message: string;
+  clientMsgId: string;
+}
+
+/**
+ * 채팅 메시지 수신 페이로드 (Server → Client)
+ *
+ * messageId는 현재 clientMsgId를 에코한다. 추후 저장 도입 시 서버 발급 ID로 교체될 수 있음.
+ * timestamp는 서버가 생성한 ISO 문자열(UTC).
+ */
+export interface ChatReceivedPayload {
+  messageId: string;
+  teamId: number;
+  userId: number;
+  userName: string;
+  message: string;
+  timestamp: string;
+}
+
 // ===== Socket 타입 정의 =====
 
 /** Server → Client 이벤트 타입 맵 */
@@ -210,6 +242,7 @@ export interface ServerToClientEvents {
   [TeamSocketEvents.ONLINE_USERS]: (payload: OnlineUsersPayload) => void;
   [TeamSocketEvents.MEMBER_ROLE_CHANGED]: (payload: MemberRoleChangedPayload) => void;
   [TeamSocketEvents.MEMBER_STATUS_CHANGED]: (payload: MemberStatusChangedPayload) => void;
+  [TeamSocketEvents.CHAT_RECEIVED]: (payload: ChatReceivedPayload) => void;
   [TeamSocketEvents.JOINED_TEAM]: (payload: JoinedTeamPayload) => void;
   [TeamSocketEvents.LEFT_TEAM]: (payload: LeftTeamPayload) => void;
   [TeamSocketEvents.ERROR]: (payload: SocketErrorPayload) => void;
@@ -225,6 +258,7 @@ export interface ClientToServerEvents {
     data: { teamId: number },
     callback?: (response: LeftTeamPayload) => void,
   ) => void;
+  [TeamSocketEvents.CHAT_MESSAGE]: (data: ChatMessagePayload) => void;
 }
 
 /** 타입 안전한 Socket 인스턴스 */

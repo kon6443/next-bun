@@ -34,6 +34,11 @@ interface TeamSocketContextValue {
   setOnlineUsers: React.Dispatch<React.SetStateAction<OnlineUserInfo[]>>;
   /** 수동 재연결 */
   reconnect: () => void;
+  /**
+   * 채팅 메시지 전송 (저장 없음, 실시간 브로드캐스트)
+   * @returns 생성된 clientMsgId (전송 시) 또는 null (빈 메시지)
+   */
+  emitChatMessage: (message: string) => string | null;
 }
 
 // ===== Context 생성 =====
@@ -284,6 +289,23 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
     setTimeout(initializeSocket, 100);
   }, [disconnectSocket, initializeSocket]);
 
+  /**
+   * 채팅 메시지 전송
+   *
+   * - clientMsgId는 클라이언트가 생성 (낙관적 업데이트 / 추후 저장 dedup 키)
+   * - teamId는 보내지 않음 — 서버가 소켓에 캐싱된 teamId로 room을 식별
+   */
+  const emitChatMessage = useCallback((message: string): string | null => {
+    const text = message.trim();
+    if (!text) return null;
+    const clientMsgId = crypto.randomUUID();
+    socketRef.current?.emit(TeamSocketEvents.CHAT_MESSAGE, {
+      message: text,
+      clientMsgId,
+    });
+    return clientMsgId;
+  }, []);
+
   // 마운트 시 연결, 언마운트 시 해제
   useEffect(() => {
     initializeSocket();
@@ -303,8 +325,9 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
       onlineUsers,
       setOnlineUsers,
       reconnect,
+      emitChatMessage,
     }),
-    [socket, isConnected, error, teamId, onlineUsers, reconnect]
+    [socket, isConnected, error, teamId, onlineUsers, reconnect, emitChatMessage]
   );
 
   return (

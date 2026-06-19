@@ -5,3 +5,4 @@ export { TeamManagementSection } from './TeamManagementSection';
 export { ViewModeToggle, type ViewMode, type DataTab } from './ViewModeToggle';
 export { OnlineUsers } from './OnlineUsers';
 export { TutorialGuide, hasSeenTutorial, markTutorialSeen } from './TutorialGuide';
+export { TeamChatPanel } from './TeamChatPanel';
