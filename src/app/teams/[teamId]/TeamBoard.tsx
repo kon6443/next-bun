@@ -11,7 +11,7 @@ import { CalendarView } from '../../components/CalendarView';
 import { TaskFilters } from '../../components/TaskFilters';
 import { Kanban } from '../../components/Kanban';
 import { TeamsPageLayout, SectionLabel, ErrorAlert, TeamBoardSkeleton, ListViewSkeleton, Skeleton, FAB, IconButton } from '../components';
-import { EditIcon, UserGroupIcon, PlusIcon, QuestionMarkIcon } from '../../components/Icons';
+import { EditIcon, UserGroupIcon, PlusIcon, QuestionMarkIcon, CommentIcon } from '../../components/Icons';
 import { DropdownMenu } from './components/DropdownMenu';
 import type { Task } from '../../types/task';
 import { useTaskFilter, useTelegramLink, useDiscordLink, useTeamInvite, useTeamSocketEvents, useSafeNavigation } from '../../hooks';
@@ -29,7 +29,7 @@ import {
 } from '@/services/teamService';
 import { cardStyles } from '@/styles/teams';
 import { STATUS_TO_COLUMN, type ColumnKey } from '../../config/taskStatusConfig';
-import { TeamManagementSection, InviteModal, RoleChangeModal, ViewModeToggle, OnlineUsers, TutorialGuide, hasSeenTutorial, markTutorialSeen, type ViewMode, type DataTab } from './components';
+import { TeamManagementSection, InviteModal, RoleChangeModal, ViewModeToggle, OnlineUsers, TutorialGuide, hasSeenTutorial, markTutorialSeen, TeamChatPanel, type ViewMode, type DataTab } from './components';
 import { ROLES } from '../../config/roleConfig';
 import type {
   TaskCreatedPayload,
@@ -97,6 +97,9 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
   // 온라인 유저 모달 상태 (FAB 숨김용)
   const [isOnlineModalOpen, setIsOnlineModalOpen] = useState(false);
+
+  // 팀 채팅 바텀시트 상태
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // 데이터 탭: 활성 / 보관함
   const [dataTab, setDataTab] = useState<DataTab>('active');
@@ -176,7 +179,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   }, [teamIdNum, classifyTasks]);
 
   // ===== WebSocket (Context에서 관리) =====
-  const { socket, onlineUsers } = useTeamSocketContext();
+  const { socket, onlineUsers, emitChatMessage } = useTeamSocketContext();
 
   // Socket 이벤트 핸들러 (useCallback으로 메모이제이션)
   const handleSocketTaskCreated = useCallback(
@@ -828,6 +831,12 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <IconButton
+                  icon={CommentIcon}
+                  label="팀 채팅"
+                  variant="outlined"
+                  onClick={() => setIsChatOpen(true)}
+                />
+                <IconButton
                   icon={PlusIcon}
                   label="새 카드 작성"
                   variant="outlined"
@@ -961,8 +970,17 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       {/* 튜토리얼 가이드 */}
       <TutorialGuide isOpen={showTutorial} onClose={handleCloseTutorial} />
 
-      {/* FAB: 새 카드 작성 (온라인 유저 모달이 열려있으면 숨김) */}
-      {!isOnlineModalOpen && <FAB href={`/teams/${teamId}/tasks/new`} label="새 카드 작성" />}
+      {/* 팀 채팅 바텀시트 (저장 없음, 실시간 브로드캐스트) */}
+      <TeamChatPanel
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        onSendMessage={emitChatMessage}
+        socket={socket}
+        currentUserId={session?.user?.userId}
+      />
+
+      {/* FAB: 새 카드 작성 (온라인 유저 모달/채팅이 열려있으면 숨김) */}
+      {!isOnlineModalOpen && !isChatOpen && <FAB href={`/teams/${teamId}/tasks/new`} label="새 카드 작성" />}
     </>
   );
 }
