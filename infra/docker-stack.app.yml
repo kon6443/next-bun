@@ -24,7 +24,7 @@ services:
       retries: 3
       start_period: 60s
     deploy:
-      replicas: 20
+      replicas: 10
       placement:
         constraints:
           - node.labels.prod_next == 1
