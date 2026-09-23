@@ -6,6 +6,7 @@
 ## 상태
 - **발견일**: 2026-01-27
 - **현재 상태**: 미해결 (카카오 서버 측 문제로 제어 불가)
+- ⚠️ **부분 정정됨 (2026-08-21)**: 후속 실측 조사에서 병목이 `/api/auth/callback/kakao` 단일 요청(794ms, 체인의 74%)으로 확정됐고, 우리 코드에도 제거 가능한 홉이 있다 → [`../bun/docs/tasks/tasks-kakao-login-latency.md`](../../bun/docs/tasks/tasks-kakao-login-latency.md). 아래 본문은 2026-01-27 시점 기록이다.
 - **적용된 조치**: 로딩 UX 개선
 
 ---
