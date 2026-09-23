@@ -32,7 +32,8 @@ Next.js 15 App Router + Bun 팀 협업/태스크 관리 웹앱. 백엔드는 형
 커밋·푸시·머지 · `docker`·`ssh` · 파일 삭제 · 새 의존성 추가 · 백엔드 API 계약에 영향을 주는 변경(백엔드 쪽 대응 필요 여부까지 알린다)
 
 ## Commands
-- 개발 `bun run dev` · 빌드 `bun run build` · 린트 `bun run lint` · 테스트 **`bun run test:run`**
+- 개발 `bun run dev` · 빌드 `bun run build` · 린트 `bun run lint` · 테스트 **`bun run test:run`** · 타입 `bun run typecheck` · 통합 **`bun run ci:core`**
+- ⚠️ Claude Code sandbox 안에서는 `build`가 Google Fonts(`next/font`) 차단으로 실패하거나 멈춘다 — 코드 문제가 아니다. sandbox 밖에서 판정한다
 
 ## 백엔드 레포 (`../bun`)
 - `../bun` 파일을 건드리면 PreToolUse 훅(`.claude/hooks/inject-sibling-claudemd.sh`)이 백엔드 규약을 자동 주입한다. 백엔드 `CLAUDE.md`는 주입 상한(약 9천 자)을 넘으므로 "지금 Read하라"는 지시가 온다 — 백엔드 파일을 다루기 전에 따른다.
