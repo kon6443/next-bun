@@ -8,7 +8,7 @@ import { useMemo } from 'react';
  * @note iOS Safari 성능 최적화
  * - backdrop-filter: blur() 사용 금지 (심각한 성능 저하)
  * - filter: blur() 최소화 (box-shadow로 대체)
- * - 참고: /docs/assistant_rules_ui.md
+ * - 참고: .claude/rules/ui.md
  */
 const AVATAR_THEMES = [
   {

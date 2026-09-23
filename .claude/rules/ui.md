@@ -1,3 +1,11 @@
+---
+paths:
+  - "src/**/*.tsx"
+  - "src/**/*.css"
+---
+
+> **로드 방식**: 위 `paths`의 파일을 읽는 순간 하네스가 자동 로드한다. 백엔드(`../bun`) 세션에서는 `inject-sibling-claudemd.sh`가 같은 glob으로 주입한다. 2026-09-23 `docs/assistant_rules_ui.md`에서 이동.
+
 ## UI/UX 개발 규칙
 
 이 문서는 UI/UX 관련 이슈 해결 경험을 바탕으로 정리한 규칙입니다.

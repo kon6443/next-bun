@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "additionalDirectories": [
+      "../bun"
+    ],
+    "deny": [
+      "Bash(pnpm db:migrate:up*)",
+      "Bash(pnpm db:migrate:fake*)",
+      "Bash(pnpm db:migrate:revert*)",
+      "Bash(pnpm db:migrate:list*)",
+      "Bash(pnpm * db:migrate:up*)",
+      "Bash(pnpm * db:migrate:fake*)",
+      "Bash(pnpm * db:migrate:revert*)",
+      "Bash(pnpm * db:migrate:list*)",
+      "Bash(npm run db:migrate:up*)",
+      "Bash(npm run db:migrate:fake*)",
+      "Bash(npm run db:migrate:revert*)",
+      "Bash(npm run db:migrate:list*)",
+      "Bash(npm * db:migrate:up*)",
+      "Bash(npm * db:migrate:fake*)",
+      "Bash(npm * db:migrate:revert*)",
+      "Bash(npm * db:migrate:list*)",
+      "Bash(npx typeorm migration:run*)",
+      "Bash(npx typeorm migration:revert*)",
+      "Bash(npx typeorm migration:show*)",
+      "Bash(tsx node_modules/typeorm/cli.js migration:run*)",
+      "Bash(tsx node_modules/typeorm/cli.js migration:revert*)",
+      "Bash(tsx node_modules/typeorm/cli.js migration:show*)",
+      "Bash(sqlplus*)",
+      "Bash(sql *)",
+      "Edit(.claude/settings.json)"
+    ],
+    "ask": [
+      "Bash(ssh *)",
+      "Bash(scp *)",
+      "Bash(redis-cli*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Edit|Write|MultiEdit|NotebookEdit|Glob|Grep|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/inject-sibling-claudemd.sh\" bun",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/inject-sibling-claudemd.sh\" --reset bun",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

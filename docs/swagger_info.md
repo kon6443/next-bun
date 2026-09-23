@@ -5,4 +5,4 @@
 
 ### 현재 주소
 - 백엔드 기본 주소: `http://localhost:3500`
-- Swagger 주소: `http://localhost:3500/api-docs`
+- Swagger 주소: `http://localhost:3500/api/v1/docs` (LOCAL 전용)
