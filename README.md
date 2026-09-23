@@ -11,7 +11,8 @@ Next.js 15 App Router + Bun 기반의 팀 협업/태스크 관리 웹앱. 백엔
 - `src/app/api`: API 라우트 (NextAuth 포함)
 - `src/lib/auth.ts`: NextAuth 설정
 - `src/services`: 백엔드 API 호출 레이어
-- `docs`: 영역별 규칙/가이드 문서 (라우팅은 [`CLAUDE.md`](CLAUDE.md))
+- `docs`: 영역별 규칙/가이드 문서 (라우팅은 [`CLAUDE.md`](CLAUDE.md)) · `docs/tasks`: 작업별 진행 기록
+- `.claude`: Claude Code 팀 공유 설정 — `settings.json`(권한·훅), `hooks/`(백엔드 규약 조건부 주입), `skills/`·`commands/`·`agents/`
 
 ## 인증/세션 흐름
 - NextAuth를 통해 Kakao 로그인 수행
@@ -27,6 +28,12 @@ Next.js 15 App Router + Bun 기반의 팀 협업/태스크 관리 웹앱. 백엔
 | 테스트 (1회) | `bun run test:run` |
 | 테스트 (watch) | `bun run test` |
 | 커버리지 | `bun run test:coverage` |
+| 타입 검사 | `bun run typecheck` |
+| **통합 검증** (lint → typecheck → test:run → build) | `bun run ci:core` |
 
 ## 배포
-`main` 브랜치에 push하면 `.github/workflows/oci_build_and_deploy_next.yml`이 이미지를 빌드해 배포한다.
+`main` 브랜치에 push하면 `.github/workflows/oci_build_and_deploy_next.yml`이 실행된다.
+1. `verify` 잡: lint → typecheck → test:run — 실패하면 배포하지 않는다
+2. `deploy` 잡: 이미지 빌드(Dockerfile의 `bun run build`) → 레지스트리 push → Swarm 배포
+
+`docs/**`·`*.md`만 바꾼 push는 워크플로를 트리거하지 않는다(`paths-ignore`).
