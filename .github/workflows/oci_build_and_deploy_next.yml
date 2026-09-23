@@ -10,7 +10,33 @@ on:
   workflow_dispatch:
 
 jobs:
+  # 배포 전 게이트: lint·typecheck·test 가 실패하면 이미지 빌드·배포로 넘어가지 않는다.
+  # build 는 아래 Docker 빌드(Dockerfile 의 `bun run build`)가 수행하므로 여기서 중복하지 않는다.
+  verify:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1   # Dockerfile 의 oven/bun:1 과 맞춘다
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test
+        run: bun run test:run
+
   deploy:
+    needs: verify
     runs-on: ubuntu-24.04-arm
     environment: prod
 
