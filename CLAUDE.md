@@ -2,19 +2,22 @@
 
 Next.js 15 App Router + Bun 팀 협업/태스크 관리 웹앱. 백엔드는 형제 레포 `../bun`(NestJS).
 
-**문서 경계** — 같은 내용을 두 곳에 쓰지 않는다: `README.md` = 사실·사용법 · **이 문서** = 규약·금지·라우팅 · `docs/assistant_*.md` = 영역별 상세 규칙 · `docs/tasks/*.md` = 진행 상황·결정 근거.
+**문서 경계** — 같은 내용을 두 곳에 쓰지 않는다: `README.md` = 사실·사용법 · **이 문서** = 규약·금지·라우팅 · `.claude/rules/*.md` = 파일 경로별 규칙(자동 로드) · `docs/assistant_*.md` = 경로로 표현 못 하는 절차·진단 규칙 · `docs/tasks/*.md` = 진행 상황·결정 근거.
 
-## 자동 라우팅 표
+## 자동 로드되는 것 (읽으라고 지시하지 않는다)
+- `.claude/rules/ui.md` — `src/**/*.tsx`·`*.css`를 읽는 순간 / `.claude/rules/nextauth.md` — `src/lib/auth.ts`·`src/app/api/auth/**` 등을 읽는 순간
+- 백엔드 규약 — `../bun` 파일을 건드리는 순간 훅이 주입 (아래 "백엔드 레포" 절)
+- 스킬 `bun` — 백엔드 API·계약을 보고 **설계하는 단계**에 요청 의도로 발동
 
-요청이 아래에 해당하면 **작업 시작 전에** 해당 문서를 Read한다. 둘 이상이면 모두 읽는다. (면제: 한 줄 수정·단순 조회)
+## 문서 라우팅 — 자동 로드되지 않는 문서
+
+요청이 아래에 해당하면 **작업 시작 전에** 해당 문서를 Read한다. 경로로 조건을 걸 수 없는 문서만 둔다. (면제: 한 줄 수정·단순 조회)
 
 | 트리거 | 읽을 파일 |
 |---|---|
-| UI·컴포넌트·스타일·모바일 반응형·iOS Safari·애니메이션 | `docs/assistant_rules_ui.md` |
-| 로그인·NextAuth·세션·카카오 | `docs/assistant_rules_nextauth.md` + `../bun/docs/tasks/tasks-kakao-login-latency.md`(지연 조사 — "카카오 탓" 결론은 부분 정정됐다) |
 | 성능·지연·병목 진단 | `docs/assistant_rules_diagnostics.md` |
+| 카카오 로그인 지연 | `../bun/docs/tasks/tasks-kakao-login-latency.md` — "카카오 탓" 결론은 부분 정정됐다 |
 | 반복 작업 절차(질문 → 실행 → 린트·빌드) | `docs/assistant_workflow.md` |
-| 백엔드 API·DTO·소켓 이벤트 계약 대조 | 아래 "백엔드 레포" 절 · 조사는 `backend-researcher` 에이전트 |
 | Swagger·백엔드 주소 | `docs/swagger_info.md` |
 
 ## 작업 경계

@@ -12,7 +12,7 @@ Next.js 15 App Router + Bun 기반의 팀 협업/태스크 관리 웹앱. 백엔
 - `src/lib/auth.ts`: NextAuth 설정
 - `src/services`: 백엔드 API 호출 레이어
 - `docs`: 영역별 규칙/가이드 문서 (라우팅은 [`CLAUDE.md`](CLAUDE.md)) · `docs/tasks`: 작업별 진행 기록
-- `.claude`: Claude Code 팀 공유 설정 — `settings.json`(권한·훅), `hooks/`(백엔드 규약 조건부 주입), `skills/`·`commands/`·`agents/`
+- `.claude`: Claude Code 팀 공유 설정 — `settings.json`(권한·훅), `rules/`(파일 경로별 규칙 — 자동 로드), `hooks/`(백엔드 규약 조건부 주입), `skills/`·`commands/`·`agents/`
 
 ## 인증/세션 흐름
 - NextAuth를 통해 Kakao 로그인 수행
