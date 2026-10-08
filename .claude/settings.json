@@ -48,6 +48,16 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.command // \"\"' | grep -q 'git commit' && printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"커밋 전 점검(리마인더, 차단 아님): bun run lint · bun run typecheck · 테스트 영역을 바꿨으면 bun run test:run · 변경 심볼 grep 전수 확인. main push는 곧 배포다.\"}}'; exit 0",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "SessionStart": [
