@@ -4,10 +4,7 @@
 카카오 로그인 시 간헐적으로 매우 오래 걸리는 현상 (200ms ~ 9,500ms)
 
 ## 상태
-- **발견일**: 2026-01-27
-- **현재 상태**: 미해결 (카카오 서버 측 문제로 제어 불가)
-- ⚠️ **부분 정정됨 (2026-08-21)**: 후속 실측 조사에서 병목이 `/api/auth/callback/kakao` 단일 요청(794ms, 체인의 74%)으로 확정됐고, 우리 코드에도 제거 가능한 홉이 있다 → [`../bun/docs/tasks/tasks-kakao-login-latency.md`](../../bun/docs/tasks/tasks-kakao-login-latency.md). 아래 본문은 2026-01-27 시점 기록이다.
-- **적용된 조치**: 로딩 UX 개선
+- 이 문서는 발견 시점(2026-01-27)의 기록이다. **현재 상태와 결론의 SSOT는 [`../bun/docs/tasks/tasks-kakao-login-latency.md`](../../bun/docs/tasks/tasks-kakao-login-latency.md)다** — 재조사 전에 그쪽부터 읽는다.
 
 ---
 

@@ -2,10 +2,10 @@
 
 Next.js 15 App Router + Bun 팀 협업/태스크 관리 웹앱. 백엔드는 형제 레포 `../bun`(NestJS).
 
-**문서 경계** — 같은 내용을 두 곳에 쓰지 않는다: `README.md` = 사실·사용법 · **이 문서** = 규약·금지·라우팅 · `.claude/rules/*.md` = 파일 경로별 규칙(자동 로드) · `docs/assistant_*.md` = 경로로 표현 못 하는 절차·진단 규칙 · `docs/tasks/*.md` = 진행 상황·결정 근거.
+**문서 경계** — 같은 내용을 두 곳에 쓰지 않는다: `README.md` = 사실·사용법 · **이 문서** = 규약·금지·라우팅 · `.claude/rules/*.md` = 파일 종류별 규칙(자동 로드) · `docs/*.md` = 경로로 표현 못 하는 절차·진단·참고 정보 · `docs/tasks/` = 진행 상황·결정 근거.
 
 ## 자동 로드되는 것 (읽으라고 지시하지 않는다)
-- `.claude/rules/ui.md` — `src/**/*.tsx`·`*.css`를 읽는 순간 / `.claude/rules/nextauth.md` — `src/lib/auth.ts`·`src/app/api/auth/**` 등을 읽는 순간
+- `.claude/rules/*.md` — 컴포넌트·스타일·API 서비스·소켓·인증·테스트 규칙. 각 파일의 `paths`에 맞는 파일을 읽거나 고치는 순간 로드된다. 파일을 열기 전 설계 단계라면 해당 규칙 파일을 직접 Read한다
 - 백엔드 규약 — `../bun` 파일을 건드리는 순간 훅이 주입 (아래 "백엔드 레포" 절)
 - 스킬 `bun` — 백엔드 API·계약을 보고 **설계하는 단계**에 요청 의도로 발동
 
@@ -16,9 +16,10 @@ Next.js 15 App Router + Bun 팀 협업/태스크 관리 웹앱. 백엔드는 형
 | 트리거 | 읽을 파일 |
 |---|---|
 | 성능·지연·병목 진단 | `docs/assistant_rules_diagnostics.md` |
-| 카카오 로그인 지연 | `../bun/docs/tasks/tasks-kakao-login-latency.md` — "카카오 탓" 결론은 부분 정정됐다 |
-| 반복 작업 절차(질문 → 실행 → 린트·빌드) | `docs/assistant_workflow.md` |
+| 카카오 로그인 지연 | `../bun/docs/tasks/tasks-kakao-login-latency.md` |
 | Swagger·백엔드 주소 | `docs/swagger_info.md` |
+| Claude 설정·훅·교차 로드 변경 | `../bun/docs/tasks/tasks-claude-config.md` |
+| 변경 코드 리뷰 | `/review-flow` → `review-front` 에이전트 |
 
 ## 작업 경계
 
@@ -27,9 +28,9 @@ Next.js 15 App Router + Bun 팀 협업/태스크 관리 웹앱. 백엔드는 형
 |---|---|
 | `bun run test` 실행 | watch 모드(`vitest`)라 끝나지 않는다 — 1회 실행은 **`bun run test:run`** |
 | 백엔드 DB 명령(`db:migrate:*`·`sqlplus`) | LOCAL과 PROD가 같은 DB — 실행이 곧 상용 적용. `.claude/settings.json`에서도 deny |
-| `backdrop-filter: blur()` | iOS Safari 성능 문제 → `box-shadow`로 대체 |
+| 새 코드에 `backdrop-filter: blur()`·`backdrop-blur-*` | iOS Safari 성능 문제 → `box-shadow`·반투명 배경으로 대체 |
 | 시크릿(`.env`·토큰)을 코드·로그·응답·문서에 기입 | 커밋 이력에 영구 보존된다 |
-| 사용자 지시 없는 `git commit`·`push` | `main` push가 곧 배포다(`.github/workflows/oci_build_and_deploy_next.yml` — `docs/**`·`*.md`만 바꾼 push는 제외) |
+| 사용자 지시 없는 `git commit`·`push` | `main` push가 곧 배포다 (배포 조건은 `README.md` "배포") |
 
 ### Ask — 실행 전 승인
 커밋·푸시·머지 · `docker`·`ssh` · 파일 삭제 · 새 의존성 추가 · 백엔드 API 계약에 영향을 주는 변경(백엔드 쪽 대응 필요 여부까지 알린다)
@@ -39,21 +40,14 @@ Next.js 15 App Router + Bun 팀 협업/태스크 관리 웹앱. 백엔드는 형
 - ⚠️ Claude Code sandbox 안에서는 `build`가 Google Fonts(`next/font`) 차단으로 실패하거나 멈춘다 — 코드 문제가 아니다. sandbox 밖에서 판정한다
 
 ## 백엔드 레포 (`../bun`)
-- `../bun` 파일을 건드리면 PreToolUse 훅(`.claude/hooks/inject-sibling-claudemd.sh`)이 백엔드 규약을 자동 주입한다. 백엔드 `CLAUDE.md`는 주입 상한(약 9천 자)을 넘으므로 "지금 Read하라"는 지시가 온다 — 백엔드 파일을 다루기 전에 따른다.
-- 백엔드 DB 명령(`db:migrate:*`·`sqlplus`)은 이 레포 `.claude/settings.json`에서도 deny다 — LOCAL과 PROD가 같은 DB라 실행이 곧 상용 적용이다.
-- Claude 설정·훅·교차 로드 작업 이력은 `../bun/docs/tasks/tasks-claude-config.md`가 SSOT다.
+- `../bun` 파일을 건드리면 PreToolUse 훅(`.claude/hooks/inject-sibling-claudemd.sh`)이 백엔드 규약을 주입한다. 훅이 "지금 Read하라"고 지시하면 백엔드 파일을 다루기 전에 따른다.
 
 ## Conventions
 - 한국어 UI (라벨, 에러 메시지, 토스트 모두 한국어)
-- 날짜: UTC 저장, 로컬 표시 (DB는 UTC, 브라우저에서 로컬 타임존으로 변환하여 표시)
-- glass-morphism: `bg-slate-800/50 border-slate-700/50`
+- 날짜: UTC 저장, 로컬 표시 — 변환은 `src/app/utils/dateUtils.ts`
 - 태스크 상태 추가/변경 시 `src/app/config/taskStatusConfig.ts` 참조
 - 역할 권한 변경 시 `src/app/config/roleConfig.ts` 참조
-- API 함수 추가 시 `src/services/teamService.ts` 패턴 따르기 (ApiError + ErrorCode)
-- 소켓 이벤트 추가 시 `src/types/socket.ts` 타입 먼저 정의
-- 소켓 핸들러에서 self-event filtering 필수 (본인 이벤트는 HTTP 응답으로 이미 처리)
-- 낙관적 업데이트: UI 먼저 반영, API 실패 시 롤백
-- 확인 모달: 되돌리기 어려운 액션(연동 해제, 보관함 이동 등)에 `ConfirmModal` 사용. soft delete(댓글 삭제)는 모달 없이 바로 실행 + 토스트
+- API 호출은 `src/services/`, 소켓 타입은 `src/types/socket.ts` — 세부 규칙은 해당 파일을 열면 자동 로드된다
 
 ## Definition of Done (이 레포)
 글로벌 DoD에 더해:
