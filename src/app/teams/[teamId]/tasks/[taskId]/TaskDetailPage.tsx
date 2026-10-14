@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import {
   getTaskDetail,
@@ -32,6 +33,7 @@ import { StatusDropdown } from '@/app/components/StatusDropdown';
 import { ConfirmModal } from '@/app/components/ConfirmModal';
 import { EditIcon, TrashIcon, CommentIcon, SendIcon, ArchiveIcon, RestoreIcon } from '@/app/components/Icons';
 import { formatCompactDateTime } from '@/app/utils/taskUtils';
+import { loadBoardState, consumeTaskOpenedFromBoard } from '@/app/utils/boardStateStorage';
 import { getStatusBorderClassName, type TaskStatusKey } from '@/app/config/taskStatusConfig';
 import { cardStyles } from '@/styles/teams';
 import { useTeamTaskId, useTeamSocketEvents } from '@/app/hooks';
@@ -68,10 +70,30 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
   const [isUpdatingComment, setIsUpdatingComment] = useState(false);
   const [isDeletingComment, setIsDeletingComment] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
+
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
 
   // useTeamTaskId 훅으로 ID 파싱 통합
   const { teamIdNum, taskIdNum, isValid: isValidIds } = useTeamTaskId(teamId, taskId);
+
+  // "팀 보드로 돌아가기": 보드에서 열었으면 history back(스크롤·탭·필터 복원), 아니면 마지막 보기(?view)로 이동
+  const router = useRouter();
+  const [boardHref, setBoardHref] = useState(`/teams/${teamId}`);
+  const [isOpenedFromBoard, setIsOpenedFromBoard] = useState(false);
+  useEffect(() => {
+    // sessionStorage는 클라이언트에서만 읽는다 (SSR href와 어긋나지 않게 마운트 후 갱신)
+    const { view } = loadBoardState(teamId);
+    setBoardHref(view && view !== 'kanban' ? `/teams/${teamId}?view=${view}` : `/teams/${teamId}`);
+    // 표시는 1회용 — 개발 모드에서 effect가 두 번 돌아도 true를 false로 덮지 않는다
+    if (consumeTaskOpenedFromBoard(teamId, taskIdNum)) setIsOpenedFromBoard(true);
+  }, [teamId, taskIdNum]);
+  const handleBackToBoard = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    // 새 탭 열기 등 수정 키 클릭은 링크 기본 동작에 맡긴다
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    if (!isOpenedFromBoard) return;
+    e.preventDefault();
+    router.back();
+  };
 
   // 댓글 목록 (taskDetail에서 직접 참조)
   const comments = taskDetail?.comments ?? [];
@@ -502,7 +524,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
       <TeamsPageLayout>
         <div className={`${cardStyles.errorSection} p-4 text-center`}>
           <p className='text-base font-semibold text-red-400'>{error}</p>
-          <ButtonLink href={`/teams/${teamId}`} variant='secondary' size='lg' className='mt-4'>
+          <ButtonLink href={boardHref} onClick={handleBackToBoard} variant='secondary' size='lg' className='mt-4'>
             팀 보드로 돌아가기
           </ButtonLink>
         </div>
@@ -518,7 +540,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
     <TeamsPageLayout>
       {/* 헤더 */}
       <div className='flex items-center justify-between'>
-        <ButtonLink href={`/teams/${teamId}`} variant='secondary' size='lg'>
+        <ButtonLink href={boardHref} onClick={handleBackToBoard} variant='secondary' size='lg'>
           ← 팀 보드로 돌아가기
         </ButtonLink>
       </div>

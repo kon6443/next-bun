@@ -8,6 +8,7 @@ import { normalizeDate, generateCalendarGrid, splitIntoWeeks, WEEKDAYS_KO, isWee
 import { getStatusBgClassName, getStatusBorderClassName } from '../config/taskStatusConfig';
 import { viewContainerStyles } from '@/styles/teams';
 import { CloseIcon } from './Icons';
+import { markTaskOpenedFromBoard } from '../utils/boardStateStorage';
 
 type CalendarViewProps = {
   tasks: Task[];
@@ -22,6 +23,9 @@ type PopoverState = {
   tasks: Task[];
   position: { top: number; left: number };
 };
+
+/** 더보기 팝오버 너비 (w-64) */
+const POPOVER_WIDTH = 256;
 
 // 마감일 상태에 따른 테두리 색상
 const deadlineBorderColors: Record<DeadlineStatus, string> = {
@@ -156,6 +160,7 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
     position: { top: 0, left: 0 },
   });
   const popoverRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -177,15 +182,20 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
   // 더보기 클릭 핸들러
   const handleMoreClick = (e: React.MouseEvent, date: Date, allTasks: Task[]) => {
     e.stopPropagation();
+    const container = containerRef.current;
+    if (!container) return;
+    // 팝오버는 컨테이너 기준 absolute — 버튼 위치를 컨테이너 좌표로 변환한다 (페이지 스크롤과 함께 움직임)
     const rect = (e.target as HTMLElement).getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    const left = rect.left - containerRect.left - container.clientLeft;
     setPopover({
       isOpen: true,
       dateKey: formatDateKey(date),
       date,
       tasks: allTasks,
       position: {
-        top: rect.bottom + window.scrollY + 8,
-        left: Math.min(rect.left, window.innerWidth - 280),
+        top: rect.bottom - containerRect.top - container.clientTop + 8,
+        left: Math.max(0, Math.min(left, container.clientWidth - POPOVER_WIDTH)),
       },
     });
   };
@@ -252,11 +262,12 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
 
   const handleTaskClick = (e: React.MouseEvent, taskId: number) => {
     e.stopPropagation();
+    markTaskOpenedFromBoard(teamId, taskId);
     router.push(`/teams/${teamId}/tasks/${taskId}`);
   };
 
   return (
-    <div className={viewContainerStyles}>
+    <div ref={containerRef} className={`relative ${viewContainerStyles}`}>
       {/* 헤더 */}
       <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
@@ -474,7 +485,7 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
       {popover.isOpen && (
         <div
           ref={popoverRef}
-          className="fixed z-50 w-64 max-h-80 overflow-y-auto rounded-xl border border-white/10 bg-slate-800/95 backdrop-blur-sm shadow-xl"
+          className="absolute z-50 w-64 max-h-80 overflow-y-auto rounded-xl border border-white/10 bg-slate-800/95 shadow-xl"
           style={{
             top: popover.position.top,
             left: popover.position.left,
