@@ -18,10 +18,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # next·tsc·vitest bin 은 `#!/usr/bin/env node` 라 러너 기본 Node 로 돈다 — 메이저를 고정해 비결정성을 없애고 백엔드 런타임(Node 24)과 맞춘다
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1   # Dockerfile 의 oven/bun:1 과 맞춘다
+
+      # setup-bun 이후에도 PATH 의 node 가 위에서 고정한 24 인지 로그로 남긴다
+      - name: Show Node version
+        run: which node && node -v
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
