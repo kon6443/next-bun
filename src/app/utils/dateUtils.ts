@@ -80,6 +80,14 @@ export const DEFAULT_START_TIME = '00:00';
 /** 종료일 기본 시간 */
 export const DEFAULT_END_TIME = '23:59';
 
+/** 날짜 + 시간 → 로컬로 해석한 Date (시작 :00초, 종료 :59초). 날짜가 없으면 null */
+function toTaskDate(date: string, time: string | undefined, type: 'start' | 'end'): Date | null {
+  if (!date) return null;
+  const t = time || (type === 'start' ? DEFAULT_START_TIME : DEFAULT_END_TIME);
+  const seconds = type === 'start' ? '00' : '59';
+  return new Date(`${date}T${t}:${seconds}`);
+}
+
 /**
  * 날짜(YYYY-MM-DD) + 시간(HH:MM) → ISO datetime 문자열 조합
  * 브라우저가 로컬(KST)로 해석 후 UTC 변환하여 ISO 문자열로 반환
@@ -90,10 +98,23 @@ export function buildTaskDatetime(
   time: string | undefined,
   type: 'start' | 'end',
 ): string | null {
-  if (!date) return null;
-  const t = time || (type === 'start' ? DEFAULT_START_TIME : DEFAULT_END_TIME);
-  const seconds = type === 'start' ? '00' : '59';
-  return new Date(`${date}T${t}:${seconds}`).toISOString();
+  return toTaskDate(date, time, type)?.toISOString() ?? null;
+}
+
+/**
+ * 시작 > 종료인지 판정 (buildTaskDatetime과 같은 기준 — 시작 :00초, 종료 :59초)
+ * 렌더 중 호출되므로 던지지 않는다: 날짜가 없거나 해석 불가(예: 5자리 연도)면 false
+ */
+export function isTaskRangeInverted(
+  startDate: string,
+  startTime: string | undefined,
+  endDate: string,
+  endTime: string | undefined,
+): boolean {
+  const start = toTaskDate(startDate, startTime, 'start')?.getTime();
+  const end = toTaskDate(endDate, endTime, 'end')?.getTime();
+  if (start === undefined || end === undefined || Number.isNaN(start) || Number.isNaN(end)) return false;
+  return start > end;
 }
 
 /**
