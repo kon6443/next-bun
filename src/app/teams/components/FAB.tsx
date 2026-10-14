@@ -13,7 +13,7 @@ type FABProps = {
 };
 
 const fabWrapperStyles =
-  'pointer-events-none fixed inset-x-0 bottom-36 z-50 mx-auto flex max-w-lg justify-end px-4';
+  'pointer-events-none fixed inset-x-0 bottom-[calc(9rem+env(safe-area-inset-bottom))] z-50 mx-auto flex max-w-lg justify-end px-4';
 
 const fabStyles =
   'pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 text-white shadow-lg shadow-sky-500/40 transition hover:brightness-110 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed';
@@ -21,7 +21,7 @@ const fabStyles =
 /**
  * FAB (Floating Action Button) 컴포넌트
  * - 모바일 레이아웃(max-w-lg) 우하단에 정렬
- * - BottomNavBar 위에 위치 (bottom-36)
+ * - BottomNavBar 위에 위치 (9rem + 하단 safe-area)
  * - 주요 액션용 (새 카드 작성, 팀 생성 등)
  */
 export function FAB({ href, onClick, label = '추가', disabled = false }: FABProps) {

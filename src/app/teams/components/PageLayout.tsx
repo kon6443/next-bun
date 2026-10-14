@@ -54,7 +54,7 @@ type CenteredLayoutProps = {
 export function TeamsCenteredLayout({ children }: CenteredLayoutProps) {
   return (
     <div className={layoutStyles.pageContainer} style={teamsPageBackground}>
-      <div className="relative z-10 flex min-h-screen items-center justify-center px-4">
+      <div className="relative z-10 flex min-h-screen supports-[height:100dvh]:min-h-dvh items-center justify-center px-4">
         {children}
       </div>
     </div>

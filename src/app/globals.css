@@ -14,6 +14,8 @@
 
 body {
   min-height: 100vh;
+  /* 모바일 주소창 변화에 맞춰 실제 보이는 높이를 쓴다 (미지원 브라우저는 위 100vh) */
+  min-height: 100dvh;
   margin: 0;
   background-color: var(--background);
   color: var(--foreground);
