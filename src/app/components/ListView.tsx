@@ -104,6 +104,15 @@ export function ListView({ tasks, teamId, isArchiveView, onRestore }: ListViewPr
     router.push(`/teams/${teamId}/tasks/${taskId}`);
   };
 
+  // 키보드로 행 열기 (Enter 또는 Space). 행 안의 버튼(복원 등)에서 올라온 키는 무시한다
+  const handleRowKeyDown = (e: React.KeyboardEvent, taskId: number) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleRowClick(taskId);
+    }
+  };
+
   return (
     <div className={viewContainerStyles}>
       <ViewHeader title="List View" subtitle="컬럼 클릭으로 정렬" count={tasks.length} />
@@ -171,8 +180,10 @@ export function ListView({ tasks, teamId, isArchiveView, onRestore }: ListViewPr
                 return (
                   <tr
                     key={task.taskId}
-                    className={`cursor-pointer border-b border-white/5 transition hover:bg-white/5 ${deadlineStyles[deadlineStatus].bg}`}
+                    className={`cursor-pointer border-b border-white/5 transition hover:bg-white/5 focus:outline-none focus:bg-white/10 focus:ring-2 focus:ring-inset focus:ring-sky-500/50 ${deadlineStyles[deadlineStatus].bg}`}
                     onClick={() => handleRowClick(task.taskId)}
+                    onKeyDown={(e) => handleRowKeyDown(e, task.taskId)}
+                    tabIndex={0}
                   >
                     <td className="px-4 py-3">
                       <div className="max-w-[200px]">

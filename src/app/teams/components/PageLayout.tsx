@@ -34,11 +34,12 @@ export function TeamsPageLayout({
 
   return (
     <div className={layoutStyles.pageContainer} style={teamsPageBackground}>
-      <main
+      {/* 루트 layout.tsx가 이미 <main>으로 감싸므로 여기서는 div (main 중첩 방지) */}
+      <div
         className={`${layoutStyles.mainContent} ${bottomPadding} ${maxWidthClasses[maxWidth]}`}
       >
         {children}
-      </main>
+      </div>
     </div>
   );
 }

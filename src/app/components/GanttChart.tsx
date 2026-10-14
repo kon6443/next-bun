@@ -71,6 +71,14 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
     router.push(`/teams/${teamId}/tasks/${taskId}`);
   };
 
+  // 키보드로 태스크 열기 (Enter 또는 Space) — TaskCard와 같은 방식
+  const handleTaskKeyDown = (e: React.KeyboardEvent, taskId: number) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleTaskClick(taskId);
+    }
+  };
+
   // 태스크의 막대 위치 및 너비 계산
   const getBarStyle = (task: Task) => {
     if (!task.startAt) return null;
@@ -137,8 +145,11 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
                   <div key={task.taskId} className={`group flex items-center hover:bg-white/5 ${deadlineStyles[deadlineStatus].bg}`}>
                     {/* 태스크 이름 */}
                     <div
-                      className="w-[200px] flex-shrink-0 cursor-pointer truncate px-3 py-3"
+                      className="w-[200px] flex-shrink-0 cursor-pointer truncate px-3 py-3 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-sky-500/50"
                       onClick={() => handleTaskClick(task.taskId)}
+                      onKeyDown={(e) => handleTaskKeyDown(e, task.taskId)}
+                      tabIndex={0}
+                      role="button"
                     >
                       <span className="text-sm font-medium text-slate-200 group-hover:text-white">
                         {task.taskName}
@@ -210,8 +221,11 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
                 return (
                   <div key={task.taskId} className={`group flex items-center hover:bg-white/5 ${deadlineStyles[deadlineStatus].bg}`}>
                     <div
-                      className="w-[200px] flex-shrink-0 cursor-pointer truncate px-3 py-3"
+                      className="w-[200px] flex-shrink-0 cursor-pointer truncate px-3 py-3 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-sky-500/50"
                       onClick={() => handleTaskClick(task.taskId)}
+                      onKeyDown={(e) => handleTaskKeyDown(e, task.taskId)}
+                      tabIndex={0}
+                      role="button"
                     >
                       <span className="text-sm font-medium text-slate-200 group-hover:text-white">
                         {task.taskName}

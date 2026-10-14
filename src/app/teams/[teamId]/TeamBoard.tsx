@@ -10,7 +10,7 @@ import { ListView } from '../../components/ListView';
 import { CalendarView } from '../../components/CalendarView';
 import { TaskFilters } from '../../components/TaskFilters';
 import { Kanban } from '../../components/Kanban';
-import { TeamsPageLayout, SectionLabel, ErrorAlert, TeamBoardSkeleton, ListViewSkeleton, Skeleton, FAB, IconButton } from '../components';
+import { TeamsPageLayout, SectionLabel, ErrorAlert, KanbanBoardSkeleton, ListViewSkeleton, Skeleton, FAB, IconButton } from '../components';
 import { EditIcon, UserGroupIcon, PlusIcon, QuestionMarkIcon, CommentIcon } from '../../components/Icons';
 import { DropdownMenu } from './components/DropdownMenu';
 import type { Task } from '../../types/task';
@@ -927,7 +927,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
         {/* 뷰 렌더링 - 로딩 시 스켈레톤 표시 */}
         {isLoading ? (
-          viewMode === 'list' ? <ListViewSkeleton /> : <TeamBoardSkeleton />
+          viewMode === 'list' ? <ListViewSkeleton /> : <KanbanBoardSkeleton />
         ) : viewMode === 'kanban' ? (
           <Kanban tasksByColumn={filteredTasksByColumn} onStatusChange={handleStatusChange} teamId={teamId} isArchiveView={dataTab === 'archive'} onRestore={handleRestore} onArchive={dataTab === 'active' ? handleArchive : undefined} />
         ) : viewMode === 'gantt' ? (

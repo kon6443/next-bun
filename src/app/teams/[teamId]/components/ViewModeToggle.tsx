@@ -33,6 +33,7 @@ export function ViewModeToggle({ viewMode, onViewModeChange, dataTab, onDataTabC
           <button
             key={key}
             onClick={() => onDataTabChange(key)}
+            aria-pressed={dataTab === key}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${
               dataTab === key
                 ? 'bg-gradient-to-r from-indigo-500/20 to-sky-500/20 text-sky-400 border border-sky-500/30'
@@ -52,6 +53,8 @@ export function ViewModeToggle({ viewMode, onViewModeChange, dataTab, onDataTabC
             key={key}
             onClick={() => onViewModeChange(key)}
             title={title}
+            aria-label={title}
+            aria-pressed={viewMode === key}
             className={`p-2.5 rounded-lg transition ${
               viewMode === key
                 ? 'bg-gradient-to-r from-indigo-500/20 to-sky-500/20 text-sky-400 border border-sky-500/30'

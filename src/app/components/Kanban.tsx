@@ -82,6 +82,8 @@ export function Kanban({ tasksByColumn, onStatusChange, teamId, isArchiveView, o
               <button
                 key={status.key}
                 onClick={() => scrollToColumn(index)}
+                aria-label={`${status.label} ${taskCount}개`}
+                aria-current={isActive ? 'true' : undefined}
                 className={`min-w-[56px] flex-1 flex flex-col items-center py-2 px-3 rounded-xl transition-all duration-200 ${
                   isActive
                     ? 'bg-gradient-to-r from-indigo-500/20 to-sky-500/20 border border-white/10 scale-105'
