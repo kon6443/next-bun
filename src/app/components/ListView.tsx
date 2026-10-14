@@ -9,6 +9,7 @@ import { EmptyState } from '../teams/components';
 import { ChevronUpIcon, ChevronDownIcon } from './Icons';
 import { viewContainerStyles } from '@/styles/teams';
 import { ViewHeader } from './ViewHeader';
+import { markTaskOpenedFromBoard } from '../utils/boardStateStorage';
 
 type ListViewProps = {
   tasks: Task[];
@@ -101,6 +102,7 @@ export function ListView({ tasks, teamId, isArchiveView, onRestore }: ListViewPr
   };
 
   const handleRowClick = (taskId: number) => {
+    markTaskOpenedFromBoard(teamId, taskId);
     router.push(`/teams/${teamId}/tasks/${taskId}`);
   };
 

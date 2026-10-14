@@ -8,6 +8,7 @@ import { normalizeDate, generateCalendarGrid, splitIntoWeeks, WEEKDAYS_KO, isWee
 import { getStatusBgClassName, getStatusBorderClassName } from '../config/taskStatusConfig';
 import { viewContainerStyles } from '@/styles/teams';
 import { CloseIcon } from './Icons';
+import { markTaskOpenedFromBoard } from '../utils/boardStateStorage';
 
 type CalendarViewProps = {
   tasks: Task[];
@@ -261,6 +262,7 @@ export function CalendarView({ tasks, teamId }: CalendarViewProps) {
 
   const handleTaskClick = (e: React.MouseEvent, taskId: number) => {
     e.stopPropagation();
+    markTaskOpenedFromBoard(teamId, taskId);
     router.push(`/teams/${teamId}/tasks/${taskId}`);
   };
 

@@ -9,6 +9,7 @@ import { getStatusMeta, getStatusColors, getStatusTextColor } from '../config/ta
 import { EmptyState } from '../teams/components';
 import { viewContainerStyles } from '@/styles/teams';
 import { ViewHeader } from './ViewHeader';
+import { markTaskOpenedFromBoard } from '../utils/boardStateStorage';
 
 type GanttChartProps = {
   tasks: Task[];
@@ -68,6 +69,7 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
   }, [sortedTasks.withStartDate]);
 
   const handleTaskClick = (taskId: number) => {
+    markTaskOpenedFromBoard(teamId, taskId);
     router.push(`/teams/${teamId}/tasks/${taskId}`);
   };
 
