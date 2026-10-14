@@ -210,7 +210,8 @@ export function filterByPeriod(tasks: Task[], period: PeriodFilter): Task[] {
 
       case 'thisWeek': {
         const weekEnd = new Date(today);
-        weekEnd.setDate(today.getDate() + (7 - today.getDay()));
+        // 주는 월~일 — 일요일(getDay()=0)은 오늘이 주의 마지막 날
+        weekEnd.setDate(today.getDate() + ((7 - today.getDay()) % 7));
         return endDateOnly && endDateOnly >= today && endDateOnly <= weekEnd;
       }
 
@@ -220,7 +221,8 @@ export function filterByPeriod(tasks: Task[], period: PeriodFilter): Task[] {
       }
 
       case 'overdue':
-        return endDateOnly && endDateOnly < today && task.taskStatus !== 3;
+        return endDateOnly && endDateOnly < today
+          && task.taskStatus !== STATUS_COMPLETED && task.taskStatus !== STATUS_CANCELLED;
 
       default:
         return true;

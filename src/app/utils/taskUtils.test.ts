@@ -22,6 +22,7 @@ import {
   formatDateKey,
   formatDateDisplay,
   formatFullDateTime,
+  filterByPeriod,
 } from './taskUtils';
 import type { Task } from '../types/task';
 
@@ -265,6 +266,35 @@ describe('taskUtils', () => {
       expect(formatFullDateTime(new Date(2025, 0, 15, 0, 0))).toContain('00:00');
       expect(formatFullDateTime(new Date(2025, 0, 15, 0, 30))).toContain('00:30');
       expect(formatFullDateTime(new Date(2025, 0, 15, 0, 30))).not.toContain('24:');
+    });
+  });
+
+  describe('filterByPeriod', () => {
+    const taskEndingAt = (endAt: Date, taskStatus = 2): Task => ({
+      taskId: 1, teamId: 1, taskName: 'T', taskStatus, actStatus: 1, crtdAt: new Date(), crtdBy: 1,
+      startAt: null, endAt, completedAt: null, taskDescription: '', userName: 'U',
+    });
+    // 2026-10-19(월) ~ 2026-10-25(일) 주
+    const sat = taskEndingAt(new Date(2026, 9, 24, 23, 59, 59));
+    const sun = taskEndingAt(new Date(2026, 9, 25, 23, 59, 59));
+    const nextMon = taskEndingAt(new Date(2026, 9, 26, 23, 59, 59));
+
+    it('thisWeek: 월요일이면 그 주 일요일까지 포함', () => {
+      vi.setSystemTime(new Date(2026, 9, 19, 10, 0));
+      expect(filterByPeriod([sat, sun, nextMon], 'thisWeek')).toEqual([sat, sun]);
+    });
+
+    it('thisWeek: 일요일이면 오늘(주의 마지막 날)까지만 — 다음 주를 포함하지 않음', () => {
+      vi.setSystemTime(new Date(2026, 9, 25, 10, 0));
+      expect(filterByPeriod([sat, sun, nextMon], 'thisWeek')).toEqual([sun]);
+    });
+
+    it('overdue: 마감이 지난 완료·취소 태스크는 제외', () => {
+      vi.setSystemTime(new Date(2026, 9, 25, 10, 0));
+      const inProgress = taskEndingAt(new Date(2026, 9, 20, 23, 59, 59), 2);
+      const completed = taskEndingAt(new Date(2026, 9, 20, 23, 59, 59), 3);
+      const cancelled = taskEndingAt(new Date(2026, 9, 20, 23, 59, 59), 5);
+      expect(filterByPeriod([inProgress, completed, cancelled], 'overdue')).toEqual([inProgress]);
     });
   });
 
