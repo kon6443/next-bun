@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useId } from 'react';
 import { TASK_STATUS, type TaskStatusKey } from '../config/taskStatusConfig';
 import { ChevronDownIcon } from './Icons';
 import { useClickOutside } from '../hooks';
@@ -18,6 +18,8 @@ export function StatusDropdown({ currentStatus, onStatusChange, disabled = false
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  // 같은 상태의 카드가 여러 개여도 aria id가 겹치지 않도록 인스턴스마다 고유 id
+  const instanceId = useId();
 
   // 현재 상태 메타데이터
   const currentStatusMeta = TASK_STATUS[currentStatus] || TASK_STATUS[1];
@@ -122,7 +124,7 @@ export function StatusDropdown({ currentStatus, onStatusChange, disabled = false
     }
   };
 
-  const dropdownId = `status-dropdown-${currentStatus}`;
+  const dropdownId = `status-dropdown-${instanceId}`;
 
   return (
     <div ref={dropdownRef} className='relative'>

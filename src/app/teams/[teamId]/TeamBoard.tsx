@@ -10,7 +10,7 @@ import { ListView } from '../../components/ListView';
 import { CalendarView } from '../../components/CalendarView';
 import { TaskFilters } from '../../components/TaskFilters';
 import { Kanban } from '../../components/Kanban';
-import { TeamsPageLayout, SectionLabel, ErrorAlert, TeamBoardSkeleton, ListViewSkeleton, Skeleton, FAB, IconButton } from '../components';
+import { TeamsPageLayout, SectionLabel, ErrorAlert, KanbanBoardSkeleton, ListViewSkeleton, Skeleton, FAB, IconButton } from '../components';
 import { EditIcon, UserGroupIcon, PlusIcon, QuestionMarkIcon, CommentIcon } from '../../components/Icons';
 import { DropdownMenu } from './components/DropdownMenu';
 import type { Task } from '../../types/task';
@@ -28,6 +28,7 @@ import {
   type TeamUserResponse,
 } from '@/services/teamService';
 import { cardStyles } from '@/styles/teams';
+import { loadBoardState, saveBoardState, consumeBoardReturn } from '../../utils/boardStateStorage';
 import { STATUS_TO_COLUMN, type ColumnKey } from '../../config/taskStatusConfig';
 import { TeamManagementSection, InviteModal, RoleChangeModal, ViewModeToggle, OnlineUsers, TutorialGuide, hasSeenTutorial, markTutorialSeen, TeamChatPanel, type ViewMode, type DataTab } from './components';
 import { ROLES } from '../../config/roleConfig';
@@ -103,6 +104,18 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
   // 데이터 탭: 활성 / 보관함
   const [dataTab, setDataTab] = useState<DataTab>('active');
+
+  // 보드 상태 복원 (sessionStorage) — 복원이 끝나야 첫 조회를 시작해 저장된 탭으로 한 번만 불러온다
+  const [isBoardStateRestored, setIsBoardStateRestored] = useState(false);
+  const [kanbanColumnIndex, setKanbanColumnIndex] = useState(0);
+  const pendingScrollYRef = useRef<number | null>(null);
+  // 상세에서 돌아온 진입인지 (팀별 1회 판정)
+  const returningRef = useRef<{ teamId: string; returning: boolean } | null>(null);
+  // 스크롤을 저장할 때의 보기 — 다른 보기로 들어오면 그 위치는 의미가 없어 복원하지 않는다
+  const pendingScrollViewRef = useRef<ViewMode | undefined>(undefined);
+  const isScrollTrackingRef = useRef(false);
+  // 마지막으로 조회를 시작한 데이터 탭 — 첫 조회와 탭 전환 조회가 겹치지 않게 한다
+  const fetchedTabRef = useRef<DataTab | null>(null);
 
   // 튜토리얼 가이드 상태
   const [showTutorial, setShowTutorial] = useState(false);
@@ -442,6 +455,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
   // 초기 로딩: 팀 정보 + 멤버 + 통합 + 태스크 (페이지 진입 시 1회)
   useEffect(() => {
+    if (!isBoardStateRestored) return;
     if (sessionStatus === 'loading') return;
 
     if (!session?.user?.accessToken) {
@@ -451,6 +465,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     }
 
     const fetchTeamData = async () => {
+      fetchedTabRef.current = dataTab;
       setIsLoading(true);
       setError(null);
       try {
@@ -505,18 +520,15 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     };
 
     fetchTeamData();
-  }, [teamId, teamIdNum, session?.user?.accessToken, session?.user?.userId, sessionStatus]); // dataTab 제외: 탭 전환은 아래 별도 useEffect
+  }, [teamId, teamIdNum, session?.user?.accessToken, session?.user?.userId, sessionStatus, isBoardStateRestored]); // dataTab 제외: 탭 전환은 아래 별도 useEffect
 
   // 데이터 탭 전환 시 태스크만 재조회 (멤버/통합 재호출 불필요)
-  const isInitialMount = useRef(true);
   useEffect(() => {
-    // 초기 마운트 시에는 위 useEffect에서 이미 호출하므로 스킵
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-
+    if (!isBoardStateRestored) return;
     if (!session?.user?.accessToken || isNaN(teamIdNum)) return;
+    // 위 첫 조회가 이미 이 탭으로 불러왔으면 스킵
+    if (fetchedTabRef.current === dataTab) return;
+    fetchedTabRef.current = dataTab;
 
     const fetchTasksOnly = async () => {
       setIsLoading(true);
@@ -531,7 +543,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     };
 
     fetchTasksOnly();
-  }, [dataTab, teamIdNum, session?.user?.accessToken, fetchAndSetTasks]);
+  }, [dataTab, teamIdNum, session?.user?.accessToken, fetchAndSetTasks, isBoardStateRestored]);
 
   // 모든 태스크를 하나의 배열로 합침
   const allTasks = useMemo(
@@ -547,11 +559,59 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     setPeriod,
     setStatus,
     resetFilters,
+    restoreFilters,
     filteredTasks,
     stats,
     assignees,
     hasActiveFilters,
   } = useTaskFilter(allTasks);
+
+  // 저장된 보드 상태 복원 (마운트 시 1회, 클라이언트에서만) — 상세에서 돌아온 진입일 때만 복원한다
+  useEffect(() => {
+    // 개발 모드에서 effect가 두 번 돌아도 첫 판정을 유지 (표시는 1회용이라 두 번째는 false)
+    if (returningRef.current?.teamId !== teamId) {
+      returningRef.current = { teamId, returning: consumeBoardReturn(teamId) };
+    }
+    const saved = returningRef.current.returning ? loadBoardState(teamId) : {};
+    if (saved.dataTab) setDataTab(saved.dataTab);
+    if (saved.filters) restoreFilters(saved.filters);
+    if (saved.kanbanColumnIndex !== undefined) setKanbanColumnIndex(saved.kanbanColumnIndex);
+    pendingScrollYRef.current = saved.scrollY ?? null;
+    pendingScrollViewRef.current = saved.view;
+    setIsBoardStateRestored(true);
+  }, [teamId, restoreFilters]);
+
+  // 첫 로딩이 끝나 콘텐츠 높이가 잡힌 뒤 스크롤 위치 복원, 이후부터 스크롤 저장 시작
+  useEffect(() => {
+    if (!isBoardStateRestored || isLoading || isScrollTrackingRef.current) return;
+    const savedY = pendingScrollYRef.current;
+    pendingScrollYRef.current = null;
+    if (savedY !== null && pendingScrollViewRef.current === viewMode) {
+      requestAnimationFrame(() => window.scrollTo(0, savedY));
+    }
+    isScrollTrackingRef.current = true;
+  }, [isBoardStateRestored, isLoading, viewMode]);
+
+  // 스크롤 위치 저장 (멈춘 뒤 한 번)
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const handleScroll = () => {
+      if (!isScrollTrackingRef.current) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => saveBoardState(teamId, { scrollY: Math.round(window.scrollY) }), 150);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [teamId]);
+
+  // 탭·필터·보기·칸반 컬럼 저장 (복원이 끝난 뒤부터 — 복원 전 기본값으로 덮어쓰지 않게)
+  useEffect(() => {
+    if (!isBoardStateRestored) return;
+    saveBoardState(teamId, { dataTab, filters, view: viewMode, kanbanColumnIndex });
+  }, [teamId, isBoardStateRestored, dataTab, filters, viewMode, kanbanColumnIndex]);
 
   // 필터된 태스크를 컬럼별로 분류
   const filteredTasksByColumn = useMemo(() => {
@@ -859,6 +919,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           statsCards={statsCards}
           canManageInvites={canManageInvites}
           invites={invites}
+          onOpenInvite={() => setShowInviteModal(true)}
           telegramStatus={telegramStatus}
           isLoadingTelegram={isLoadingTelegram}
           isCreatingTelegramLink={isCreatingTelegramLink}
@@ -927,9 +988,9 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
         {/* 뷰 렌더링 - 로딩 시 스켈레톤 표시 */}
         {isLoading ? (
-          viewMode === 'list' ? <ListViewSkeleton /> : <TeamBoardSkeleton />
+          viewMode === 'list' ? <ListViewSkeleton /> : <KanbanBoardSkeleton />
         ) : viewMode === 'kanban' ? (
-          <Kanban tasksByColumn={filteredTasksByColumn} onStatusChange={handleStatusChange} teamId={teamId} isArchiveView={dataTab === 'archive'} onRestore={handleRestore} onArchive={dataTab === 'active' ? handleArchive : undefined} />
+          <Kanban tasksByColumn={filteredTasksByColumn} onStatusChange={handleStatusChange} teamId={teamId} isArchiveView={dataTab === 'archive'} onRestore={handleRestore} onArchive={dataTab === 'active' ? handleArchive : undefined} initialColumnIndex={kanbanColumnIndex} onColumnChange={setKanbanColumnIndex} />
         ) : viewMode === 'gantt' ? (
           <GanttChart tasks={filteredTasks} teamId={teamId} />
         ) : viewMode === 'list' ? (

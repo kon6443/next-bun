@@ -26,6 +26,8 @@ export interface UseTaskFilterReturn {
   setPeriod: (period: PeriodFilter) => void;
   setStatus: (status: StatusFilter) => void;
   resetFilters: () => void;
+  /** 저장해 둔 필터 전체를 한 번에 적용 (보드 상태 복원용) */
+  restoreFilters: (filters: TaskFilterState) => void;
 
   // 필터된 결과
   filteredTasks: Task[];
@@ -72,6 +74,10 @@ export function useTaskFilter(tasks: Task[]): UseTaskFilterReturn {
     setFilters(initialFilters);
   }, []);
 
+  const restoreFilters = useCallback((saved: TaskFilterState) => {
+    setFilters(saved);
+  }, []);
+
   // 필터된 태스크
   const filteredTasks = useMemo(() => {
     return applyAllFilters(tasks, filters.searchQuery, filters.assigneeId, filters.period, filters.status);
@@ -103,6 +109,7 @@ export function useTaskFilter(tasks: Task[]): UseTaskFilterReturn {
     setPeriod,
     setStatus,
     resetFilters,
+    restoreFilters,
     filteredTasks,
     stats,
     filteredStats,
