@@ -330,7 +330,8 @@ export function formatFullDateTime(date: Date | null): string | null {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false,
+    // hour12: false는 구버전 엔진(ko-KR)에서 00시대(00:00~00:59)를 "24:xx"로 출력한다 — h23으로 고정
+    hourCycle: 'h23',
   });
 }
 

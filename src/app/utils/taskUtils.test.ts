@@ -21,6 +21,7 @@ import {
   formatDateWithYear,
   formatDateKey,
   formatDateDisplay,
+  formatFullDateTime,
 } from './taskUtils';
 import type { Task } from '../types/task';
 
@@ -251,6 +252,19 @@ describe('taskUtils', () => {
       const date = new Date('2025-01-15T10:00:00Z');
       const result = formatDateWithYear(date);
       expect(result).toContain('2025');
+    });
+  });
+
+  describe('formatFullDateTime', () => {
+    it('null이면 null 반환', () => {
+      expect(formatFullDateTime(null)).toBe(null);
+    });
+
+    // 구엔진(h24 해석) 회귀는 최신 Node에서 재현되지 않는다 — 00시대 표시 형식 계약만 고정
+    it('로컬 00시대는 "24:xx"가 아니라 "00:xx"로 표시', () => {
+      expect(formatFullDateTime(new Date(2025, 0, 15, 0, 0))).toContain('00:00');
+      expect(formatFullDateTime(new Date(2025, 0, 15, 0, 30))).toContain('00:30');
+      expect(formatFullDateTime(new Date(2025, 0, 15, 0, 30))).not.toContain('24:');
     });
   });
 
