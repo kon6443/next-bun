@@ -919,6 +919,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           statsCards={statsCards}
           canManageInvites={canManageInvites}
           invites={invites}
+          onOpenInvite={() => setShowInviteModal(true)}
           telegramStatus={telegramStatus}
           isLoadingTelegram={isLoadingTelegram}
           isCreatingTelegramLink={isCreatingTelegramLink}

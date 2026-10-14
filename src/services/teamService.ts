@@ -243,7 +243,7 @@ export type UpdateTeamResponse = {
 };
 
 export type CreateTeamInviteRequest = {
-  endAt?: string;
+  endAt: string;
   usageMaxCnt?: number;
 };
 

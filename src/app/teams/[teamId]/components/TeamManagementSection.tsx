@@ -31,6 +31,7 @@ type TeamManagementSectionProps = {
   // 초대 관련
   canManageInvites: boolean;
   invites: TeamInviteResponse[];
+  onOpenInvite: () => void;
 
   // 텔레그램 관련
   telegramStatus: TelegramStatusResponse | null;
@@ -89,6 +90,7 @@ export function TeamManagementSection({
   statsCards,
   canManageInvites,
   invites,
+  onOpenInvite,
   telegramStatus,
   isLoadingTelegram,
   isCreatingTelegramLink,
@@ -434,6 +436,13 @@ export function TeamManagementSection({
           {/* 초대 링크 탭 내용 */}
           {activeTab === 'invites' && canManageInvites && (
             <div className="mt-4">
+              <button
+                type="button"
+                onClick={onOpenInvite}
+                className="mb-4 min-h-11 w-full rounded-lg border border-sky-500/30 bg-sky-500/10 px-4 py-2.5 text-xs font-semibold text-sky-300 transition hover:border-sky-500/50 hover:bg-sky-500/20"
+              >
+                초대 링크 만들기
+              </button>
               {invites.length === 0 ? (
                 <EmptyState message="생성된 초대 링크가 없습니다." />
               ) : (

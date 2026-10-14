@@ -6,6 +6,7 @@ import {
   getTeamInvites,
   createTeamInvite,
   type TeamInviteResponse,
+  type CreateTeamInviteRequest,
 } from '@/services/teamService';
 import { ApiError } from '@/types/api';
 
@@ -64,18 +65,18 @@ export function useTeamInvite(
         endDate.setDate(endDate.getDate() + days);
         endDate.setHours(23, 59, 59, 999);
 
-        const request: { endAt: string; usageMaxCnt?: number } = {
+        const request: CreateTeamInviteRequest = {
           endAt: endDate.toISOString(),
         };
         if (typeof usageMaxCnt === 'number') {
           request.usageMaxCnt = usageMaxCnt;
         }
 
-        await createTeamInvite(teamId, request, accessToken);
+        const response = await createTeamInvite(teamId, request, accessToken);
 
         toast.success('초대 링크가 성공적으로 생성되었습니다!');
-        setShowModal(false);
-        setCreatedInviteLink(null);
+        // 모달을 닫지 않고 새 링크를 보여줘 바로 복사할 수 있게 한다 (닫을 때 초기화)
+        setCreatedInviteLink(response.data.inviteLink);
 
         // 초대 링크 목록 새로고침
         await fetchInvites();
