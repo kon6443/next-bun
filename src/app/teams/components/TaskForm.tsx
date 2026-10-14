@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Input, TextArea, DateInput, TimeInput } from "./FormInput";
 import { Button, ButtonLink } from "./Button";
-import { DEFAULT_START_TIME, DEFAULT_END_TIME } from "@/app/utils/dateUtils";
+import { Alert } from "./Alert";
+import { DEFAULT_START_TIME, DEFAULT_END_TIME, isTaskRangeInverted } from "@/app/utils/dateUtils";
 
 export type TaskFormData = {
   taskName: string;
@@ -27,6 +28,8 @@ type TaskFormProps = {
  * 태스크 생성/수정 공통 폼 컴포넌트
  * - mode: "create" | "edit"로 생성/수정 구분
  * - 모바일 전용 레이아웃
+ * - initialData는 마운트 시 1회만 반영한다 — 편집 중 부모 리렌더(소켓 갱신 등)로 입력이 덮어써지지 않게.
+ *   편집 화면은 수정 모드 진입마다 새로 마운트된다(TaskDetailPage의 isEditing 조건부 렌더)
  */
 export function TaskForm({
   mode,
@@ -45,20 +48,11 @@ export function TaskForm({
   const [startAtTime, setStartAtTime] = useState(initialData?.startAtTime || DEFAULT_START_TIME);
   const [endAtTime, setEndAtTime] = useState(initialData?.endAtTime || DEFAULT_END_TIME);
 
-  // initialData가 변경되면 폼 상태 업데이트 (편집 모드 진입 시)
-  useEffect(() => {
-    if (initialData) {
-      setTaskName(initialData.taskName);
-      setTaskDescription(initialData.taskDescription);
-      setStartAt(initialData.startAt);
-      setEndAt(initialData.endAt);
-      setStartAtTime(initialData.startAtTime || DEFAULT_START_TIME);
-      setEndAtTime(initialData.endAtTime || DEFAULT_END_TIME);
-    }
-  }, [initialData]);
+  const isRangeInverted = isTaskRangeInverted(startAt, startAtTime, endAt, endAtTime);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isRangeInverted) return;
     onSubmit({
       taskName: taskName.trim(),
       taskDescription: taskDescription.trim(),
@@ -69,7 +63,7 @@ export function TaskForm({
     });
   };
 
-  const isValid = taskName.trim() && taskDescription.trim();
+  const isValid = taskName.trim() && taskDescription.trim() && !isRangeInverted;
 
   const submitButtonText = isSubmitting
     ? mode === "create"
@@ -123,6 +117,7 @@ export function TaskForm({
             id="endAt"
             label="종료일"
             value={endAt}
+            min={startAt || undefined}
             onChange={(e) => setEndAt(e.target.value)}
             disabled={isSubmitting}
           />
@@ -134,6 +129,9 @@ export function TaskForm({
             disabled={isSubmitting || !endAt}
           />
         </div>
+        {isRangeInverted && (
+          <Alert variant="error" message="종료 시각은 시작 시각보다 빠를 수 없습니다." />
+        )}
       </div>
 
       <div className="flex flex-col justify-end gap-2 pt-2">
