@@ -1,9 +1,10 @@
 'use client';
 
 import { KanbanIcon, TimelineIcon, ListIcon, CalendarIcon, ArchiveIcon } from '@/app/components/Icons';
+import type { BoardViewMode, BoardDataTab } from '@/app/utils/boardStateStorage';
 
-export type ViewMode = 'kanban' | 'gantt' | 'list' | 'calendar';
-export type DataTab = 'active' | 'archive';
+export type ViewMode = BoardViewMode;
+export type DataTab = BoardDataTab;
 
 type ViewModeToggleProps = {
   viewMode: ViewMode;
@@ -28,13 +29,13 @@ export function ViewModeToggle({ viewMode, onViewModeChange, dataTab, onDataTabC
   return (
     <div className="flex items-center justify-between mb-4">
       {/* 데이터 탭: 활성 / 보관함 */}
-      <div className="flex rounded-xl border border-white/10 bg-slate-900/30 p-1">
+      <div role="group" aria-label="데이터 구분" className="flex rounded-xl border border-white/10 bg-slate-900/30 p-1">
         {dataTabConfig.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             onClick={() => onDataTabChange(key)}
             aria-pressed={dataTab === key}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${
+            className={`min-h-[44px] px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${
               dataTab === key
                 ? 'bg-gradient-to-r from-indigo-500/20 to-sky-500/20 text-sky-400 border border-sky-500/30'
                 : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
@@ -47,7 +48,7 @@ export function ViewModeToggle({ viewMode, onViewModeChange, dataTab, onDataTabC
       </div>
 
       {/* 뷰 모드 토글 */}
-      <div className="flex rounded-xl border border-white/10 bg-slate-900/30 p-1">
+      <div role="group" aria-label="보기 방식" className="flex rounded-xl border border-white/10 bg-slate-900/30 p-1">
         {viewModeConfig.map(({ key, icon: Icon, title }) => (
           <button
             key={key}
@@ -55,7 +56,7 @@ export function ViewModeToggle({ viewMode, onViewModeChange, dataTab, onDataTabC
             title={title}
             aria-label={title}
             aria-pressed={viewMode === key}
-            className={`p-2.5 rounded-lg transition ${
+            className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2.5 rounded-lg transition ${
               viewMode === key
                 ? 'bg-gradient-to-r from-indigo-500/20 to-sky-500/20 text-sky-400 border border-sky-500/30'
                 : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
