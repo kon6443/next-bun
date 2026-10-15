@@ -80,7 +80,7 @@ const BottomNavBar = () => {
   const pathname = usePathname() ?? '';
 
   return (
-    <nav className={styles.nav} aria-label="주요 탐색">
+    <nav className={styles.nav} aria-label="주요 탐색" data-fixed-bottom-overlay>
       <ul className={styles.list}>
         {navItems.map(({ href, label, icon, match }) => {
           const isActive = match ? match(pathname) : pathname === href;
