@@ -18,6 +18,8 @@
 }
 
 .svg {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
   transform: rotate(-90deg);
@@ -34,20 +36,33 @@
   stroke: url(#ringGradient);
   transition: stroke-dashoffset 0.45s ease;
   filter: drop-shadow(0 0 10px rgba(96, 165, 250, 0.5));
+}
+
+/* 맥박 효과는 뒤쪽 빛 레이어의 opacity 만 움직인다 (filter 애니메이션은 매 프레임 다시 그린다) */
+.ring::before {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  border-radius: 50%;
+  /* 진행 원 반지름(60/80 = 75%) 둘레에만 빛 띠를 둔다 — closest-side 기준이라 컨테이너 크기와 무관하다 */
+  background: radial-gradient(circle closest-side, transparent 64%, rgba(96, 165, 250, 0.35) 75%, transparent 86%);
+  opacity: 0.4;
   animation: ringPulse 2s ease-in-out infinite;
+  pointer-events: none;
 }
 
 @keyframes ringPulse {
   0%, 100% {
-    filter: drop-shadow(0 0 10px rgba(96, 165, 250, 0.5));
+    opacity: 0.4;
   }
   50% {
-    filter: drop-shadow(0 0 18px rgba(96, 165, 250, 0.8));
+    opacity: 1;
   }
 }
 
 .text {
   position: absolute;
+  z-index: 2; /* svg(z-index 1) 위 — 숫자가 진행 원에 가려지지 않게 */
   inset: 0;
   display: flex;
   flex-direction: column;
@@ -60,13 +75,22 @@
 .percent {
   font-size: clamp(1.3rem, 4.5vw, 2rem);
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   color: #f8fafc;
 }
 
 .caption {
   font-size: clamp(0.55rem, 1.8vw, 0.7rem);
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
+  letter-spacing: 0.1em;
   color: rgba(148, 163, 184, 0.8);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .progress {
+    transition: none;
+  }
+
+  .ring::before {
+    animation: none;
+  }
+}

@@ -42,15 +42,34 @@
 
 .level {
   position: absolute;
+  top: 10px;
   left: 10px;
   right: 10px;
   bottom: 50px;
   border-radius: 18px;
-  transition: height 0.6s ease, background 0.6s ease;
+  transition: clip-path 0.6s ease;
   box-shadow:
     inset 0 10px 30px rgba(255, 255, 255, 0.18),
     inset 0 -6px 12px rgba(15, 23, 42, 0.6);
   overflow: hidden;
+}
+
+.tone {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.6s ease;
+}
+
+.toneHigh {
+  background: linear-gradient(180deg, #34d399, #14b8a6);
+}
+
+.toneMid {
+  background: linear-gradient(180deg, #fbbf24, #f97316);
+}
+
+.toneLow {
+  background: linear-gradient(180deg, #f87171, #ef4444);
 }
 
 .level::after {
@@ -86,6 +105,7 @@
 .percent {
   font-size: clamp(0.9rem, 3vw, 1.1rem);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
   letter-spacing: 0.08em;
   color: #f8fafc;
 }
@@ -109,7 +129,17 @@
 
 .label {
   font-size: clamp(0.45rem, 1.5vw, 0.55rem);
-  text-transform: uppercase;
-  letter-spacing: 0.3em;
+  letter-spacing: 0.1em;
   color: rgba(148, 163, 184, 0.7);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .level,
+  .tone {
+    transition: none;
+  }
+
+  .level::after {
+    animation: none;
+  }
 }

@@ -39,7 +39,7 @@ export default function RingAnimation({ progress }: AnimationProps) {
       </svg>
       <div className={styles.text}>
         <p className={styles.percent}>{Math.round(clamped)}%</p>
-        <p className={styles.caption}>focus</p>
+        <p className={styles.caption}>경과</p>
       </div>
     </div>
   );
