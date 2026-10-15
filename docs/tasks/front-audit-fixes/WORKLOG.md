@@ -583,3 +583,24 @@
   - 실제 배포 판정: 다음 main 배포 로그에서 `Update completed`, 4/4, healthcheck를 본다
   - iOS 실기기
   - `/time-measurement` 시각 확인
+
+## 2026-10-15 — 커밋·머지·운영 배포 (사용자 지시, bun-4a 경유)
+
+- 커밋 30개 (feat-onam-audit, 베이스 b60ee60). 다른 세션 WIP(`src/lib/auth.ts`, `docs/handoff/`)는 제외했다
+  - 여러 슬라이스가 같은 hunk를 공유하는 파일은 커밋 시점 버전을 만들어 `git update-index --cacheinfo`로 나눠 스테이징했다. 대상은 workflow·Dockerfile·hooks/index·teams/components/index·taskUtils(+test)
+  - 보드 관련 파일 다수는 하나의 슬라이스가 같은 파일 여러 곳을 고쳐서 주제별 커밋으로 묶었다. 각 커밋이 단독으로 컴파일되는 순서로 배치했다
+  - **30개 커밋 각각을 단독 worktree에서 tsc로 검사해 오류 0건**
+  - tip 검증: lint 에러 0·경고 4, typecheck, test 17/250, build(sandbox 밖) 모두 통과
+- PR #328 (feat-onam-audit → develop): verify 통과(17s), deploy는 PR이라 skip → merge `e31018e`
+- PR #329 (develop → main): `origin/main..origin/develop`에는 이번 30개 + 머지 커밋만 있었다. verify 통과(21s) → merge `95e4eac`
+- 운영 배포 run 38704433056(push, 95e4eac): **success**
+  - verify 08:16:04→08:16:23
+  - deploy 08:16:29→08:19:47. 이미지 빌드는 Dockerfile cache mount·`USER bun` 포함으로 성공했다
+  - 판정 로그
+    - `--detach=false` 경고(`Since --detach=false was not specified`) **0건**. 이전 배포에서는 이 경고가 찍혔다
+    - `verify: Service … converged` → **`Update completed`**
+    - `prod_next_app replicated 4/4 …/prod_next:95e4eac`
+    - 수렴 시간은 약 87초(배포 단계 시작 08:18:05 → converged 08:19:32). rollback·`Deploy failed` 출력 없음
+  - 결론: 새 배포 판정 스크립트, replicas 4, 비root 실행 이미지가 실제 배포에서 동작함을 확인했다
+- 배포 직후 Dependabot이 PR #330~#334(develop 대상)를 열었다. 메이저 범프가 섞여 있어 사용자가 방침을 확인하는 중이다 — **머지·닫기 금지**
+- 이 WORKLOG·STATUS 갱신은 아직 커밋하지 않았다(docs만 바뀐 변경이라 main에 들어가도 배포를 트리거하지 않는다)
