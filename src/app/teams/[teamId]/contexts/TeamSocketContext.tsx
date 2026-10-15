@@ -14,6 +14,7 @@ import { useSession } from 'next-auth/react';
 import { io } from 'socket.io-client';
 import type { TeamSocket, OnlineUserInfo } from '@/types/socket';
 import { TeamSocketEvents } from '@/types/socket';
+import { isChatError } from '@/app/utils/teamChatUtils';
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_API ?? '';
 
@@ -35,10 +36,21 @@ interface TeamSocketContextValue {
   /** 수동 재연결 */
   reconnect: () => void;
   /**
-   * 채팅 메시지 전송 (저장 없음, 실시간 브로드캐스트)
-   * @returns 생성된 clientMsgId (전송 시) 또는 null (빈 메시지)
+   * 팀 room 참가 완료 횟수 (재연결마다 증가)
+   * 끊긴 동안 놓친 이벤트를 REST로 보정하는 트리거 — room 참가 후에 조회해야 그 사이 이벤트가 빠지지 않는다
    */
-  emitChatMessage: (message: string) => string | null;
+  roomJoinCount: number;
+  /**
+   * 채팅 메시지 전송 (서버가 저장 후 room에 chatReceived 브로드캐스트)
+   * 순서 보장(1건씩)은 호출부의 전송 대기열이 맡는다 (D-025)
+   * @returns 보냈으면 true, 연결이 끊겼거나 room 참가 전이라 보내지 않았으면 false
+   */
+  emitChatMessage: (payload: { clientMsgId: string; message: string }) => boolean;
+  /**
+   * 채팅 읽음 위치 전송 (이 ID 이하를 모두 읽음)
+   * @returns 보냈으면 true, 연결이 끊겼거나 room 참가 전이라 보내지 않았으면 false
+   */
+  emitChatRead: (lastReadMessageId: number) => boolean;
 }
 
 // ===== Context 생성 =====
@@ -83,10 +95,13 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<OnlineUserInfo[]>([]);
+  const [roomJoinCount, setRoomJoinCount] = useState(0);
 
   // Refs (cleanup 및 최신 상태 참조용)
   const socketRef = useRef<TeamSocket | null>(null);
   const isConnectedRef = useRef(false);
+  /** 팀 room 참가 ack를 받았는지 — 연결 직후 ack 전 채팅 emit은 서버가 CHAT_NOT_JOINED로 거부한다 */
+  const isRoomJoinedRef = useRef(false);
   const isConnectingRef = useRef(false);
   const connectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentTeamIdRef = useRef(teamId);
@@ -127,10 +142,14 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
       isConnectedRef.current = true;
       setError(null);
 
-      // 팀 room 참가
+      // 팀 room 참가 — 서버 ack가 오면 room 이벤트 수신이 시작된 것 (REST 보정 시점)
       newSocket.emit(
         TeamSocketEvents.JOIN_TEAM,
         { teamId: currentTeamIdRef.current },
+        () => {
+          isRoomJoinedRef.current = true;
+          setRoomJoinCount((count) => count + 1);
+        },
       );
     });
 
@@ -139,6 +158,7 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
       isConnectingRef.current = false;
       setIsConnected(false);
       isConnectedRef.current = false;
+      isRoomJoinedRef.current = false;
     });
 
     // 연결 에러
@@ -153,6 +173,8 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
     // 서버 에러 이벤트
     newSocket.on(TeamSocketEvents.ERROR, (payload) => {
       console.warn('[TeamSocket] 서버 에러:', payload);
+      // 채팅 전송 거부는 연결 에러가 아니다 — TeamChatContext가 메시지 실패 표시·토스트로 처리
+      if (isChatError(payload)) return;
       if (payload.message) setError(payload.message);
     });
 
@@ -292,18 +314,27 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
   /**
    * 채팅 메시지 전송
    *
-   * - clientMsgId는 클라이언트가 생성 (낙관적 업데이트 / 추후 저장 dedup 키)
+   * - clientMsgId는 호출부가 생성 (낙관적 업데이트 교체 키 / 서버 저장 멱등 키)
    * - teamId는 보내지 않음 — 서버가 소켓에 캐싱된 teamId로 room을 식별
    */
-  const emitChatMessage = useCallback((message: string): string | null => {
-    const text = message.trim();
-    if (!text) return null;
-    const clientMsgId = crypto.randomUUID();
-    socketRef.current?.emit(TeamSocketEvents.CHAT_MESSAGE, {
-      message: text,
-      clientMsgId,
-    });
-    return clientMsgId;
+  const emitChatMessage = useCallback((payload: { clientMsgId: string; message: string }): boolean => {
+    // 끊긴 동안·room 참가 전에 emit하면 서버가 CHAT_NOT_JOINED로 거부한다
+    // (끊긴 동안의 emit은 socket.io가 버퍼에 쌓았다가 재연결 직후 joinTeam보다 먼저 보낸다)
+    if (!socketRef.current?.connected || !isRoomJoinedRef.current) return false;
+    socketRef.current.emit(TeamSocketEvents.CHAT_MESSAGE, payload);
+    return true;
+  }, []);
+
+  /**
+   * 채팅 읽음 위치 전송
+   *
+   * - 호출 빈도 조절(debounce)은 TeamChatContext가 맡는다
+   */
+  const emitChatRead = useCallback((lastReadMessageId: number): boolean => {
+    // 끊긴 동안·room 참가 전에는 보내지 않는다 (서버가 거부) — 재연결 보정이 다시 보낸다
+    if (!socketRef.current?.connected || !isRoomJoinedRef.current) return false;
+    socketRef.current.emit(TeamSocketEvents.CHAT_READ, { lastReadMessageId });
+    return true;
   }, []);
 
   // 마운트 시 연결, 언마운트 시 해제
@@ -325,9 +356,11 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
       onlineUsers,
       setOnlineUsers,
       reconnect,
+      roomJoinCount,
       emitChatMessage,
+      emitChatRead,
     }),
-    [socket, isConnected, error, teamId, onlineUsers, reconnect, emitChatMessage]
+    [socket, isConnected, error, teamId, onlineUsers, reconnect, roomJoinCount, emitChatMessage, emitChatRead]
   );
 
   return (

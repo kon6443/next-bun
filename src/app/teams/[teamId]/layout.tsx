@@ -2,7 +2,7 @@
 
 import { type ReactNode } from 'react';
 import { useParams } from 'next/navigation';
-import { TeamSocketProvider } from './contexts';
+import { TeamSocketProvider, TeamChatProvider } from './contexts';
 
 interface TeamLayoutProps {
   children: ReactNode;
@@ -13,6 +13,7 @@ interface TeamLayoutProps {
  *
  * teams/[teamId] 하위의 모든 페이지를 감싸는 레이아웃입니다.
  * TeamSocketProvider를 통해 하위 페이지들이 동일한 소켓 연결을 공유합니다.
+ * TeamChatProvider는 그 소켓으로 채팅 메시지·읽음 상태를 팀 화면 전체에서 유지합니다.
  *
  * 이 레이아웃 덕분에:
  * - 팀 상세 페이지 ↔ 태스크 상세 페이지 이동 시 소켓 연결이 유지됩니다.
@@ -34,7 +35,9 @@ export default function TeamLayout({ children }: TeamLayoutProps) {
 
   return (
     <TeamSocketProvider teamId={teamIdNum}>
-      {children}
+      <TeamChatProvider key={teamIdNum} teamId={teamIdNum}>
+        {children}
+      </TeamChatProvider>
     </TeamSocketProvider>
   );
 }

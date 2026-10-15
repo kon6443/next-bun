@@ -7,6 +7,7 @@ export const TeamSocketEvents = {
   JOIN_TEAM: 'joinTeam',
   LEAVE_TEAM: 'leaveTeam',
   CHAT_MESSAGE: 'chatMessage',
+  CHAT_READ: 'chatRead',
 
   // Server → Client (태스크)
   TASK_CREATED: 'taskCreated',
@@ -28,9 +29,11 @@ export const TeamSocketEvents = {
   // Server → Client (멤버 역할/상태)
   MEMBER_ROLE_CHANGED: 'memberRoleChanged',
   MEMBER_STATUS_CHANGED: 'memberStatusChanged',
+  MEMBER_JOINED: 'memberJoined',
 
   // Server → Client (채팅)
   CHAT_RECEIVED: 'chatReceived',
+  CHAT_READ_UPDATED: 'chatReadUpdated',
 
   // 공통
   JOINED_TEAM: 'joinedTeam',
@@ -139,6 +142,8 @@ export interface SocketErrorPayload {
   code: string;
   message: string;
   timestamp?: string;
+  /** 채팅 전송 거부 시 대상 메시지의 clientMsgId (CHAT_* 에러) */
+  clientMsgId?: string;
 }
 
 // ===== 온라인 유저 관련 타입 =====
@@ -197,6 +202,18 @@ export interface MemberStatusChangedPayload {
   changedBy: number;
 }
 
+/**
+ * 멤버 가입 이벤트 (초대 수락 — 신규·재가입)
+ *
+ * lastReadMessageId는 가입 시점의 커서(팀 최신 메시지 ID)다.
+ */
+export interface MemberJoinedPayload {
+  teamId: number;
+  userId: number;
+  userName: string;
+  lastReadMessageId: number;
+}
+
 // ===== 채팅 관련 타입 =====
 
 /**
@@ -213,16 +230,39 @@ export interface ChatMessagePayload {
 /**
  * 채팅 메시지 수신 페이로드 (Server → Client)
  *
- * messageId는 현재 clientMsgId를 에코한다. 추후 저장 도입 시 서버 발급 ID로 교체될 수 있음.
+ * 두 형식을 모두 받는다 (배포 순서상 과도기 — 정규화는 teamChatUtils.normalizeChatIds):
+ * - 옛 형식: messageId = clientMsgId 에코 (string), clientMsgId 필드 없음
+ * - 새 형식: messageId = 서버 발급 ID (number), clientMsgId 별도 필드
  * timestamp는 서버가 생성한 ISO 문자열(UTC).
  */
 export interface ChatReceivedPayload {
-  messageId: string;
+  messageId: string | number;
+  clientMsgId?: string;
   teamId: number;
   userId: number;
   userName: string;
   message: string;
   timestamp: string;
+}
+
+/**
+ * 채팅 읽음 위치 갱신 (Client → Server)
+ *
+ * 이 ID 이하의 메시지를 모두 읽었다는 뜻이다. 서버는 현재 커서보다 클 때만 반영한다.
+ */
+export interface ChatReadPayload {
+  lastReadMessageId: number;
+}
+
+/**
+ * 멤버 읽음 위치 갱신 알림 (Server → Client)
+ *
+ * 커서가 실제로 전진했을 때만 온다. 본인의 다른 탭 갱신도 포함된다.
+ */
+export interface ChatReadUpdatedPayload {
+  teamId: number;
+  userId: number;
+  lastReadMessageId: number;
 }
 
 // ===== Socket 타입 정의 =====
@@ -242,7 +282,9 @@ export interface ServerToClientEvents {
   [TeamSocketEvents.ONLINE_USERS]: (payload: OnlineUsersPayload) => void;
   [TeamSocketEvents.MEMBER_ROLE_CHANGED]: (payload: MemberRoleChangedPayload) => void;
   [TeamSocketEvents.MEMBER_STATUS_CHANGED]: (payload: MemberStatusChangedPayload) => void;
+  [TeamSocketEvents.MEMBER_JOINED]: (payload: MemberJoinedPayload) => void;
   [TeamSocketEvents.CHAT_RECEIVED]: (payload: ChatReceivedPayload) => void;
+  [TeamSocketEvents.CHAT_READ_UPDATED]: (payload: ChatReadUpdatedPayload) => void;
   [TeamSocketEvents.JOINED_TEAM]: (payload: JoinedTeamPayload) => void;
   [TeamSocketEvents.LEFT_TEAM]: (payload: LeftTeamPayload) => void;
   [TeamSocketEvents.ERROR]: (payload: SocketErrorPayload) => void;
@@ -259,6 +301,7 @@ export interface ClientToServerEvents {
     callback?: (response: LeftTeamPayload) => void,
   ) => void;
   [TeamSocketEvents.CHAT_MESSAGE]: (data: ChatMessagePayload) => void;
+  [TeamSocketEvents.CHAT_READ]: (data: ChatReadPayload) => void;
 }
 
 /** 타입 안전한 Socket 인스턴스 */

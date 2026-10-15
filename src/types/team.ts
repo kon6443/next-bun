@@ -7,4 +7,6 @@ export type TeamSummary = {
   name: string;
   description: string;
   role: string;
+  /** 안 읽은 채팅 수 (남이 보낸 메시지만) */
+  unreadChatCount: number;
 };
