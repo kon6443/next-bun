@@ -24,7 +24,7 @@ services:
       retries: 3
       start_period: 60s
     deploy:
-      replicas: 10
+      replicas: 4
       placement:
         constraints:
           - node.labels.prod_next == 1
@@ -32,7 +32,7 @@ services:
         parallelism: 1
         order: start-first
         failure_action: rollback
-        monitor: 10s
+        monitor: 60s
         max_failure_ratio: 0
       rollback_config:
         parallelism: 1
@@ -42,6 +42,7 @@ services:
         max_failure_ratio: 0
       restart_policy:
         condition: on-failure
+        delay: 10s
 
 networks:
   sys_default:
