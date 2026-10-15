@@ -7,7 +7,21 @@ on:
     paths-ignore:
       - 'docs/**'
       - '*.md'
+      - '.claude/**'
+  # PR 에서는 verify 만 돈다 (deploy 는 아래 if 로 막는다)
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.claude/**'
   workflow_dispatch:
+
+# 기본 GITHUB_TOKEN 권한을 읽기로 제한한다 (이 워크플로는 저장소에 쓰지 않는다)
+permissions:
+  contents: read
 
 jobs:
   # 배포 전 게이트: lint·typecheck·test 가 실패하면 이미지 빌드·배포로 넘어가지 않는다.
@@ -47,22 +61,33 @@ jobs:
 
   deploy:
     needs: verify
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04-arm
     environment: prod
+    # 배포 두 개가 동시에 stack deploy 하지 않게 하나씩 — 진행 중 배포는 끊지 않고 대기열로
+    # (실행 순서까지 보장하지는 않는다: 옛 push 의 verify 가 늦게 끝나면 옛 SHA 가 나중에 배포될 수 있다)
+    concurrency:
+      group: deploy-prod-next
+      cancel-in-progress: false
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 시크릿은 run 스크립트에 직접 보간하지 않고 env 로 넘긴다 (셸 인젝션 표면 축소)
       - name: Log in to Docker Registry
-        run: echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ${{ secrets.REGISTRY_URL }} -u ${{ secrets.REGISTRY_USERNAME }} --password-stdin
+        env:
+          REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY_URL" -u "$REGISTRY_USERNAME" --password-stdin
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Set short SHA
         id: sha
-        run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Build and Push arm64 image
         uses: docker/build-push-action@v5
@@ -76,17 +101,22 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Rsync stack YAML to Swarm manager
+        env:
+          SSH_KEY: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SERVER: ${{ secrets.DEPLOY_SERVER }}
         run: |
-          echo "${{ secrets.SWARM_MANAGER_SSH_KEY }}" > /tmp/ssh_key
+          printf '%s\n' "$SSH_KEY" > /tmp/ssh_key
           chmod 600 /tmp/ssh_key
           rsync -avz \
             -e "ssh -i /tmp/ssh_key -o StrictHostKeyChecking=no" \
             infra/docker-stack.app.yml \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_SERVER }}:/home/ubuntu/desktop/deploy/infra/prod_next.yml
+            "$DEPLOY_USER@$DEPLOY_SERVER:/home/ubuntu/desktop/deploy/infra/prod_next.yml"
           rm /tmp/ssh_key
 
       - name: Deploy stack + wait for converge via SSH
-        uses: appleboy/ssh-action@v1.0.0
+        # 서드파티 액션이 SSH 키를 받으므로 태그가 아닌 커밋 SHA 로 고정한다 (Dependabot 은 같은 줄 끝 버전 주석을 읽는다)
+        uses: appleboy/ssh-action@55dabf81b49d4120609345970c91507e2d734799 # v1.0.0
         with:
           host: ${{ secrets.DEPLOY_SERVER }}
           username: ${{ secrets.DEPLOY_USER }}
