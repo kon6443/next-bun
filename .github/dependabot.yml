@@ -1,8 +1,17 @@
-# 워크플로의 GitHub Actions 버전 갱신 PR 을 받는다 (SHA 로 고정한 액션도 주석의 버전을 따라 갱신된다)
+# GitHub Actions 버전 갱신 — 월 1회, PR 1개로 묶음, 메이저 업데이트는 제외(필요 시 사람이 직접 올린다)
+# SHA로 고정한 액션도 주석의 버전을 따라 갱신된다
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     target-branch: develop
+    groups:
+      github-actions:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    commit-message:
+      prefix: "chore(ci)"
