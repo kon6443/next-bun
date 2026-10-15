@@ -51,6 +51,7 @@ export const layoutStyles = {
 /**
  * 뷰 컨테이너 공통 스타일
  * GanttChart, ListView, CalendarView 등에서 사용
+ * blur 대신 반투명 배경으로 깊이를 낸다 (iOS Safari 성능 — CLAUDE.md Never)
  */
-export const viewContainerStyles = 
-  "rounded-3xl border border-white/10 bg-white/5 p-5 shadow-[0_25px_60px_rgba(15,23,42,0.55)] backdrop-blur-xl";
+export const viewContainerStyles =
+  "rounded-3xl border border-white/10 bg-slate-900/80 p-5 shadow-[0_25px_60px_rgba(15,23,42,0.55)]";

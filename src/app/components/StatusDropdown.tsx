@@ -167,7 +167,7 @@ export function StatusDropdown({ currentStatus, onStatusChange, disabled = false
           aria-label="상태 선택"
           className={`
             absolute left-0 right-0 z-50
-            rounded-lg border border-white/10 bg-slate-800/95 backdrop-blur-sm
+            rounded-lg border border-white/10 bg-slate-800/95
             shadow-xl shadow-black/20 overflow-hidden
             animate-in fade-in duration-150
             ${openDirection === 'up' 
