@@ -1,22 +1,11 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { CloseIcon, SendIcon } from '@/app/components/Icons';
-import type { TeamSocket, ChatReceivedPayload } from '@/types/socket';
+import type { TeamSocket, ChatReceivedPayload, SocketErrorPayload } from '@/types/socket';
 import { TeamSocketEvents } from '@/types/socket';
-
-/**
- * 팀 채팅 메시지 (클라이언트 로컬 상태)
- *
- * 현재는 저장 없이 실시간 브로드캐스트만 하므로 새로고침 시 사라진다.
- */
-interface TeamChatMessage {
-  id: string;
-  sender: string;
-  text: string;
-  timestamp: number;
-  isMine: boolean;
-}
+import { mergeChatReceived, markChatFailed, isChatError, type TeamChatMessage } from '@/app/utils/teamChatUtils';
 
 interface TeamChatPanelProps {
   isOpen: boolean;
@@ -82,30 +71,27 @@ export function TeamChatPanel({ isOpen, onClose, onSendMessage, socket, currentU
     }
   }, [isOpen, messages.length]);
 
-  // 채팅 수신 (본인 메시지는 전송 시 로컬에 추가했으므로 skip)
+  // 채팅 수신 (본인 메시지는 전송 시 로컬에 추가했으므로 clientMsgId로 dedup — 옛·새 형식 모두)
   useEffect(() => {
     if (!socket) return;
 
     const handleChatReceived = (payload: ChatReceivedPayload) => {
-      setMessages((prev) => {
-        // 이미 추가된 메시지(본인 로컬 추가분 또는 중복 수신)는 무시 — clientMsgId 기반 dedup
-        if (prev.some((m) => m.id === payload.messageId)) return prev;
-        return [
-          ...prev,
-          {
-            id: payload.messageId,
-            sender: payload.userName,
-            text: payload.message,
-            timestamp: new Date(payload.timestamp).getTime(),
-            isMine: currentUserId != null && payload.userId === currentUserId,
-          },
-        ];
-      });
+      setMessages((prev) => mergeChatReceived(prev, payload, currentUserId));
+    };
+
+    // 채팅 전송 거부 (연결 에러 상태는 TeamSocketContext가 CHAT_* 를 제외하고 관리)
+    const handleError = (payload: SocketErrorPayload) => {
+      if (!isChatError(payload)) return;
+      const { clientMsgId } = payload;
+      if (clientMsgId) setMessages((prev) => markChatFailed(prev, clientMsgId));
+      toast.error(payload.message || '메시지 전송에 실패했습니다.');
     };
 
     socket.on(TeamSocketEvents.CHAT_RECEIVED, handleChatReceived);
+    socket.on(TeamSocketEvents.ERROR, handleError);
     return () => {
       socket.off(TeamSocketEvents.CHAT_RECEIVED, handleChatReceived);
+      socket.off(TeamSocketEvents.ERROR, handleError);
     };
   }, [socket, currentUserId]);
 
@@ -119,7 +105,7 @@ export function TeamChatPanel({ isOpen, onClose, onSendMessage, socket, currentU
     // 서버 echo는 동일 clientMsgId로 dedup되므로 로컬에 즉시 추가 (낙관적 업데이트)
     setMessages((prev) => [
       ...prev,
-      { id: clientMsgId, sender: '나', text, timestamp: Date.now(), isMine: true },
+      { key: clientMsgId, clientMsgId, serverId: null, sender: '나', text, timestamp: Date.now(), isMine: true },
     ]);
     setInput('');
     inputRef.current?.focus();
@@ -203,7 +189,7 @@ export function TeamChatPanel({ isOpen, onClose, onSendMessage, socket, currentU
                 ) : (
                   messages.map((msg) => (
                     <div
-                      key={msg.id}
+                      key={msg.key}
                       className={`flex flex-col ${msg.isMine ? 'items-end' : 'items-start'}`}
                     >
                       {!msg.isMine && (
@@ -216,7 +202,11 @@ export function TeamChatPanel({ isOpen, onClose, onSendMessage, socket, currentU
                       >
                         {msg.text}
                       </div>
-                      <span className="mt-0.5 text-[10px] text-slate-500">{formatTime(msg.timestamp)}</span>
+                      {msg.failed ? (
+                        <span className="mt-0.5 text-[10px] text-red-400">전송 실패</span>
+                      ) : (
+                        <span className="mt-0.5 text-[10px] text-slate-500">{formatTime(msg.timestamp)}</span>
+                      )}
                     </div>
                   ))
                 )}

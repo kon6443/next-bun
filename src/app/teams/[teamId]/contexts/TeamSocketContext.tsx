@@ -14,6 +14,7 @@ import { useSession } from 'next-auth/react';
 import { io } from 'socket.io-client';
 import type { TeamSocket, OnlineUserInfo } from '@/types/socket';
 import { TeamSocketEvents } from '@/types/socket';
+import { isChatError } from '@/app/utils/teamChatUtils';
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_API ?? '';
 
@@ -153,6 +154,8 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
     // 서버 에러 이벤트
     newSocket.on(TeamSocketEvents.ERROR, (payload) => {
       console.warn('[TeamSocket] 서버 에러:', payload);
+      // 채팅 전송 거부는 연결 에러가 아니다 — TeamChatPanel이 메시지 실패 표시·토스트로 처리
+      if (isChatError(payload)) return;
       if (payload.message) setError(payload.message);
     });
 

@@ -139,6 +139,8 @@ export interface SocketErrorPayload {
   code: string;
   message: string;
   timestamp?: string;
+  /** 채팅 전송 거부 시 대상 메시지의 clientMsgId (CHAT_* 에러) */
+  clientMsgId?: string;
 }
 
 // ===== 온라인 유저 관련 타입 =====
@@ -213,11 +215,14 @@ export interface ChatMessagePayload {
 /**
  * 채팅 메시지 수신 페이로드 (Server → Client)
  *
- * messageId는 현재 clientMsgId를 에코한다. 추후 저장 도입 시 서버 발급 ID로 교체될 수 있음.
+ * 두 형식을 모두 받는다 (배포 순서상 과도기 — 정규화는 teamChatUtils.normalizeChatIds):
+ * - 옛 형식: messageId = clientMsgId 에코 (string), clientMsgId 필드 없음
+ * - 새 형식: messageId = 서버 발급 ID (number), clientMsgId 별도 필드
  * timestamp는 서버가 생성한 ISO 문자열(UTC).
  */
 export interface ChatReceivedPayload {
-  messageId: string;
+  messageId: string | number;
+  clientMsgId?: string;
   teamId: number;
   userId: number;
   userName: string;
