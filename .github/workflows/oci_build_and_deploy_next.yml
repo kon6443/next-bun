@@ -34,7 +34,7 @@ jobs:
 
       # next·tsc·vitest bin 은 `#!/usr/bin/env node` 라 러너 기본 Node 로 돈다 — 메이저를 고정해 비결정성을 없애고 백엔드 런타임(Node 24)과 맞춘다
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
 
