@@ -29,9 +29,16 @@ export function InviteModal({
   };
 
   const handleCopyLink = (link: string) => {
-    navigator.clipboard.writeText(link).then(() => {
-      toast.success('초대 링크가 클립보드에 복사되었습니다.');
-    });
+    const copyFailedMessage = '복사에 실패했습니다. 링크를 길게 눌러 복사해 주세요.';
+    // 비보안 컨텍스트(http)에서는 clipboard API가 없다
+    if (!navigator.clipboard) {
+      toast.error(copyFailedMessage);
+      return;
+    }
+    navigator.clipboard
+      .writeText(link)
+      .then(() => toast.success('초대 링크가 클립보드에 복사되었습니다.'))
+      .catch(() => toast.error(copyFailedMessage));
   };
 
   return (
@@ -39,7 +46,8 @@ export function InviteModal({
       <div className="relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-slate-900 p-4">
         <button
           onClick={handleClose}
-          className="absolute right-4 top-4 text-slate-400 hover:text-slate-200"
+          disabled={isCreating}
+          className="absolute right-4 top-4 text-slate-400 hover:text-slate-200 disabled:opacity-50"
           aria-label="닫기"
         >
           <CloseIcon className="w-5 h-5" />

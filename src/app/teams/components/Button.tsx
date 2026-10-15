@@ -67,6 +67,8 @@ type ButtonLinkProps = {
   fullWidth?: boolean;
   href: string;
   className?: string;
+  /** 기본 이동을 바꿔야 할 때 (e.preventDefault() 후 직접 이동) */
+  onClick?: React.MouseEventHandler<HTMLAnchorElement>;
   children: React.ReactNode;
 };
 
@@ -83,6 +85,7 @@ export function ButtonLink({
   fullWidth = false,
   href,
   className = "",
+  onClick,
   children,
 }: ButtonLinkProps) {
   const widthClass = fullWidth ? "w-full" : "";
@@ -90,6 +93,7 @@ export function ButtonLink({
   return (
     <Link
       href={href}
+      onClick={onClick}
       className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${widthClass} inline-block text-center ${className}`.trim()}
     >
       {children}

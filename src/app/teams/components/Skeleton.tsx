@@ -171,6 +171,18 @@ export function TeamBoardSkeleton() {
         <Skeleton width="2.75rem" height="2.75rem" rounded="xl" />
       </div>
 
+      <KanbanBoardSkeleton />
+    </div>
+  );
+}
+
+/**
+ * 칸반 뷰 영역 스켈레톤 (상태 탭 바 + 컬럼)
+ * 팀 헤더·필터가 이미 렌더된 상태에서 뷰 영역만 대체할 때 사용
+ */
+export function KanbanBoardSkeleton() {
+  return (
+    <div className="space-y-6" aria-hidden="true">
       {/* 탭 바 */}
       <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-1.5">
         <div className="flex gap-2">

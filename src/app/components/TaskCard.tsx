@@ -9,6 +9,7 @@ import { StatusDropdown } from './StatusDropdown';
 import { ConfirmModal } from './ConfirmModal';
 import { ArchiveIcon, RestoreIcon } from './Icons';
 import { DateInfoInline } from '../teams/components';
+import { markTaskOpenedFromBoard } from '../utils/boardStateStorage';
 
 type TaskCardProps = {
   task: Task;
@@ -40,6 +41,7 @@ export function TaskCard({ task, onStatusChange, teamId, isArchiveView, onRestor
   const archiveDaysLeft = getArchiveDaysLeft(task);
 
   const handleCardClick = () => {
+    markTaskOpenedFromBoard(teamId, taskId);
     router.push(`/teams/${teamId}/tasks/${taskId}`);
   };
 

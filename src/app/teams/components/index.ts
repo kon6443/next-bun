@@ -17,6 +17,7 @@ export {
   SkeletonText,
   TaskCardSkeleton,
   KanbanColumnSkeleton,
+  KanbanBoardSkeleton,
   TeamBoardSkeleton,
   ListViewSkeleton,
   TeamCardSkeleton,
