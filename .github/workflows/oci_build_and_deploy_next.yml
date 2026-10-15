@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # next·tsc·vitest bin 은 `#!/usr/bin/env node` 라 러너 기본 Node 로 돈다 — 메이저를 고정해 비결정성을 없애고 백엔드 런타임(Node 24)과 맞춘다
       - name: Set up Node
@@ -72,7 +72,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # 시크릿은 run 스크립트에 직접 보간하지 않고 env 로 넘긴다 (셸 인젝션 표면 축소)
       - name: Log in to Docker Registry
