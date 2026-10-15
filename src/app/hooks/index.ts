@@ -4,6 +4,7 @@ export { useTeamId, useTeamTaskId } from './useTeamId';
 export { useAsyncOperation } from './useAsyncOperation';
 export { useTaskFilter } from './useTaskFilter';
 export { useClickOutside } from './useClickOutside';
+export { useDialog } from './useDialog';
 export { useTelegramLink } from './useTelegramLink';
 export { useDiscordLink } from './useDiscordLink';
 export { useTeamInvite } from './useTeamInvite';

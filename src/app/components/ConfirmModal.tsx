@@ -1,6 +1,8 @@
 'use client';
 
+import { useId } from 'react';
 import { CloseIcon } from './Icons';
+import { useDialog } from '../hooks/useDialog';
 
 type ConfirmModalProps = {
   isOpen: boolean;
@@ -25,6 +27,9 @@ export function ConfirmModal({
   isLoading = false,
   variant = 'default',
 }: ConfirmModalProps) {
+  const titleId = useId();
+  // 처리 중에는 닫기 버튼이 막혀 있으므로 Esc도 막는다
+  const dialogRef = useDialog<HTMLDivElement>(isOpen, onClose, { closeOnEscape: !isLoading });
   if (!isOpen) return null;
 
   const confirmClassName =
@@ -34,7 +39,14 @@ export function ConfirmModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="relative z-10 w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900 p-4 sm:p-6">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="relative z-10 w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900 p-4 sm:p-6 focus:outline-none"
+      >
         <button
           onClick={onClose}
           disabled={isLoading}
@@ -44,7 +56,7 @@ export function ConfirmModal({
           <CloseIcon className="w-5 h-5" />
         </button>
 
-        <h3 className="mb-3 pr-8 text-lg font-bold text-white break-words">{title}</h3>
+        <h3 id={titleId} className="mb-3 pr-8 text-lg font-bold text-white break-words">{title}</h3>
         <p className="mb-6 text-sm leading-relaxed text-slate-400 break-words">{message}</p>
 
         <div className="flex flex-col gap-2 sm:flex-row">
