@@ -79,6 +79,8 @@ export type TeamMemberResponse = {
   crtdAt: Date;
   actStatus: number;
   leaderId: number;
+  /** 안 읽은 채팅 수 (남이 보낸 메시지만) */
+  unreadChatCount: number;
 };
 
 export type TeamInfoResponse = {
@@ -286,6 +288,58 @@ export type AcceptTeamInviteResponse = {
     teamId: number;
     teamName: string;
     message: string;
+  };
+};
+
+/** 채팅 메시지 항목 — 소켓 chatReceived 페이로드와 같은 형태 */
+export type ChatMessageItem = {
+  messageId: number;
+  clientMsgId: string;
+  teamId: number;
+  userId: number;
+  userName: string;
+  message: string;
+  /** ISO 문자열 (UTC) */
+  timestamp: string;
+};
+
+/** 이력 조회 조건 — beforeId·afterId는 미포함(exclusive)이고 둘 중 하나만 쓴다. 둘 다 없으면 최신 limit개 */
+export type GetChatMessagesQuery = {
+  beforeId?: number;
+  afterId?: number;
+  /** 기본 50, 최대 100 */
+  limit?: number;
+};
+
+export type GetChatMessagesResponse = {
+  code: 'SUCCESS';
+  message: string;
+  data: {
+    /** 오래된 것부터 정렬 */
+    messages: ChatMessageItem[];
+    /** 요청 방향(beforeId·기본 = 과거, afterId = 최신)에 메시지가 더 있는지 */
+    hasMore: boolean;
+  };
+};
+
+export type ChatMemberReadState = {
+  userId: number;
+  userName: string;
+  /** 0 = 아무것도 안 읽음 */
+  lastReadMessageId: number;
+};
+
+export type GetChatReadStateResponse = {
+  code: 'SUCCESS';
+  message: string;
+  data: {
+    /** 메시지가 없으면 0 */
+    latestMessageId: number;
+    myLastReadMessageId: number;
+    /** 남이 보낸 메시지만 센다 */
+    myUnreadCount: number;
+    /** 활성 멤버만, 본인 포함 */
+    members: ChatMemberReadState[];
   };
 };
 
@@ -974,6 +1028,61 @@ export async function updateMemberStatus(
       403: '상태를 변경할 권한이 없습니다.',
       404: '팀 멤버를 찾을 수 없습니다.',
       default: '상태 변경 실패',
+    });
+  }
+
+  return response.json();
+}
+
+/**
+ * 팀 채팅 이력 조회 (keyset)
+ */
+export async function getChatMessages(
+  teamId: number,
+  accessToken: string,
+  query: GetChatMessagesQuery = {},
+): Promise<GetChatMessagesResponse> {
+  const params = new URLSearchParams();
+  if (query.beforeId !== undefined) params.set('beforeId', String(query.beforeId));
+  if (query.afterId !== undefined) params.set('afterId', String(query.afterId));
+  if (query.limit !== undefined) params.set('limit', String(query.limit));
+  const queryString = params.toString();
+
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'GET',
+    endpoint: `/api/v1/teams/${teamId}/chat/messages${queryString ? `?${queryString}` : ''}`,
+    accessToken,
+  });
+
+  if (!response.ok) {
+    await handleApiError(response, {
+      403: '팀 멤버만 채팅을 볼 수 있습니다.',
+      404: '팀을 찾을 수 없습니다.',
+      default: '채팅 이력 조회 실패',
+    });
+  }
+
+  return response.json();
+}
+
+/**
+ * 팀 채팅 읽음 상태 조회 (멤버별 커서·내 안읽음 수)
+ */
+export async function getChatReadState(
+  teamId: number,
+  accessToken: string,
+): Promise<GetChatReadStateResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'GET',
+    endpoint: `/api/v1/teams/${teamId}/chat/read-state`,
+    accessToken,
+  });
+
+  if (!response.ok) {
+    await handleApiError(response, {
+      403: '팀 멤버만 채팅을 볼 수 있습니다.',
+      404: '팀을 찾을 수 없습니다.',
+      default: '채팅 읽음 상태 조회 실패',
     });
   }
 

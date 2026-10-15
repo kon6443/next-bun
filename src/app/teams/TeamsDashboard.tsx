@@ -18,6 +18,7 @@ export default function TeamsDashboard() {
         name: team.teamName,
         description: team.teamDescription || '',
         role: team.role,
+        unreadChatCount: team.unreadChatCount ?? 0,
       }),
     );
   }, []);

@@ -15,7 +15,7 @@ import { EditIcon, UserGroupIcon, PlusIcon, QuestionMarkIcon, CommentIcon } from
 import { DropdownMenu } from './components/DropdownMenu';
 import type { Task } from '../../types/task';
 import { useTaskFilter, useTelegramLink, useDiscordLink, useTeamInvite, useTeamSocketEvents, useSafeNavigation } from '../../hooks';
-import { useTeamSocketContext } from './contexts';
+import { useTeamSocketContext, useTeamChatContext } from './contexts';
 import {
   getTeamTasks,
   updateTaskStatus,
@@ -98,9 +98,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
   // 온라인 유저 모달 상태 (FAB 숨김용)
   const [isOnlineModalOpen, setIsOnlineModalOpen] = useState(false);
-
-  // 팀 채팅 바텀시트 상태
-  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // 데이터 탭: 활성 / 보관함
   const [dataTab, setDataTab] = useState<DataTab>('active');
@@ -192,7 +189,11 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   }, [teamIdNum, classifyTasks]);
 
   // ===== WebSocket (Context에서 관리) =====
-  const { socket, onlineUsers, emitChatMessage } = useTeamSocketContext();
+  const { socket, onlineUsers } = useTeamSocketContext();
+  const { isChatOpen, openChat, closeChat, myUnreadCount } = useTeamChatContext();
+
+  // 채팅 상태는 레이아웃에 있으므로, 보드를 떠나면 패널을 닫는다 (안 보이는 채팅이 계속 읽음 처리되지 않도록)
+  useEffect(() => closeChat, [closeChat]);
 
   // Socket 이벤트 핸들러 (useCallback으로 메모이제이션)
   const handleSocketTaskCreated = useCallback(
@@ -894,7 +895,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                   icon={CommentIcon}
                   label="팀 채팅"
                   variant="outlined"
-                  onClick={() => setIsChatOpen(true)}
+                  onClick={openChat}
+                  badge={myUnreadCount}
                 />
                 <IconButton
                   icon={PlusIcon}
@@ -1031,14 +1033,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       {/* 튜토리얼 가이드 */}
       <TutorialGuide isOpen={showTutorial} onClose={handleCloseTutorial} />
 
-      {/* 팀 채팅 바텀시트 (저장 없음, 실시간 브로드캐스트) */}
-      <TeamChatPanel
-        isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
-        onSendMessage={emitChatMessage}
-        socket={socket}
-        currentUserId={session?.user?.userId}
-      />
+      {/* 팀 채팅 바텀시트 (상태는 레이아웃의 TeamChatProvider) */}
+      <TeamChatPanel />
 
       {/* FAB: 새 카드 작성 (온라인 유저 모달/채팅이 열려있으면 숨김) */}
       {!isOnlineModalOpen && !isChatOpen && <FAB href={`/teams/${teamId}/tasks/new`} label="새 카드 작성" />}
