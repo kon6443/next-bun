@@ -344,3 +344,17 @@ export function formatDateKey(date: Date): string {
 export function formatDateDisplay(date: Date): string {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
+
+/**
+ * 소켓으로 받은 새 태스크를 현재 목록에 넣을지 판정
+ * 보고 있는 데이터 탭(활성=actStatus 1, 보관함=0)과 맞고, 아직 목록에 없을 때만 넣는다
+ * (refetch 결과와 소켓 이벤트가 겹치면 같은 태스크가 두 번 들어오는 것을 막는다)
+ */
+export function shouldInsertCreatedTask(
+  actStatus: number,
+  dataTab: 'active' | 'archive',
+  alreadyExists: boolean,
+): boolean {
+  if (alreadyExists) return false;
+  return actStatus === (dataTab === 'archive' ? 0 : 1);
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -33,7 +33,7 @@ import { StatusDropdown } from '@/app/components/StatusDropdown';
 import { ConfirmModal } from '@/app/components/ConfirmModal';
 import { EditIcon, TrashIcon, CommentIcon, SendIcon, ArchiveIcon, RestoreIcon } from '@/app/components/Icons';
 import { formatCompactDateTime } from '@/app/utils/taskUtils';
-import { loadBoardState, consumeTaskOpenedFromBoard } from '@/app/utils/boardStateStorage';
+import { loadBoardState, consumeTaskOpenedFromBoard, buildBoardHref } from '@/app/utils/boardStateStorage';
 import { getStatusBorderClassName, type TaskStatusKey } from '@/app/config/taskStatusConfig';
 import { cardStyles } from '@/styles/teams';
 import { useTeamTaskId, useTeamSocketEvents } from '@/app/hooks';
@@ -58,6 +58,11 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  // 성공 메시지 자동 숨김 타이머 — 연속 작성 시 이전 타이머가 새 메시지를 지우지 않게, 언마운트 시 정리
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (successTimerRef.current) clearTimeout(successTimerRef.current);
+  }, []);
   const [newComment, setNewComment] = useState('');
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
   const [editingContent, setEditingContent] = useState('');
@@ -82,8 +87,8 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
   const [isOpenedFromBoard, setIsOpenedFromBoard] = useState(false);
   useEffect(() => {
     // sessionStorage는 클라이언트에서만 읽는다 (SSR href와 어긋나지 않게 마운트 후 갱신)
-    const { view } = loadBoardState(teamId);
-    setBoardHref(view && view !== 'kanban' ? `/teams/${teamId}?view=${view}` : `/teams/${teamId}`);
+    const { view, dataTab } = loadBoardState(teamId);
+    setBoardHref(buildBoardHref(teamId, { view, dataTab }));
     // 표시는 1회용 — 개발 모드에서 effect가 두 번 돌아도 true를 false로 덮지 않는다
     if (consumeTaskOpenedFromBoard(teamId, taskIdNum)) setIsOpenedFromBoard(true);
   }, [teamId, taskIdNum]);
@@ -99,7 +104,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
   const comments = taskDetail?.comments ?? [];
 
   // ===== WebSocket (Context에서 관리) =====
-  const { socket } = useTeamSocketContext();
+  const { socket, roomJoinCount } = useTeamSocketContext();
 
   // Socket 이벤트 핸들러: 태스크 수정
   const handleSocketTaskUpdated = useCallback(
@@ -173,9 +178,11 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
 
       setTaskDetail(prev => {
         if (!prev) return prev;
+        // refetch 결과와 소켓 이벤트가 겹치면 같은 댓글이 두 번 들어오지 않게
+        if (prev.comments.some(c => c.commentId === payload.commentId)) return prev;
         return { ...prev, comments: [...prev.comments, newComment] };
       });
-      toast.success('새 댓글이 추가되었습니다.');
+      toast.success('새 댓글이 추가되었습니다.', { id: `comment-created-${payload.commentId}` });
     },
     [taskIdNum],
   );
@@ -296,6 +303,14 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
     fetchTaskDetail();
   }, [fetchTaskDetail]);
 
+  // 소켓이 끊겼다 다시 방에 들어오면 끊긴 동안 놓친 변경을 메우려 조용히 재조회한다 (마운트 이후 재입장만)
+  const roomJoinBaselineRef = useRef(roomJoinCount);
+  useEffect(() => {
+    if (roomJoinCount <= Math.max(roomJoinBaselineRef.current, 1)) return;
+    roomJoinBaselineRef.current = roomJoinCount;
+    fetchTaskDetail(false);
+  }, [roomJoinCount, fetchTaskDetail]);
+
   // 상태 변경 핸들러
   const handleStatusChange = async (newStatus: number, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -375,7 +390,8 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
       setSuccessMessage('댓글이 작성되었습니다.');
       await fetchTaskDetail(false);
 
-      setTimeout(() => setSuccessMessage(null), 3000);
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+      successTimerRef.current = setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '댓글 작성에 실패했습니다.';
       setError(errorMessage);
@@ -428,13 +444,8 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
     setError(null);
     try {
       await deleteTaskComment(teamIdNum, taskIdNum, commentId, session.user.accessToken);
-
-      try {
-        await fetchTaskDetail(false);
-      } catch (refreshErr) {
-        console.warn('Failed to refresh task detail after delete:', refreshErr);
-        setError('댓글이 삭제되었지만 목록을 새로고침하지 못했습니다. 페이지를 새로고침해주세요.');
-      }
+      // fetchTaskDetail 은 실패를 내부에서 setError 로 처리하고 throw 하지 않는다
+      await fetchTaskDetail(false);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '댓글 삭제에 실패했습니다.';
       setError(errorMessage);
@@ -683,6 +694,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
             value={newComment}
             onChange={e => setNewComment(e.target.value)}
             placeholder='댓글을 입력하세요...'
+            aria-label='댓글 입력'
             className='flex-1 resize-none rounded-xl border border-white/10 bg-slate-900/60 p-3 text-base text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20'
             rows={2}
           />
@@ -713,6 +725,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
                     <textarea
                       value={editingContent}
                       onChange={e => setEditingContent(e.target.value)}
+                      aria-label='댓글 수정'
                       className='w-full resize-none rounded-xl border border-white/10 bg-slate-900/60 p-3 text-base text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20'
                       rows={3}
                     />
