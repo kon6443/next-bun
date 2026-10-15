@@ -116,7 +116,7 @@ jobs:
 
       - name: Deploy stack + wait for converge via SSH
         # 서드파티 액션이 SSH 키를 받으므로 태그가 아닌 커밋 SHA 로 고정한다 (Dependabot 은 같은 줄 끝 버전 주석을 읽는다)
-        uses: appleboy/ssh-action@55dabf81b49d4120609345970c91507e2d734799 # v1.0.0
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           host: ${{ secrets.DEPLOY_SERVER }}
           username: ${{ secrets.DEPLOY_USER }}
