@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { Session } from "next-auth";
-import { TeamsPageLayout, TeamListSkeleton, TeamsHeaderSkeleton, ButtonLink, SectionLabel, FAB, IconButton } from "./components";
+import { TeamsPageLayout, TeamListSkeleton, TeamsHeaderSkeleton, ButtonLink, SectionLabel, FAB, IconButton, CountBadge } from "./components";
 import { PlusIcon } from "../components/Icons";
 import { cardStyles } from "@/styles/teams";
 import type { TeamSummary } from "@/types/team";
@@ -109,6 +109,8 @@ function TeamList({ teams }: { teams: TeamSummary[] }) {
             <SectionLabel spacing="tight" color="subtle">
               {team.role}
             </SectionLabel>
+            <CountBadge count={team.unreadChatCount} />
+            {team.unreadChatCount > 0 && <span className="sr-only">안 읽은 채팅 {team.unreadChatCount}개</span>}
           </div>
           <h2 className="mt-3 text-xl font-semibold text-white">
             {team.name}

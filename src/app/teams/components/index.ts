@@ -11,6 +11,7 @@ export { Alert, ErrorAlert, SuccessAlert } from './Alert';
 export { EmptyState } from './EmptyState';
 export { FAB } from './FAB';
 export { IconButton } from './IconButton';
+export { CountBadge } from './CountBadge';
 export {
   Skeleton,
   SkeletonText,
