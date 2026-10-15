@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { SectionLabel, EmptyState } from '../../components';
 import { ChevronUpIcon, ChevronDownIcon, UserIcon, ChartIcon, MailIcon, SendIcon, EditIcon, DiscordIcon } from '@/app/components/Icons';
@@ -117,6 +117,17 @@ export function TeamManagementSection({
 }: TeamManagementSectionProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>('stats');
+
+  // 연동 상태는 관리자 탭에서만 쓰므로 그 탭을 처음 열 때 조회한다 (비관리자는 조회하지 않는다)
+  // 클릭 핸들러 안에서 부르면 로딩 상태가 탭 전환과 같은 렌더에 켜져 미연동 화면이 깜빡이지 않는다
+  const requestedIntegrationTabsRef = useRef(new Set<TabKey>());
+  const handleTabClick = (key: TabKey) => {
+    setActiveTab(key);
+    if ((key === 'telegram' || key === 'discord') && !requestedIntegrationTabsRef.current.has(key)) {
+      requestedIntegrationTabsRef.current.add(key);
+      void (key === 'telegram' ? onRefreshTelegramStatus() : onRefreshDiscordStatus());
+    }
+  };
   const [memberStatusFilter, setMemberStatusFilter] = useState<MemberStatusFilter>('active');
 
   // 멤버 필터링
@@ -263,7 +274,7 @@ export function TeamManagementSection({
             {visibleTabs.map(tab => (
               <button
                 key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() => handleTabClick(tab.key)}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition ${
                   activeTab === tab.key
                     ? 'bg-gradient-to-r from-indigo-500/20 to-sky-500/20 text-white border border-white/10'

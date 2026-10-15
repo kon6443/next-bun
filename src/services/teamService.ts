@@ -771,9 +771,10 @@ export type CreateTelegramLinkResponse = {
   };
 };
 
+// 관리자가 아니면 백엔드가 isLinked 등 최소 정보만 내려줄 수 있어 나머지 필드는 optional 이다
 export type TelegramStatusResponse = {
   isLinked: boolean;
-  chatId: number | null;
+  chatId?: number | null;
   pendingLink?: {
     token: string;
     deepLink: string;
@@ -856,9 +857,10 @@ export async function deleteTelegramLink(teamId: number, accessToken: string): P
 
 // ==================== 디스코드 연동 API ====================
 
+// 관리자가 아니면 백엔드가 isLinked 만 내려줄 수 있어 webhookUrl 은 optional 이다
 export type DiscordStatusResponse = {
   isLinked: boolean;
-  webhookUrl: string | null;
+  webhookUrl?: string | null;
 };
 
 export type GetDiscordStatusResponse = {
