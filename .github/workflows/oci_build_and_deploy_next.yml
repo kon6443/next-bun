@@ -91,39 +91,57 @@ jobs:
           host: ${{ secrets.DEPLOY_SERVER }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
+          # 기본 10m 이면 스크립트의 15분 대기보다 먼저 세션이 끊겨 판정·진단 출력 없이 실패한다
+          command_timeout: 20m
+          # --detach=false 로 롤링 업데이트가 끝날 때까지 기다린 뒤, 결과는 UpdateStatus 로 판정한다.
+          # (detach 없이 Replicas 만 보면 교체 전 기존 태스크를 세어 실패 배포도 성공으로 남았다)
           script: |
-            set -e
+            set -euo pipefail
             export REGISTRY_URL=${{ secrets.REGISTRY_URL }}
             export IMAGE_TAG=${{ steps.sha.outputs.short }}
 
-            docker stack deploy \
+            SERVICE=prod_next_app
+            DEADLINE=$((SECONDS + 900))   # 전체 대기 상한 15분
+
+            fail() {
+              echo "Deploy failed: $1"
+              docker service ps "$SERVICE" --no-trunc | head -20 || true
+              exit 1
+            }
+
+            # 원격 호스트와 Swarm 리더의 시계 차이를 감안해 30초 여유를 둔다 (concurrency 로 배포는 겹치지 않는다)
+            DEPLOY_STARTED=$(( $(date -u +%s) - 30 ))
+            timeout 900 docker stack deploy --detach=false \
               -c /home/ubuntu/desktop/deploy/infra/prod_next.yml \
               --with-registry-auth \
-              prod_next
+              prod_next || fail "stack deploy 실패 또는 시간 초과"
 
-            SERVICE=prod_next_app
-            TIMEOUT=600
-            echo "Waiting for $SERVICE to converge (timeout ${TIMEOUT}s)..."
-            SECONDS=0
-            while [ $SECONDS -lt $TIMEOUT ]; do
-              REPLICAS=$(docker service ls --filter name=$SERVICE --format "{{.Replicas}}" | head -1)
-              RUNNING=$(echo "$REPLICAS" | cut -d/ -f1)
-              DESIRED=$(echo "$REPLICAS" | cut -d/ -f2)
-              if [ "$RUNNING" = "$DESIRED" ] && [ "$RUNNING" != "0" ]; then
-                echo "Converged at ${SECONDS}s: $REPLICAS"
-                break
-              fi
-              echo "  ${SECONDS}s: $REPLICAS"
+            # UpdateStatus 는 이전 배포 값이 남는다 — 이번 배포에서 시작된 업데이트가 아니면(최초 생성·같은 SHA 재실행)
+            # 상태 대신 Replicas 로 판정한다
+            while :; do
+              # set -e 로 진단 없이 끝나지 않게 inspect 실패를 직접 처리한다
+              STATE=$(docker service inspect "$SERVICE" --format '{{if .UpdateStatus}}{{.UpdateStatus.State}}{{end}}') \
+                || fail "service inspect 실패"
+              UPDATE_STARTED=$(docker service inspect "$SERVICE" --format '{{if .UpdateStatus}}{{if .UpdateStatus.StartedAt}}{{.UpdateStatus.StartedAt.Unix}}{{else}}0{{end}}{{else}}0{{end}}') \
+                || fail "service inspect 실패"
+              [ "$UPDATE_STARTED" -ge "$DEPLOY_STARTED" ] || STATE=""
+              case "$STATE" in
+                completed)
+                  echo "Update completed"
+                  break ;;
+                "")
+                  REPLICAS=$(docker service ls --filter "name=$SERVICE" --format '{{.Replicas}}' | head -1)
+                  if [ "${REPLICAS%%/*}" = "${REPLICAS##*/}" ] && [ "${REPLICAS%%/*}" != "0" ]; then
+                    echo "No update in this deploy, replicas: $REPLICAS"
+                    break
+                  fi ;;
+                updating|rollback_started)
+                  ;;
+                *)
+                  fail "UpdateStatus=$STATE" ;;
+              esac
+              [ "$SECONDS" -lt "$DEADLINE" ] || fail "대기 상한 초과 (UpdateStatus=${STATE:-none})"
               sleep 5
             done
-
-            FINAL=$(docker service ls --filter name=$SERVICE --format "{{.Replicas}}")
-            RUNNING=$(echo "$FINAL" | cut -d/ -f1)
-            DESIRED=$(echo "$FINAL" | cut -d/ -f2)
-            if [ "$RUNNING" != "$DESIRED" ] || [ "$RUNNING" = "0" ]; then
-              echo "Deploy failed: $FINAL"
-              docker service ps $SERVICE --no-trunc | head -20
-              exit 1
-            fi
 
             docker stack services prod_next
