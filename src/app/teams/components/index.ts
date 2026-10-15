@@ -18,6 +18,8 @@ export {
   KanbanBoardSkeleton,
   TeamBoardSkeleton,
   ListViewSkeleton,
+  CalendarViewSkeleton,
+  GanttViewSkeleton,
   TeamCardSkeleton,
   TeamListSkeleton,
   TeamsHeaderSkeleton,
