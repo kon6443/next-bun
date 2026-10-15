@@ -1,6 +1,6 @@
 # 프론트 전수조사 후속 수정
 
-- **상태**: 🟢 구현·리뷰·화면 실측 완료 (커밋 없음, 작업트리) · 커밋 지시 대기
+- **상태**: 🟢 완료 — main 머지·운영 배포 성공 (run 38704433056, `Update completed`, 4/4)
 - **브랜치**: `feat-onam-audit` (`origin/develop` b60ee60 기반) · **최종수정**: 2026-10-15
 - **근거 문서**: [감사 보고서](../front-audit-2026-10.md) — 항목 ID(V·G·T·C)는 이 보고서의 ID다. 이 폴더에서는 보고서 내용을 반복하지 않는다
 - **관련**: [DECISIONS.md](DECISIONS.md) · [WORKLOG.md](WORKLOG.md) · 백엔드 짝 작업은 `../bun` 같은 이름 브랜치
@@ -60,9 +60,9 @@
 - 완료: 감사 보고서, 추가 조사 (a)(b)(c) → [WORKLOG 2026-10-15](WORKLOG.md)
 - 완료: 사용자 답변 반영(DECISIONS 2차), F-Q3 쿠키 조사, S12에 `--detach=false` 반영
 - **다음 할 일**:
-  1. 커밋 지시 대기 — 슬라이스별 커밋 초안은 WORKLOG "구현" 절, TeamBoard·TaskDetailPage·CalendarView는 `git add -p`로 hunk 분리
-  2. (결정됨) 야간 구간 '완료' 상태 — 현재 동작 유지 (DECISIONS D-TM-overnight)
-  3. 배포 후 확인: `Update completed`·4/4·healthcheck(USER bun) — WORKLOG "최종 확인" 미검증 목록
+  1. Dependabot PR #330~#334 처리 방침 — 사용자 확인 대기 (머지·닫기 금지)
+  2. 후속 목록 — WORKLOG "리뷰 A·B 교차검증 루프"·"Playwright 실측 후속" 절의 후속 항목, S11 발견 프로덕션 의심 4건
+  3. 이 문서 갱신분 커밋 (지시 대기)
 
 ## 진행 체크리스트
 - [x] 감사 보고서
@@ -73,4 +73,5 @@
 - [x] S23
 - [x] 리뷰 A·B 교차검증·수정 루프 (2라운드, 상·중 0건)
 - [x] Playwright 화면 실측 (bun-4a) — 팝오버 FAIL 2건 수정 후 전부 PASS, 리뷰 4라운드 상·중 0
-- [ ] 커밋 (사용자 지시 대기)
+- [x] 커밋 30개 → PR #328(develop) → PR #329(main) 머지
+- [x] 운영 배포 확인 (run 38704433056 success, Update completed, 4/4, 수렴 약 87초)
