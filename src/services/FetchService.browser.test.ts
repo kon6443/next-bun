@@ -1,0 +1,60 @@
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { FetchClient } from './FetchService';
+
+// 브라우저 전용 분기: 401 전역 이벤트, 쿠키 헤더 미부착
+describe('FetchClient (브라우저)', () => {
+  const fetchMock = vi.fn();
+  const onUnauthorized = vi.fn();
+
+  beforeEach(() => {
+    fetchMock.mockReset();
+    onUnauthorized.mockReset();
+    vi.stubGlobal('fetch', fetchMock);
+    window.addEventListener('backend:unauthorized', onUnauthorized);
+  });
+
+  afterEach(() => {
+    window.removeEventListener('backend:unauthorized', onUnauthorized);
+    vi.unstubAllGlobals();
+  });
+
+  it('인증 헤더를 붙인 요청이 401이면 backend:unauthorized 를 1회 발행한다', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 401 }));
+    await new FetchClient('http://x').fetch('/t', { accessToken: 'tok' });
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+  });
+
+  it('직접 넣은 authorization 헤더(소문자)도 인증 요청으로 본다', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 401 }));
+    await new FetchClient('http://x').fetch('/t', { headers: { authorization: 'Bearer tok' } });
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+  });
+
+  it('인증 헤더 없는 요청의 401은 이벤트를 발행하지 않는다', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 401 }));
+    await new FetchClient('http://x').fetch('/t');
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it('401이 아닌 실패(403)는 이벤트를 발행하지 않는다', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 403 }));
+    await new FetchClient('http://x').fetch('/t', { accessToken: 'tok' });
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it('throwOnError여도 이벤트를 먼저 발행한 뒤 던진다', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 401 }));
+    await expect(
+      new FetchClient('http://x').fetch('/t', { accessToken: 'tok', throwOnError: true }),
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED', status: 401 });
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+  });
+
+  it('브라우저에서는 cookies 옵션을 Cookie 헤더로 붙이지 않는다', async () => {
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200 }));
+    await new FetchClient('http://x').fetch('/t', { cookies: 'a=1' });
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.headers.Cookie).toBeUndefined();
+  });
+});
