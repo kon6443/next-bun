@@ -39,6 +39,7 @@ import {
   removeMember,
   replaceWithLatestPage,
   upsertMember,
+  shouldResyncOnVisible,
   type TeamChatMessage,
 } from '@/app/utils/teamChatUtils';
 import { ChatOutbox } from '@/app/utils/chatOutbox';
@@ -211,6 +212,8 @@ export function TeamChatProvider({ children, teamId }: TeamChatProviderProps) {
   // ----- 보정: read-state + 최신 페이지 교체 (D-024) -----
 
   const isResyncingRef = useRef(false);
+  // 마지막 보정 시작 시각 — 탭 복귀 보정의 최소 간격 판단용
+  const lastResyncStartedAtRef = useRef<number | null>(null);
   const resyncAgainRef = useRef(false);
   const resyncAgainReplaceRef = useRef(false);
   /** 이력 조회 중에 보정이 왔으면, 이력이 도착한 뒤 한 번 더 보정한다 (조회 스냅샷 이후 메시지를 놓치지 않도록) */
@@ -236,6 +239,7 @@ export function TeamChatProvider({ children, teamId }: TeamChatProviderProps) {
       return;
     }
     isResyncingRef.current = true;
+    lastResyncStartedAtRef.current = Date.now();
     setIsSyncPending(true);
     // 이 보정이 판정할 미확인 건은 조회 시작 전에 끊긴 것만 — 시작 뒤 끊긴 건은 이 스냅샷 이후에 저장됐을 수 있다
     const judgeable = new Set(unconfirmedAtDisconnectRef.current);
@@ -534,7 +538,8 @@ export function TeamChatProvider({ children, teamId }: TeamChatProviderProps) {
       const visible = document.visibilityState === 'visible';
       setIsVisible(visible);
       if (visible) {
-        void resync();
+        // 잠깐 오간 탭 복귀마다 API 2건·목록 교체가 일어나지 않게 최소 간격을 둔다 (재입장 보정은 별도)
+        if (shouldResyncOnVisible(lastResyncStartedAtRef.current, Date.now())) void resync();
       } else {
         flushRead();
       }

@@ -318,3 +318,19 @@ export function formatChatDateDivider(timestamp: number): string {
 export function isChatError(payload: SocketErrorPayload): boolean {
   return payload.clientMsgId != null || payload.code?.startsWith('CHAT_') === true;
 }
+
+/** 탭 복귀 시 보정 최소 간격 — 탭을 잠깐 오갈 때마다 read-state·최신 페이지를 다시 받지 않게 */
+export const VISIBLE_RESYNC_MIN_INTERVAL_MS = 30_000;
+
+/**
+ * 탭이 다시 보일 때 보정을 할지
+ * 마지막 보정을 시작한 지 최소 간격이 지났을 때만 한다. 보정한 적이 없으면(null) 한다.
+ * 소켓 재입장으로 인한 보정은 이 간격과 무관하게 따로 돈다.
+ */
+export function shouldResyncOnVisible(
+  lastResyncStartedAt: number | null,
+  now: number,
+  minIntervalMs = VISIBLE_RESYNC_MIN_INTERVAL_MS,
+): boolean {
+  return lastResyncStartedAt === null || now - lastResyncStartedAt >= minIntervalMs;
+}
