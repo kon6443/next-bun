@@ -42,15 +42,25 @@
   border-radius: 999px;
   background: radial-gradient(circle, #f0fdfa, #67e8f9);
   box-shadow: 0 0 12px rgba(14, 165, 233, 0.8);
+}
+
+/* 빛 번짐은 고정된 그림자 레이어의 opacity 만 움직인다 (box-shadow 애니메이션은 매 프레임 다시 그린다) */
+.satellite::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 20px rgba(14, 165, 233, 1), 0 0 30px rgba(14, 165, 233, 0.5);
+  opacity: 0;
   animation: satelliteGlow 2s ease-in-out infinite;
 }
 
 @keyframes satelliteGlow {
   0%, 100% {
-    box-shadow: 0 0 12px rgba(14, 165, 233, 0.8);
+    opacity: 0;
   }
   50% {
-    box-shadow: 0 0 20px rgba(14, 165, 233, 1), 0 0 30px rgba(14, 165, 233, 0.5);
+    opacity: 1;
   }
 }
 
@@ -71,13 +81,23 @@
 .percent {
   font-size: clamp(1.1rem, 4vw, 1.5rem);
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   color: #f8fafc;
 }
 
 .label {
   font-size: clamp(0.5rem, 1.5vw, 0.6rem);
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
+  letter-spacing: 0.1em;
   color: rgba(148, 163, 184, 0.7);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .orbit {
+    transition: none;
+    animation: none;
+  }
+
+  .satellite::after {
+    animation: none;
+  }
+}

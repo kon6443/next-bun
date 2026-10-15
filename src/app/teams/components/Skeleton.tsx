@@ -207,7 +207,7 @@ export function KanbanBoardSkeleton() {
 export function ListViewSkeleton({ rowCount = 5 }: { rowCount?: number }) {
   return (
     <div
-      className="rounded-3xl border border-white/10 bg-white/5 p-5"
+      className="rounded-3xl border border-white/10 bg-slate-900/80 p-5"
       aria-hidden="true"
     >
       {/* 헤더 */}
@@ -238,6 +238,53 @@ export function ListViewSkeleton({ rowCount = 5 }: { rowCount?: number }) {
             <Skeleton width="60px" height="1.5rem" rounded="full" />
             <Skeleton width="80px" height="0.75rem" />
             <Skeleton width="80px" height="0.75rem" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 캘린더 뷰 스켈레톤 — 월 헤더 + 7열 6주 그리드 (로딩 후 레이아웃이 크게 바뀌지 않게 실제 뷰 골격과 맞춘다)
+ */
+export function CalendarViewSkeleton() {
+  return (
+    <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-5" aria-hidden="true">
+      <div className="mb-4 flex items-center justify-between">
+        <Skeleton width="100px" height="1rem" />
+        <div className="flex gap-2">
+          <Skeleton width="32px" height="1.75rem" rounded="lg" />
+          <Skeleton width="48px" height="1.75rem" rounded="lg" />
+          <Skeleton width="32px" height="1.75rem" rounded="lg" />
+        </div>
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {Array.from({ length: 7 * 6 }, (_, i) => (
+          <Skeleton key={i} width="100%" height="4.5rem" rounded="lg" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 간트(타임라인) 뷰 스켈레톤 — 이름 열 + 기간 막대 행
+ */
+export function GanttViewSkeleton({ rowCount = 5 }: { rowCount?: number }) {
+  return (
+    <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-5" aria-hidden="true">
+      <div className="mb-4 space-y-1">
+        <Skeleton width="80px" height="0.625rem" />
+        <Skeleton width="100px" height="0.875rem" />
+      </div>
+      <div className="space-y-3">
+        {Array.from({ length: rowCount }, (_, i) => (
+          <div key={i} className="flex items-center gap-3">
+            <Skeleton width="96px" height="0.875rem" />
+            <div className="flex-1">
+              <Skeleton width={`${40 + ((i * 17) % 45)}%`} height="1.25rem" rounded="full" />
+            </div>
           </div>
         ))}
       </div>

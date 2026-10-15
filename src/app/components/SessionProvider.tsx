@@ -38,7 +38,11 @@ function BackendAccessTokenCookieSync() {
 
 export default function SessionProvider({ children, session }: Props) {
   useEffect(() => {
+    // 동시에 나간 요청들이 401을 여러 번 받아도 로그아웃은 한 번만 시작한다
+    let isSigningOut = false;
     const onUnauthorized = () => {
+      if (isSigningOut) return;
+      isSigningOut = true;
       document.cookie = `access_token=; Path=/; Max-Age=0; SameSite=Lax`;
       signOut({ callbackUrl: '/auth/signin' });
     };

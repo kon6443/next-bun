@@ -1,5 +1,15 @@
 # dependencies
 /node_modules
+**/node_modules
 
-# .env*
+# .env* — .env.build 는 빌드에 필요하므로 .env 만 막는다
 .env
+
+# 빌드에 필요 없는 것 (컨텍스트 전송량·COPY . . 캐시 안정성)
+.git
+.github
+.next
+.claude
+docs
+coverage
+*.tsbuildinfo

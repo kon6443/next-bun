@@ -17,7 +17,7 @@ import {
   filterByStatus,
   getUniqueAssignees,
   formatCompactDateTime,
-  formatShortDate,
+  shouldInsertCreatedTask,
   formatDateWithYear,
   formatDateKey,
   formatDateDisplay,
@@ -231,19 +231,6 @@ describe('taskUtils', () => {
     });
   });
 
-  describe('formatShortDate', () => {
-    it('null이면 null 반환', () => {
-      expect(formatShortDate(null)).toBe(null);
-    });
-
-    it('월 일 형식으로 반환', () => {
-      const date = new Date('2025-01-15T10:00:00Z');
-      const result = formatShortDate(date);
-      expect(result).toBeTruthy();
-      expect(typeof result).toBe('string');
-    });
-  });
-
   describe('formatDateWithYear', () => {
     it('null이면 "-" 반환', () => {
       expect(formatDateWithYear(null)).toBe('-');
@@ -311,6 +298,22 @@ describe('taskUtils', () => {
       const date = new Date('2025-01-15T10:00:00Z');
       const result = formatDateDisplay(date);
       expect(result).toBe('1/15');
+    });
+  });
+
+  describe('shouldInsertCreatedTask', () => {
+    it('활성 탭에는 활성 태스크만 넣는다', () => {
+      expect(shouldInsertCreatedTask(1, 'active', false)).toBe(true);
+      expect(shouldInsertCreatedTask(0, 'active', false)).toBe(false);
+    });
+
+    it('보관함 탭에는 보관 태스크만 넣는다', () => {
+      expect(shouldInsertCreatedTask(0, 'archive', false)).toBe(true);
+      expect(shouldInsertCreatedTask(1, 'archive', false)).toBe(false);
+    });
+
+    it('이미 목록에 있으면 넣지 않는다', () => {
+      expect(shouldInsertCreatedTask(1, 'active', true)).toBe(false);
     });
   });
 });

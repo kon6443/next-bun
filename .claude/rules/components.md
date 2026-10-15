@@ -26,7 +26,5 @@ paths:
 
 | 컴포넌트 | 용도 |
 |---|---|
-| `LoadingSpinner` | 페이지 레벨 로딩 (컨테이너와 메시지 포함) |
 | `LoadingSpinnerSimple` | 컨테이너 없는 간단한 로딩 |
-| `ButtonSpinner` | 버튼 안 인라인 로딩 (`border-current`로 색 상속) |
 | `BarLoader` | 바형 게이지 (로그인 오버레이에서 사용) |

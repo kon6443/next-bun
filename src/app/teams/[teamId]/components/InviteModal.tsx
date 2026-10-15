@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import toast from 'react-hot-toast';
 import { CloseIcon } from '@/app/components/Icons';
+import { useDialog } from '@/app/hooks/useDialog';
 
 type InviteModalProps = {
   isOpen: boolean;
@@ -21,12 +22,15 @@ export function InviteModal({
   createdInviteLink,
   onClearCreatedLink,
 }: InviteModalProps) {
-  if (!isOpen) return null;
-
+  const titleId = useId();
   const handleClose = () => {
     onClearCreatedLink();
     onClose();
   };
+  // 생성 중에는 닫기 버튼이 막혀 있으므로 Esc도 막는다
+  const dialogRef = useDialog<HTMLDivElement>(isOpen, handleClose, { closeOnEscape: !isCreating });
+
+  if (!isOpen) return null;
 
   const handleCopyLink = (link: string) => {
     const copyFailedMessage = '복사에 실패했습니다. 링크를 길게 눌러 복사해 주세요.';
@@ -43,7 +47,14 @@ export function InviteModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-slate-900 p-4">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-slate-900 p-4 focus:outline-none"
+      >
         <button
           onClick={handleClose}
           disabled={isCreating}
@@ -53,7 +64,7 @@ export function InviteModal({
           <CloseIcon className="w-5 h-5" />
         </button>
 
-        <h3 className="mb-4 text-xl font-bold text-white">초대 링크 생성</h3>
+        <h3 id={titleId} className="mb-4 text-xl font-bold text-white">초대 링크 생성</h3>
 
         {createdInviteLink ? (
           <div>
@@ -109,8 +120,9 @@ function InviteCreateForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div>
-        <label className="mb-2 block text-xs font-semibold text-slate-300">만료일 (최대 3일)</label>
+        <label htmlFor="invite-expires-days" className="mb-2 block text-xs font-semibold text-slate-300">만료일 (최대 3일)</label>
         <select
+          id="invite-expires-days"
           value={expiresInDays}
           onChange={e => setExpiresInDays(Number(e.target.value))}
           className="w-full max-w-full box-border appearance-none rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2 text-base text-slate-200 focus:border-white/20 focus:outline-none"
@@ -125,8 +137,9 @@ function InviteCreateForm({
       </div>
 
       <div>
-        <label className="mb-2 block text-xs font-semibold text-slate-300">최대 사용 횟수 (선택사항)</label>
+        <label htmlFor="invite-usage-max" className="mb-2 block text-xs font-semibold text-slate-300">최대 사용 횟수 (선택사항)</label>
         <input
+          id="invite-usage-max"
           type="number"
           value={usageMaxCnt}
           onChange={e => setUsageMaxCnt(e.target.value === '' ? '' : Number(e.target.value))}

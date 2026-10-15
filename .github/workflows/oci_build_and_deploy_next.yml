@@ -7,7 +7,21 @@ on:
     paths-ignore:
       - 'docs/**'
       - '*.md'
+      - '.claude/**'
+  # PR 에서는 verify 만 돈다 (deploy 는 아래 if 로 막는다)
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.claude/**'
   workflow_dispatch:
+
+# 기본 GITHUB_TOKEN 권한을 읽기로 제한한다 (이 워크플로는 저장소에 쓰지 않는다)
+permissions:
+  contents: read
 
 jobs:
   # 배포 전 게이트: lint·typecheck·test 가 실패하면 이미지 빌드·배포로 넘어가지 않는다.
@@ -47,22 +61,33 @@ jobs:
 
   deploy:
     needs: verify
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04-arm
     environment: prod
+    # 배포 두 개가 동시에 stack deploy 하지 않게 하나씩 — 진행 중 배포는 끊지 않고 대기열로
+    # (실행 순서까지 보장하지는 않는다: 옛 push 의 verify 가 늦게 끝나면 옛 SHA 가 나중에 배포될 수 있다)
+    concurrency:
+      group: deploy-prod-next
+      cancel-in-progress: false
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 시크릿은 run 스크립트에 직접 보간하지 않고 env 로 넘긴다 (셸 인젝션 표면 축소)
       - name: Log in to Docker Registry
-        run: echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ${{ secrets.REGISTRY_URL }} -u ${{ secrets.REGISTRY_USERNAME }} --password-stdin
+        env:
+          REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY_URL" -u "$REGISTRY_USERNAME" --password-stdin
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Set short SHA
         id: sha
-        run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Build and Push arm64 image
         uses: docker/build-push-action@v5
@@ -76,54 +101,77 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Rsync stack YAML to Swarm manager
+        env:
+          SSH_KEY: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SERVER: ${{ secrets.DEPLOY_SERVER }}
         run: |
-          echo "${{ secrets.SWARM_MANAGER_SSH_KEY }}" > /tmp/ssh_key
+          printf '%s\n' "$SSH_KEY" > /tmp/ssh_key
           chmod 600 /tmp/ssh_key
           rsync -avz \
             -e "ssh -i /tmp/ssh_key -o StrictHostKeyChecking=no" \
             infra/docker-stack.app.yml \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_SERVER }}:/home/ubuntu/desktop/deploy/infra/prod_next.yml
+            "$DEPLOY_USER@$DEPLOY_SERVER:/home/ubuntu/desktop/deploy/infra/prod_next.yml"
           rm /tmp/ssh_key
 
       - name: Deploy stack + wait for converge via SSH
-        uses: appleboy/ssh-action@v1.0.0
+        # 서드파티 액션이 SSH 키를 받으므로 태그가 아닌 커밋 SHA 로 고정한다 (Dependabot 은 같은 줄 끝 버전 주석을 읽는다)
+        uses: appleboy/ssh-action@55dabf81b49d4120609345970c91507e2d734799 # v1.0.0
         with:
           host: ${{ secrets.DEPLOY_SERVER }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
+          # 기본 10m 이면 스크립트의 15분 대기보다 먼저 세션이 끊겨 판정·진단 출력 없이 실패한다
+          command_timeout: 20m
+          # --detach=false 로 롤링 업데이트가 끝날 때까지 기다린 뒤, 결과는 UpdateStatus 로 판정한다.
+          # (detach 없이 Replicas 만 보면 교체 전 기존 태스크를 세어 실패 배포도 성공으로 남았다)
           script: |
-            set -e
+            set -euo pipefail
             export REGISTRY_URL=${{ secrets.REGISTRY_URL }}
             export IMAGE_TAG=${{ steps.sha.outputs.short }}
 
-            docker stack deploy \
+            SERVICE=prod_next_app
+            DEADLINE=$((SECONDS + 900))   # 전체 대기 상한 15분
+
+            fail() {
+              echo "Deploy failed: $1"
+              docker service ps "$SERVICE" --no-trunc | head -20 || true
+              exit 1
+            }
+
+            # 원격 호스트와 Swarm 리더의 시계 차이를 감안해 30초 여유를 둔다 (concurrency 로 배포는 겹치지 않는다)
+            DEPLOY_STARTED=$(( $(date -u +%s) - 30 ))
+            timeout 900 docker stack deploy --detach=false \
               -c /home/ubuntu/desktop/deploy/infra/prod_next.yml \
               --with-registry-auth \
-              prod_next
+              prod_next || fail "stack deploy 실패 또는 시간 초과"
 
-            SERVICE=prod_next_app
-            TIMEOUT=600
-            echo "Waiting for $SERVICE to converge (timeout ${TIMEOUT}s)..."
-            SECONDS=0
-            while [ $SECONDS -lt $TIMEOUT ]; do
-              REPLICAS=$(docker service ls --filter name=$SERVICE --format "{{.Replicas}}" | head -1)
-              RUNNING=$(echo "$REPLICAS" | cut -d/ -f1)
-              DESIRED=$(echo "$REPLICAS" | cut -d/ -f2)
-              if [ "$RUNNING" = "$DESIRED" ] && [ "$RUNNING" != "0" ]; then
-                echo "Converged at ${SECONDS}s: $REPLICAS"
-                break
-              fi
-              echo "  ${SECONDS}s: $REPLICAS"
+            # UpdateStatus 는 이전 배포 값이 남는다 — 이번 배포에서 시작된 업데이트가 아니면(최초 생성·같은 SHA 재실행)
+            # 상태 대신 Replicas 로 판정한다
+            while :; do
+              # set -e 로 진단 없이 끝나지 않게 inspect 실패를 직접 처리한다
+              STATE=$(docker service inspect "$SERVICE" --format '{{if .UpdateStatus}}{{.UpdateStatus.State}}{{end}}') \
+                || fail "service inspect 실패"
+              UPDATE_STARTED=$(docker service inspect "$SERVICE" --format '{{if .UpdateStatus}}{{if .UpdateStatus.StartedAt}}{{.UpdateStatus.StartedAt.Unix}}{{else}}0{{end}}{{else}}0{{end}}') \
+                || fail "service inspect 실패"
+              [ "$UPDATE_STARTED" -ge "$DEPLOY_STARTED" ] || STATE=""
+              case "$STATE" in
+                completed)
+                  echo "Update completed"
+                  break ;;
+                "")
+                  REPLICAS=$(docker service ls --filter "name=$SERVICE" --format '{{.Replicas}}' | head -1)
+                  if [ "${REPLICAS%%/*}" = "${REPLICAS##*/}" ] && [ "${REPLICAS%%/*}" != "0" ]; then
+                    echo "No update in this deploy, replicas: $REPLICAS"
+                    break
+                  fi ;;
+                updating|rollback_started)
+                  ;;
+                *)
+                  fail "UpdateStatus=$STATE" ;;
+              esac
+              [ "$SECONDS" -lt "$DEADLINE" ] || fail "대기 상한 초과 (UpdateStatus=${STATE:-none})"
               sleep 5
             done
-
-            FINAL=$(docker service ls --filter name=$SERVICE --format "{{.Replicas}}")
-            RUNNING=$(echo "$FINAL" | cut -d/ -f1)
-            DESIRED=$(echo "$FINAL" | cut -d/ -f2)
-            if [ "$RUNNING" != "$DESIRED" ] || [ "$RUNNING" = "0" ]; then
-              echo "Deploy failed: $FINAL"
-              docker service ps $SERVICE --no-trunc | head -20
-              exit 1
-            fi
 
             docker stack services prod_next

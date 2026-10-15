@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { SITE_CONFIG } from '../config/siteConfig';
 import LoginButton from './LoginButton';
 import PublicFooter from '../components/PublicFooter';
+import { serializeJsonLd } from '@/app/utils/jsonLd';
 
 const features = [
   {
@@ -86,15 +87,15 @@ export default function TeamsLanding() {
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(appJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(appJsonLd) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqJsonLd) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
       />
 
       <div className="mx-auto max-w-2xl px-4 pb-16 sm:pb-24 pt-12">

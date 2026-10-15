@@ -1,5 +1,8 @@
 .waveBox {
-  width: min(280px, 90vw);
+  /* 좁은 화면에서 카드 안쪽을 넘지 않게 부모 폭을 넘지 않는다 */
+  width: 100%;
+  max-width: 280px;
+  box-sizing: border-box;
   height: clamp(140px, 38vw, 170px);
   border-radius: 24px;
   padding: 14px 18px;
@@ -21,42 +24,51 @@
 
 .badge {
   font-size: 0.6rem;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
+  letter-spacing: 0.1em;
   color: rgba(148, 163, 184, 0.8);
 }
 
 .value {
   font-size: clamp(1rem, 4vw, 1.25rem);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
   color: #f8fafc;
 }
 
 .bars {
   flex: 1;
   display: flex;
-  align-items: flex-end;
+  align-items: stretch;
   gap: clamp(6px, 2vw, 10px);
   padding-bottom: 6px;
 }
 
-.bar {
+/* 진행률 높이는 바깥 슬롯의 scaleY 로, 출렁임은 안쪽 막대의 scaleY 로 — 높이(layout) 전환 없이 둘을 겹친다 */
+.slot {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  transform-origin: bottom center;
+  transition: transform 0.35s ease;
+}
+
+.bar {
+  flex: 1;
+  height: 100%;
   border-radius: 999px;
   background: linear-gradient(180deg, rgba(59, 130, 246, 0.9), rgba(14, 165, 233, 0.65));
   box-shadow: 0 8px 16px rgba(14, 165, 233, 0.35);
   transform-origin: bottom center;
-  transition: height 0.35s ease, opacity 0.35s ease;
   opacity: 0.9;
   animation: waveFloat 2s ease-in-out infinite;
 }
 
-.bar:nth-child(1) { animation-delay: 0s; }
-.bar:nth-child(2) { animation-delay: 0.15s; }
-.bar:nth-child(3) { animation-delay: 0.3s; }
-.bar:nth-child(4) { animation-delay: 0.45s; }
-.bar:nth-child(5) { animation-delay: 0.6s; }
+.slot:nth-child(1) .bar { animation-delay: 0s; }
+.slot:nth-child(2) .bar { animation-delay: 0.15s; }
+.slot:nth-child(3) .bar { animation-delay: 0.3s; }
+.slot:nth-child(4) .bar { animation-delay: 0.45s; }
+.slot:nth-child(5) .bar { animation-delay: 0.6s; }
 
 @keyframes waveFloat {
   0%, 100% {
@@ -67,8 +79,17 @@
   }
 }
 
-.bar:nth-child(even) {
+.slot:nth-child(even) .bar {
   background: linear-gradient(180deg, rgba(236, 72, 153, 0.9), rgba(249, 115, 22, 0.7));
   box-shadow: 0 8px 20px rgba(236, 72, 153, 0.35);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .slot {
+    transition: none;
+  }
+
+  .bar {
+    animation: none;
+  }
+}

@@ -100,6 +100,7 @@ export default function Mypage() {
                 value={newUserName}
                 onChange={(e) => setNewUserName(e.target.value)}
                 maxLength={20}
+                aria-label="닉네임"
                 className="w-full px-4 py-2 text-center text-xl font-bold bg-slate-800/50 border border-slate-600/50 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500"
                 placeholder="닉네임 입력"
                 autoFocus

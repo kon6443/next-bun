@@ -5,6 +5,7 @@ import { RIVER_FISH } from '../data/fish';
 import { GRADE_NAMES } from '../config/constants';
 import TeamsPromoBanner from '../guide/TeamsPromoBanner';
 import PublicFooter from '../../components/PublicFooter';
+import { serializeJsonLd } from '@/app/utils/jsonLd';
 
 export const metadata: Metadata = {
   title: '낚시 게임 소개',
@@ -75,11 +76,11 @@ export default function FishingAboutPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqJsonLd) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
       />
 
       <div className="mx-auto max-w-2xl px-4 pb-16 sm:pb-24 pt-12">

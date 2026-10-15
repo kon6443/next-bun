@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 
 type ViewHeaderProps = {
-  /** 뷰 제목 (영문 라벨) */
+  /** 뷰 제목 (짧은 한국어 라벨) */
   title: string;
   /** 부제목/설명 */
   subtitle: string;
@@ -27,7 +27,7 @@ export function ViewHeader({ title, subtitle, count, actions }: ViewHeaderProps)
       <div className="flex items-center gap-3">
         {actions}
         <span className="text-xs font-semibold text-slate-400">
-          {count} tasks
+          {count}개
         </span>
       </div>
     </div>

@@ -233,6 +233,7 @@ export default function ChatPanel({ isOpen, onClose, onSendMessage, socket, curr
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="메시지 입력..."
+            aria-label="채팅 메시지 입력"
             className="flex-1 bg-slate-800/80 border border-slate-600/50 rounded-lg px-2.5 py-1.5
                        text-slate-200 placeholder:text-slate-500
                        focus:outline-none focus:border-cyan-500/50"

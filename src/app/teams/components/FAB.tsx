@@ -28,7 +28,7 @@ export function FAB({ href, onClick, label = '추가', disabled = false }: FABPr
   return (
     <div className={fabWrapperStyles} aria-hidden={disabled ? 'true' : undefined}>
       {href ? (
-        <Link href={href} className={fabStyles} aria-label={label}>
+        <Link href={href} className={fabStyles} aria-label={label} data-fixed-bottom-overlay>
           <PlusIcon className='w-6 h-6' />
         </Link>
       ) : (
@@ -38,6 +38,7 @@ export function FAB({ href, onClick, label = '추가', disabled = false }: FABPr
           disabled={disabled}
           className={fabStyles}
           aria-label={label}
+          data-fixed-bottom-overlay
         >
           <PlusIcon className='w-6 h-6' />
         </button>

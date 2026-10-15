@@ -104,7 +104,7 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
 
   return (
     <div className={viewContainerStyles}>
-      <ViewHeader title="Timeline" subtitle="시작일 기준 정렬" count={tasks.length} />
+      <ViewHeader title="타임라인" subtitle="시작일 기준 정렬" count={tasks.length} />
 
       {/* 간트 차트 영역 */}
       <div className="overflow-x-auto">

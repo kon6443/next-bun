@@ -6,6 +6,7 @@ import { GRADE_COLORS, GRADE_NAMES } from '../../config/constants';
 import { SITE_CONFIG } from '../../../config/siteConfig';
 import { getDifficultyLabel } from '../../utils/format';
 import PublicFooter from '../../../components/PublicFooter';
+import { serializeJsonLd } from '@/app/utils/jsonLd';
 
 interface PageProps {
   params: Promise<{ fishId: string }>;
@@ -84,11 +85,11 @@ export default async function FishDetailPage({ params }: PageProps) {
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
       />
 
       <div className="mx-auto max-w-2xl px-4 pb-16 sm:pb-24 pt-12">
