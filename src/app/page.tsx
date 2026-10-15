@@ -1,6 +1,7 @@
 import { TeamsPageLayout, SectionLabel, ButtonLink } from "./teams/components";
 import { cardStyles } from "@/styles/teams";
 import { SITE_CONFIG } from "./config/siteConfig";
+import { serializeJsonLd } from '@/app/utils/jsonLd';
 
 const baseDomain = process.env.NEXT_PUBLIC_DOMAIN?.replace(/\/$/, "") ?? "";
 
@@ -28,7 +29,7 @@ export default function Home() {
     <TeamsPageLayout>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(siteJsonLd) }}
       />
       <div className="flex flex-col gap-6">
         {/* Time Tracker 섹션 */}
