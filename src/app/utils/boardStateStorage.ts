@@ -8,6 +8,8 @@ import type { PeriodFilter, StatusFilter } from './taskUtils';
 
 export type BoardViewMode = 'kanban' | 'gantt' | 'list' | 'calendar';
 export type BoardDataTab = 'active' | 'archive';
+export type ListSortKey = 'taskName' | 'taskStatus' | 'userName' | 'startAt' | 'endAt' | 'crtdAt';
+export type ListSort = { key: ListSortKey; order: 'asc' | 'desc' };
 
 export type BoardFilters = {
   searchQuery: string;
@@ -22,14 +24,23 @@ export type BoardState = {
   view: BoardViewMode;
   filters: BoardFilters;
   kanbanColumnIndex: number;
+  /** 캘린더에서 보던 달 'YYYY-MM' */
+  calendarMonth: string;
+  /** 리스트 정렬 */
+  listSort: ListSort;
 };
 
 const BOARD_KEY_PREFIX = 'teamBoardState:';
 const OPENED_FROM_BOARD_KEY = 'taskOpenedFromBoard';
 const BOARD_RETURN_KEY_PREFIX = 'teamBoardReturn:';
 
-const VIEW_MODES: readonly BoardViewMode[] = ['kanban', 'gantt', 'list', 'calendar'];
+/** 보기 방식 목록 (SSOT) — URL `?view=` 검증과 저장값 검증이 함께 쓴다 */
+export const VIEW_MODES: readonly BoardViewMode[] = ['kanban', 'gantt', 'list', 'calendar'];
 const DATA_TABS: readonly BoardDataTab[] = ['active', 'archive'];
+const LIST_SORT_KEYS: readonly ListSortKey[] = ['taskName', 'taskStatus', 'userName', 'startAt', 'endAt', 'crtdAt'];
+const CALENDAR_MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+/** 상세에서 돌아왔다는 표시의 유효 시간 — 상세에서 보드를 거치지 않고 떠났다가 한참 뒤 들어올 때 옛 상태를 복원하지 않게 */
+export const BOARD_RETURN_TTL_MS = 30 * 60 * 1000;
 const PERIODS: readonly PeriodFilter[] = ['all', 'today', 'thisWeek', 'thisMonth', 'overdue'];
 const STATUSES: readonly StatusFilter[] = ['all', 1, 2, 3, 4, 5];
 
@@ -95,6 +106,17 @@ export function loadBoardState(teamId: string): Partial<BoardState> {
   if (DATA_TABS.includes(s.dataTab as BoardDataTab)) state.dataTab = s.dataTab as BoardDataTab;
   if (VIEW_MODES.includes(s.view as BoardViewMode)) state.view = s.view as BoardViewMode;
   if (isNonNegativeInteger(s.kanbanColumnIndex)) state.kanbanColumnIndex = s.kanbanColumnIndex;
+  if (typeof s.calendarMonth === 'string' && CALENDAR_MONTH_PATTERN.test(s.calendarMonth)) {
+    state.calendarMonth = s.calendarMonth;
+  }
+  const listSort = s.listSort as Record<string, unknown> | null | undefined;
+  if (
+    typeof listSort === 'object' && listSort !== null &&
+    LIST_SORT_KEYS.includes(listSort.key as ListSortKey) &&
+    (listSort.order === 'asc' || listSort.order === 'desc')
+  ) {
+    state.listSort = { key: listSort.key as ListSortKey, order: listSort.order };
+  }
   const filters = parseFilters(s.filters);
   if (filters) state.filters = filters;
   return state;
@@ -114,7 +136,7 @@ export function saveBoardState(teamId: string, patch: Partial<BoardState>): void
 export function markTaskOpenedFromBoard(teamId: string | number, taskId: number): void {
   saveBoardState(String(teamId), { scrollY: Math.round(window.scrollY) });
   writeItem(OPENED_FROM_BOARD_KEY, `${teamId}:${taskId}`);
-  writeItem(BOARD_RETURN_KEY_PREFIX + teamId, '1');
+  writeItem(BOARD_RETURN_KEY_PREFIX + teamId, String(Date.now()));
 }
 
 /**
@@ -123,9 +145,26 @@ export function markTaskOpenedFromBoard(teamId: string | number, taskId: number)
  */
 export function consumeBoardReturn(teamId: string | number): boolean {
   const key = BOARD_RETURN_KEY_PREFIX + teamId;
-  const returning = readItem(key) === '1';
-  if (returning) removeItem(key);
-  return returning;
+  const raw = readItem(key);
+  if (raw === null) return false;
+  removeItem(key);
+  const markedAt = Number(raw);
+  // 표시한 시각이 없거나(이전 형식) 유효 시간이 지났으면 복원하지 않는다
+  return Number.isFinite(markedAt) && Date.now() - markedAt <= BOARD_RETURN_TTL_MS;
+}
+
+/** URL `?tab=` 값 → 데이터 탭 (보관함만 파라미터로 남기고 나머지는 활성) */
+export function parseDataTabParam(value: string | null | undefined): BoardDataTab {
+  return value === 'archive' ? 'archive' : 'active';
+}
+
+/** 보드 주소 — 기본값(칸반·활성)은 파라미터를 생략한다 */
+export function buildBoardHref(teamId: string | number, { view, dataTab }: { view?: BoardViewMode; dataTab?: BoardDataTab }): string {
+  const params = new URLSearchParams();
+  if (view && view !== 'kanban') params.set('view', view);
+  if (dataTab === 'archive') params.set('tab', 'archive');
+  const query = params.toString();
+  return `/teams/${teamId}${query ? `?${query}` : ''}`;
 }
 
 /**
