@@ -86,6 +86,7 @@ export function TaskFilters({
             value={searchQuery}
             onChange={e => onSearchChange(e.target.value)}
             placeholder="태스크 검색..."
+            aria-label="태스크 검색"
             className="w-full rounded-xl border border-white/10 bg-slate-900/50 pl-10 pr-10 py-2.5 text-base text-slate-200 placeholder-slate-500 focus:border-sky-500/50 focus:outline-none"
           />
           <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
@@ -146,6 +147,7 @@ export function TaskFilters({
             <select
               value={assigneeId ?? ''}
               onChange={e => onAssigneeChange(e.target.value === '' ? null : Number(e.target.value))}
+              aria-label="담당자"
               className="flex-1 max-w-full box-border px-3 py-2.5 rounded-lg border border-white/10 bg-slate-900/50 text-base text-slate-200 focus:outline-none"
             >
               <option value="">모든 담당자</option>

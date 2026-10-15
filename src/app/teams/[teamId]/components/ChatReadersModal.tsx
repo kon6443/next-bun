@@ -1,6 +1,7 @@
 'use client';
 
 import { CloseIcon } from '@/app/components/Icons';
+import { useDialog } from '@/app/hooks/useDialog';
 import { UserAvatar } from '@/app/components/UserAvatar';
 import type { ChatMemberReadState } from '@/services/teamService';
 
@@ -18,6 +19,7 @@ interface ChatReadersModalProps {
  * 채팅 패널(z-[100]) 위에 겹쳐 뜨도록 z-[110]을 쓴다.
  */
 export function ChatReadersModal({ isOpen, onClose, readers, currentUserId }: ChatReadersModalProps) {
+  const dialogRef = useDialog<HTMLDivElement>(isOpen && Boolean(readers), onClose);
   if (!isOpen || !readers) return null;
 
   return (
@@ -25,7 +27,9 @@ export function ChatReadersModal({ isOpen, onClose, readers, currentUserId }: Ch
       <div className="fixed inset-0 z-[110] bg-black/60" onClick={onClose} aria-hidden="true" />
 
       <div
-        className="fixed bottom-0 left-0 right-0 z-[110] animate-[slideUp_0.3s_ease-out]"
+        ref={dialogRef}
+        tabIndex={-1}
+        className="fixed bottom-0 left-0 right-0 z-[110] animate-[slideUp_0.3s_ease-out] focus:outline-none"
         role="dialog"
         aria-modal="true"
         aria-labelledby="chat-readers-title"

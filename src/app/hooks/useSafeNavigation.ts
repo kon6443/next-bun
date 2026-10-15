@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import {
   useSearchParams as useNextSearchParams,
   usePathname as useNextPathname,
@@ -75,10 +75,11 @@ export function useSafeNavigation(): SafeNavigationResult {
   // 안전한 pathname (null일 경우 빈 문자열)
   const pathname = nextPathname ?? '';
 
-  // 파라미터 안전하게 가져오기
-  const getParam = (key: string, defaultValue = ''): string => {
-    return searchParams.get(key) ?? defaultValue;
-  };
+  // 파라미터 안전하게 가져오기 — effect·useCallback 의존성에 넣어도 매 렌더 바뀌지 않게 메모이즈
+  const getParam = useCallback(
+    (key: string, defaultValue = ''): string => searchParams.get(key) ?? defaultValue,
+    [searchParams],
+  );
 
   // 단일 파라미터 설정
   const setParam = (key: string, value: string | null | undefined): URLSearchParams => {

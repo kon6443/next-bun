@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense, useCallback } from "react";
+import { useEffect, useState, Suspense, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSession, signIn } from "next-auth/react";
 import { acceptTeamInvite } from "@/services/teamService";
@@ -18,11 +18,18 @@ function InviteAcceptContent() {
   const [success, setSuccess] = useState(false);
 
   const token = getParam("token") || null;
+  // 수락 요청은 한 번만 — state 가드는 같은 렌더의 effect 재실행(StrictMode 등)을 막지 못한다
+  const acceptStartedRef = useRef(false);
+  const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+  }, []);
 
   const handleAcceptInvite = useCallback(async () => {
-    if (!token || !session?.user?.accessToken) {
+    if (!token || !session?.user?.accessToken || acceptStartedRef.current) {
       return;
     }
+    acceptStartedRef.current = true;
 
     setIsProcessing(true);
     setError(null);
@@ -34,7 +41,7 @@ function InviteAcceptContent() {
       );
 
       setSuccess(true);
-      setTimeout(() => {
+      redirectTimerRef.current = setTimeout(() => {
         router.push(`/teams/${response.data.teamId}`);
       }, 1500);
     } catch (err) {

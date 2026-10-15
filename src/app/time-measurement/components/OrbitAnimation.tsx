@@ -15,7 +15,7 @@ export default function OrbitAnimation({ progress }: AnimationProps) {
       </div>
       <div className={styles.core}>
         <span className={styles.percent}>{Math.round(clamped)}%</span>
-        <span className={styles.label}>orbit</span>
+        <span className={styles.label}>경과</span>
       </div>
     </div>
   );

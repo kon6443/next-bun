@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import { CloseIcon } from '@/app/components/Icons';
+import { useDialog } from '@/app/hooks/useDialog';
 import { ROLES, getRoleMeta } from '@/app/config/roleConfig';
 
 type RoleChangeModalProps = {
@@ -32,13 +33,16 @@ export function RoleChangeModal({
   actorRole,
 }: RoleChangeModalProps) {
   const [selectedRole, setSelectedRole] = useState<'MANAGER' | 'MEMBER' | null>(null);
-
-  if (!isOpen || !targetUser) return null;
-
+  const titleId = useId();
   const handleClose = () => {
     setSelectedRole(null);
     onClose();
   };
+  const dialogRef = useDialog<HTMLDivElement>(isOpen && Boolean(targetUser), handleClose, {
+    closeOnEscape: !isSubmitting,
+  });
+
+  if (!isOpen || !targetUser) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,7 +74,14 @@ export function RoleChangeModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-slate-900 p-6">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-slate-900 p-6 focus:outline-none"
+      >
         <button
           onClick={handleClose}
           className="absolute right-4 top-4 text-slate-400 hover:text-slate-200"
@@ -79,7 +90,7 @@ export function RoleChangeModal({
           <CloseIcon className="w-5 h-5" />
         </button>
 
-        <h3 className="mb-4 text-xl font-bold text-white">역할 변경</h3>
+        <h3 id={titleId} className="mb-4 text-xl font-bold text-white">역할 변경</h3>
 
         {/* 대상 사용자 정보 */}
         <div className="mb-6 rounded-xl border border-white/10 bg-slate-950/30 p-4">

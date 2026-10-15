@@ -7,6 +7,7 @@ import type { FishGrade } from '../types/fish';
 import { getDifficultyLabel } from '../utils/format';
 import TeamsPromoBanner from './TeamsPromoBanner';
 import PublicFooter from '../../components/PublicFooter';
+import { serializeJsonLd } from '@/app/utils/jsonLd';
 
 export const metadata: Metadata = {
   title: '낚시 도감',
@@ -57,7 +58,7 @@ export default function FishingGuidePage() {
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
       />
       <div className="mx-auto max-w-2xl px-4 pb-16 sm:pb-24 pt-12">
         {/* 헤더 */}

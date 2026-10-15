@@ -5,6 +5,9 @@ import {
   markTaskOpenedFromBoard,
   consumeTaskOpenedFromBoard,
   consumeBoardReturn,
+  parseDataTabParam,
+  buildBoardHref,
+  BOARD_RETURN_TTL_MS,
 } from './boardStateStorage';
 
 function createMemoryStorage() {
@@ -87,5 +90,51 @@ describe('boardStateStorage', () => {
     saveBoardState('7', { dataTab: 'archive' });
     markTaskOpenedFromBoard('7', 15);
     expect(loadBoardState('7')).toEqual({ dataTab: 'archive', scrollY: 812 });
+  });
+
+  it('캘린더 달·리스트 정렬을 저장하고, 형식이 틀린 값은 버린다', () => {
+    saveBoardState('7', { calendarMonth: '2026-03', listSort: { key: 'endAt', order: 'asc' } });
+    expect(loadBoardState('7')).toEqual({ calendarMonth: '2026-03', listSort: { key: 'endAt', order: 'asc' } });
+
+    window.sessionStorage.setItem(
+      'teamBoardState:8',
+      JSON.stringify({ calendarMonth: '2026-13', listSort: { key: 'unknown', order: 'asc' } }),
+    );
+    expect(loadBoardState('8')).toEqual({});
+  });
+
+  it('복귀 표시는 유효 시간이 지나면 복원하지 않는다 (표시는 지운다)', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    markTaskOpenedFromBoard('7', 15);
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000 + BOARD_RETURN_TTL_MS + 1);
+    expect(consumeBoardReturn('7')).toBe(false);
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000 + BOARD_RETURN_TTL_MS + 2);
+    expect(consumeBoardReturn('7')).toBe(false);
+    vi.restoreAllMocks();
+  });
+
+  it('이전 형식(시각 없는 표시)은 복원하지 않는다', () => {
+    window.sessionStorage.setItem('teamBoardReturn:7', '1');
+    expect(consumeBoardReturn('7')).toBe(false);
+  });
+
+  it('URL 탭 파라미터는 archive만 보관함, 나머지는 활성', () => {
+    expect(parseDataTabParam('archive')).toBe('archive');
+    expect(parseDataTabParam('active')).toBe('active');
+    expect(parseDataTabParam(null)).toBe('active');
+    expect(parseDataTabParam('ARCHIVE')).toBe('active');
+  });
+
+  it('보드 주소는 기본값(칸반·활성) 파라미터를 생략한다', () => {
+    expect(buildBoardHref('7', {})).toBe('/teams/7');
+    expect(buildBoardHref('7', { view: 'kanban', dataTab: 'active' })).toBe('/teams/7');
+    expect(buildBoardHref('7', { view: 'calendar' })).toBe('/teams/7?view=calendar');
+    expect(buildBoardHref('7', { view: 'list', dataTab: 'archive' })).toBe('/teams/7?view=list&tab=archive');
+  });
+
+  it('undefined로 저장하면 이전에 저장한 달·정렬을 지운다', () => {
+    saveBoardState('7', { calendarMonth: '2026-03', listSort: { key: 'endAt', order: 'asc' } });
+    saveBoardState('7', { calendarMonth: undefined, listSort: undefined });
+    expect(loadBoardState('7')).toEqual({});
   });
 });

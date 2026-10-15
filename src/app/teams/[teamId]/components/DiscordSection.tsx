@@ -138,6 +138,7 @@ export function DiscordSection({
           value={webhookUrl}
           onChange={(e) => setWebhookUrl(e.target.value)}
           placeholder="https://discord.com/api/webhooks/..."
+          aria-label="디스코드 Webhook URL"
           className="w-full rounded-lg border border-white/20 bg-slate-900/50 px-4 py-2.5 text-base text-slate-200 placeholder-slate-500 outline-none focus:border-indigo-500/50 transition"
         />
       </div>

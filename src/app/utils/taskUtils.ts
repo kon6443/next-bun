@@ -264,7 +264,6 @@ export function getUniqueAssignees(tasks: Task[]): { id: number; name: string }[
  * | 함수명                 | 포맷 예시           | 용도                              |
  * |------------------------|---------------------|-----------------------------------|
  * | formatCompactDateTime  | "1/15 14:30"        | 카드 날짜 표시, 좁은 공간         |
- * | formatShortDate        | "1월 15일"          | 한글 날짜, 중간 공간              |
  * | formatDateWithYear     | "2024년 1월 15일"   | 테이블, 상세 정보                 |
  * | formatFullDateTime     | "2024년 1월 15일 14:30" | 상세 페이지, 전체 정보        |
  * | formatDateKey          | "2024-01-15"        | 내부 키, 비교용 (표시 X)          |
@@ -283,22 +282,6 @@ export function formatCompactDateTime(date: Date): string {
   const hours = d.getHours().toString().padStart(2, '0');
   const minutes = d.getMinutes().toString().padStart(2, '0');
   return `${d.getMonth() + 1}/${d.getDate()} ${hours}:${minutes}`;
-}
-
-/**
- * 짧은 날짜 포맷 (M월 D일)
- * 한글로 자연스러운 날짜 표시가 필요할 때 사용
- * @param date - 포맷할 날짜 (null 가능)
- * @returns "M월 D일" 형식 문자열 또는 null
- * @example formatShortDate(new Date('2024-01-15')) // "1월 15일"
- */
-export function formatShortDate(date: Date | null): string | null {
-  if (!date) return null;
-  const d = new Date(date);
-  return d.toLocaleDateString('ko-KR', {
-    month: 'short',
-    day: 'numeric',
-  });
 }
 
 /**
@@ -360,4 +343,18 @@ export function formatDateKey(date: Date): string {
  */
 export function formatDateDisplay(date: Date): string {
   return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+/**
+ * 소켓으로 받은 새 태스크를 현재 목록에 넣을지 판정
+ * 보고 있는 데이터 탭(활성=actStatus 1, 보관함=0)과 맞고, 아직 목록에 없을 때만 넣는다
+ * (refetch 결과와 소켓 이벤트가 겹치면 같은 태스크가 두 번 들어오는 것을 막는다)
+ */
+export function shouldInsertCreatedTask(
+  actStatus: number,
+  dataTab: 'active' | 'archive',
+  alreadyExists: boolean,
+): boolean {
+  if (alreadyExists) return false;
+  return actStatus === (dataTab === 'archive' ? 0 : 1);
 }

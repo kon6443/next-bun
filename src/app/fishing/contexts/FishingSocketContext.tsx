@@ -328,7 +328,11 @@ export function FishingSocketProvider({ children, mapId }: FishingSocketProvider
 
   const reconnect = useCallback(() => {
     disconnectSocket();
-    setTimeout(initializeSocket, 100);
+    // 언마운트 시 disconnectSocket 이 이 타이머도 취소하도록 같은 ref 에 둔다
+    connectTimerRef.current = setTimeout(() => {
+      connectTimerRef.current = null;
+      initializeSocket();
+    }, 100);
   }, [disconnectSocket, initializeSocket]);
 
   // 마운트 시 연결, 언마운트 시 해제

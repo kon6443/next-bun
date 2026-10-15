@@ -308,7 +308,11 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
   const reconnect = useCallback(() => {
     disconnectSocket();
     // 다음 tick에서 재연결 (cleanup 완료 후)
-    setTimeout(initializeSocket, 100);
+    // 언마운트 시 disconnectSocket 이 이 타이머도 취소하도록 같은 ref 에 둔다
+    connectTimerRef.current = setTimeout(() => {
+      connectTimerRef.current = null;
+      initializeSocket();
+    }, 100);
   }, [disconnectSocket, initializeSocket]);
 
   /**

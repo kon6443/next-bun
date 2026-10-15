@@ -10,25 +10,24 @@ import { ListView } from '../../components/ListView';
 import { CalendarView } from '../../components/CalendarView';
 import { TaskFilters } from '../../components/TaskFilters';
 import { Kanban } from '../../components/Kanban';
-import { TeamsPageLayout, SectionLabel, ErrorAlert, KanbanBoardSkeleton, ListViewSkeleton, Skeleton, FAB, IconButton } from '../components';
+import { TeamsPageLayout, SectionLabel, ErrorAlert, KanbanBoardSkeleton, ListViewSkeleton, CalendarViewSkeleton, GanttViewSkeleton, Skeleton, FAB, IconButton } from '../components';
 import { EditIcon, UserGroupIcon, PlusIcon, QuestionMarkIcon, CommentIcon } from '../../components/Icons';
 import { DropdownMenu } from './components/DropdownMenu';
 import type { Task } from '../../types/task';
-import { useTaskFilter, useTelegramLink, useDiscordLink, useTeamInvite, useTeamSocketEvents, useSafeNavigation } from '../../hooks';
+import { useTaskFilter, useTelegramLink, useDiscordLink, useTeamInvite, useTeamSocketEvents, useSafeNavigation, useLatestFlag } from '../../hooks';
 import { useTeamSocketContext, useTeamChatContext } from './contexts';
 import {
   getTeamTasks,
   updateTaskStatus,
   updateTaskActiveStatus,
   getTeamUsers,
-  getTelegramStatus,
-  getDiscordStatus,
   updateMemberRole,
   updateMemberStatus,
   type TeamUserResponse,
 } from '@/services/teamService';
 import { cardStyles } from '@/styles/teams';
-import { loadBoardState, saveBoardState, consumeBoardReturn } from '../../utils/boardStateStorage';
+import { loadBoardState, saveBoardState, consumeBoardReturn, parseDataTabParam, VIEW_MODES, type ListSort } from '../../utils/boardStateStorage';
+import { shouldInsertCreatedTask } from '../../utils/taskUtils';
 import { STATUS_TO_COLUMN, type ColumnKey } from '../../config/taskStatusConfig';
 import { TeamManagementSection, InviteModal, RoleChangeModal, ViewModeToggle, OnlineUsers, TutorialGuide, hasSeenTutorial, markTutorialSeen, TeamChatPanel, type ViewMode, type DataTab } from './components';
 import { ROLES } from '../../config/roleConfig';
@@ -56,8 +55,6 @@ type TeamBoardProps = {
   teamId: string;
 };
 
-const validViewModes: ViewMode[] = ['kanban', 'gantt', 'list', 'calendar'];
-
 export default function TeamBoard({ teamId }: TeamBoardProps) {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
@@ -66,7 +63,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   // URL 쿼리에서 viewMode 읽기
   const getViewModeFromQuery = useCallback((): ViewMode => {
     const viewParam = getParam('view');
-    if (viewParam && validViewModes.includes(viewParam as ViewMode)) {
+    if (viewParam && VIEW_MODES.includes(viewParam as ViewMode)) {
       return viewParam as ViewMode;
     }
     return 'kanban';
@@ -81,10 +78,16 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     onHold: [],
     cancelled: [],
   });
+  // 소켓 핸들러가 최신 목록으로 중복 여부를 판단하도록 (핸들러 재생성 없이)
+  const tasksRef = useRef(tasks);
+  useEffect(() => {
+    tasksRef.current = tasks;
+  }, [tasks]);
   const [teamName, setTeamName] = useState<string>('');
   const [teamDescription, setTeamDescription] = useState<string>('');
   const [members, setMembers] = useState<TeamUserResponse[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // 초기 로딩(스켈레톤)과 탭 재조회(흐림)는 표시마다 순번을 따로 둔다 — 겹쳐도 서로의 표시를 끄지 못하는 일이 없게
+  const [isLoading, trackInitialLoad, setIsLoading] = useLatestFlag(true);
   const [error, setError] = useState<string | null>(null);
   const [canManageInvites, setCanManageInvites] = useState(false);
 
@@ -99,8 +102,34 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   // 온라인 유저 모달 상태 (FAB 숨김용)
   const [isOnlineModalOpen, setIsOnlineModalOpen] = useState(false);
 
-  // 데이터 탭: 활성 / 보관함
-  const [dataTab, setDataTab] = useState<DataTab>('active');
+  // 데이터 탭: 활성 / 보관함 — 보기 방식처럼 URL(`?tab=archive`)에서 파생해 새로고침·공유 링크에서도 유지한다
+  const dataTab = parseDataTabParam(getParam('tab'));
+  const setDataTab = useCallback(
+    (tab: DataTab) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (tab === 'archive') {
+        params.set('tab', 'archive');
+      } else {
+        params.delete('tab');
+      }
+      const queryString = params.toString();
+      // 보기 방식 전환과 같이 push — 뒤로가기로 이전 탭으로 돌아간다 (D-F-Q1)
+      router.push(`${pathname}${queryString ? `?${queryString}` : ''}`, { scroll: false });
+    },
+    [router, pathname, searchParams],
+  );
+  // 목록에 지금 표시 중인 태스크가 어느 탭의 것인지 — 탭 전환 재조회 동안 이전 목록을 유지하므로
+  // 보관/복원 버튼 등은 URL 탭이 아니라 이 값을 따른다
+  const [tasksTab, setTasksTab] = useState<DataTab>(dataTab);
+  const dataTabRef = useRef(dataTab);
+  useEffect(() => {
+    dataTabRef.current = dataTab;
+  }, [dataTab]);
+  // 탭 전환 재조회 중 (뷰를 언마운트하지 않고 흐리게 표시)
+  const [isTabRefetching, trackTabRefetch] = useLatestFlag(false);
+  // 상세 왕복·보기 전환 사이에도 유지할 캘린더 달·리스트 정렬
+  const [calendarMonth, setCalendarMonth] = useState<string | undefined>(undefined);
+  const [listSort, setListSort] = useState<ListSort | undefined>(undefined);
 
   // 보드 상태 복원 (sessionStorage) — 복원이 끝나야 첫 조회를 시작해 저장된 탭으로 한 번만 불러온다
   const [isBoardStateRestored, setIsBoardStateRestored] = useState(false);
@@ -124,7 +153,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     isCreating: isCreatingTelegramLink,
     isDeleting: isDeletingTelegramLink,
     showDeleteConfirm: showTelegramDeleteConfirm,
-    setTelegramStatus,
     handleCreateLink: handleCreateTelegramLink,
     requestDeleteLink: requestDeleteTelegramLink,
     confirmDeleteLink: confirmDeleteTelegramLink,
@@ -138,7 +166,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     isSaving: isSavingDiscordWebhook,
     isDeleting: isDeletingDiscordWebhook,
     showDeleteConfirm: showDiscordDeleteConfirm,
-    setDiscordStatus,
     handleSaveWebhook: handleSaveDiscordWebhook,
     requestDeleteWebhook: requestDeleteDiscordWebhook,
     confirmDeleteWebhook: confirmDeleteDiscordWebhook,
@@ -180,16 +207,28 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     return classified;
   }, []);
 
+  // 태스크 조회 순번 — 더 늦게 시작한 조회가 있으면 먼저 시작한 조회의 응답은 목록에 반영하지 않는다
+  // (탭 연타, 첫 조회와 탭 전환 조회가 겹칠 때 늦게 온 이전 탭 응답이 덮어쓰는 것을 막는다)
+  const taskFetchSeqRef = useRef(0);
+  useEffect(() => () => {
+    // 팀이 바뀌거나 언마운트되면 진행 중인 응답을 모두 버린다
+    taskFetchSeqRef.current += 1;
+  }, [teamIdNum]);
+
   // 태스크 목록 조회 (현재 탭 API 1회만 호출)
   const fetchAndSetTasks = useCallback(async (accessToken: string, tab: DataTab) => {
+    const seq = ++taskFetchSeqRef.current;
     const actStatusParam = tab === 'archive' ? 0 : 1;
     const tasksResponse = await getTeamTasks(teamIdNum, accessToken, actStatusParam);
-    setTasks(classifyTasks(tasksResponse.data.tasks));
+    if (seq === taskFetchSeqRef.current) {
+      setTasks(classifyTasks(tasksResponse.data.tasks));
+      setTasksTab(tab);
+    }
     return tasksResponse;
   }, [teamIdNum, classifyTasks]);
 
   // ===== WebSocket (Context에서 관리) =====
-  const { socket, onlineUsers } = useTeamSocketContext();
+  const { socket, onlineUsers, roomJoinCount } = useTeamSocketContext();
   const { isChatOpen, openChat, closeChat, myUnreadCount } = useTeamChatContext();
 
   // 채팅 상태는 레이아웃에 있으므로, 보드를 떠나면 패널을 닫는다 (안 보이는 채팅이 계속 읽음 처리되지 않도록)
@@ -220,15 +259,19 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         userName,
       };
 
-      if (payload.actStatus === 1) {
-        setTasks(prev => ({
-          ...prev,
-          [columnKey]: [...prev[columnKey], newTask],
-        }));
-        toast.success('새 태스크가 추가되었습니다.');
-      }
+      const alreadyExists = Object.values(tasksRef.current).some(column =>
+        column.some(t => t.taskId === payload.taskId),
+      );
+      // 탭 전환 재조회 중에는 화면에 남아 있는 목록(tasksTab) 기준으로 판단한다 — 재조회 결과가 곧 덮어쓴다
+      if (!shouldInsertCreatedTask(payload.actStatus, tasksTab, alreadyExists)) return;
+
+      setTasks(prev => {
+        if (prev[columnKey].some(t => t.taskId === payload.taskId)) return prev;
+        return { ...prev, [columnKey]: [...prev[columnKey], newTask] };
+      });
+      toast.success('새 태스크가 추가되었습니다.');
     },
-    [members],
+    [members, tasksTab],
   );
 
   const handleSocketTaskUpdated = useCallback((payload: TaskUpdatedPayload) => {
@@ -326,7 +369,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         }
         activeStatusRefetchTimerRef.current = setTimeout(() => {
           if (!session?.user?.accessToken) return;
-          fetchAndSetTasks(session.user.accessToken, dataTab).catch(err => {
+          // 대기 중에 탭을 바꿨으면 바뀐 탭으로 — 이벤트 시점 탭으로 조회하면 최신 순번이 되어 URL 탭과 목록이 어긋난다
+          fetchAndSetTasks(session.user.accessToken, dataTabRef.current).catch(err => {
             console.error('Failed to refresh tasks on active-status change:', err);
             toast.error('태스크 목록 갱신에 실패했습니다.');
           });
@@ -467,7 +511,6 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
     const fetchTeamData = async () => {
       fetchedTabRef.current = dataTab;
-      setIsLoading(true);
       setError(null);
       try {
         if (isNaN(teamIdNum)) {
@@ -476,18 +519,11 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
         const currentUserId = session.user.userId;
 
-        const [tasksResponse, membersResult, telegramResult, discordResult] = await Promise.all([
+        // 연동 상태(텔레그램·디스코드)는 관리 탭을 처음 열 때 TeamManagementSection 이 조회한다
+        const [tasksResponse, membersResult] = await Promise.all([
           fetchAndSetTasks(session.user.accessToken, dataTab),
           getTeamUsers(teamIdNum, session.user.accessToken).catch(err => {
             console.error('Failed to fetch team members:', err);
-            return null;
-          }),
-          getTelegramStatus(teamIdNum, session.user.accessToken).catch(err => {
-            console.error('Failed to fetch telegram status:', err);
-            return null;
-          }),
-          getDiscordStatus(teamIdNum, session.user.accessToken).catch(err => {
-            console.error('Failed to fetch discord status:', err);
             return null;
           }),
         ]);
@@ -508,19 +544,14 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           setCanManageInvites(isMasterUser);
           if (isMasterUser) await fetchInvitesRef.current();
         }
-
-        setTelegramStatus(telegramResult?.data ?? null);
-        setDiscordStatus(discordResult?.data ?? null);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : '태스크 목록을 불러오는데 실패했습니다.';
         setError(errorMessage);
         console.error('Failed to fetch team data:', err);
-      } finally {
-        setIsLoading(false);
       }
     };
 
-    fetchTeamData();
+    trackInitialLoad(fetchTeamData);
   }, [teamId, teamIdNum, session?.user?.accessToken, session?.user?.userId, sessionStatus, isBoardStateRestored]); // dataTab 제외: 탭 전환은 아래 별도 useEffect
 
   // 데이터 탭 전환 시 태스크만 재조회 (멤버/통합 재호출 불필요)
@@ -531,20 +562,31 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     if (fetchedTabRef.current === dataTab) return;
     fetchedTabRef.current = dataTab;
 
+    // 탭 전환은 스켈레톤으로 뷰를 갈아끼우지 않는다 — 캘린더 달·리스트 정렬·스크롤이 유지되게 기존 뷰를 흐리게 둔다
     const fetchTasksOnly = async () => {
-      setIsLoading(true);
       try {
         await fetchAndSetTasks(session.user.accessToken, dataTab);
       } catch (err) {
         console.error('Failed to fetch tasks:', err);
         toast.error('태스크 목록 조회에 실패했습니다.');
-      } finally {
-        setIsLoading(false);
       }
     };
 
-    fetchTasksOnly();
-  }, [dataTab, teamIdNum, session?.user?.accessToken, fetchAndSetTasks, isBoardStateRestored]);
+    trackTabRefetch(fetchTasksOnly);
+  }, [dataTab, teamIdNum, session?.user?.accessToken, fetchAndSetTasks, isBoardStateRestored, trackTabRefetch]);
+
+  // 소켓이 끊겼다 다시 방에 들어오면, 끊긴 동안 놓친 태스크 이벤트를 메우려 현재 탭을 조용히 재조회한다
+  // (마운트 시점 이후의 재입장만 — 첫 입장은 위 초기 조회가 담당)
+  const roomJoinBaselineRef = useRef(roomJoinCount);
+  useEffect(() => {
+    if (roomJoinCount <= Math.max(roomJoinBaselineRef.current, 1)) return;
+    roomJoinBaselineRef.current = roomJoinCount;
+    const accessToken = session?.user?.accessToken;
+    if (!accessToken || !isBoardStateRestored) return;
+    fetchAndSetTasks(accessToken, dataTab).catch(err => {
+      console.error('Failed to refresh tasks after reconnect:', err);
+    });
+  }, [roomJoinCount, session?.user?.accessToken, isBoardStateRestored, fetchAndSetTasks, dataTab]);
 
   // 모든 태스크를 하나의 배열로 합침
   const allTasks = useMemo(
@@ -574,8 +616,10 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       returningRef.current = { teamId, returning: consumeBoardReturn(teamId) };
     }
     const saved = returningRef.current.returning ? loadBoardState(teamId) : {};
-    if (saved.dataTab) setDataTab(saved.dataTab);
+    // 데이터 탭은 URL(?tab)이 들고 있으므로 복원하지 않는다 — 상세의 돌아가기 링크가 탭을 포함한다
     if (saved.filters) restoreFilters(saved.filters);
+    if (saved.calendarMonth) setCalendarMonth(saved.calendarMonth);
+    if (saved.listSort) setListSort(saved.listSort);
     if (saved.kanbanColumnIndex !== undefined) setKanbanColumnIndex(saved.kanbanColumnIndex);
     pendingScrollYRef.current = saved.scrollY ?? null;
     pendingScrollViewRef.current = saved.view;
@@ -611,8 +655,16 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   // 탭·필터·보기·칸반 컬럼 저장 (복원이 끝난 뒤부터 — 복원 전 기본값으로 덮어쓰지 않게)
   useEffect(() => {
     if (!isBoardStateRestored) return;
-    saveBoardState(teamId, { dataTab, filters, view: viewMode, kanbanColumnIndex });
-  }, [teamId, isBoardStateRestored, dataTab, filters, viewMode, kanbanColumnIndex]);
+    saveBoardState(teamId, {
+      dataTab,
+      filters,
+      view: viewMode,
+      kanbanColumnIndex,
+      // undefined 도 그대로 넘긴다 — 병합 저장이라 키를 빼면 이전 왕복의 달·정렬이 남는다 (JSON 직렬화에서 지워진다)
+      calendarMonth,
+      listSort,
+    });
+  }, [teamId, isBoardStateRestored, dataTab, filters, viewMode, kanbanColumnIndex, calendarMonth, listSort]);
 
   // 필터된 태스크를 컬럼별로 분류
   const filteredTasksByColumn = useMemo(() => {
@@ -990,15 +1042,27 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
         {/* 뷰 렌더링 - 로딩 시 스켈레톤 표시 */}
         {isLoading ? (
-          viewMode === 'list' ? <ListViewSkeleton /> : <KanbanBoardSkeleton />
-        ) : viewMode === 'kanban' ? (
-          <Kanban tasksByColumn={filteredTasksByColumn} onStatusChange={handleStatusChange} teamId={teamId} isArchiveView={dataTab === 'archive'} onRestore={handleRestore} onArchive={dataTab === 'active' ? handleArchive : undefined} initialColumnIndex={kanbanColumnIndex} onColumnChange={setKanbanColumnIndex} />
-        ) : viewMode === 'gantt' ? (
-          <GanttChart tasks={filteredTasks} teamId={teamId} />
-        ) : viewMode === 'list' ? (
-          <ListView tasks={filteredTasks} teamId={teamId} isArchiveView={dataTab === 'archive'} onRestore={handleRestore} />
+          {
+            list: <ListViewSkeleton />,
+            calendar: <CalendarViewSkeleton />,
+            gantt: <GanttViewSkeleton />,
+            kanban: <KanbanBoardSkeleton />,
+          }[viewMode]
         ) : (
-          <CalendarView tasks={filteredTasks} teamId={teamId} />
+          <div
+            aria-busy={isTabRefetching}
+            className={`transition-opacity duration-150 ${isTabRefetching ? 'pointer-events-none opacity-50' : ''}`}
+          >
+            {viewMode === 'kanban' ? (
+              <Kanban tasksByColumn={filteredTasksByColumn} onStatusChange={handleStatusChange} teamId={teamId} isArchiveView={tasksTab === 'archive'} onRestore={handleRestore} onArchive={tasksTab === 'active' ? handleArchive : undefined} initialColumnIndex={kanbanColumnIndex} onColumnChange={setKanbanColumnIndex} />
+            ) : viewMode === 'gantt' ? (
+              <GanttChart tasks={filteredTasks} teamId={teamId} />
+            ) : viewMode === 'list' ? (
+              <ListView tasks={filteredTasks} teamId={teamId} isArchiveView={tasksTab === 'archive'} onRestore={handleRestore} initialSort={listSort} onSortChange={setListSort} />
+            ) : (
+              <CalendarView tasks={filteredTasks} teamId={teamId} initialMonth={calendarMonth} onMonthChange={setCalendarMonth} />
+            )}
+          </div>
         )}
       </TeamsPageLayout>
 

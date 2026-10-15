@@ -9,22 +9,27 @@ import { EmptyState } from '../teams/components';
 import { ChevronUpIcon, ChevronDownIcon } from './Icons';
 import { viewContainerStyles } from '@/styles/teams';
 import { ViewHeader } from './ViewHeader';
-import { markTaskOpenedFromBoard } from '../utils/boardStateStorage';
+import { markTaskOpenedFromBoard, type ListSort, type ListSortKey } from '../utils/boardStateStorage';
 
 type ListViewProps = {
   tasks: Task[];
   teamId: string;
   isArchiveView?: boolean;
   onRestore?: (taskId: number) => Promise<void>;
+  /** 처음 정렬 (없으면 생성일 내림차순) — 상세 왕복·보기 전환 후 같은 정렬로 돌아오게 */
+  initialSort?: ListSort;
+  onSortChange?: (sort: ListSort) => void;
 };
 
-type SortKey = 'taskName' | 'taskStatus' | 'userName' | 'startAt' | 'endAt' | 'crtdAt';
-type SortOrder = 'asc' | 'desc';
+type SortKey = ListSortKey;
+type SortOrder = ListSort['order'];
 
-export function ListView({ tasks, teamId, isArchiveView, onRestore }: ListViewProps) {
+export function ListView({ tasks, teamId, isArchiveView, onRestore, initialSort, onSortChange }: ListViewProps) {
+  // 복원 열은 헤더·셀·빈 행 colSpan이 같은 조건을 써야 열이 어긋나지 않는다
+  const showRestore = Boolean(isArchiveView && onRestore);
   const router = useRouter();
-  const [sortKey, setSortKey] = useState<SortKey>('crtdAt');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [sortKey, setSortKey] = useState<SortKey>(initialSort?.key ?? 'crtdAt');
+  const [sortOrder, setSortOrder] = useState<SortOrder>(initialSort?.order ?? 'desc');
 
   // 정렬된 태스크
   const sortedTasks = useMemo(() => {
@@ -72,16 +77,14 @@ export function ListView({ tasks, teamId, isArchiveView, onRestore }: ListViewPr
 
   // 정렬 토글
   const handleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortKey(key);
-      setSortOrder('asc');
-    }
+    const nextOrder: SortOrder = sortKey === key ? (sortOrder === 'asc' ? 'desc' : 'asc') : 'asc';
+    setSortKey(key);
+    setSortOrder(nextOrder);
+    onSortChange?.({ key, order: nextOrder });
   };
 
-  // 정렬 아이콘 - SVG 아이콘 사용
-  const SortIcon = ({ columnKey }: { columnKey: SortKey }) => {
+  // 정렬 아이콘 - SVG 아이콘 사용 (컴포넌트로 정의하면 렌더마다 새 타입이 되어 매번 다시 마운트된다)
+  const renderSortIcon = (columnKey: SortKey) => {
     if (sortKey !== columnKey) {
       return (
         <span className="ml-1 inline-flex flex-col text-slate-600">
@@ -115,52 +118,40 @@ export function ListView({ tasks, teamId, isArchiveView, onRestore }: ListViewPr
     }
   };
 
+  // 정렬 가능한 헤더 — 키보드로 정렬할 수 있게 버튼을 두고, 현재 정렬 상태를 aria-sort 로 알린다
+  const renderSortableHeader = (columnKey: SortKey, label: string) => (
+    <th
+      key={columnKey}
+      scope="col"
+      aria-sort={sortKey === columnKey ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
+      className="px-4 py-3 text-left text-xs font-semibold text-slate-400"
+    >
+      <button
+        type="button"
+        onClick={() => handleSort(columnKey)}
+        className="inline-flex items-center hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/50 rounded"
+      >
+        {label} {renderSortIcon(columnKey)}
+      </button>
+    </th>
+  );
+
   return (
     <div className={viewContainerStyles}>
-      <ViewHeader title="List View" subtitle="컬럼 클릭으로 정렬" count={tasks.length} />
+      <ViewHeader title="목록" subtitle="컬럼 클릭으로 정렬" count={tasks.length} />
 
       {/* 테이블 */}
       <div className="overflow-x-auto">
         <table className="w-full min-w-[700px]">
           <thead>
             <tr className="border-b border-white/10">
-              <th
-                className="cursor-pointer px-4 py-3 text-left text-xs font-semibold text-slate-400 hover:text-slate-200"
-                onClick={() => handleSort('taskName')}
-              >
-                태스크명 <SortIcon columnKey="taskName" />
-              </th>
-              <th
-                className="cursor-pointer px-4 py-3 text-left text-xs font-semibold text-slate-400 hover:text-slate-200"
-                onClick={() => handleSort('taskStatus')}
-              >
-                상태 <SortIcon columnKey="taskStatus" />
-              </th>
-              <th
-                className="cursor-pointer px-4 py-3 text-left text-xs font-semibold text-slate-400 hover:text-slate-200"
-                onClick={() => handleSort('userName')}
-              >
-                담당자 <SortIcon columnKey="userName" />
-              </th>
-              <th
-                className="cursor-pointer px-4 py-3 text-left text-xs font-semibold text-slate-400 hover:text-slate-200"
-                onClick={() => handleSort('startAt')}
-              >
-                시작일 <SortIcon columnKey="startAt" />
-              </th>
-              <th
-                className="cursor-pointer px-4 py-3 text-left text-xs font-semibold text-slate-400 hover:text-slate-200"
-                onClick={() => handleSort('endAt')}
-              >
-                마감일 <SortIcon columnKey="endAt" />
-              </th>
-              <th
-                className="cursor-pointer px-4 py-3 text-left text-xs font-semibold text-slate-400 hover:text-slate-200"
-                onClick={() => handleSort('crtdAt')}
-              >
-                생성일 <SortIcon columnKey="crtdAt" />
-              </th>
-              {isArchiveView && (
+              {renderSortableHeader('taskName', '태스크명')}
+              {renderSortableHeader('taskStatus', '상태')}
+              {renderSortableHeader('userName', '담당자')}
+              {renderSortableHeader('startAt', '시작일')}
+              {renderSortableHeader('endAt', '마감일')}
+              {renderSortableHeader('crtdAt', '생성일')}
+              {showRestore && (
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400">
                   복원
                 </th>
@@ -170,7 +161,7 @@ export function ListView({ tasks, teamId, isArchiveView, onRestore }: ListViewPr
           <tbody>
             {sortedTasks.length === 0 ? (
               <tr>
-                <td colSpan={isArchiveView ? 7 : 6}>
+                <td colSpan={showRestore ? 7 : 6}>
                   <EmptyState message="표시할 태스크가 없습니다" variant="minimal" />
                 </td>
               </tr>
@@ -221,14 +212,15 @@ export function ListView({ tasks, teamId, isArchiveView, onRestore }: ListViewPr
                     <td className="px-4 py-3 text-sm text-slate-400">
                       {formatDateWithYear(task.crtdAt)}
                     </td>
-                    {isArchiveView && onRestore && (
+                    {showRestore && onRestore && (
                       <td className="px-4 py-3">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             onRestore(task.taskId);
                           }}
-                          className="px-2.5 py-1 rounded-lg text-[10px] font-medium transition bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                          type="button"
+                          className="inline-flex min-h-[44px] items-center px-2.5 py-1 rounded-lg text-[10px] font-medium transition bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
                         >
                           복원
                         </button>

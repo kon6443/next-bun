@@ -20,6 +20,7 @@ import {
   formatChatDateDivider,
   markUnconfirmedFailed,
   replaceWithLatestPage,
+  shouldResyncOnVisible,
 } from './teamChatUtils';
 import type { ChatReceivedPayload } from '@/types/socket';
 import type { ChatMemberReadState } from '@/services/teamService';
@@ -339,5 +340,16 @@ describe('replaceWithLatestPage (재연결·탭 복귀 보정, D-024)', () => {
   it('빈 페이지면(서버에 메시지 없음) 받아 둔 메시지를 모두 남긴다', () => {
     const before = mergeChatMessages([], [saved(1)], 1);
     expect(replaceWithLatestPage(before, [], 1).map((m) => m.serverId)).toEqual([1]);
+  });
+});
+
+describe('shouldResyncOnVisible', () => {
+  it('보정한 적이 없으면 한다', () => {
+    expect(shouldResyncOnVisible(null, 1_000)).toBe(true);
+  });
+
+  it('마지막 보정 후 30초가 지나야 다시 한다', () => {
+    expect(shouldResyncOnVisible(0, 29_999)).toBe(false);
+    expect(shouldResyncOnVisible(0, 30_000)).toBe(true);
   });
 });

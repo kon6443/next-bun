@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { CloseIcon } from '@/app/components/Icons';
+import { useDialog } from '@/app/hooks/useDialog';
 import { UserAvatar } from '@/app/components/UserAvatar';
 import type { OnlineUserInfo } from '@/types/socket';
 
@@ -208,6 +209,7 @@ function OnlineUsersModal({
   users: OnlineUserInfo[];
   currentUserId?: number;
 }) {
+  const dialogRef = useDialog<HTMLDivElement>(isOpen, onClose);
   if (!isOpen) return null;
 
   return (
@@ -221,7 +223,9 @@ function OnlineUsersModal({
 
       {/* 바텀시트 */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-[100] animate-[slideUp_0.3s_ease-out]"
+        ref={dialogRef}
+        tabIndex={-1}
+        className="fixed bottom-0 left-0 right-0 z-[100] animate-[slideUp_0.3s_ease-out] focus:outline-none"
         role="dialog"
         aria-modal="true"
         aria-labelledby="online-users-title"
