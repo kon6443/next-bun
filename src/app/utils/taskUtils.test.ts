@@ -17,7 +17,6 @@ import {
   filterByStatus,
   getUniqueAssignees,
   formatCompactDateTime,
-  formatShortDate,
   formatDateWithYear,
   formatDateKey,
   formatDateDisplay,
@@ -228,19 +227,6 @@ describe('taskUtils', () => {
       // 타임존에 따라 결과가 다를 수 있으므로 형식만 확인
       const result = formatCompactDateTime(date);
       expect(result).toMatch(/\d{1,2}\/\d{1,2} \d{2}:\d{2}/);
-    });
-  });
-
-  describe('formatShortDate', () => {
-    it('null이면 null 반환', () => {
-      expect(formatShortDate(null)).toBe(null);
-    });
-
-    it('월 일 형식으로 반환', () => {
-      const date = new Date('2025-01-15T10:00:00Z');
-      const result = formatShortDate(date);
-      expect(result).toBeTruthy();
-      expect(typeof result).toBe('string');
     });
   });
 

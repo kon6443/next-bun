@@ -1,26 +1,3 @@
-import { cardStyles } from "@/styles/teams";
-
-type LoadingSpinnerProps = {
-  /** 로딩 메시지 (기본값: "로딩 중...") */
-  message?: string;
-};
-
-/**
- * 로딩 스피너 컴포넌트
- * - 대시 보더 컨테이너 포함
- * - 스피너 애니메이션 + 메시지
- */
-export function LoadingSpinner({ message = "로딩 중..." }: LoadingSpinnerProps) {
-  return (
-    <div
-      className={`${cardStyles.dashedContainer} px-6 py-14 text-center`}
-    >
-      <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-400 border-t-transparent" />
-      <p className="mt-4 text-base font-semibold text-white">{message}</p>
-    </div>
-  );
-}
-
 type LoadingSpinnerSimpleProps = {
   /** 로딩 메시지 */
   message?: string;
@@ -39,28 +16,6 @@ export function LoadingSpinnerSimple({
         <p className="text-lg font-semibold text-slate-200">{message}</p>
       )}
     </div>
-  );
-}
-
-type ButtonSpinnerProps = {
-  /** 스피너 크기 (기본값: "sm") */
-  size?: "sm" | "md";
-  /** 추가 CSS 클래스 */
-  className?: string;
-};
-
-/**
- * 버튼용 인라인 스피너 컴포넌트
- * - 버튼 내에서 로딩 상태를 표시할 때 사용
- * - border-current를 사용하여 부모 요소의 색상을 상속
- */
-export function ButtonSpinner({ size = "sm", className = "" }: ButtonSpinnerProps) {
-  const sizeClass = size === "sm" ? "h-4 w-4" : "h-5 w-5";
-  return (
-    <span
-      className={`inline-block animate-spin rounded-full border-2 border-current border-t-transparent ${sizeClass} ${className}`}
-      aria-hidden="true"
-    />
   );
 }
 
