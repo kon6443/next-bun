@@ -1,3 +1,18 @@
+/** 태스크에 붙은 태그 (목록·상세 응답, 팀 태그 SORT_ORDER 순) */
+export type TaskTag = {
+  tagId: number;
+  tagName: string;
+  /** #RRGGBB 대문자 */
+  tagColor: string;
+};
+
+/** 팀 태그 정의 (GET /teams/:teamId/tags) */
+export type TeamTag = TaskTag & {
+  sortOrder: number;
+  /** 이 태그가 붙은 태스크 수 (삭제 확인창용) */
+  taskCount: number;
+};
+
 export type Task = {
   taskId: number;
   teamId: number;
@@ -11,6 +26,7 @@ export type Task = {
   crtdAt: Date;
   crtdBy: number;
   userName: string | null;
+  tags: TaskTag[];
 };
 
 export type TaskComment = {
@@ -38,6 +54,7 @@ export type TaskDetail = {
   crtdAt: Date;
   crtdBy: number;
   userName: string | null;
+  tags: TaskTag[];
   comments: TaskComment[];
 };
 

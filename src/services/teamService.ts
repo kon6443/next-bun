@@ -1,5 +1,7 @@
 import fetchServiceInstance from './FetchService';
 import { ApiError, ApiErrorResponse, createApiError } from '@/types/api';
+import type { TaskTag, TeamTag } from '@/app/types/task';
+import { normalizeTaskTags } from '@/app/utils/tagUtils';
 
 // ==================== 공통 에러 처리 ====================
 
@@ -8,6 +10,7 @@ type ErrorMessageMap = {
   403?: string;
   404?: string;
   400?: string;
+  409?: string;
   default: string;
 };
 
@@ -105,6 +108,7 @@ export type TeamTaskResponse = {
   crtdAt: Date;
   crtdBy: number;
   userName: string | null;
+  tags: TaskTag[];
 };
 
 export type GetMyTeamsResponse = {
@@ -153,6 +157,7 @@ export type TaskDetailResponse = {
   crtdAt: Date;
   crtdBy: number;
   userName: string | null;
+  tags: TaskTag[];
   comments: TaskCommentResponse[];
 };
 
@@ -187,6 +192,8 @@ export type CreateTaskRequest = {
   taskDescription: string;
   startAt?: string | null;
   endAt?: string | null;
+  /** 붙일 태그 ID (최대 10개) */
+  tagIds?: number[];
 };
 
 export type CreateTaskResponse = {
@@ -200,6 +207,8 @@ export type UpdateTaskRequest = {
   taskDescription: string;
   startAt?: string | null;
   endAt?: string | null;
+  /** 붙일 태그 ID 전체 (최대 10개). 생략하면 태그는 바뀌지 않는다 */
+  tagIds?: number[];
 };
 
 export type UpdateTaskResponse = {
@@ -468,7 +477,9 @@ export async function getTeamTasks(
     });
   }
 
-  return response.json();
+  const data: GetTeamTasksResponse = await response.json();
+  data.data.tasks = data.data.tasks.map(task => ({ ...task, tags: normalizeTaskTags(task.tags) }));
+  return data;
 }
 
 /**
@@ -602,7 +613,9 @@ export async function getTaskDetail(
     });
   }
 
-  return response.json();
+  const data: GetTaskDetailResponse = await response.json();
+  data.data.tags = normalizeTaskTags(data.data.tags);
+  return data;
 }
 
 /**
@@ -1085,6 +1098,163 @@ export async function getChatReadState(
       403: '팀 멤버만 채팅을 볼 수 있습니다.',
       404: '팀을 찾을 수 없습니다.',
       default: '채팅 읽음 상태 조회 실패',
+    });
+  }
+
+  return response.json();
+}
+
+// ==================== 팀 태그 API ====================
+
+export type GetTeamTagsResponse = {
+  code: 'SUCCESS';
+  message: string;
+  /** SORT_ORDER 오름차순 */
+  data: TeamTag[];
+};
+
+/** 태그 생성·수정 응답 — taskCount 포함 (생성은 0, 수정은 현재 값) */
+export type TeamTagMutationResponse = {
+  code: 'SUCCESS';
+  message: string;
+  data: TeamTag;
+};
+
+export type CreateTeamTagRequest = {
+  tagName: string;
+  /** #RRGGBB */
+  tagColor: string;
+};
+
+export type UpdateTeamTagRequest = {
+  tagName?: string;
+  tagColor?: string;
+};
+
+export type ReorderTeamTagsResponse = {
+  code: 'SUCCESS';
+  message: string;
+  data: TeamTag[];
+};
+
+/**
+ * 팀 태그 목록 조회 (팀 정렬 순서)
+ */
+export async function getTeamTags(teamId: number, accessToken: string): Promise<GetTeamTagsResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'GET',
+    endpoint: `/api/v1/teams/${teamId}/tags`,
+    accessToken,
+  });
+
+  if (!response.ok) {
+    await handleApiError(response, {
+      403: '팀 멤버만 태그를 볼 수 있습니다.',
+      404: '팀을 찾을 수 없습니다.',
+      default: '태그 목록 조회 실패',
+    });
+  }
+
+  return response.json();
+}
+
+/**
+ * 팀 태그 생성 (맨 뒤에 추가된다)
+ */
+export async function createTeamTag(
+  teamId: number,
+  request: CreateTeamTagRequest,
+  accessToken: string,
+): Promise<TeamTagMutationResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'POST',
+    endpoint: `/api/v1/teams/${teamId}/tags`,
+    accessToken,
+    body: request,
+  });
+
+  if (!response.ok) {
+    await handleApiError(response, {
+      400: '태그 생성 요청이 올바르지 않습니다.',
+      403: '팀 멤버만 태그를 만들 수 있습니다.',
+      409: '같은 이름의 태그가 이미 있습니다.',
+      default: '태그 생성 실패',
+    });
+  }
+
+  return response.json();
+}
+
+/**
+ * 팀 태그 이름·색 수정
+ */
+export async function updateTeamTag(
+  teamId: number,
+  tagId: number,
+  request: UpdateTeamTagRequest,
+  accessToken: string,
+): Promise<TeamTagMutationResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'PATCH',
+    endpoint: `/api/v1/teams/${teamId}/tags/${tagId}`,
+    accessToken,
+    body: request,
+  });
+
+  if (!response.ok) {
+    await handleApiError(response, {
+      400: '태그 수정 요청이 올바르지 않습니다.',
+      403: '팀 멤버만 태그를 수정할 수 있습니다.',
+      404: '태그를 찾을 수 없습니다.',
+      409: '같은 이름의 태그가 이미 있습니다.',
+      default: '태그 수정 실패',
+    });
+  }
+
+  return response.json();
+}
+
+/**
+ * 팀 태그 삭제 (붙어 있던 태스크에서도 함께 빠진다)
+ */
+export async function deleteTeamTag(teamId: number, tagId: number, accessToken: string): Promise<void> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'DELETE',
+    endpoint: `/api/v1/teams/${teamId}/tags/${tagId}`,
+    accessToken,
+  });
+
+  if (response.ok) return;
+
+  await handleApiError(response, {
+    403: '팀 멤버만 태그를 삭제할 수 있습니다.',
+    404: '태그를 찾을 수 없습니다.',
+    default: '태그 삭제 실패',
+  });
+}
+
+/**
+ * 팀 태그 순서 변경
+ * @param tagIds 팀의 전체 태그 ID를 원하는 순서로. 그사이 태그가 추가·삭제돼 집합이 다르면 409
+ */
+export async function reorderTeamTags(
+  teamId: number,
+  tagIds: number[],
+  accessToken: string,
+): Promise<ReorderTeamTagsResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'PUT',
+    endpoint: `/api/v1/teams/${teamId}/tags/order`,
+    accessToken,
+    body: { tagIds },
+  });
+
+  if (!response.ok) {
+    await handleApiError(response, {
+      400: '태그 순서 변경 요청이 올바르지 않습니다.',
+      403: '팀 멤버만 태그 순서를 바꿀 수 있습니다.',
+      409: '그사이 태그 목록이 바뀌었습니다. 다시 시도해주세요.',
+      default: '태그 순서 변경 실패',
     });
   }
 

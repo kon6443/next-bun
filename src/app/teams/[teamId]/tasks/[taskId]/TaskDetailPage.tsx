@@ -31,6 +31,7 @@ import {
 } from '../../../components';
 import { StatusDropdown } from '@/app/components/StatusDropdown';
 import { ConfirmModal } from '@/app/components/ConfirmModal';
+import { TaskTagChips } from '@/app/components/TagChip';
 import { EditIcon, TrashIcon, CommentIcon, SendIcon, ArchiveIcon, RestoreIcon } from '@/app/components/Icons';
 import { formatCompactDateTime } from '@/app/utils/taskUtils';
 import { loadBoardState, consumeTaskOpenedFromBoard, buildBoardHref } from '@/app/utils/boardStateStorage';
@@ -120,6 +121,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
           ...(payload.taskDescription !== undefined && { taskDescription: payload.taskDescription }),
           ...(payload.startAt !== undefined && { startAt: payload.startAt ? new Date(payload.startAt) : null }),
           ...(payload.endAt !== undefined && { endAt: payload.endAt ? new Date(payload.endAt) : null }),
+          ...(payload.tags !== undefined && { tags: payload.tags }),
         };
       });
       toast.success('태스크 정보가 업데이트되었습니다.');
@@ -358,6 +360,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
           taskDescription: data.taskDescription,
           startAt: buildTaskDatetime(data.startAt, data.startAtTime, 'start'),
           endAt: buildTaskDatetime(data.endAt, data.endAtTime, 'end'),
+          tagIds: data.tagIds,
         },
         session.user.accessToken,
       );
@@ -573,6 +576,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
                 endAt: parseTaskDatetime(taskDetail.endAt).date,
                 startAtTime: parseTaskDatetime(taskDetail.startAt).time || DEFAULT_START_TIME,
                 endAtTime: parseTaskDatetime(taskDetail.endAt).time || DEFAULT_END_TIME,
+                tagIds: taskDetail.tags.map(tag => tag.tagId),
               }}
               onSubmit={handleUpdateTask}
               onCancel={handleCancelEdit}
@@ -607,6 +611,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
                 <span className='mt-1 block text-xs text-slate-400'>
                   {taskDetail.userName || `사용자 ${taskDetail.crtdBy}`}
                 </span>
+                <TaskTagChips tags={taskDetail.tags} size='md' className='mt-2' />
               </div>
               <button
                 onClick={handleStartEdit}

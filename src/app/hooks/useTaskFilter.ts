@@ -16,6 +16,8 @@ export interface TaskFilterState {
   assigneeId: number | null;
   period: PeriodFilter;
   status: StatusFilter;
+  /** 태그 필터 (OR — 하나라도 붙은 태스크). 비어 있으면 전부 */
+  tagIds: number[];
 }
 
 export interface UseTaskFilterReturn {
@@ -25,6 +27,7 @@ export interface UseTaskFilterReturn {
   setAssigneeId: (id: number | null) => void;
   setPeriod: (period: PeriodFilter) => void;
   setStatus: (status: StatusFilter) => void;
+  setTagIds: (tagIds: number[]) => void;
   resetFilters: () => void;
   /** 저장해 둔 필터 전체를 한 번에 적용 (보드 상태 복원용) */
   restoreFilters: (filters: TaskFilterState) => void;
@@ -48,6 +51,7 @@ const initialFilters: TaskFilterState = {
   assigneeId: null,
   period: 'all',
   status: 'all',
+  tagIds: [],
 };
 
 export function useTaskFilter(tasks: Task[]): UseTaskFilterReturn {
@@ -70,6 +74,10 @@ export function useTaskFilter(tasks: Task[]): UseTaskFilterReturn {
     setFilters(prev => ({ ...prev, status }));
   }, []);
 
+  const setTagIds = useCallback((tagIds: number[]) => {
+    setFilters(prev => ({ ...prev, tagIds }));
+  }, []);
+
   const resetFilters = useCallback(() => {
     setFilters(initialFilters);
   }, []);
@@ -80,7 +88,7 @@ export function useTaskFilter(tasks: Task[]): UseTaskFilterReturn {
 
   // 필터된 태스크
   const filteredTasks = useMemo(() => {
-    return applyAllFilters(tasks, filters.searchQuery, filters.assigneeId, filters.period, filters.status);
+    return applyAllFilters(tasks, filters.searchQuery, filters.assigneeId, filters.period, filters.status, filters.tagIds);
   }, [tasks, filters]);
 
   // 전체 통계
@@ -98,7 +106,8 @@ export function useTaskFilter(tasks: Task[]): UseTaskFilterReturn {
       filters.searchQuery !== '' ||
       filters.assigneeId !== null ||
       filters.period !== 'all' ||
-      filters.status !== 'all'
+      filters.status !== 'all' ||
+      filters.tagIds.length > 0
     );
   }, [filters]);
 
@@ -108,6 +117,7 @@ export function useTaskFilter(tasks: Task[]): UseTaskFilterReturn {
     setAssigneeId,
     setPeriod,
     setStatus,
+    setTagIds,
     resetFilters,
     restoreFilters,
     filteredTasks,

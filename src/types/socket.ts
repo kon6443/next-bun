@@ -1,4 +1,5 @@
 import type { Socket } from 'socket.io-client';
+import type { TaskTag } from '@/app/types/task';
 
 // ===== 이벤트 상수 (백엔드와 동기화) =====
 
@@ -15,6 +16,12 @@ export const TeamSocketEvents = {
   TASK_STATUS_CHANGED: 'taskStatusChanged',
   TASK_ACTIVE_STATUS_CHANGED: 'taskActiveStatusChanged',
   TASK_DELETED: 'taskDeleted',
+
+  // Server → Client (팀 태그)
+  TAG_CREATED: 'tagCreated',
+  TAG_UPDATED: 'tagUpdated',
+  TAG_DELETED: 'tagDeleted',
+  TAGS_REORDERED: 'tagsReordered',
 
   // Server → Client (댓글)
   COMMENT_CREATED: 'commentCreated',
@@ -55,6 +62,7 @@ export interface TaskCreatedPayload {
   actStatus: number;
   startAt: string | null;
   endAt: string | null;
+  tags: TaskTag[];
   createdBy: number;
 }
 
@@ -67,6 +75,8 @@ export interface TaskUpdatedPayload {
   taskStatus?: number;
   startAt?: string | null;
   endAt?: string | null;
+  /** 태스크의 현재 태그 전체 (팀 태그 순서) — 서버는 항상 보낸다 (D-021) */
+  tags?: TaskTag[];
   updatedBy: number;
 }
 
@@ -94,6 +104,34 @@ export interface TaskDeletedPayload {
   taskId: number;
   teamId: number;
   deletedBy: number;
+}
+
+/** 팀 태그 생성 이벤트 (taskCount는 없다 — 새 태그는 0) */
+export interface TagCreatedPayload extends TaskTag {
+  teamId: number;
+  sortOrder: number;
+  createdBy: number;
+}
+
+/** 팀 태그 이름·색 수정 이벤트 */
+export interface TagUpdatedPayload extends TaskTag {
+  teamId: number;
+  sortOrder: number;
+  updatedBy: number;
+}
+
+/** 팀 태그 삭제 이벤트 (붙어 있던 태스크에서도 빠진다) */
+export interface TagDeletedPayload {
+  teamId: number;
+  tagId: number;
+  deletedBy: number;
+}
+
+/** 팀 태그 순서 변경 이벤트 — 팀 전체 태그 ID를 새 순서로 */
+export interface TagsReorderedPayload {
+  teamId: number;
+  tagIds: number[];
+  updatedBy: number;
 }
 
 /** 댓글 생성 이벤트 */
@@ -274,6 +312,10 @@ export interface ServerToClientEvents {
   [TeamSocketEvents.TASK_STATUS_CHANGED]: (payload: TaskStatusChangedPayload) => void;
   [TeamSocketEvents.TASK_ACTIVE_STATUS_CHANGED]: (payload: TaskActiveStatusChangedPayload) => void;
   [TeamSocketEvents.TASK_DELETED]: (payload: TaskDeletedPayload) => void;
+  [TeamSocketEvents.TAG_CREATED]: (payload: TagCreatedPayload) => void;
+  [TeamSocketEvents.TAG_UPDATED]: (payload: TagUpdatedPayload) => void;
+  [TeamSocketEvents.TAG_DELETED]: (payload: TagDeletedPayload) => void;
+  [TeamSocketEvents.TAGS_REORDERED]: (payload: TagsReorderedPayload) => void;
   [TeamSocketEvents.COMMENT_CREATED]: (payload: CommentCreatedPayload) => void;
   [TeamSocketEvents.COMMENT_UPDATED]: (payload: CommentUpdatedPayload) => void;
   [TeamSocketEvents.COMMENT_DELETED]: (payload: CommentDeletedPayload) => void;

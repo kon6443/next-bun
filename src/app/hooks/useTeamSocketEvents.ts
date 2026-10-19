@@ -8,6 +8,10 @@ import type {
   TaskStatusChangedPayload,
   TaskActiveStatusChangedPayload,
   TaskDeletedPayload,
+  TagCreatedPayload,
+  TagUpdatedPayload,
+  TagDeletedPayload,
+  TagsReorderedPayload,
   CommentCreatedPayload,
   CommentUpdatedPayload,
   CommentDeletedPayload,
@@ -30,6 +34,14 @@ interface TeamSocketEventHandlers {
   onTaskActiveStatusChanged?: (payload: TaskActiveStatusChangedPayload) => void;
   /** 태스크 삭제 이벤트 핸들러 */
   onTaskDeleted?: (payload: TaskDeletedPayload) => void;
+  /** 팀 태그 생성 이벤트 핸들러 */
+  onTagCreated?: (payload: TagCreatedPayload) => void;
+  /** 팀 태그 수정 이벤트 핸들러 */
+  onTagUpdated?: (payload: TagUpdatedPayload) => void;
+  /** 팀 태그 삭제 이벤트 핸들러 */
+  onTagDeleted?: (payload: TagDeletedPayload) => void;
+  /** 팀 태그 순서 변경 이벤트 핸들러 */
+  onTagsReordered?: (payload: TagsReorderedPayload) => void;
   /** 댓글 생성 이벤트 핸들러 */
   onCommentCreated?: (payload: CommentCreatedPayload) => void;
   /** 댓글 수정 이벤트 핸들러 */
@@ -105,6 +117,24 @@ export function useTeamSocketEvents(
       handlersRef.current.onTaskDeleted?.(payload);
     };
 
+    // 팀 태그 이벤트는 본인 것도 전달한다 — 같은 사용자의 다른 탭에서 만든 태그를 이 탭이 모르면
+    // 태스크 수정 폼이 그 태그를 "삭제된 태그"로 보고 떼어 버린다. 받는 쪽(TeamTagsContext) 반영이 모두 멱등이라 안전하다
+    const handleTagCreated = (payload: TagCreatedPayload) => {
+      handlersRef.current.onTagCreated?.(payload);
+    };
+
+    const handleTagUpdated = (payload: TagUpdatedPayload) => {
+      handlersRef.current.onTagUpdated?.(payload);
+    };
+
+    const handleTagDeleted = (payload: TagDeletedPayload) => {
+      handlersRef.current.onTagDeleted?.(payload);
+    };
+
+    const handleTagsReordered = (payload: TagsReorderedPayload) => {
+      handlersRef.current.onTagsReordered?.(payload);
+    };
+
     const handleCommentCreated = (payload: CommentCreatedPayload) => {
       if (isSelfTriggered(payload.userId)) return;
       handlersRef.current.onCommentCreated?.(payload);
@@ -147,6 +177,10 @@ export function useTeamSocketEvents(
     socket.on(TeamSocketEvents.TASK_STATUS_CHANGED, handleTaskStatusChanged);
     socket.on(TeamSocketEvents.TASK_ACTIVE_STATUS_CHANGED, handleTaskActiveStatusChanged);
     socket.on(TeamSocketEvents.TASK_DELETED, handleTaskDeleted);
+    socket.on(TeamSocketEvents.TAG_CREATED, handleTagCreated);
+    socket.on(TeamSocketEvents.TAG_UPDATED, handleTagUpdated);
+    socket.on(TeamSocketEvents.TAG_DELETED, handleTagDeleted);
+    socket.on(TeamSocketEvents.TAGS_REORDERED, handleTagsReordered);
     socket.on(TeamSocketEvents.COMMENT_CREATED, handleCommentCreated);
     socket.on(TeamSocketEvents.COMMENT_UPDATED, handleCommentUpdated);
     socket.on(TeamSocketEvents.COMMENT_DELETED, handleCommentDeleted);
@@ -162,6 +196,10 @@ export function useTeamSocketEvents(
       socket.off(TeamSocketEvents.TASK_STATUS_CHANGED, handleTaskStatusChanged);
       socket.off(TeamSocketEvents.TASK_ACTIVE_STATUS_CHANGED, handleTaskActiveStatusChanged);
       socket.off(TeamSocketEvents.TASK_DELETED, handleTaskDeleted);
+      socket.off(TeamSocketEvents.TAG_CREATED, handleTagCreated);
+      socket.off(TeamSocketEvents.TAG_UPDATED, handleTagUpdated);
+      socket.off(TeamSocketEvents.TAG_DELETED, handleTagDeleted);
+      socket.off(TeamSocketEvents.TAGS_REORDERED, handleTagsReordered);
       socket.off(TeamSocketEvents.COMMENT_CREATED, handleCommentCreated);
       socket.off(TeamSocketEvents.COMMENT_UPDATED, handleCommentUpdated);
       socket.off(TeamSocketEvents.COMMENT_DELETED, handleCommentDeleted);

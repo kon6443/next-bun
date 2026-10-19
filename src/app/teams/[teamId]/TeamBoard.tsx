@@ -11,11 +11,11 @@ import { CalendarView } from '../../components/CalendarView';
 import { TaskFilters } from '../../components/TaskFilters';
 import { Kanban } from '../../components/Kanban';
 import { TeamsPageLayout, SectionLabel, ErrorAlert, KanbanBoardSkeleton, ListViewSkeleton, CalendarViewSkeleton, GanttViewSkeleton, Skeleton, FAB, IconButton } from '../components';
-import { EditIcon, UserGroupIcon, PlusIcon, QuestionMarkIcon, CommentIcon } from '../../components/Icons';
+import { EditIcon, UserGroupIcon, PlusIcon, QuestionMarkIcon, CommentIcon, TagIcon } from '../../components/Icons';
 import { DropdownMenu } from './components/DropdownMenu';
 import type { Task } from '../../types/task';
 import { useTaskFilter, useTelegramLink, useDiscordLink, useTeamInvite, useTeamSocketEvents, useSafeNavigation, useLatestFlag } from '../../hooks';
-import { useTeamSocketContext, useTeamChatContext } from './contexts';
+import { useTeamSocketContext, useTeamChatContext, useTeamTagsContext } from './contexts';
 import {
   getTeamTasks,
   updateTaskStatus,
@@ -28,8 +28,9 @@ import {
 import { cardStyles } from '@/styles/teams';
 import { loadBoardState, saveBoardState, consumeBoardReturn, parseDataTabParam, VIEW_MODES, type ListSort } from '../../utils/boardStateStorage';
 import { shouldInsertCreatedTask } from '../../utils/taskUtils';
+import { normalizeTaskTags } from '../../utils/tagUtils';
 import { STATUS_TO_COLUMN, type ColumnKey } from '../../config/taskStatusConfig';
-import { TeamManagementSection, InviteModal, RoleChangeModal, ViewModeToggle, OnlineUsers, TutorialGuide, hasSeenTutorial, markTutorialSeen, TeamChatPanel, type ViewMode, type DataTab } from './components';
+import { TeamManagementSection, InviteModal, RoleChangeModal, ViewModeToggle, OnlineUsers, TutorialGuide, hasSeenTutorial, markTutorialSeen, TeamChatPanel, TagModal, type ViewMode, type DataTab } from './components';
 import { ROLES } from '../../config/roleConfig';
 import type {
   TaskCreatedPayload,
@@ -101,6 +102,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
   // 온라인 유저 모달 상태 (FAB 숨김용)
   const [isOnlineModalOpen, setIsOnlineModalOpen] = useState(false);
+  const [showTagModal, setShowTagModal] = useState(false);
 
   // 데이터 탭: 활성 / 보관함 — 보기 방식처럼 URL(`?tab=archive`)에서 파생해 새로고침·공유 링크에서도 유지한다
   const dataTab = parseDataTabParam(getParam('tab'));
@@ -257,6 +259,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         crtdBy: payload.createdBy,
         crtdAt: new Date(),
         userName,
+        tags: normalizeTaskTags(payload.tags),
       };
 
       const alreadyExists = Object.values(tasksRef.current).some(column =>
@@ -289,6 +292,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                   ...(payload.taskDescription !== undefined && { taskDescription: payload.taskDescription }),
                   ...(payload.startAt !== undefined && { startAt: payload.startAt ? new Date(payload.startAt) : null }),
                   ...(payload.endAt !== undefined && { endAt: payload.endAt ? new Date(payload.endAt) : null }),
+                  ...(payload.tags !== undefined && { tags: payload.tags }),
                 }
               : task,
           );
@@ -601,6 +605,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     setAssigneeId,
     setPeriod,
     setStatus,
+    setTagIds,
     resetFilters,
     restoreFilters,
     filteredTasks,
@@ -608,6 +613,15 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     assignees,
     hasActiveFilters,
   } = useTaskFilter(allTasks);
+
+  const { tags: teamTags } = useTeamTagsContext();
+
+  // 없는 태그(다른 팀원이 삭제·복원한 필터의 옛 ID)는 필터 선택에서 뺀다 — 남겨 두면 아무것도 안 보이는 필터가 걸린 채 남는다
+  useEffect(() => {
+    if (!teamTags) return;
+    const existing = new Set(teamTags.map(tag => tag.tagId));
+    if (filters.tagIds.some(id => !existing.has(id))) setTagIds(filters.tagIds.filter(id => existing.has(id)));
+  }, [teamTags, filters.tagIds, setTagIds]);
 
   // 저장된 보드 상태 복원 (마운트 시 1회, 클라이언트에서만) — 상세에서 돌아온 진입일 때만 복원한다
   useEffect(() => {
@@ -958,6 +972,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                 />
                 <DropdownMenu items={[
                   { label: '팀 초대', icon: UserGroupIcon, onClick: () => setShowInviteModal(true), show: canManageInvites },
+                  { label: '태그 관리', icon: TagIcon, onClick: () => setShowTagModal(true) },
                   { label: '팀 수정', icon: EditIcon, href: `/teams/${teamId}/edit` },
                   { label: '사용 가이드', icon: QuestionMarkIcon, onClick: () => setShowTutorial(true) },
                 ]} />
@@ -1012,6 +1027,9 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           onPeriodChange={setPeriod}
           status={filters.status}
           onStatusChange={setStatus}
+          tags={teamTags}
+          tagIds={filters.tagIds}
+          onTagIdsChange={setTagIds}
           taskCounts={{
             total: stats.total,
             todo: stats.todo,
@@ -1067,6 +1085,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       </TeamsPageLayout>
 
       {/* 초대 링크 생성 모달 */}
+      <TagModal isOpen={showTagModal} onClose={() => setShowTagModal(false)} mode="manage" />
+
       <InviteModal
         isOpen={showInviteModal}
         onClose={() => setShowInviteModal(false)}

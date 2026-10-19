@@ -7,6 +7,7 @@ import { getDeadlineStatus, getDeadlineLabel, getArchiveDaysLeft, deadlineStyles
 import { type TaskStatusKey, STATUS_COMPLETED, STATUS_CANCELLED } from '../config/taskStatusConfig';
 import { StatusDropdown } from './StatusDropdown';
 import { ConfirmModal } from './ConfirmModal';
+import { TaskTagChips } from './TagChip';
 import { ArchiveIcon, RestoreIcon } from './Icons';
 import { DateInfoInline } from '../teams/components';
 import { markTaskOpenedFromBoard } from '../utils/boardStateStorage';
@@ -21,7 +22,7 @@ type TaskCardProps = {
 };
 
 export function TaskCard({ task, onStatusChange, teamId, isArchiveView, onRestore, onArchive }: TaskCardProps) {
-  const { taskId, taskName, taskDescription, startAt, endAt, crtdAt, userName, crtdBy, taskStatus } = task;
+  const { taskId, taskName, taskDescription, startAt, endAt, crtdAt, userName, crtdBy, taskStatus, tags } = task;
   const router = useRouter();
   const [isUpdating, setIsUpdating] = useState(false);
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
@@ -114,6 +115,9 @@ export function TaskCard({ task, onStatusChange, teamId, isArchiveView, onRestor
 
         {/* 태스크 제목 */}
         <h3 className="mt-2 text-base font-semibold text-white line-clamp-2">{taskName}</h3>
+
+        {/* 태그 (최대 3개 + N) */}
+        <TaskTagChips tags={tags} max={3} className="mt-2" />
 
         {/* 태스크 설명 */}
         {taskDescription && (

@@ -54,6 +54,7 @@ export default function CreateTaskPage({ params }: CreateTaskPageProps) {
           taskDescription: data.taskDescription,
           startAt: buildTaskDatetime(data.startAt, data.startAtTime, 'start'),
           endAt: buildTaskDatetime(data.endAt, data.endAtTime, 'end'),
+          tagIds: data.tagIds,
         },
         session.user.accessToken
       );
