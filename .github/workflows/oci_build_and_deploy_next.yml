@@ -25,7 +25,7 @@ permissions:
 
 jobs:
   # 배포 전 게이트: lint·typecheck·test 가 실패하면 이미지 빌드·배포로 넘어가지 않는다.
-  # build 는 아래 Docker 빌드(Dockerfile 의 `bun run build`)가 수행하므로 여기서 중복하지 않는다.
+  # build 는 아래 Docker 빌드(Dockerfile 의 Node `next build`)가 수행하므로 여기서 중복하지 않는다.
   verify:
     runs-on: ubuntu-24.04-arm
     steps:
@@ -41,7 +41,7 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1   # Dockerfile 의 oven/bun:1 과 맞춘다
+          bun-version: 1   # 의존성 설치용 — Dockerfile 이 넣는 oven/bun:1 바이너리와 맞춘다 (빌드·실행은 Node 24)
 
       # setup-bun 이후에도 PATH 의 node 가 위에서 고정한 24 인지 로그로 남긴다
       - name: Show Node version
