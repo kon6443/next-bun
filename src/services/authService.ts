@@ -54,11 +54,19 @@ export async function postKakaoSignInUp({
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000); // 10초 타임아웃
 
+  const headers: Record<string, string> = {
+    // 로그인마다 새 연결을 맺는다. Bun fetch 는 중간에서 조용히(FIN·RST 없이) 끊긴 유휴 풀 소켓을
+    // 그대로 재사용해 abort 까지 멈춘다(로컬 재현: 유휴 후 요청 15s TimeoutError, 직후 새 연결 2ms).
+    // Connection: close 는 Bun·Node 모두에서 이 경우를 해결함을 실측했다 — docs/tasks/kakao-login-latency-front.md
+    Connection: 'close',
+  };
+
   try {
     const response = await fetchServiceInstance.backendFetch({
       method: 'POST',
       endpoint: '/api/v1/auth/kakao',
       body: { kakaoNickname, accessToken },
+      headers,
       signal: controller.signal,
     });
 
