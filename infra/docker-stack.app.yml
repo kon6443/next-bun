@@ -17,11 +17,13 @@ services:
         published: 23000
         mode: ingress
     healthcheck:
+      # 런타임 이미지가 node 다 (Dockerfile 과 같은 커밋으로 바꿔야 롤링이 깨지지 않는다).
+      # node -e 는 CommonJS 라 최상위 await 대신 then 으로 쓴다
       test:
         - CMD
-        - bun
+        - node
         - -e
-        - "const r = await fetch('http://127.0.0.1:3000/api/health'); process.exit(r.ok?0:1)"
+        - "fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
       interval: 30s
       timeout: 10s
       retries: 3
