@@ -1,15 +1,43 @@
 import type { CSSProperties } from "react";
 import { signIn } from "next-auth/react";
-import { AUTH_LOADING_KEY } from "@/app/components/AuthLoadingOverlay";
+import { AUTH_LOADING_KEY, clearAuthLoading } from "@/app/components/AuthLoadingOverlay";
+import { createLoginStarter } from "./kakaoLoginStarter";
+
+export type KakaoLoginOptions = {
+  /** "login"이면 카카오 로그인 화면 강제 표시 (계정 전환용) */
+  prompt?: "login";
+  /** 로그인 후 이동할 주소 (기본 /mypage) */
+  callbackUrl?: string;
+};
+
+// 페이지(탭) 단위 잠금 — 같은 화면의 로그인 버튼이 여러 개여도 시작은 한 번만 보낸다
+const kakaoLoginStarter = createLoginStarter();
 
 /**
- * 카카오 로그인 시작 (로딩 오버레이 활성화 포함)
- * @param options.prompt - "login"이면 카카오 로그인 화면 강제 표시 (계정 전환용)
+ * 카카오 로그인 시작 (로딩 오버레이 활성화 포함, 중복 시작 방지)
+ * @returns 실제로 시작했으면 true, 이미 진행 중이라 무시했으면 false
+ * @throws 시작 요청이 실패하면(네트워크 등) 잠금·오버레이를 정리한 뒤 던진다
  */
-export function startKakaoLogin(options?: { prompt?: "login" }) {
-  sessionStorage.setItem(AUTH_LOADING_KEY, "true");
+export function startKakaoLogin(options?: KakaoLoginOptions): Promise<boolean> {
   const authParams = options?.prompt ? { prompt: options.prompt } : undefined;
-  signIn("kakao", { callbackUrl: "/mypage" }, authParams);
+  return kakaoLoginStarter.start({
+    signIn: () => signIn("kakao", { callbackUrl: options?.callbackUrl ?? "/mypage" }, authParams),
+    onStart: () => sessionStorage.setItem(AUTH_LOADING_KEY, "true"),
+    onReset: clearAuthLoading,
+  });
+}
+
+/** 화면에 다시 남게 됐을 때(뒤로가기로 bfcache 복원 등) 잠금·오버레이를 푼다 */
+export function resetKakaoLogin() {
+  kakaoLoginStarter.reset(clearAuthLoading);
+}
+
+// 잠금은 모듈 단위라 해제도 모듈에서 한 번 건다 — 버튼 훅이 없는 진입점(초대 수락 자동 로그인)에서
+// 카카오로 갔다가 뒤로가기로 복원돼도 잠금이 남아 다른 화면의 로그인 버튼이 멈추지 않게 한다
+if (typeof window !== "undefined") {
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) resetKakaoLogin();
+  });
 }
 
 // ─── 공유 스타일 ──────────────────────────────────────────
@@ -50,6 +78,13 @@ export const authBaseButtonStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   gap: "0.35rem",
+};
+
+/** 로그인 시작 후 비활성 표시 — 중복 클릭을 막는 동안 눌리지 않는 것처럼 보이게 */
+export const authButtonBusyStyle: CSSProperties = {
+  cursor: "progress",
+  opacity: 0.7,
+  filter: "saturate(0.8)",
 };
 
 export const authKakaoButtonStyle: CSSProperties = {

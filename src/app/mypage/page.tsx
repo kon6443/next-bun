@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { MypageSkeleton } from "@/app/teams/components";
 import { updateUserProfile } from "@/services/userService";
-import { startKakaoLogin } from "@/app/auth/shared";
+import { useKakaoLogin } from "@/app/auth/useKakaoLogin";
 
 // 공통 스타일 상수
 const CARD_STYLES = "w-full max-w-[430px] bg-slate-900/85 border border-slate-400/25 rounded-[28px] p-6 sm:p-11 shadow-[0_35px_65px_rgba(2,6,23,0.75)] text-center";
@@ -19,7 +19,7 @@ export default function Mypage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleKakaoLogin = () => startKakaoLogin();
+  const { start: startKakaoLogin, isStarting: isStartingLogin } = useKakaoLogin();
 
   const handleEditClick = () => {
     setNewUserName(user?.userName ?? "");
@@ -161,10 +161,14 @@ export default function Mypage() {
                 로그아웃
               </button>
               <button
+                type="button"
                 onClick={() => startKakaoLogin({ prompt: "login" })}
-                className={`${BASE_BUTTON_STYLES} bg-slate-700/40 text-slate-400 text-sm shadow-none`}
+                disabled={isStartingLogin}
+                aria-disabled={isStartingLogin}
+                aria-busy={isStartingLogin}
+                className={`${BASE_BUTTON_STYLES} bg-slate-700/40 text-slate-400 text-sm shadow-none disabled:cursor-progress disabled:opacity-70`}
               >
-                다른 계정으로 로그인
+                {isStartingLogin ? "카카오로 이동 중..." : "다른 계정으로 로그인"}
               </button>
             </div>
           )}
@@ -194,11 +198,15 @@ export default function Mypage() {
         
         {/* 카카오 로그인 버튼 */}
         <button
-          onClick={handleKakaoLogin}
-          className={`${BASE_BUTTON_STYLES} gap-2 bg-[#FEE500] text-[#181600] shadow-[0_18px_35px_rgba(251,191,36,0.35)]`}
+          type="button"
+          onClick={() => startKakaoLogin()}
+          disabled={isStartingLogin}
+          aria-disabled={isStartingLogin}
+          aria-busy={isStartingLogin}
+          className={`${BASE_BUTTON_STYLES} gap-2 bg-[#FEE500] text-[#181600] shadow-[0_18px_35px_rgba(251,191,36,0.35)] disabled:cursor-progress disabled:opacity-70`}
         >
           <span className="text-xl">💬</span>
-          카카오로 계속하기
+          {isStartingLogin ? "카카오로 이동 중..." : "카카오로 계속하기"}
         </button>
       </section>
     </div>

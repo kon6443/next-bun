@@ -3,13 +3,14 @@
 import type { CSSProperties } from "react";
 import { Suspense } from "react";
 import { useSafeNavigation } from "@/app/hooks";
+import { useKakaoLogin } from "../useKakaoLogin";
 import {
-  startKakaoLogin,
   authContainerStyle,
   authCardStyle,
   authKakaoButtonStyle,
   authEyebrowStyle,
   authTitleStyle,
+  authButtonBusyStyle,
 } from "../shared";
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -28,6 +29,7 @@ function SignInContent() {
   const { getParam } = useSafeNavigation();
   const error = getParam("error") || null;
   const errorMessage = error ? ERROR_MESSAGES[error] ?? null : null;
+  const { start, isStarting } = useKakaoLogin();
 
   return (
     <div style={authContainerStyle}>
@@ -46,11 +48,15 @@ function SignInContent() {
           </div>
         )}
         <button
-          style={authKakaoButtonStyle}
-          onClick={() => startKakaoLogin()}
+          type="button"
+          style={isStarting ? { ...authKakaoButtonStyle, ...authButtonBusyStyle } : authKakaoButtonStyle}
+          onClick={() => start()}
+          disabled={isStarting}
+          aria-disabled={isStarting}
+          aria-busy={isStarting}
         >
           <span style={{ fontSize: "1.25rem", marginRight: 8 }}>💬</span>
-          카카오로 계속하기
+          {isStarting ? "카카오로 이동 중..." : "카카오로 계속하기"}
         </button>
       </section>
     </div>

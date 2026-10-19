@@ -2,7 +2,8 @@
 
 import { useEffect, useState, Suspense, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useSession, signIn } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { startKakaoLogin } from "@/app/auth/shared";
 import { acceptTeamInvite } from "@/services/teamService";
 import { TeamsCenteredLayout, LoadingSpinnerSimple, Button } from "../../components";
 import { useSafeNavigation } from "@/app/hooks";
@@ -65,9 +66,13 @@ function InviteAcceptContent() {
       return;
     }
 
-    if (status === "unauthenticated") {
+    // 로그인 시작이 실패해 error 를 띄웠으면 다시 시작하지 않는다 (error 변경으로 effect 가 재실행된다)
+    if (status === "unauthenticated" && !error) {
       const callbackUrl = `/teams/invite/accept?token=${encodeURIComponent(token)}`;
-      signIn("kakao", { callbackUrl });
+      // 공통 진입점 — 로딩 오버레이와 중복 시작 방지(effect 재실행 시 signIn 이 두 번 나가지 않게)
+      startKakaoLogin({ callbackUrl }).catch(() => {
+        setError("로그인을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      });
       return;
     }
 

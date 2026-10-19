@@ -68,11 +68,26 @@ export const authOptions: NextAuthOptions = {
           throw new Error("카카오 로그인 인증 정보를 가져오는데 실패했습니다.");
         }
 
+        // 백엔드 왕복 계측 — 콜백 전체 소요에서 이 값을 빼면 카카오 token/userinfo 2홉의
+        // 소요가 남는다. 간헐적 수 초 스파이크의 범인을 분해하는 유일한 수단.
+        // 판정 기준: ../../../bun/docs/tasks/tasks-kakao-login-latency.md
+        const backendStartedAt = Date.now();
+
         try {
           const response = await postKakaoSignInUp({
             accessToken: account.access_token,
             kakaoNickname: user.name ?? "",
           });
+
+          console.log(
+            JSON.stringify({
+              level: "info",
+              time: new Date().toISOString(),
+              tag: "login.backend",
+              ms: Date.now() - backendStartedAt,
+              msg: "백엔드 로그인 왕복 측정",
+            }),
+          );
 
           const { userId, userName, loginType, accessToken, tokenType } = response.data;
 
@@ -82,6 +97,16 @@ export const authOptions: NextAuthOptions = {
           token.accessToken = accessToken;
           token.tokenType = tokenType;
         } catch (err) {
+          // 실패도 소요를 남긴다 — 타임아웃(10초 abort)으로 끝나는 스파이크를 잡기 위해
+          console.log(
+            JSON.stringify({
+              level: "error",
+              time: new Date().toISOString(),
+              tag: "login.backend.error",
+              ms: Date.now() - backendStartedAt,
+              msg: "백엔드 로그인 왕복 실패",
+            }),
+          );
           console.error("Error during login/signup:", err);
           const errorMessage = err instanceof Error ? err.message : "로그인 처리 중 오류가 발생했습니다.";
 
