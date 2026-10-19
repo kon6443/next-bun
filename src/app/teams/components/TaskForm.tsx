@@ -5,6 +5,7 @@ import { Input, TextArea, DateInput, TimeInput } from "./FormInput";
 import { Button, ButtonLink } from "./Button";
 import { Alert } from "./Alert";
 import { DEFAULT_START_TIME, DEFAULT_END_TIME, isTaskRangeInverted } from "@/app/utils/dateUtils";
+import { TaskTagField } from "@/app/teams/[teamId]/components/TaskTagField";
 
 export type TaskFormData = {
   taskName: string;
@@ -13,6 +14,8 @@ export type TaskFormData = {
   endAt: string;
   startAtTime: string;
   endAtTime: string;
+  /** 붙일 태그 ID (팀 태그 순서와 무관하게 고른 순서) */
+  tagIds: number[];
 };
 
 type TaskFormProps = {
@@ -47,6 +50,7 @@ export function TaskForm({
   const [endAt, setEndAt] = useState(initialData?.endAt || "");
   const [startAtTime, setStartAtTime] = useState(initialData?.startAtTime || DEFAULT_START_TIME);
   const [endAtTime, setEndAtTime] = useState(initialData?.endAtTime || DEFAULT_END_TIME);
+  const [tagIds, setTagIds] = useState<number[]>(initialData?.tagIds ?? []);
 
   const isRangeInverted = isTaskRangeInverted(startAt, startAtTime, endAt, endAtTime);
 
@@ -60,6 +64,7 @@ export function TaskForm({
       endAt,
       startAtTime,
       endAtTime,
+      tagIds,
     });
   };
 
@@ -133,6 +138,8 @@ export function TaskForm({
           <Alert variant="error" message="종료 시각은 시작 시각보다 빠를 수 없습니다." />
         )}
       </div>
+
+      <TaskTagField value={tagIds} onChange={setTagIds} disabled={isSubmitting} />
 
       <div className="flex flex-col justify-end gap-2 pt-2">
         {cancelHref ? (

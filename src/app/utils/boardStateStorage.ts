@@ -16,6 +16,7 @@ export type BoardFilters = {
   assigneeId: number | null;
   period: PeriodFilter;
   status: StatusFilter;
+  tagIds: number[];
 };
 
 export type BoardState = {
@@ -84,6 +85,9 @@ function parseFilters(value: unknown): BoardFilters | undefined {
     assigneeId: f.assigneeId as number | null,
     period: f.period as PeriodFilter,
     status: f.status as StatusFilter,
+    // 태그 필터 도입 전에 저장된 값에는 tagIds가 없다 — 없거나 깨졌으면 빈 선택으로 보고 나머지 필터는 살린다.
+    // 그사이 삭제된 태그 ID는 여기서 알 수 없다 — 팀 태그를 받은 뒤 보드가 걸러낸다
+    tagIds: Array.isArray(f.tagIds) ? f.tagIds.filter(isNonNegativeInteger) : [],
   };
 }
 

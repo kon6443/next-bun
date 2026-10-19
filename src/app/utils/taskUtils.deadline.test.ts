@@ -22,6 +22,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     crtdAt: new Date(2026, 9, 1),
     crtdBy: 1,
     userName: 'U',
+    tags: [],
     ...overrides,
   };
 }

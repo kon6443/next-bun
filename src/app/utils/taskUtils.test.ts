@@ -95,11 +95,11 @@ describe('taskUtils', () => {
   // =============== calculateTaskStats 테스트 ===============
   describe('calculateTaskStats', () => {
     const mockTasks: Task[] = [
-      { taskId: 1, teamId: 1, taskName: 'Task 1', taskStatus: 1, actStatus: 1, crtdAt: new Date(), crtdBy: 1, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'User1' },
-      { taskId: 2, teamId: 1, taskName: 'Task 2', taskStatus: 2, actStatus: 1, crtdAt: new Date(), crtdBy: 2, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'User2' },
-      { taskId: 3, teamId: 1, taskName: 'Task 3', taskStatus: 3, actStatus: 1, crtdAt: new Date(), crtdBy: 1, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'User1' },
-      { taskId: 4, teamId: 1, taskName: 'Task 4', taskStatus: 4, actStatus: 1, crtdAt: new Date(), crtdBy: 2, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'User2' },
-      { taskId: 5, teamId: 1, taskName: 'Task 5', taskStatus: 5, actStatus: 1, crtdAt: new Date(), crtdBy: 1, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'User1' },
+      { taskId: 1, teamId: 1, taskName: 'Task 1', taskStatus: 1, actStatus: 1, crtdAt: new Date(), crtdBy: 1, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'User1', tags: [] },
+      { taskId: 2, teamId: 1, taskName: 'Task 2', taskStatus: 2, actStatus: 1, crtdAt: new Date(), crtdBy: 2, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'User2', tags: [] },
+      { taskId: 3, teamId: 1, taskName: 'Task 3', taskStatus: 3, actStatus: 1, crtdAt: new Date(), crtdBy: 1, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'User1', tags: [] },
+      { taskId: 4, teamId: 1, taskName: 'Task 4', taskStatus: 4, actStatus: 1, crtdAt: new Date(), crtdBy: 2, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'User2', tags: [] },
+      { taskId: 5, teamId: 1, taskName: 'Task 5', taskStatus: 5, actStatus: 1, crtdAt: new Date(), crtdBy: 1, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'User1', tags: [] },
     ];
 
     it('전체 태스크 수를 정확히 계산', () => {
@@ -131,9 +131,9 @@ describe('taskUtils', () => {
   // =============== filterBySearch 테스트 ===============
   describe('filterBySearch', () => {
     const mockTasks: Task[] = [
-      { taskId: 1, teamId: 1, taskName: '로그인 기능 구현', taskDescription: 'OAuth 연동', taskStatus: 1, actStatus: 1, crtdAt: new Date(), crtdBy: 1, startAt: null, endAt: null, completedAt: null, userName: 'User1' },
-      { taskId: 2, teamId: 1, taskName: '버그 수정', taskDescription: '로그인 오류 수정', taskStatus: 2, actStatus: 1, crtdAt: new Date(), crtdBy: 2, startAt: null, endAt: null, completedAt: null, userName: 'User2' },
-      { taskId: 3, teamId: 1, taskName: 'UI 개선', taskDescription: '다크모드 추가', taskStatus: 1, actStatus: 1, crtdAt: new Date(), crtdBy: 1, startAt: null, endAt: null, completedAt: null, userName: 'User1' },
+      { taskId: 1, teamId: 1, taskName: '로그인 기능 구현', taskDescription: 'OAuth 연동', taskStatus: 1, actStatus: 1, crtdAt: new Date(), crtdBy: 1, startAt: null, endAt: null, completedAt: null, userName: 'User1', tags: [] },
+      { taskId: 2, teamId: 1, taskName: '버그 수정', taskDescription: '로그인 오류 수정', taskStatus: 2, actStatus: 1, crtdAt: new Date(), crtdBy: 2, startAt: null, endAt: null, completedAt: null, userName: 'User2', tags: [] },
+      { taskId: 3, teamId: 1, taskName: 'UI 개선', taskDescription: '다크모드 추가', taskStatus: 1, actStatus: 1, crtdAt: new Date(), crtdBy: 1, startAt: null, endAt: null, completedAt: null, userName: 'User1', tags: [] },
     ];
 
     it('빈 검색어는 전체 태스크 반환', () => {
@@ -163,9 +163,9 @@ describe('taskUtils', () => {
   // =============== filterByAssignee 테스트 ===============
   describe('filterByAssignee', () => {
     const mockTasks: Task[] = [
-      { taskId: 1, teamId: 1, taskName: 'Task 1', taskStatus: 1, actStatus: 1, crtdAt: new Date(), crtdBy: 1, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'User1' },
-      { taskId: 2, teamId: 1, taskName: 'Task 2', taskStatus: 2, actStatus: 1, crtdAt: new Date(), crtdBy: 2, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'User2' },
-      { taskId: 3, teamId: 1, taskName: 'Task 3', taskStatus: 1, actStatus: 1, crtdAt: new Date(), crtdBy: 1, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'User1' },
+      { taskId: 1, teamId: 1, taskName: 'Task 1', taskStatus: 1, actStatus: 1, crtdAt: new Date(), crtdBy: 1, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'User1', tags: [] },
+      { taskId: 2, teamId: 1, taskName: 'Task 2', taskStatus: 2, actStatus: 1, crtdAt: new Date(), crtdBy: 2, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'User2', tags: [] },
+      { taskId: 3, teamId: 1, taskName: 'Task 3', taskStatus: 1, actStatus: 1, crtdAt: new Date(), crtdBy: 1, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'User1', tags: [] },
     ];
 
     it('null이면 전체 태스크 반환', () => {
@@ -182,9 +182,9 @@ describe('taskUtils', () => {
   // =============== filterByStatus 테스트 ===============
   describe('filterByStatus', () => {
     const mockTasks: Task[] = [
-      { taskId: 1, teamId: 1, taskName: 'Task 1', taskStatus: 1, actStatus: 1, crtdAt: new Date(), crtdBy: 1, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'User1' },
-      { taskId: 2, teamId: 1, taskName: 'Task 2', taskStatus: 2, actStatus: 1, crtdAt: new Date(), crtdBy: 2, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'User2' },
-      { taskId: 3, teamId: 1, taskName: 'Task 3', taskStatus: 3, actStatus: 1, crtdAt: new Date(), crtdBy: 1, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'User1' },
+      { taskId: 1, teamId: 1, taskName: 'Task 1', taskStatus: 1, actStatus: 1, crtdAt: new Date(), crtdBy: 1, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'User1', tags: [] },
+      { taskId: 2, teamId: 1, taskName: 'Task 2', taskStatus: 2, actStatus: 1, crtdAt: new Date(), crtdBy: 2, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'User2', tags: [] },
+      { taskId: 3, teamId: 1, taskName: 'Task 3', taskStatus: 3, actStatus: 1, crtdAt: new Date(), crtdBy: 1, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'User1', tags: [] },
     ];
 
     it('"all"이면 전체 태스크 반환', () => {
@@ -201,9 +201,9 @@ describe('taskUtils', () => {
   // =============== getUniqueAssignees 테스트 ===============
   describe('getUniqueAssignees', () => {
     const mockTasks: Task[] = [
-      { taskId: 1, teamId: 1, taskName: 'Task 1', taskStatus: 1, actStatus: 1, crtdAt: new Date(), crtdBy: 1, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'Alice' },
-      { taskId: 2, teamId: 1, taskName: 'Task 2', taskStatus: 2, actStatus: 1, crtdAt: new Date(), crtdBy: 2, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'Bob' },
-      { taskId: 3, teamId: 1, taskName: 'Task 3', taskStatus: 1, actStatus: 1, crtdAt: new Date(), crtdBy: 1, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'Alice' },
+      { taskId: 1, teamId: 1, taskName: 'Task 1', taskStatus: 1, actStatus: 1, crtdAt: new Date(), crtdBy: 1, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'Alice', tags: [] },
+      { taskId: 2, teamId: 1, taskName: 'Task 2', taskStatus: 2, actStatus: 1, crtdAt: new Date(), crtdBy: 2, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'Bob', tags: [] },
+      { taskId: 3, teamId: 1, taskName: 'Task 3', taskStatus: 1, actStatus: 1, crtdAt: new Date(), crtdBy: 1, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: 'Alice', tags: [] },
     ];
 
     it('중복 없이 담당자 목록 반환', () => {
@@ -214,7 +214,7 @@ describe('taskUtils', () => {
 
     it('userName이 없으면 기본 이름 사용', () => {
       const tasksWithoutName: Task[] = [
-        { taskId: 1, teamId: 1, taskName: 'Task 1', taskStatus: 1, actStatus: 1, crtdAt: new Date(), crtdBy: 99, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: '' },
+        { taskId: 1, teamId: 1, taskName: 'Task 1', taskStatus: 1, actStatus: 1, crtdAt: new Date(), crtdBy: 99, startAt: null, endAt: null, completedAt: null, taskDescription: '', userName: '', tags: [] },
       ];
       const assignees = getUniqueAssignees(tasksWithoutName);
       expect(assignees[0].name).toBe('사용자 99');
@@ -259,7 +259,7 @@ describe('taskUtils', () => {
   describe('filterByPeriod', () => {
     const taskEndingAt = (endAt: Date, taskStatus = 2): Task => ({
       taskId: 1, teamId: 1, taskName: 'T', taskStatus, actStatus: 1, crtdAt: new Date(), crtdBy: 1,
-      startAt: null, endAt, completedAt: null, taskDescription: '', userName: 'U',
+      startAt: null, endAt, completedAt: null, taskDescription: '', userName: 'U', tags: [],
     });
     // 2026-10-19(월) ~ 2026-10-25(일) 주
     const sat = taskEndingAt(new Date(2026, 9, 24, 23, 59, 59));

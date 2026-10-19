@@ -19,7 +19,7 @@ function createMemoryStorage() {
   };
 }
 
-const filters = { searchQuery: '회의', assigneeId: 3, period: 'thisWeek' as const, status: 2 as const };
+const filters = { searchQuery: '회의', assigneeId: 3, period: 'thisWeek' as const, status: 2 as const, tagIds: [4, 9] };
 
 describe('boardStateStorage', () => {
   beforeEach(() => {
@@ -51,6 +51,17 @@ describe('boardStateStorage', () => {
       JSON.stringify({ scrollY: -5, dataTab: 'deleted', view: 'gantt', kanbanColumnIndex: 1.5, filters: { ...filters, period: 'yesterday' } }),
     );
     expect(loadBoardState('2')).toEqual({ view: 'gantt' });
+  });
+
+  it('태그 필터 도입 전에 저장된 필터(tagIds 없음)도 나머지 필터를 살려 빈 태그 선택으로 복원한다', () => {
+    const legacyFilters = { searchQuery: filters.searchQuery, assigneeId: filters.assigneeId, period: filters.period, status: filters.status };
+    window.sessionStorage.setItem('teamBoardState:3', JSON.stringify({ filters: legacyFilters }));
+    expect(loadBoardState('3')).toEqual({ filters: { ...legacyFilters, tagIds: [] } });
+  });
+
+  it('tagIds의 잘못된 항목은 버리고 정수 ID만 남긴다', () => {
+    window.sessionStorage.setItem('teamBoardState:4', JSON.stringify({ filters: { ...filters, tagIds: [4, '9', -1, 2.5, 7] } }));
+    expect(loadBoardState('4').filters?.tagIds).toEqual([4, 7]);
   });
 
   it('저장소를 쓸 수 없으면 던지지 않고 기본값으로 동작한다', () => {

@@ -305,3 +305,43 @@ export function UserGroupIcon({ className = 'w-4 h-4' }: IconProps) {
     </svg>
   );
 }
+
+export function TagIcon({ className = 'w-4 h-4' }: IconProps) {
+  return (
+    <svg className={className} fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+      <path
+        strokeLinecap='round'
+        strokeLinejoin='round'
+        strokeWidth={2}
+        d='M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z'
+      />
+    </svg>
+  );
+}
+
+/** 드래그 핸들 (⋮⋮) */
+export function GripIcon({ className = 'w-4 h-4' }: IconProps) {
+  return (
+    <svg className={className} fill='currentColor' viewBox='0 0 24 24'>
+      <circle cx='9' cy='6' r='1.5' />
+      <circle cx='15' cy='6' r='1.5' />
+      <circle cx='9' cy='12' r='1.5' />
+      <circle cx='15' cy='12' r='1.5' />
+      <circle cx='9' cy='18' r='1.5' />
+      <circle cx='15' cy='18' r='1.5' />
+    </svg>
+  );
+}
+
+export function EyeDropperIcon({ className = 'w-4 h-4' }: IconProps) {
+  return (
+    <svg className={className} fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+      <path
+        strokeLinecap='round'
+        strokeLinejoin='round'
+        strokeWidth={1.5}
+        d='m15 11.25 1.5 1.5.75-.75V8.758l2.276-.61a3 3 0 1 0-3.675-3.675l-.61 2.277H12l-.75.75 1.5 1.5M15 11.25l-8.47 8.47c-.34.34-.8.53-1.28.53s-.94.19-1.28.53l-.97.97-.75-.75.97-.97c.34-.34.53-.8.53-1.28s.19-.94.53-1.28L12.75 9M15 11.25 12.75 9'
+      />
+    </svg>
+  );
+}

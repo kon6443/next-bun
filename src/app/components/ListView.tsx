@@ -9,6 +9,7 @@ import { EmptyState } from '../teams/components';
 import { ChevronUpIcon, ChevronDownIcon } from './Icons';
 import { viewContainerStyles } from '@/styles/teams';
 import { ViewHeader } from './ViewHeader';
+import { TaskTagChips } from './TagChip';
 import { markTaskOpenedFromBoard, type ListSort, type ListSortKey } from '../utils/boardStateStorage';
 
 type ListViewProps = {
@@ -181,6 +182,7 @@ export function ListView({ tasks, teamId, isArchiveView, onRestore, initialSort,
                     <td className="px-4 py-3">
                       <div className="max-w-[200px]">
                         <p className="truncate text-sm font-medium text-slate-200">{task.taskName}</p>
+                        <TaskTagChips tags={task.tags} max={2} className="mt-1" />
                         {task.taskDescription && (
                           <p className="mt-0.5 truncate text-xs text-slate-400">{task.taskDescription}</p>
                         )}

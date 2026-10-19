@@ -1,5 +1,6 @@
 import type { Task } from '../types/task';
 import { STATUS_COMPLETED, STATUS_CANCELLED } from '../config/taskStatusConfig';
+import { filterByTags } from './tagUtils';
 
 /** 자동 아카이브 대기 일수 (백엔드와 동기화) */
 const AUTO_ARCHIVE_DAYS = 14;
@@ -236,13 +237,15 @@ export function applyAllFilters(
   searchQuery: string,
   assigneeId: number | null,
   period: PeriodFilter,
-  status: StatusFilter
+  status: StatusFilter,
+  tagIds: readonly number[] = []
 ): Task[] {
   let filtered = tasks;
   filtered = filterBySearch(filtered, searchQuery);
   filtered = filterByAssignee(filtered, assigneeId);
   filtered = filterByPeriod(filtered, period);
   filtered = filterByStatus(filtered, status);
+  filtered = filterByTags(filtered, tagIds);
   return filtered;
 }
 
