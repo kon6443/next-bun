@@ -28,7 +28,7 @@ tools: Read, Grep, Glob, Bash
 ## 판정 규율
 - 각 이슈에 `[차단]`/`[확인 필요]`/`[제안]` 중 하나를 붙이고, 근거는 `파일:라인`으로 단다.
 - "없다"·"0건"이라고 할 때는 검색한 명령과 범위를 함께 적는다.
-- 빌드·테스트를 직접 돌리지 않는다. 메인에게 돌릴 명령을 권고만 한다(`bun run lint`·`bun run typecheck`·`bun run test:run`. 백엔드는 `../bun/CLAUDE.md` Commands).
+- 빌드·테스트를 직접 돌리지 않는다. 메인에게 돌릴 명령을 권고만 한다(`pnpm lint`·`pnpm typecheck`·`pnpm test:run`. 백엔드는 `../bun/CLAUDE.md` Commands).
 
 ## 출력
 ### 플로우별 검증 결과
