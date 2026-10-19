@@ -104,7 +104,11 @@ export async function postKakaoSignInUp({
       typeof response_data.data.tokenType !== 'string' ||
       !response_data.data.tokenType
     ) {
-      console.error('Invalid response data structure:', response_data);
+      // 응답 본문에 accessToken 이 들어 있을 수 있다 — 값은 남기지 않고 구조(code·키 목록)만 남긴다
+      console.error('Invalid response data structure:', {
+        code: response_data?.code,
+        dataKeys: Object.keys(response_data?.data ?? {}),
+      });
       throw new Error('서버 응답 형식이 올바르지 않습니다.');
     }
 

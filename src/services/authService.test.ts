@@ -56,4 +56,21 @@ describe('postKakaoSignInUp', () => {
     expect(lastRequest().headers).not.toHaveProperty('X-Forwarded-For');
   });
 
+  it('응답 형식이 틀려 실패해도 로그에 토큰 값을 남기지 않는다', async () => {
+    const leakedToken = 'backend-jwt-must-not-be-logged';
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ code: 'SUCCESS', data: { ...okBody.data, accessToken: leakedToken, tokenType: '' } }), {
+        status: 201,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { postKakaoSignInUp } = await load();
+    await expect(postKakaoSignInUp({ accessToken: 'kakao-token', kakaoNickname: '닉' })).rejects.toThrow(
+      '서버 응답 형식이 올바르지 않습니다.',
+    );
+    expect(errorSpy).toHaveBeenCalled();
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(leakedToken);
+    errorSpy.mockRestore();
+  });
 });
