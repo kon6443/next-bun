@@ -13,3 +13,6 @@
 docs
 coverage
 *.tsbuildinfo
+
+# pnpm 로컬 store (sandbox 실행 시 생성)
+.pnpm-store

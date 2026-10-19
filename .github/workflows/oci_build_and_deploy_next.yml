@@ -32,32 +32,32 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # pnpm 버전은 package.json 의 packageManager 를 따른다 (Dockerfile 의 corepack 과 같은 버전).
+      # setup-node 의 cache: pnpm 이 pnpm 바이너리를 찾으므로 setup-node 보다 먼저 둔다
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
       # next·tsc·vitest bin 은 `#!/usr/bin/env node` 라 러너 기본 Node 로 돈다 — 메이저를 고정해 비결정성을 없애고 백엔드 런타임(Node 24)과 맞춘다
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 24
+          cache: pnpm
 
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1   # 의존성 설치용 — Dockerfile 이 넣는 oven/bun:1 바이너리와 맞춘다 (빌드·실행은 Node 24)
-
-      # setup-bun 이후에도 PATH 의 node 가 위에서 고정한 24 인지 로그로 남긴다
-      - name: Show Node version
-        run: which node && node -v
+      - name: Show Node and pnpm version
+        run: which node && node -v && pnpm -v
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: bun run lint
+        run: pnpm lint
 
       - name: Typecheck
-        run: bun run typecheck
+        run: pnpm typecheck
 
       - name: Test
-        run: bun run test:run
+        run: pnpm test:run
 
   deploy:
     needs: verify
