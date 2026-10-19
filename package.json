@@ -14,7 +14,7 @@
     "ci:core": "bun run lint && bun run typecheck && bun run test:run && bun run build"
   },
   "dependencies": {
-    "next": "15.3.8",
+    "next": "15.5.28",
     "next-auth": "^4.24.11",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
@@ -31,7 +31,7 @@
     "@types/react-dom": "^19",
     "@vitest/coverage-v8": "4.0.18",
     "eslint": "^9",
-    "eslint-config-next": "15.3.8",
+    "eslint-config-next": "15.5.28",
     "jsdom": "^27.4.0",
     "tailwindcss": "^4",
     "typescript": "^5",
