@@ -1,4 +1,5 @@
-import fetchServiceInstance from './FetchService';
+import serverFetchInstance from './serverFetch';
+import { getRequestContext } from '@/lib/requestContext';
 
 type KakaoSignInUpRequest = {
   kakaoNickname: string;
@@ -54,15 +55,19 @@ export async function postKakaoSignInUp({
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000); // 10초 타임아웃
 
+  // 백엔드는 로그인 스로틀 키로 바로 앞 프록시가 붙인 IP(req.ip)를 쓴다 — 내부 주소로 직행할 때는
+  // Next 가 사용자 IP 를 넘겨야 전 사용자가 Next 서버 IP 하나를 공유하지 않는다
+  const clientIp = getRequestContext()?.clientIp;
   const headers: Record<string, string> = {
     // 로그인마다 새 연결을 맺는다. Bun fetch 는 중간에서 조용히(FIN·RST 없이) 끊긴 유휴 풀 소켓을
     // 그대로 재사용해 abort 까지 멈춘다(로컬 재현: 유휴 후 요청 15s TimeoutError, 직후 새 연결 2ms).
     // Connection: close 는 Bun·Node 모두에서 이 경우를 해결함을 실측했다 — docs/tasks/kakao-login-latency-front.md
     Connection: 'close',
+    ...(clientIp ? { 'X-Forwarded-For': clientIp } : {}),
   };
 
   try {
-    const response = await fetchServiceInstance.backendFetch({
+    const response = await serverFetchInstance.backendFetch({
       method: 'POST',
       endpoint: '/api/v1/auth/kakao',
       body: { kakaoNickname, accessToken },

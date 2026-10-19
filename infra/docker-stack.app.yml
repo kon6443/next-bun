@@ -9,6 +9,9 @@ services:
       - /home/ubuntu/desktop/deploy/sys/config/env/.env
     environment:
       HOSTNAME: "0.0.0.0"
+      # 서버 사이드 백엔드 호출(로그인)은 공인 도메인 헤어핀 대신 같은 overlay 내부 주소로 직행한다
+      # (src/services/serverFetch.ts — 없으면 NEXT_PUBLIC_API 로 폴백). 사용자 IP 전달(X-Forwarded-For)과 같이 배포해야 한다
+      SERVER_API_BASE: "http://prod_nest_app:3500"
     ports:
       - target: 3000
         published: 23000

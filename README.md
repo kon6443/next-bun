@@ -36,4 +36,6 @@ Next.js 15 App Router + Bun 기반의 팀 협업/태스크 관리 웹앱. 백엔
 1. `verify` 잡: lint → typecheck → test:run — 실패하면 배포하지 않는다
 2. `deploy` 잡: 이미지 빌드(Dockerfile의 `bun run build`) → 레지스트리 push → Swarm 배포
 
+서버에서 백엔드를 부르는 로그인 호출은 런타임 env `SERVER_API_BASE`(`infra/docker-stack.app.yml`, 같은 overlay 내부 주소)로 직행한다. 없으면 `NEXT_PUBLIC_API`로 폴백한다(`src/services/serverFetch.ts`).
+
 `docs/**`·`*.md`만 바꾼 push는 워크플로를 트리거하지 않는다(`paths-ignore`).
