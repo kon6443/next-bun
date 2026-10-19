@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getMyTeams, updateTeam, getTeamUsers, deleteTelegramLink } from './teamService';
+import { getMyTeams, updateTeam, getTeamUsers, deleteTelegramLink, getTeamTasks, getTaskDetail } from './teamService';
 import { ApiError } from '@/types/api';
 
 // 서비스 → FetchService → fetch 경로 전체를 실제로 타고, 네트워크만 stub 한다
@@ -70,6 +70,18 @@ describe('teamService 응답·에러 처리', () => {
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/v1\/teams\/7\/users\?status=0$/);
     expect(res.data[0].joinedAt).toBeInstanceOf(Date);
     expect(res.data[0].joinedAt.toISOString()).toBe('2026-10-20T01:00:00.000Z');
+  });
+
+  it('태스크 목록·상세 응답에 tags가 없으면(태그 도입 전 백엔드) 빈 배열로 맞춘다', async () => {
+    const task = { taskId: 1, teamId: 1, taskName: 'T' };
+    const tagged = { ...task, taskId: 2, tags: [{ tagId: 5, tagName: '버그', tagColor: '#F87171' }] };
+    fetchMock.mockResolvedValueOnce(json({ code: 'SUCCESS', message: 'ok', data: { team: {}, tasks: [task, tagged] } }));
+    const list = await getTeamTasks(1, 'tok');
+    expect(list.data.tasks.map(t => t.tags)).toEqual([[], tagged.tags]);
+
+    fetchMock.mockResolvedValueOnce(json({ code: 'SUCCESS', message: 'ok', data: { ...task, comments: [] } }));
+    const detail = await getTaskDetail(1, 1, 'tok');
+    expect(detail.data.tags).toEqual([]);
   });
 
   it('deleteTelegramLink: 성공이면 본문을 읽지 않고 undefined, 실패면 ApiError', async () => {

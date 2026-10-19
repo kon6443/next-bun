@@ -4,6 +4,8 @@ import { useState } from 'react';
 import type { PeriodFilter, StatusFilter } from '../utils/taskUtils';
 import { getAllStatuses } from '../config/taskStatusConfig';
 import { SearchIcon, CloseIcon, FilterIcon } from './Icons';
+import type { TeamTag } from '../types/task';
+import { getTagChipStyle } from '../utils/tagUtils';
 
 type TaskFiltersProps = {
   // 검색
@@ -22,6 +24,11 @@ type TaskFiltersProps = {
   // 상태 필터
   status: StatusFilter;
   onStatusChange: (status: StatusFilter) => void;
+
+  // 태그 필터 (OR) — 팀 태그를 아직 못 받았으면 null
+  tags: TeamTag[] | null;
+  tagIds: number[];
+  onTagIdsChange: (tagIds: number[]) => void;
 
   // 태스크 수 (상태별)
   taskCounts: {
@@ -59,6 +66,9 @@ export function TaskFilters({
   onPeriodChange,
   status,
   onStatusChange,
+  tags,
+  tagIds,
+  onTagIdsChange,
   taskCounts,
   hasActiveFilters,
   onResetFilters,
@@ -74,6 +84,10 @@ export function TaskFilters({
         onAssigneeChange(currentUserId);
       }
     }
+  };
+
+  const toggleTag = (tagId: number) => {
+    onTagIdsChange(tagIds.includes(tagId) ? tagIds.filter(id => id !== tagId) : [...tagIds, tagId]);
   };
 
   return (
@@ -122,6 +136,7 @@ export function TaskFilters({
               assigneeId !== null,
               status !== 'all',
               period !== 'all',
+              tagIds.length > 0,
             ].filter(Boolean).length}개 필터
           </span>
         )}
@@ -209,6 +224,34 @@ export function TaskFilters({
               ))}
             </div>
           </div>
+
+          {/* 태그 (여러 개 고르면 하나라도 붙은 태스크) */}
+          {tags && tags.length > 0 && (
+            <div>
+              <span id="task-filter-tags-label" className="block text-[10px] text-slate-400 mb-2">
+                태그 <span className="text-slate-500">(하나라도 붙은 태스크)</span>
+              </span>
+              <div className="flex gap-1.5 flex-wrap" role="group" aria-labelledby="task-filter-tags-label">
+                {tags.map(tag => {
+                  const selected = tagIds.includes(tag.tagId);
+                  return (
+                    <button
+                      key={tag.tagId}
+                      type="button"
+                      onClick={() => toggleTag(tag.tagId)}
+                      aria-pressed={selected}
+                      className={`max-w-[10rem] truncate rounded-lg border px-3 py-2 text-xs font-medium transition ${
+                        selected ? 'ring-2 ring-white/50' : 'opacity-50 hover:opacity-80'
+                      }`}
+                      style={getTagChipStyle(tag.tagColor)}
+                    >
+                      {tag.tagName}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* 초기화 버튼 */}
           {hasActiveFilters && (
