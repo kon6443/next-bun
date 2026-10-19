@@ -1,6 +1,6 @@
 # next-bun
 
-Next.js 15 App Router + Bun 기반의 팀 협업/태스크 관리 웹앱. 백엔드는 형제 레포 [`../bun`](../bun)(NestJS)이다.
+Next.js 15 App Router 기반(운영 런타임 Node 24, 패키지 매니저 pnpm)의 팀 협업/태스크 관리 웹앱. 백엔드는 형제 레포 [`../bun`](../bun)(NestJS)이다.
 
 ## 개요
 - 인증: NextAuth + Kakao
@@ -22,19 +22,19 @@ Next.js 15 App Router + Bun 기반의 팀 협업/태스크 관리 웹앱. 백엔
 ## 개발/빌드
 | 용도 | 명령 |
 |---|---|
-| 개발 서버 | `bun run dev` |
-| 빌드 | `bun run build` |
-| 린트 | `bun run lint` |
-| 테스트 (1회) | `bun run test:run` |
-| 테스트 (watch) | `bun run test` |
-| 커버리지 | `bun run test:coverage` |
-| 타입 검사 | `bun run typecheck` |
-| **통합 검증** (lint → typecheck → test:run → build) | `bun run ci:core` |
+| 개발 서버 | `pnpm dev` |
+| 빌드 | `pnpm build` |
+| 린트 | `pnpm lint` |
+| 테스트 (1회) | `pnpm test:run` |
+| 테스트 (watch) | `pnpm test` |
+| 커버리지 | `pnpm test:coverage` |
+| 타입 검사 | `pnpm typecheck` |
+| **통합 검증** (lint → typecheck → test:run → build) | `pnpm ci:core` |
 
 ## 배포
 `main` 브랜치에 push하면 `.github/workflows/oci_build_and_deploy_next.yml`이 실행된다.
 1. `verify` 잡: lint → typecheck → test:run — 실패하면 배포하지 않는다
-2. `deploy` 잡: 이미지 빌드(Dockerfile — bun으로 의존성 설치, Node로 `next build`, 운영 런타임 Node 24) → 레지스트리 push → Swarm 배포
+2. `deploy` 잡: 이미지 빌드(Dockerfile — pnpm으로 의존성 설치, Node로 `next build`, 운영 런타임 Node 24) → 레지스트리 push → Swarm 배포
 
 서버에서 백엔드를 부르는 로그인 호출은 런타임 env `SERVER_API_BASE`(`infra/docker-stack.app.yml`, 같은 overlay 내부 주소)로 직행한다. 없으면 `NEXT_PUBLIC_API`로 폴백한다(`src/services/serverFetch.ts`).
 

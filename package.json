@@ -2,6 +2,7 @@
   "name": "next-bun",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.34.7",
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0 --turbopack",
     "build": "next build",
@@ -11,7 +12,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "ci:core": "bun run lint && bun run typecheck && bun run test:run && bun run build"
+    "ci:core": "pnpm lint && pnpm typecheck && pnpm test:run && pnpm build"
   },
   "dependencies": {
     "next": "15.5.28",
@@ -36,5 +37,13 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.0.18"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [],
+    "ignoredBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "unrs-resolver"
+    ]
   }
 }
