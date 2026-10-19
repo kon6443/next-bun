@@ -1,6 +1,6 @@
 "use client";
 
-import { signIn } from "next-auth/react";
+import { useKakaoLogin } from "@/app/auth/useKakaoLogin";
 
 type LoginButtonProps = {
   variant?: "default" | "primary";
@@ -27,11 +27,20 @@ export default function LoginButton({
     md: "px-4 py-2 text-xs sm:px-6 sm:py-3 sm:text-sm",
   };
 
-  const classes = `${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`;
+  const classes = `${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} disabled:cursor-progress disabled:opacity-70 ${className}`;
+  const { start, isStarting } = useKakaoLogin();
 
   return (
-    <button onClick={() => signIn("kakao")} className={classes}>
-      {children || "로그인하기"}
+    <button
+      type="button"
+      // 로그인 후 지금 보던 화면으로 돌아온다 (signIn 기본값과 같음)
+      onClick={() => start({ callbackUrl: window.location.href })}
+      disabled={isStarting}
+      aria-disabled={isStarting}
+      aria-busy={isStarting}
+      className={classes}
+    >
+      {isStarting ? "카카오로 이동 중..." : children || "로그인하기"}
     </button>
   );
 }

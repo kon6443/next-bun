@@ -4,8 +4,9 @@ import type { CSSProperties } from "react";
 import { Suspense, useEffect } from "react";
 import { useSafeNavigation } from "@/app/hooks";
 import { clearAuthLoading } from "@/app/components/AuthLoadingOverlay";
+import { useKakaoLogin } from "../useKakaoLogin";
 import {
-  startKakaoLogin,
+  authButtonBusyStyle,
   authContainerStyle,
   authCardStyle,
   authBaseButtonStyle,
@@ -88,6 +89,7 @@ const DEFAULT_ERROR: ErrorInfo = {
 function AuthErrorContent() {
   const { getParam } = useSafeNavigation();
   const error = getParam("error");
+  const { start, isStarting } = useKakaoLogin();
 
   useEffect(() => {
     clearAuthLoading();
@@ -115,10 +117,14 @@ function AuthErrorContent() {
             다시 로그인
           </button>
           <button
-            style={switchAccountButtonStyle}
-            onClick={() => startKakaoLogin({ prompt: "login" })}
+            type="button"
+            style={isStarting ? { ...switchAccountButtonStyle, ...authButtonBusyStyle } : switchAccountButtonStyle}
+            onClick={() => start({ prompt: "login" })}
+            disabled={isStarting}
+            aria-disabled={isStarting}
+            aria-busy={isStarting}
           >
-            다른 계정으로 로그인
+            {isStarting ? "카카오로 이동 중..." : "다른 계정으로 로그인"}
           </button>
           <button
             style={secondaryButtonStyle}
