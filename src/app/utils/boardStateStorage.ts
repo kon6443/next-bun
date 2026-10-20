@@ -162,11 +162,18 @@ export function parseDataTabParam(value: string | null | undefined): BoardDataTa
   return value === 'archive' ? 'archive' : 'active';
 }
 
-/** 보드 주소 — 기본값(칸반·활성)은 파라미터를 생략한다 */
-export function buildBoardHref(teamId: string | number, { view, dataTab }: { view?: BoardViewMode; dataTab?: BoardDataTab }): string {
+/**
+ * 보드 주소 — 기본값(칸반·활성)은 파라미터를 생략한다
+ * tagId를 주면 보드가 그 태그로 거른 채 열린다(`?tag=`, 적용 후 보드가 주소에서 지운다)
+ */
+export function buildBoardHref(
+  teamId: string | number,
+  { view, dataTab, tagId }: { view?: BoardViewMode; dataTab?: BoardDataTab; tagId?: number },
+): string {
   const params = new URLSearchParams();
   if (view && view !== 'kanban') params.set('view', view);
   if (dataTab === 'archive') params.set('tab', 'archive');
+  if (tagId !== undefined) params.set('tag', String(tagId));
   const query = params.toString();
   return `/teams/${teamId}${query ? `?${query}` : ''}`;
 }

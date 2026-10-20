@@ -23,7 +23,9 @@ export default function TeamsDashboard() {
     );
   }, []);
 
-  const { data: teams, isLoading, error } = useAuthenticatedFetch(fetchTeams);
+  const { data: teams, isLoading, error, refetch } = useAuthenticatedFetch(fetchTeams);
 
-  return <TeamsClient session={session} initialTeams={teams ?? []} error={error} isLoading={isLoading} />;
+  return (
+    <TeamsClient session={session} initialTeams={teams ?? []} error={error} isLoading={isLoading} onRetry={refetch} />
+  );
 }

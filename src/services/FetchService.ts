@@ -1,4 +1,4 @@
-import { ApiErrorResponse, createApiError } from '@/types/api';
+import { ApiErrorResponse, NetworkError, createApiError } from '@/types/api';
 
 export type HTTPMethodType = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 
@@ -109,7 +109,15 @@ class FetchClient {
       body,
     };
 
-    const response = await fetch(url, init);
+    let response: Response;
+    try {
+      response = await fetch(url, init);
+    } catch (err) {
+      // 요청 취소(AbortController)는 그대로 던진다 — 호출부가 취소로 구분한다
+      // (DOMException이 Error를 상속하지 않는 환경도 있어 name으로 판별)
+      if (typeof err === 'object' && err !== null && 'name' in err && err.name === 'AbortError') throw err;
+      throw new NetworkError(err);
+    }
 
     // 브라우저에서 백엔드 인증 실패(401) 시: 전역 이벤트로 알려서 세션 정리/재로그인 유도
     // (인증 헤더를 붙였던 요청에 대해서만 처리)

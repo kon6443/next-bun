@@ -143,6 +143,11 @@ describe('boardStateStorage', () => {
     expect(buildBoardHref('7', { view: 'list', dataTab: 'archive' })).toBe('/teams/7?view=list&tab=archive');
   });
 
+  it('태그를 주면 그 태그로 거른 보드 주소(?tag=)를 만든다', () => {
+    expect(buildBoardHref('7', { tagId: 12 })).toBe('/teams/7?tag=12');
+    expect(buildBoardHref('7', { view: 'list', tagId: 12 })).toBe('/teams/7?view=list&tag=12');
+  });
+
   it('undefined로 저장하면 이전에 저장한 달·정렬을 지운다', () => {
     saveBoardState('7', { calendarMonth: '2026-03', listSort: { key: 'endAt', order: 'asc' } });
     saveBoardState('7', { calendarMonth: undefined, listSort: undefined });

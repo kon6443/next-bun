@@ -88,6 +88,21 @@ export const ERROR_CODE_MESSAGES: Record<ErrorCode, string> = {
 
 // ==================== API 에러 클래스 ====================
 
+/** fetch 자체가 실패했을 때 보여줄 문구 */
+export const NETWORK_ERROR_MESSAGE = '네트워크 연결을 확인해주세요.';
+
+/**
+ * 네트워크 에러 — 서버 응답을 받지 못했다(오프라인·DNS·CORS 등)
+ * FetchService가 fetch의 reject를 이 클래스로 바꿔 던진다. 응답을 받은 뒤의 런타임 TypeError와 구분하기 위해서다.
+ * 메시지가 곧 사용자 안내 문구라 err.message를 그대로 보여줘도 된다
+ */
+export class NetworkError extends Error {
+  constructor(cause?: unknown) {
+    super(NETWORK_ERROR_MESSAGE, { cause });
+    this.name = 'NetworkError';
+  }
+}
+
 /**
  * API 에러 클래스
  * 에러 코드와 메시지를 포함하여 프론트엔드에서 세밀한 에러 처리 가능
