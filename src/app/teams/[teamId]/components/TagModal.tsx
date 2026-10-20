@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import {
@@ -57,6 +57,8 @@ type TagModalProps = {
  * - 입력하다 Enter: 같은 이름이 있으면 그 태그를 고르고(select), 없으면 새로 만든다
  * - manage 모드에서 핸들(⋮⋮)을 끌어 순서를 바꾼다. 검색 중에는 순서를 바꿀 수 없다(일부만 보이므로)
  * - 폼 안에서 열려도 폼이 제출되지 않게 body로 portal한다
+ * - 태그를 수정하는 동안 footer는 "닫기" 대신 "취소 / 저장" — 모바일에서 편집 폼이 길어 폼 안 버튼은 화면 밖에 있었다.
+ *   저장하지 않은 변경이 있으면 닫기·Esc·X·다른 태그 편집으로 넘어가기 전에 버릴지 묻는다
  */
 export function TagModal({ isOpen, onClose, mode, selectedTagIds = [], onSelectedTagIdsChange }: TagModalProps) {
   const titleId = useId();
@@ -70,6 +72,11 @@ export function TagModal({ isOpen, onClose, mode, selectedTagIds = [], onSelecte
   const [isDeleting, setIsDeleting] = useState(false);
   /** 드래그 중에는 시작 시점 순서를 고정한다 — 그사이 온 tagsReordered는 드롭 뒤에 보인다 */
   const [dragOrder, setDragOrder] = useState<number[] | null>(null);
+  /** 편집 폼의 상태 — footer 저장 버튼과 미저장 변경 확인에 쓴다 */
+  const [editorStatus, setEditorStatus] = useState<EditorStatus>(IDLE_EDITOR_STATUS);
+  /** 미저장 변경을 버릴지 묻는 중이면, 버리기로 했을 때 이어서 할 일 */
+  const [pendingDiscard, setPendingDiscard] = useState<{ run: () => void } | null>(null);
+  const editorFormId = `${titleId}-tag-editor`;
 
   // 열 때마다 초기화하고 서버 목록(taskCount 포함)을 새로 받는다
   useEffect(() => {
@@ -79,12 +86,32 @@ export function TagModal({ isOpen, onClose, mode, selectedTagIds = [], onSelecte
     setEditingTagId(null);
     setDeleteTarget(null);
     setDragOrder(null);
+    setPendingDiscard(null);
     refresh();
   }, [isOpen, refresh]);
 
-  // 확인창이 열려 있는 동안에는 확인창이 포커스·Esc를 맡는다. 드래그 중 Esc는 드래그 취소에 쓴다
-  const dialogRef = useDialog<HTMLDivElement>(isOpen && !deleteTarget, onClose, {
-    closeOnEscape: dragOrder === null && !isCreating,
+  // 편집 중인 태그 — 다른 팀원이 지웠으면 없다(그때 footer는 다시 "닫기")
+  const editingTag = editingTagId === null ? undefined : (tags ?? []).find(tag => tag.tagId === editingTagId);
+  const hasUnsavedEdit = editingTag !== undefined && editorStatus.dirty;
+
+  /** 미저장 변경이 있으면 버릴지 먼저 묻고, 없으면 바로 한다 */
+  const guardUnsavedEdit = (action: () => void) => {
+    // 저장 요청이 진행 중이면 기다린다 — 이미 나간 저장은 "버리기"로 되돌릴 수 없다(Esc·취소도 같은 정책)
+    if (editorStatus.saving) return;
+    if (hasUnsavedEdit) setPendingDiscard({ run: action });
+    else action();
+  };
+  // 닫을 때 편집도 끝낸다 — 남겨 두면 다시 열 때 첫 렌더에 이전 편집 폼이 잠깐 붙어 그 행으로 스크롤된다
+  const requestClose = () =>
+    guardUnsavedEdit(() => {
+      setEditingTagId(null);
+      onClose();
+    });
+
+  // 확인창(삭제·미저장 변경)이 열려 있는 동안에는 확인창이 포커스·Esc를 맡는다 — Esc 한 번에 둘 다 닫히지 않게.
+  // 드래그 중 Esc는 드래그 취소에, 저장 중에는 결과를 기다린다
+  const dialogRef = useDialog<HTMLDivElement>(isOpen && !deleteTarget && !pendingDiscard, requestClose, {
+    closeOnEscape: dragOrder === null && !isCreating && !editorStatus.saving,
   });
 
   const sensors = useSensors(
@@ -103,8 +130,11 @@ export function TagModal({ isOpen, onClose, mode, selectedTagIds = [], onSelecte
   }, [tags, dragOrder]);
 
   const normalizedQuery = normalizeTagName(query);
+  // 편집 중인 태그는 검색어와 맞지 않아도 남긴다 — 검색하다 편집 폼이 사라지면 고치던 내용이 조용히 버려진다
   const visibleTags = normalizedQuery
-    ? orderedTags.filter(tag => tag.tagName.toUpperCase().includes(normalizedQuery.toUpperCase()))
+    ? orderedTags.filter(
+        tag => tag.tagId === editingTagId || tag.tagName.toUpperCase().includes(normalizedQuery.toUpperCase()),
+      )
     : orderedTags;
   const exactMatch = normalizedQuery ? findTagByName(orderedTags, normalizedQuery) : undefined;
   const isTeamLimitReached = (tags?.length ?? 0) >= TEAM_TAG_LIMIT;
@@ -233,14 +263,20 @@ export function TagModal({ isOpen, onClose, mode, selectedTagIds = [], onSelecte
       isEditing={editingTagId === tag.tagId}
       onToggle={() => toggleSelect(tag.tagId)}
       onEdit={() => {
-        setFormError(null);
-        setEditingTagId(current => (current === tag.tagId ? null : tag.tagId));
+        // 다음 값은 지금 계산한다 — 확인창의 "변경 버리기"가 편집을 먼저 닫은 뒤 실행해도 토글이 되돌아가지 않게
+        const nextEditingTagId = editingTagId === tag.tagId ? null : tag.tagId;
+        guardUnsavedEdit(() => {
+          setFormError(null);
+          setEditingTagId(nextEditingTagId);
+        });
       }}
       editor={
         editingTagId === tag.tagId ? (
           <TagEditor
+            formId={editorFormId}
             tag={tag}
             allTags={orderedTags}
+            onStatusChange={setEditorStatus}
             onCancel={() => setEditingTagId(null)}
             onSave={async request => {
               await updateTag(tag.tagId, request);
@@ -271,8 +307,9 @@ export function TagModal({ isOpen, onClose, mode, selectedTagIds = [], onSelecte
             </h3>
             <button
               type="button"
-              onClick={onClose}
-              className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 hover:bg-white/5 hover:text-slate-200"
+              onClick={requestClose}
+              disabled={editorStatus.saving}
+              className="flex h-11 w-11 disabled:opacity-50 items-center justify-center rounded-lg text-slate-400 hover:bg-white/5 hover:text-slate-200"
               aria-label="닫기"
             >
               <CloseIcon className="h-5 w-5" />
@@ -372,13 +409,35 @@ export function TagModal({ isOpen, onClose, mode, selectedTagIds = [], onSelecte
           </div>
 
           <div className="border-t border-white/5 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="min-h-11 w-full rounded-lg bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110"
-            >
-              {mode === 'select' ? '선택 완료' : '닫기'}
-            </button>
+            {editingTag ? (
+              // 편집 중: 저장은 편집 폼을 제출한다(form 속성) — 폼이 길어도 저장·취소가 늘 보이게
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingTagId(null)}
+                  disabled={editorStatus.saving}
+                  className="min-h-11 flex-1 rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-white/10 disabled:opacity-50"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  form={editorFormId}
+                  disabled={editorStatus.saving}
+                  className="min-h-11 flex-1 rounded-lg bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110 disabled:opacity-50"
+                >
+                  {editorStatus.saving ? '저장 중...' : '저장'}
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={onClose}
+                className="min-h-11 w-full rounded-lg bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110"
+              >
+                {mode === 'select' ? '선택 완료' : '닫기'}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -400,6 +459,22 @@ export function TagModal({ isOpen, onClose, mode, selectedTagIds = [], onSelecte
         confirmLabel="삭제"
         variant="danger"
         isLoading={isDeleting}
+      />
+
+      <ConfirmModal
+        isOpen={pendingDiscard !== null}
+        onClose={() => setPendingDiscard(null)}
+        onConfirm={() => {
+          const next = pendingDiscard;
+          setPendingDiscard(null);
+          setEditingTagId(null);
+          next?.run();
+        }}
+        title="수정 중인 태그"
+        message="저장하지 않은 변경을 버릴까요?"
+        confirmLabel="변경 버리기"
+        cancelLabel="계속 편집"
+        variant="danger"
       />
     </>,
     document.body,
@@ -509,35 +584,71 @@ function SortableTagRow({
 
 // ===== 이름·색 수정 =====
 
+type EditorStatus = {
+  /** 저장하지 않은 이름·색 변경이 있다 */
+  dirty: boolean;
+  saving: boolean;
+};
+
+const IDLE_EDITOR_STATUS: EditorStatus = { dirty: false, saving: false };
+
 type TagEditorProps = {
+  /** 모달 footer의 저장 버튼이 이 폼을 제출한다 (form 속성) */
+  formId: string;
   tag: TeamTag;
   allTags: TeamTag[];
+  onStatusChange: (status: EditorStatus) => void;
   onCancel: () => void;
   onSave: (request: { tagName?: string; tagColor?: string }) => Promise<void>;
   onRequestDelete: () => void;
 };
 
-function TagEditor({ tag, allTags, onCancel, onSave, onRequestDelete }: TagEditorProps) {
+function TagEditor({ formId, tag, allTags, onStatusChange, onCancel, onSave, onRequestDelete }: TagEditorProps) {
   const nameId = useId();
+  const formRef = useRef<HTMLFormElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(tag.tagName);
   const [color, setColor] = useState(tag.tagColor);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  // 편집을 연 때의 값 — 그사이 다른 팀원이 이 태그를 바꿔도(소켓) 내가 고친 것만 변경으로 보고 저장한다.
+  // 현재 값과 비교하면 손대지 않은 칸까지 변경으로 보여 확인창이 뜨고, 저장 때 상대 변경을 덮는다
+  const [initial] = useState({ tagName: tag.tagName, tagColor: tag.tagColor });
+
+  const isDirty = normalizeTagName(name) !== initial.tagName || color !== initial.tagColor;
+  useEffect(() => {
+    onStatusChange({ dirty: isDirty, saving: isSaving });
+  }, [isDirty, isSaving, onStatusChange]);
+  // 편집이 끝나면(언마운트) 모달의 footer·확인창 상태를 되돌린다
+  useEffect(() => () => onStatusChange(IDLE_EDITOR_STATUS), [onStatusChange]);
+
+  // 열면 편집 중인 행부터 보이게 — 모바일에서는 폼이 스크롤 영역보다 길다
+  useEffect(() => {
+    formRef.current?.closest('li')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+  }, []);
 
   const handleSave = async () => {
+    if (isSaving) return;
+    // 이름 오류는 이름 칸 아래에 뜬다 — 색을 고르느라 아래로 내려가 저장했으면 그 칸까지 올려 보여 준다
+    // (포커스까지 옮기면 모바일 키보드가 올라와 화면을 더 가린다)
+    const showNameError = (message: string) => {
+      setError(message);
+      nameInputRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    };
     const invalid = validateTagName(name);
     if (invalid) {
-      setError(invalid);
+      showNameError(invalid);
       return;
     }
     const tagName = normalizeTagName(name);
-    if (findTagByName(allTags, tagName, tag.tagId)) {
-      setError('같은 이름의 태그가 이미 있습니다.');
+    // 이름을 고쳤을 때만 중복을 본다 — 그사이 다른 팀원이 이름을 바꿔 생긴 겹침이 색만 바꾼 저장을 막지 않게
+    if (tagName !== initial.tagName && findTagByName(allTags, tagName, tag.tagId)) {
+      showNameError('같은 이름의 태그가 이미 있습니다.');
       return;
     }
     const request = {
-      ...(tagName !== tag.tagName && { tagName }),
-      ...(color !== tag.tagColor && { tagColor: color }),
+      ...(tagName !== initial.tagName && { tagName }),
+      ...(color !== initial.tagColor && { tagColor: color }),
     };
     if (Object.keys(request).length === 0) {
       onCancel();
@@ -553,13 +664,27 @@ function TagEditor({ tag, allTags, onCancel, onSave, onRequestDelete }: TagEdito
     }
   };
 
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    // 모달은 portal이지만 React 이벤트는 컴포넌트 트리로 올라간다 — 태스크 폼(select 모드) 제출로 번지지 않게
+    e.stopPropagation();
+    handleSave();
+  };
+
   return (
-    <div className="mx-2 mb-2 space-y-3 rounded-xl border border-white/10 bg-slate-950/40 p-3">
+    <form
+      ref={formRef}
+      id={formId}
+      onSubmit={handleSubmit}
+      noValidate
+      className="mx-2 mb-2 space-y-3 rounded-xl border border-white/10 bg-slate-950/40 p-3"
+    >
       <div>
         <label htmlFor={nameId} className="mb-1 block text-xs font-semibold text-slate-300">
           이름 ({normalizeTagName(name).length}/{TAG_NAME_MAX_LENGTH})
         </label>
         <input
+          ref={nameInputRef}
           id={nameId}
           type="text"
           value={name}
@@ -574,8 +699,16 @@ function TagEditor({ tag, allTags, onCancel, onSave, onRequestDelete }: TagEdito
           }}
           maxLength={TAG_NAME_MAX_LENGTH}
           autoComplete="off"
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${nameId}-error` : undefined}
           className="w-full max-w-full box-border rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2 text-base text-slate-200 focus:border-white/20 focus:outline-none"
         />
+        {/* 오류는 모두 이름 검증이라 이름 칸 바로 아래 — footer 저장을 눌러도 화면 안(폼 맨 위)에서 보인다 */}
+        {error && (
+          <p id={`${nameId}-error`} role="alert" className="mt-1 text-xs text-red-400">
+            {error}
+          </p>
+        )}
       </div>
 
       <TagColorPicker value={color} onChange={setColor} />
@@ -585,38 +718,15 @@ function TagEditor({ tag, allTags, onCancel, onSave, onRequestDelete }: TagEdito
         <TagChip tag={{ tagName: normalizeTagName(name) || tag.tagName, tagColor: color }} size="md" className="min-w-0" />
       </div>
 
-      {error && (
-        <p role="alert" className="text-xs text-red-400">
-          {error}
-        </p>
-      )}
-
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={onRequestDelete}
-          disabled={isSaving}
-          className="min-h-11 rounded-lg border border-red-500/30 px-3 text-xs font-semibold text-red-400 transition hover:bg-red-500/10 disabled:opacity-50"
-        >
-          삭제
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={isSaving}
-          className="min-h-11 flex-1 rounded-lg border border-white/20 bg-white/5 px-3 text-xs font-semibold text-slate-200 transition hover:bg-white/10 disabled:opacity-50"
-        >
-          취소
-        </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={isSaving}
-          className="min-h-11 flex-1 rounded-lg bg-gradient-to-r from-indigo-500 to-sky-500 px-3 text-xs font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
-        >
-          {isSaving ? '저장 중...' : '저장'}
-        </button>
-      </div>
-    </div>
+      {/* 저장·취소는 모달 footer에 있다. 삭제는 되돌릴 수 없어 확인창을 거친다 */}
+      <button
+        type="button"
+        onClick={onRequestDelete}
+        disabled={isSaving}
+        className="min-h-11 rounded-lg border border-red-500/30 px-3 text-xs font-semibold text-red-400 transition hover:bg-red-500/10 disabled:opacity-50"
+      >
+        태그 삭제
+      </button>
+    </form>
   );
 }
