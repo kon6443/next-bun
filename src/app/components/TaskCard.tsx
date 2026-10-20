@@ -19,9 +19,10 @@ type TaskCardProps = {
   isArchiveView?: boolean;
   onRestore?: (taskId: number) => Promise<void>;
   onArchive?: (taskId: number) => Promise<void>;
+  onTagClick?: (tagId: number) => void;
 };
 
-export function TaskCard({ task, onStatusChange, teamId, isArchiveView, onRestore, onArchive }: TaskCardProps) {
+export function TaskCard({ task, onStatusChange, teamId, isArchiveView, onRestore, onArchive, onTagClick }: TaskCardProps) {
   const { taskId, taskName, taskDescription, startAt, endAt, crtdAt, userName, crtdBy, taskStatus, tags } = task;
   const router = useRouter();
   const [isUpdating, setIsUpdating] = useState(false);
@@ -91,12 +92,12 @@ export function TaskCard({ task, onStatusChange, teamId, isArchiveView, onRestor
         {(endDateStr || showDeadlineAlert) && (
           <div className="flex items-center justify-end gap-2 text-xs">
             {showDeadlineAlert && (
-              <span className={`rounded border px-1.5 py-0.5 text-[0.6rem] font-semibold ${deadlineStyles[deadlineStatus].badge}`}>
+              <span className={`rounded border px-1.5 py-0.5 text-[11px] font-semibold ${deadlineStyles[deadlineStatus].badge}`}>
                 {deadlineLabel}
               </span>
             )}
             {endDateStr && (
-              <span className={`text-[0.65rem] font-normal tracking-normal ${deadlineStyles[deadlineStatus].text}`}>
+              <span className={`text-[11px] font-normal tracking-normal ${deadlineStyles[deadlineStatus].text}`}>
                 {endDateStr}
               </span>
             )}
@@ -106,7 +107,7 @@ export function TaskCard({ task, onStatusChange, teamId, isArchiveView, onRestor
         {/* 자동 아카이브 예정 배지 */}
         {archiveDaysLeft !== null && (
           <div className="mt-1.5">
-            <span className="inline-flex items-center gap-1 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[0.6rem] font-medium text-amber-400">
+            <span className="inline-flex items-center gap-1 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-400">
               <ArchiveIcon className="w-3 h-3" />
               {archiveDaysLeft === 0 ? '오늘 자동 보관' : `${archiveDaysLeft}일 후 자동 보관`}
             </span>
@@ -117,7 +118,7 @@ export function TaskCard({ task, onStatusChange, teamId, isArchiveView, onRestor
         <h3 className="mt-2 text-base font-semibold text-white line-clamp-2">{taskName}</h3>
 
         {/* 태그 (최대 3개 + N) */}
-        <TaskTagChips tags={tags} max={3} className="mt-2" />
+        <TaskTagChips tags={tags} max={3} className="mt-2" onTagClick={onTagClick} />
 
         {/* 태스크 설명 */}
         {taskDescription && (

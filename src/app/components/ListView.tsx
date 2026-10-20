@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from '../types/task';
 import { deadlineStyles, formatDateWithYear, getTaskDeadlineInfo } from '../utils/taskUtils';
@@ -20,12 +20,16 @@ type ListViewProps = {
   /** 처음 정렬 (없으면 생성일 내림차순) — 상세 왕복·보기 전환 후 같은 정렬로 돌아오게 */
   initialSort?: ListSort;
   onSortChange?: (sort: ListSort) => void;
+  /** 행의 태그 칩을 누를 때 (보드를 그 태그로 거른다) */
+  onTagClick?: (tagId: number) => void;
+  /** 빈 목록에 띄울 행동 (예: 새 카드 작성) */
+  emptyAction?: ReactNode;
 };
 
 type SortKey = ListSortKey;
 type SortOrder = ListSort['order'];
 
-export function ListView({ tasks, teamId, isArchiveView, onRestore, initialSort, onSortChange }: ListViewProps) {
+export function ListView({ tasks, teamId, isArchiveView, onRestore, initialSort, onSortChange, onTagClick, emptyAction }: ListViewProps) {
   // 복원 열은 헤더·셀·빈 행 colSpan이 같은 조건을 써야 열이 어긋나지 않는다
   const showRestore = Boolean(isArchiveView && onRestore);
   const router = useRouter();
@@ -141,7 +145,11 @@ export function ListView({ tasks, teamId, isArchiveView, onRestore, initialSort,
     <div className={viewContainerStyles}>
       <ViewHeader title="목록" subtitle="컬럼 클릭으로 정렬" count={tasks.length} />
 
-      {/* 테이블 */}
+      {/* 태스크가 없으면 표 없이 안내만 — 최소 700px 표 안에 두면 모바일에서 안내·버튼이 화면 밖 가운데에 놓인다 */}
+      {sortedTasks.length === 0 ? (
+        <EmptyState message="표시할 태스크가 없습니다" variant="minimal" action={emptyAction} />
+      ) : (
+      /* 테이블 */
       <div className="overflow-x-auto">
         <table className="w-full min-w-[700px]">
           <thead>
@@ -160,14 +168,7 @@ export function ListView({ tasks, teamId, isArchiveView, onRestore, initialSort,
             </tr>
           </thead>
           <tbody>
-            {sortedTasks.length === 0 ? (
-              <tr>
-                <td colSpan={showRestore ? 7 : 6}>
-                  <EmptyState message="표시할 태스크가 없습니다" variant="minimal" />
-                </td>
-              </tr>
-            ) : (
-              sortedTasks.map(task => {
+            {sortedTasks.map(task => {
                 const statusMeta = getStatusMeta(task.taskStatus);
                 const { status: deadlineStatus, label: deadlineLabel, showAlert: showDeadlineAlert } = getTaskDeadlineInfo(task);
 
@@ -182,14 +183,14 @@ export function ListView({ tasks, teamId, isArchiveView, onRestore, initialSort,
                     <td className="px-4 py-3">
                       <div className="max-w-[200px]">
                         <p className="truncate text-sm font-medium text-slate-200">{task.taskName}</p>
-                        <TaskTagChips tags={task.tags} max={2} className="mt-1" />
+                        <TaskTagChips tags={task.tags} max={2} className="mt-1" onTagClick={onTagClick} />
                         {task.taskDescription && (
                           <p className="mt-0.5 truncate text-xs text-slate-400">{task.taskDescription}</p>
                         )}
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-block rounded-full border px-2.5 py-1 text-[10px] font-semibold ${statusMeta.badgeClassName}`}>
+                      <span className={`inline-block rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusMeta.badgeClassName}`}>
                         {statusMeta.label}
                       </span>
                     </td>
@@ -205,7 +206,7 @@ export function ListView({ tasks, teamId, isArchiveView, onRestore, initialSort,
                           {formatDateWithYear(task.endAt)}
                         </span>
                         {showDeadlineAlert && (
-                          <span className={`rounded border px-1.5 py-0.5 text-[9px] font-semibold ${deadlineStyles[deadlineStatus].badge}`}>
+                          <span className={`rounded border px-1.5 py-0.5 text-[11px] font-semibold ${deadlineStyles[deadlineStatus].badge}`}>
                             {deadlineLabel}
                           </span>
                         )}
@@ -222,7 +223,7 @@ export function ListView({ tasks, teamId, isArchiveView, onRestore, initialSort,
                             onRestore(task.taskId);
                           }}
                           type="button"
-                          className="inline-flex min-h-[44px] items-center px-2.5 py-1 rounded-lg text-[10px] font-medium transition bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                          className="inline-flex min-h-[44px] items-center px-2.5 py-1 rounded-lg text-xs font-medium transition bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
                         >
                           복원
                         </button>
@@ -230,11 +231,11 @@ export function ListView({ tasks, teamId, isArchiveView, onRestore, initialSort,
                     )}
                   </tr>
                 );
-              })
-            )}
+              })}
           </tbody>
         </table>
       </div>
+      )}
 
       {/* 결과 카운트 */}
       <div className="mt-4 text-right text-xs text-slate-400">

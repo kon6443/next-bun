@@ -611,7 +611,16 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
                 <span className='mt-1 block text-xs text-slate-400'>
                   {taskDetail.userName || `사용자 ${taskDetail.crtdBy}`}
                 </span>
-                <TaskTagChips tags={taskDetail.tags} size='md' className='mt-2' />
+                <TaskTagChips
+                  tags={taskDetail.tags}
+                  size='md'
+                  className='mt-2'
+                  onTagClick={tagId => {
+                    // 보드를 그 태그로 거른 채 연다 — 보던 보기·탭은 유지
+                    const { view, dataTab } = loadBoardState(teamId);
+                    router.push(buildBoardHref(teamId, { view, dataTab, tagId }));
+                  }}
+                />
               </div>
               <button
                 onClick={handleStartEdit}

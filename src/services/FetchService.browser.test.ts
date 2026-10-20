@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { FetchClient } from './FetchService';
+import { NetworkError, NETWORK_ERROR_MESSAGE } from '@/types/api';
 
 // 브라우저 전용 분기: 401 전역 이벤트, 쿠키 헤더 미부착
 describe('FetchClient (브라우저)', () => {
@@ -49,6 +50,21 @@ describe('FetchClient (브라우저)', () => {
       new FetchClient('http://x').fetch('/t', { accessToken: 'tok', throwOnError: true }),
     ).rejects.toMatchObject({ code: 'UNAUTHORIZED', status: 401 });
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
+  });
+
+  it('fetch 자체가 실패하면(TypeError) 한국어 안내를 가진 NetworkError로 바꿔 던진다', async () => {
+    const cause = new TypeError('Failed to fetch');
+    fetchMock.mockRejectedValue(cause);
+    const err = await new FetchClient('http://x').fetch('/t').catch(e => e);
+    expect(err).toBeInstanceOf(NetworkError);
+    expect(err).toMatchObject({ message: NETWORK_ERROR_MESSAGE, cause });
+  });
+
+  it('요청 취소(AbortError)는 NetworkError로 바꾸지 않는다', async () => {
+    fetchMock.mockRejectedValue(new DOMException('aborted', 'AbortError'));
+    const err = await new FetchClient('http://x').fetch('/t').catch(e => e);
+    expect(err).not.toBeInstanceOf(NetworkError);
+    expect(err.name).toBe('AbortError');
   });
 
   it('브라우저에서는 cookies 옵션을 Cookie 헤더로 붙이지 않는다', async () => {

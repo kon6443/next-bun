@@ -139,6 +139,22 @@ describe('tagUtils', () => {
     });
   });
 
+  describe('검색에 태그 이름 포함', () => {
+    const tasks = [makeTask(1, [tag(1, '버그')]), makeTask(2, [tag(2, '디자인')]), makeTask(3, [])];
+
+    it('태그 이름으로도 찾는다 (대소문자 무시)', () => {
+      expect(applyAllFilters(tasks, '버그', null, 'all', 'all').map(t => t.taskId)).toEqual([1]);
+    });
+
+    it('팀 태그 목록을 주면 칩에 보이는 현재 이름으로 찾고, 삭제된 태그 이름으로는 찾지 않는다', () => {
+      const teamTags = [teamTag(1, 1, 'Bug'), teamTag(3, 2, '기타')]; // 1은 이름이 바뀌었고 2는 삭제됐다
+      const search = (query: string) => applyAllFilters(tasks, query, null, 'all', 'all', [], teamTags).map(t => t.taskId);
+      expect(search('bug')).toEqual([1]);
+      expect(search('버그')).toEqual([]);
+      expect(search('디자인')).toEqual([]);
+    });
+  });
+
   describe('applyTagOrder', () => {
     it('tagIds 순서로 정렬하고 목록에 없는 태그는 뒤에 둔다', () => {
       const tags = [teamTag(1, 1), teamTag(2, 2), teamTag(3, 3), teamTag(4, 4)];

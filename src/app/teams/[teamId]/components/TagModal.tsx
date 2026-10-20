@@ -23,6 +23,7 @@ import {
 } from '@dnd-kit/sortable';
 import type { TeamTag } from '@/app/types/task';
 import { ApiError } from '@/types/api';
+import { extractErrorMessage } from '@/app/utils/errorUtils';
 import { useDialog } from '@/app/hooks/useDialog';
 import { ConfirmModal } from '@/app/components/ConfirmModal';
 import { TagChip } from '@/app/components/TagChip';
@@ -50,16 +51,6 @@ type TagModalProps = {
   selectedTagIds?: number[];
   onSelectedTagIdsChange?: (tagIds: number[]) => void;
 };
-
-/**
- * 서버 요청 실패 문구 — 서버 message 우선(TEAM_TAG_DUPLICATE·TEAM_TAG_LIMIT_EXCEEDED·VALIDATION_ERROR 등).
- * fetch 자체가 실패하면(TypeError) 브라우저 영문 메시지 대신 네트워크 안내를 쓴다
- */
-function errorMessage(err: unknown, fallback: string): string {
-  if (err instanceof ApiError && err.message) return err.message;
-  if (err instanceof TypeError) return '네트워크 연결을 확인해주세요.';
-  return fallback;
-}
 
 /**
  * 공통 태그 모달 (D-009) — 입구 3곳(보드 메뉴·태스크 생성·태스크 수정)이 같은 컴포넌트를 연다
@@ -164,7 +155,7 @@ export function TagModal({ isOpen, onClose, mode, selectedTagIds = [], onSelecte
       if (mode === 'manage') toast.success('태그를 만들었습니다.');
       setQuery('');
     } catch (err) {
-      toast.error(errorMessage(err, '태그를 만들지 못했습니다.'));
+      toast.error(extractErrorMessage(err, '태그를 만들지 못했습니다.'));
     } finally {
       setIsCreating(false);
     }
@@ -194,7 +185,7 @@ export function TagModal({ isOpen, onClose, mode, selectedTagIds = [], onSelecte
       toast.error(
         err instanceof ApiError && err.status === 409
           ? '다른 팀원이 태그를 바꿔 목록을 새로 불러왔습니다. 다시 시도해주세요.'
-          : errorMessage(err, '태그 순서를 바꾸지 못했습니다.'),
+          : extractErrorMessage(err, '태그 순서를 바꾸지 못했습니다.'),
       );
     });
   };
@@ -222,7 +213,7 @@ export function TagModal({ isOpen, onClose, mode, selectedTagIds = [], onSelecte
       setEditingTagId(null);
       setDeleteTarget(null);
     } catch (err) {
-      toast.error(errorMessage(err, '태그를 삭제하지 못했습니다.'));
+      toast.error(extractErrorMessage(err, '태그를 삭제하지 못했습니다.'));
     } finally {
       setIsDeleting(false);
     }
@@ -557,7 +548,7 @@ function TagEditor({ tag, allTags, onCancel, onSave, onRequestDelete }: TagEdito
     try {
       await onSave(request);
     } catch (err) {
-      toast.error(errorMessage(err, '태그를 수정하지 못했습니다.'));
+      toast.error(extractErrorMessage(err, '태그를 수정하지 못했습니다.'));
       setIsSaving(false);
     }
   };

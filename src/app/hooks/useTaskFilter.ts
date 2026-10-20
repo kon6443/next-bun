@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
-import type { Task } from '../types/task';
+import type { Task, TeamTag } from '../types/task';
 import {
   applyAllFilters,
   calculateTaskStats,
@@ -54,7 +54,10 @@ const initialFilters: TaskFilterState = {
   tagIds: [],
 };
 
-export function useTaskFilter(tasks: Task[]): UseTaskFilterReturn {
+/**
+ * @param teamTags 팀 태그 — 검색이 칩에 보이는 태그 이름으로 찾게 한다 (없으면 태스크 응답의 이름)
+ */
+export function useTaskFilter(tasks: Task[], teamTags: readonly TeamTag[] | null = null): UseTaskFilterReturn {
   const [filters, setFilters] = useState<TaskFilterState>(initialFilters);
 
   // 필터 설정 함수들
@@ -88,8 +91,8 @@ export function useTaskFilter(tasks: Task[]): UseTaskFilterReturn {
 
   // 필터된 태스크
   const filteredTasks = useMemo(() => {
-    return applyAllFilters(tasks, filters.searchQuery, filters.assigneeId, filters.period, filters.status, filters.tagIds);
-  }, [tasks, filters]);
+    return applyAllFilters(tasks, filters.searchQuery, filters.assigneeId, filters.period, filters.status, filters.tagIds, teamTags);
+  }, [tasks, filters, teamTags]);
 
   // 전체 통계
   const stats = useMemo(() => calculateTaskStats(tasks), [tasks]);

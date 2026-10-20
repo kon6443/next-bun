@@ -86,6 +86,9 @@ export function TaskFilters({
     }
   };
 
+  // 팀 태그 순서로 — 삭제된 태그는 보드가 선택에서 뺀다
+  const selectedTags = tags?.filter(tag => tagIds.includes(tag.tagId)) ?? [];
+
   const toggleTag = (tagId: number) => {
     onTagIdsChange(tagIds.includes(tagId) ? tagIds.filter(id => id !== tagId) : [...tagIds, tagId]);
   };
@@ -142,6 +145,26 @@ export function TaskFilters({
         )}
       </div>
 
+      {/* 접힌 상태에서도 거르는 중인 태그를 보이고 하나씩 해제한다 */}
+      {!isExpanded && selectedTags.length > 0 && (
+        <ul className="flex flex-wrap gap-1.5" aria-label="선택한 태그 필터">
+          {selectedTags.map(tag => (
+            <li key={tag.tagId} className="min-w-0 max-w-full">
+              <button
+                type="button"
+                onClick={() => toggleTag(tag.tagId)}
+                aria-label={`${tag.tagName} 태그 필터 해제`}
+                className="flex min-h-11 max-w-[12rem] items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition hover:brightness-125"
+                style={getTagChipStyle(tag.tagColor)}
+              >
+                <span className="truncate">{tag.tagName}</span>
+                <CloseIcon className="h-3 w-3 shrink-0" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
       {/* 펼쳐진 필터 영역 */}
       {isExpanded && (
         <div className="rounded-xl border border-white/10 bg-slate-900/30 p-4 space-y-4">
@@ -174,7 +197,7 @@ export function TaskFilters({
 
           {/* 상태 버튼 그리드 */}
           <div>
-            <label className="block text-[10px] text-slate-400 mb-2">상태</label>
+            <label className="block text-xs text-slate-400 mb-2">상태</label>
             <div className="grid grid-cols-3 gap-1.5">
               <button
                 onClick={() => onStatusChange('all')}
@@ -207,7 +230,7 @@ export function TaskFilters({
 
           {/* 기간 버튼 */}
           <div>
-            <label className="block text-[10px] text-slate-400 mb-2">기간</label>
+            <label className="block text-xs text-slate-400 mb-2">기간</label>
             <div className="flex gap-1.5 flex-wrap">
               {periodOptions.map(opt => (
                 <button
@@ -228,7 +251,7 @@ export function TaskFilters({
           {/* 태그 (여러 개 고르면 하나라도 붙은 태스크) */}
           {tags && tags.length > 0 && (
             <div>
-              <span id="task-filter-tags-label" className="block text-[10px] text-slate-400 mb-2">
+              <span id="task-filter-tags-label" className="block text-xs text-slate-400 mb-2">
                 태그 <span className="text-slate-500">(하나라도 붙은 태스크)</span>
               </span>
               <div className="flex gap-1.5 flex-wrap" role="group" aria-labelledby="task-filter-tags-label">
@@ -288,7 +311,7 @@ export function DeadlineBadge({
     none: '',
   };
 
-  const sizeStyles = size === 'sm' ? 'px-2 py-0.5 text-[10px]' : 'px-1.5 py-0.5 text-[9px]';
+  const sizeStyles = size === 'sm' ? 'px-2 py-0.5 text-[11px]' : 'px-1.5 py-0.5 text-[11px]';
 
   return (
     <span className={`inline-block rounded border font-semibold ${styles[status]} ${sizeStyles}`}>

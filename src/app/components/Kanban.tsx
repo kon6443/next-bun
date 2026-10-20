@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNode } from 'react';
 import type { Task } from '../types/task';
 import { TaskCard } from './TaskCard';
 import { getWorkflowStatuses, STATUS_TO_COLUMN, type ColumnKey } from '../config/taskStatusConfig';
@@ -13,6 +13,10 @@ type KanbanProps = {
   isArchiveView?: boolean;
   onRestore?: (taskId: number) => Promise<void>;
   onArchive?: (taskId: number) => Promise<void>;
+  /** 카드의 태그 칩을 누를 때 (보드를 그 태그로 거른다) */
+  onTagClick?: (tagId: number) => void;
+  /** 첫 컬럼(할 일)이 비었을 때 띄울 행동 (예: 새 카드 작성) — 새 카드는 할 일로 들어가므로 다른 빈 컬럼에는 띄우지 않는다 */
+  emptyAction?: ReactNode;
   /** 처음 보여줄 컬럼 (보드 상태 복원용) */
   initialColumnIndex?: number;
   /** 활성 컬럼이 바뀔 때 (보드 상태 저장용) */
@@ -23,7 +27,7 @@ type KanbanProps = {
  * 탭 기반 칸반 보드 컴포넌트
  * PC/모바일 모두에서 동일한 UX 제공 (스와이프 또는 탭 클릭으로 컬럼 전환)
  */
-export function Kanban({ tasksByColumn, onStatusChange, teamId, isArchiveView, onRestore, onArchive, initialColumnIndex = 0, onColumnChange }: KanbanProps) {
+export function Kanban({ tasksByColumn, onStatusChange, teamId, isArchiveView, onRestore, onArchive, onTagClick, emptyAction, initialColumnIndex = 0, onColumnChange }: KanbanProps) {
   // 워크플로우 상태만 가져오기 (칸반 보드에 표시되는 상태)
   const workflowStatuses = getWorkflowStatuses();
 
@@ -239,7 +243,7 @@ export function Kanban({ tasksByColumn, onStatusChange, teamId, isArchiveView, o
                 {/* 태스크 목록 — 컬럼 내부 스크롤 없이 페이지 스크롤 하나로 본다 */}
                 <div className="space-y-3 pb-4">
                   {tasks.length === 0 ? (
-                    <EmptyState message="태스크가 없습니다" variant="dashed" />
+                    <EmptyState message="태스크가 없습니다" variant="dashed" action={index === 0 ? emptyAction : undefined} />
                   ) : (
                     tasks.map((task) => (
                       <TaskCard
@@ -250,6 +254,7 @@ export function Kanban({ tasksByColumn, onStatusChange, teamId, isArchiveView, o
                         isArchiveView={isArchiveView}
                         onRestore={onRestore}
                         onArchive={onArchive}
+                        onTagClick={onTagClick}
                       />
                     ))
                   )}
