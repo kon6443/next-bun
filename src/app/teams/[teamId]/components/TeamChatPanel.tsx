@@ -11,6 +11,7 @@ import {
   isDifferentLocalDay,
   type TeamChatMessage,
 } from '@/app/utils/teamChatUtils';
+import { useDialog } from '@/app/hooks/useDialog';
 import { useTeamChatContext } from '../contexts';
 import { ChatUnreadCount } from './ChatUnreadCount';
 import { ChatReadersModal } from './ChatReadersModal';
@@ -150,18 +151,18 @@ export function TeamChatPanel() {
         e.preventDefault();
         handleSend();
       }
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-      }
     },
-    [handleSend, onClose],
+    [handleSend],
   );
 
   const readers = useMemo(
     () => (readersTarget ? getChatReaders(readersTarget, members) : null),
     [readersTarget, members],
   );
+
+  // 포커스 가두기·Esc 닫기·닫을 때 포커스 복귀. 읽은 사람 모달이 열려 있는 동안은 그 모달이 맡는다
+  // (첫 포커스는 위 effect가 다음 프레임에 입력창으로 옮긴다)
+  const dialogRef = useDialog<HTMLDivElement>(isOpen && readersTarget === null, onClose);
 
   if (!isOpen) return null;
 
@@ -172,10 +173,12 @@ export function TeamChatPanel() {
 
       {/* 바텀시트 */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-[100] animate-[slideUp_0.3s_ease-out]"
+        ref={dialogRef}
+        className="fixed bottom-0 left-0 right-0 z-[100] animate-[slideUp_0.3s_ease-out] focus:outline-none"
         role="dialog"
         aria-modal="true"
         aria-labelledby="team-chat-title"
+        tabIndex={-1}
       >
         <div className="mx-auto max-w-lg">
           <div className="flex flex-col rounded-t-3xl border border-white/10 border-b-0 bg-slate-900 shadow-2xl">
@@ -190,8 +193,9 @@ export function TeamChatPanel() {
                 팀 채팅
               </h3>
               <button
+                type="button"
                 onClick={onClose}
-                className="p-2 text-slate-400 hover:text-slate-200 hover:bg-white/5 rounded-full transition"
+                className="flex h-11 w-11 items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-white/5 rounded-full transition"
                 aria-label="닫기"
               >
                 <CloseIcon className="w-5 h-5" />

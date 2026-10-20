@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
+import { extractErrorMessage } from '../utils/errorUtils';
 
 type UseAuthenticatedFetchResult<T> = {
   data: T | null;
@@ -62,7 +63,7 @@ export function useAuthenticatedFetch<T>(
       setData(result);
       onSuccessRef.current?.(result);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '데이터를 불러오는데 실패했습니다.';
+      const errorMessage = extractErrorMessage(err, '데이터를 불러오는데 실패했습니다.');
       setError(errorMessage);
       onErrorRef.current?.(err instanceof Error ? err : new Error(errorMessage));
       console.error('useAuthenticatedFetch error:', err);

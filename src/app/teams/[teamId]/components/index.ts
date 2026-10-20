@@ -4,6 +4,7 @@ export { TelegramSection } from './TelegramSection';
 export { TeamManagementSection } from './TeamManagementSection';
 export { ViewModeToggle, type ViewMode, type DataTab } from './ViewModeToggle';
 export { OnlineUsers } from './OnlineUsers';
-export { TutorialGuide, hasSeenTutorial, markTutorialSeen } from './TutorialGuide';
+export { TutorialGuide, hasSeenTutorial, markTutorialSeen, shouldAutoShowTutorial } from './TutorialGuide';
 export { TeamChatPanel } from './TeamChatPanel';
 export { TagModal } from './TagModal';
+export { BoardLoadError } from './BoardLoadError';

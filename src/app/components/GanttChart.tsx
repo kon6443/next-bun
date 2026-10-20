@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from '../types/task';
 import { deadlineStyles, formatDateDisplay, getTaskDeadlineInfo } from '../utils/taskUtils';
@@ -14,9 +14,11 @@ import { markTaskOpenedFromBoard } from '../utils/boardStateStorage';
 type GanttChartProps = {
   tasks: Task[];
   teamId: string;
+  /** 빈 차트에 띄울 행동 (예: 새 카드 작성) */
+  emptyAction?: ReactNode;
 };
 
-export function GanttChart({ tasks, teamId }: GanttChartProps) {
+export function GanttChart({ tasks, teamId, emptyAction }: GanttChartProps) {
   const router = useRouter();
 
   // 태스크 정렬: 시작일 있는 것 먼저 (오름차순), 없는 것은 하단에 (생성일 기준)
@@ -106,7 +108,11 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
     <div className={viewContainerStyles}>
       <ViewHeader title="타임라인" subtitle="시작일 기준 정렬" count={tasks.length} />
 
-      {/* 간트 차트 영역 */}
+      {/* 태스크가 없으면 차트 없이 안내만 — 가로 스크롤 영역(최소 1000px 남짓) 안에 두면 모바일에서 화면 밖 가운데에 놓인다 */}
+      {tasks.length === 0 ? (
+        <EmptyState message="표시할 태스크가 없습니다" variant="dashed" action={emptyAction} />
+      ) : (
+      /* 간트 차트 영역 */
       <div className="overflow-x-auto">
         <div style={{ minWidth: totalWidth + 200 }}>
           {/* 날짜 헤더 */}
@@ -267,12 +273,9 @@ export function GanttChart({ tasks, teamId }: GanttChartProps) {
             </div>
           )}
 
-          {/* 태스크가 없는 경우 */}
-          {tasks.length === 0 && (
-            <EmptyState message="표시할 태스크가 없습니다" variant="dashed" />
-          )}
         </div>
       </div>
+      )}
     </div>
   );
 }

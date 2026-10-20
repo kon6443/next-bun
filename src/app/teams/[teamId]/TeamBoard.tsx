@@ -10,7 +10,7 @@ import { ListView } from '../../components/ListView';
 import { CalendarView } from '../../components/CalendarView';
 import { TaskFilters } from '../../components/TaskFilters';
 import { Kanban } from '../../components/Kanban';
-import { TeamsPageLayout, SectionLabel, ErrorAlert, KanbanBoardSkeleton, ListViewSkeleton, CalendarViewSkeleton, GanttViewSkeleton, Skeleton, FAB, IconButton } from '../components';
+import { TeamsPageLayout, SectionLabel, Button, ButtonLink, KanbanBoardSkeleton, ListViewSkeleton, CalendarViewSkeleton, GanttViewSkeleton, Skeleton, FAB, IconButton } from '../components';
 import { EditIcon, UserGroupIcon, PlusIcon, QuestionMarkIcon, CommentIcon, TagIcon } from '../../components/Icons';
 import { DropdownMenu } from './components/DropdownMenu';
 import type { Task } from '../../types/task';
@@ -29,8 +29,9 @@ import { cardStyles } from '@/styles/teams';
 import { loadBoardState, saveBoardState, consumeBoardReturn, parseDataTabParam, VIEW_MODES, type ListSort } from '../../utils/boardStateStorage';
 import { shouldInsertCreatedTask } from '../../utils/taskUtils';
 import { normalizeTaskTags } from '../../utils/tagUtils';
+import { extractErrorMessage } from '../../utils/errorUtils';
 import { STATUS_TO_COLUMN, type ColumnKey } from '../../config/taskStatusConfig';
-import { TeamManagementSection, InviteModal, RoleChangeModal, ViewModeToggle, OnlineUsers, TutorialGuide, hasSeenTutorial, markTutorialSeen, TeamChatPanel, TagModal, type ViewMode, type DataTab } from './components';
+import { TeamManagementSection, InviteModal, RoleChangeModal, ViewModeToggle, OnlineUsers, TutorialGuide, shouldAutoShowTutorial, markTutorialSeen, TeamChatPanel, TagModal, BoardLoadError, type ViewMode, type DataTab } from './components';
 import { ROLES } from '../../config/roleConfig';
 import type {
   TaskCreatedPayload,
@@ -90,6 +91,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
   // 초기 로딩(스켈레톤)과 탭 재조회(흐림)는 표시마다 순번을 따로 둔다 — 겹쳐도 서로의 표시를 끄지 못하는 일이 없게
   const [isLoading, trackInitialLoad, setIsLoading] = useLatestFlag(true);
   const [error, setError] = useState<string | null>(null);
+  /** 초기 조회 다시 시도 횟수 — 늘리면 초기 로딩 effect가 다시 돈다 */
+  const [reloadAttempt, setReloadAttempt] = useState(0);
   const [canManageInvites, setCanManageInvites] = useState(false);
 
   // 역할 변경 모달 상태
@@ -513,8 +516,10 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       return;
     }
 
+    // 데이터 탭은 의존성에서 뺀다 — 탭 전환은 아래 별도 effect가 태스크만 재조회한다(멤버·초대까지 다시 부르지 않게)
+    const tab = dataTabRef.current;
     const fetchTeamData = async () => {
-      fetchedTabRef.current = dataTab;
+      fetchedTabRef.current = tab;
       setError(null);
       try {
         if (isNaN(teamIdNum)) {
@@ -525,7 +530,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
         // 연동 상태(텔레그램·디스코드)는 관리 탭을 처음 열 때 TeamManagementSection 이 조회한다
         const [tasksResponse, membersResult] = await Promise.all([
-          fetchAndSetTasks(session.user.accessToken, dataTab),
+          fetchAndSetTasks(session.user.accessToken, tab),
           getTeamUsers(teamIdNum, session.user.accessToken).catch(err => {
             console.error('Failed to fetch team members:', err);
             return null;
@@ -549,14 +554,25 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           if (isMasterUser) await fetchInvitesRef.current();
         }
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : '태스크 목록을 불러오는데 실패했습니다.';
+        const errorMessage = extractErrorMessage(err, '태스크 목록을 불러오는데 실패했습니다.');
         setError(errorMessage);
         console.error('Failed to fetch team data:', err);
       }
     };
 
     trackInitialLoad(fetchTeamData);
-  }, [teamId, teamIdNum, session?.user?.accessToken, session?.user?.userId, sessionStatus, isBoardStateRestored]); // dataTab 제외: 탭 전환은 아래 별도 useEffect
+  }, [
+    teamId,
+    teamIdNum,
+    session?.user?.accessToken,
+    session?.user?.userId,
+    sessionStatus,
+    isBoardStateRestored,
+    reloadAttempt,
+    fetchAndSetTasks,
+    setIsLoading,
+    trackInitialLoad,
+  ]);
 
   // 데이터 탭 전환 시 태스크만 재조회 (멤버/통합 재호출 불필요)
   useEffect(() => {
@@ -587,16 +603,23 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     roomJoinBaselineRef.current = roomJoinCount;
     const accessToken = session?.user?.accessToken;
     if (!accessToken || !isBoardStateRestored) return;
+    // 첫 조회가 실패해 오류 화면이면 태스크만이 아니라 팀 정보·멤버까지 처음부터 다시 부른다(성공하면 오류 화면이 걷힌다)
+    if (error) {
+      setReloadAttempt(n => n + 1);
+      return;
+    }
     fetchAndSetTasks(accessToken, dataTab).catch(err => {
       console.error('Failed to refresh tasks after reconnect:', err);
     });
-  }, [roomJoinCount, session?.user?.accessToken, isBoardStateRestored, fetchAndSetTasks, dataTab]);
+  }, [roomJoinCount, session?.user?.accessToken, isBoardStateRestored, fetchAndSetTasks, dataTab, error]);
 
   // 모든 태스크를 하나의 배열로 합침
   const allTasks = useMemo(
     () => [...tasks.todo, ...tasks.inProgress, ...tasks.done, ...tasks.onHold, ...tasks.cancelled],
     [tasks],
   );
+
+  const { tags: teamTags } = useTeamTagsContext();
 
   // 필터 훅 사용
   const {
@@ -612,9 +635,21 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     stats,
     assignees,
     hasActiveFilters,
-  } = useTaskFilter(allTasks);
+  } = useTaskFilter(allTasks, teamTags);
 
-  const { tags: teamTags } = useTeamTagsContext();
+  // 빈 보드·빈 컬럼에서 다음 행동
+  // - 필터 때문에 비었으면 새 카드가 아니라 필터 초기화가 맞는 행동이다
+  // - 보관함 탭에서는 새 카드가 들어가지 않으므로 띄우지 않는다
+  const emptyAction = hasActiveFilters ? (
+    <Button type="button" variant="secondary" onClick={resetFilters}>
+      필터 초기화
+    </Button>
+  ) : tasksTab === 'active' ? (
+    <ButtonLink href={`/teams/${teamId}/tasks/new`}>새 카드 작성</ButtonLink>
+  ) : undefined;
+
+  // 카드·행의 태그 칩을 누르면 그 태그로만 거른다
+  const handleTagClick = useCallback((tagId: number) => setTagIds([tagId]), [setTagIds]);
 
   // 없는 태그(다른 팀원이 삭제·복원한 필터의 옛 ID)는 필터 선택에서 뺀다 — 남겨 두면 아무것도 안 보이는 필터가 걸린 채 남는다
   useEffect(() => {
@@ -622,6 +657,22 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     const existing = new Set(teamTags.map(tag => tag.tagId));
     if (filters.tagIds.some(id => !existing.has(id))) setTagIds(filters.tagIds.filter(id => existing.has(id)));
   }, [teamTags, filters.tagIds, setTagIds]);
+
+  // 태스크 상세의 태그 칩에서 넘어온 태그 필터(?tag=) — 저장된 상태 복원 뒤에 적용하고 주소에서 지운다.
+  // 주소에 남겨 두면 이후 필터를 바꾼 뒤 새로고침할 때 옛 태그가 다시 걸린다
+  const tagParam = getParam('tag');
+  useEffect(() => {
+    if (!isBoardStateRestored || !tagParam) return;
+    const tagId = Number(tagParam);
+    if (Number.isInteger(tagId) && tagId > 0) setTagIds([tagId]);
+    // 필터가 바뀐 화면이라 저장해 둔 옛 스크롤 위치로 튀지 않게 복원을 건너뛴다
+    // (이 effect가 스크롤 복원 effect보다 먼저 선언돼 같은 커밋에서 먼저 돈다)
+    pendingScrollYRef.current = null;
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('tag');
+    const queryString = params.toString();
+    router.replace(`${pathname}${queryString ? `?${queryString}` : ''}`, { scroll: false });
+  }, [isBoardStateRestored, tagParam, setTagIds, searchParams, pathname, router]);
 
   // 저장된 보드 상태 복원 (마운트 시 1회, 클라이언트에서만) — 상세에서 돌아온 진입일 때만 복원한다
   useEffect(() => {
@@ -800,7 +851,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         });
       }
     },
-    [session?.user?.accessToken, tasks, teamId],
+    [session?.user?.accessToken, tasks, teamIdNum],
   );
 
   // 역할 변경 모달 열기
@@ -898,7 +949,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         toast.error(err instanceof Error ? err.message : '태스크 복원에 실패했습니다.');
       }
     },
-    [session?.user?.accessToken, teamIdNum],
+    [session?.user?.accessToken, teamIdNum, removeTaskFromLocal],
   );
 
   // 활성 태스크를 보관함으로 이동
@@ -915,15 +966,23 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         toast.error(err instanceof Error ? err.message : '보관함 이동에 실패했습니다.');
       }
     },
-    [session?.user?.accessToken, teamIdNum],
+    [session?.user?.accessToken, teamIdNum, removeTaskFromLocal],
   );
 
-  // 첫 방문 시 튜토리얼 자동 표시
+  // 첫 방문 시 튜토리얼 자동 표시 (다른 대화상자가 열려 있으면 모두 닫힌 뒤에)
+  const isOtherDialogOpen =
+    isChatOpen ||
+    showTagModal ||
+    showInviteModal ||
+    showRoleChangeModal ||
+    isOnlineModalOpen ||
+    showTelegramDeleteConfirm ||
+    showDiscordDeleteConfirm;
   useEffect(() => {
-    if (!isLoading && !error && !hasSeenTutorial()) {
+    if (shouldAutoShowTutorial({ isLoading, hasError: Boolean(error), isOtherDialogOpen })) {
       setShowTutorial(true);
     }
-  }, [isLoading, error]);
+  }, [isLoading, error, isOtherDialogOpen]);
 
   const handleCloseTutorial = useCallback(() => {
     setShowTutorial(false);
@@ -1014,7 +1073,16 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           togglingMemberIds={togglingMemberIds}
         />
 
-        {error && <ErrorAlert message={error} className="text-center" />}
+        {/* 태스크를 못 불러왔으면 빈 보드 대신 오류와 다시 시도 — 빈 칸반은 "태스크가 없다"로 읽힌다 */}
+        {error ? (
+          <BoardLoadError
+            message={error}
+            isAuthRequired={sessionStatus !== 'loading' && !session?.user?.accessToken}
+            canRetry={!isNaN(teamIdNum)}
+            onRetry={() => setReloadAttempt(n => n + 1)}
+          />
+        ) : (
+        <>
 
         {/* 필터 UI */}
         <TaskFilters
@@ -1072,21 +1140,24 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
             className={`transition-opacity duration-150 ${isTabRefetching ? 'pointer-events-none opacity-50' : ''}`}
           >
             {viewMode === 'kanban' ? (
-              <Kanban tasksByColumn={filteredTasksByColumn} onStatusChange={handleStatusChange} teamId={teamId} isArchiveView={tasksTab === 'archive'} onRestore={handleRestore} onArchive={tasksTab === 'active' ? handleArchive : undefined} initialColumnIndex={kanbanColumnIndex} onColumnChange={setKanbanColumnIndex} />
+              <Kanban tasksByColumn={filteredTasksByColumn} onStatusChange={handleStatusChange} teamId={teamId} isArchiveView={tasksTab === 'archive'} onRestore={handleRestore} onArchive={tasksTab === 'active' ? handleArchive : undefined} onTagClick={handleTagClick} emptyAction={emptyAction} initialColumnIndex={kanbanColumnIndex} onColumnChange={setKanbanColumnIndex} />
             ) : viewMode === 'gantt' ? (
-              <GanttChart tasks={filteredTasks} teamId={teamId} />
+              <GanttChart tasks={filteredTasks} teamId={teamId} emptyAction={emptyAction} />
             ) : viewMode === 'list' ? (
-              <ListView tasks={filteredTasks} teamId={teamId} isArchiveView={tasksTab === 'archive'} onRestore={handleRestore} initialSort={listSort} onSortChange={setListSort} />
+              <ListView tasks={filteredTasks} teamId={teamId} isArchiveView={tasksTab === 'archive'} onRestore={handleRestore} initialSort={listSort} onSortChange={setListSort} onTagClick={handleTagClick} emptyAction={emptyAction} />
             ) : (
               <CalendarView tasks={filteredTasks} teamId={teamId} initialMonth={calendarMonth} onMonthChange={setCalendarMonth} />
             )}
           </div>
         )}
+        </>
+        )}
       </TeamsPageLayout>
 
-      {/* 초대 링크 생성 모달 */}
+      {/* 태그 관리 모달 */}
       <TagModal isOpen={showTagModal} onClose={() => setShowTagModal(false)} mode="manage" />
 
+      {/* 초대 링크 생성 모달 */}
       <InviteModal
         isOpen={showInviteModal}
         onClose={() => setShowInviteModal(false)}

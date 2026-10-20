@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useId } from 'react';
 import { CloseIcon, ChevronLeftIcon, ChevronRightIcon } from '@/app/components/Icons';
+import { useDialog } from '@/app/hooks/useDialog';
 
 const TUTORIAL_STORAGE_KEY = 'teams-tutorial-shown';
 
@@ -61,6 +62,9 @@ type TutorialGuideProps = {
 
 export function TutorialGuide({ isOpen, onClose }: TutorialGuideProps) {
   const [currentStep, setCurrentStep] = useState(0);
+  const titleId = useId();
+  // 포커스 가두기·Esc 닫기·닫을 때 포커스 복귀
+  const dialogRef = useDialog<HTMLDivElement>(isOpen, onClose);
 
   // 모달 닫힐 때 스텝 리셋
   useEffect(() => {
@@ -93,13 +97,19 @@ export function TutorialGuide({ isOpen, onClose }: TutorialGuideProps) {
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900 p-5 sm:p-6"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="relative w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900 p-5 sm:p-6 focus:outline-none"
         onClick={e => e.stopPropagation()}
       >
         {/* 닫기 버튼 */}
         <button
+          type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 text-slate-400 hover:text-slate-200 transition-colors"
+          className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-colors"
           aria-label="닫기"
         >
           <CloseIcon className="w-5 h-5" />
@@ -118,7 +128,7 @@ export function TutorialGuide({ isOpen, onClose }: TutorialGuideProps) {
           </span>
 
           {/* 제목 */}
-          <h3 className="text-lg font-bold text-white mb-2">
+          <h3 id={titleId} className="text-lg font-bold text-white mb-2">
             {step.title}
           </h3>
 
@@ -188,6 +198,23 @@ export function TutorialGuide({ isOpen, onClose }: TutorialGuideProps) {
 export function hasSeenTutorial(): boolean {
   if (typeof window === 'undefined') return true;
   return localStorage.getItem(TUTORIAL_STORAGE_KEY) === 'true';
+}
+
+/**
+ * 첫 방문 튜토리얼을 지금 자동으로 띄울지
+ * 다른 대화상자(채팅·태그 관리·온라인 사용자·초대·역할 변경)가 열려 있으면 미룬다 —
+ * 둘 다 useDialog로 열리면 포커스를 서로 뺏고 Esc 한 번에 함께 닫히며, 가려진 튜토리얼이 "본 것"으로 기록된다
+ */
+export function shouldAutoShowTutorial({
+  isLoading,
+  hasError,
+  isOtherDialogOpen,
+}: {
+  isLoading: boolean;
+  hasError: boolean;
+  isOtherDialogOpen: boolean;
+}): boolean {
+  return !isLoading && !hasError && !isOtherDialogOpen && !hasSeenTutorial();
 }
 
 /** 튜토리얼을 봤다고 기록 + 구 스와이프 힌트 키 정리 */

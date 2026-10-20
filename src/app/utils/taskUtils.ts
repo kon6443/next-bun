@@ -1,6 +1,6 @@
-import type { Task } from '../types/task';
+import type { Task, TeamTag } from '../types/task';
 import { STATUS_COMPLETED, STATUS_CANCELLED } from '../config/taskStatusConfig';
-import { filterByTags } from './tagUtils';
+import { filterByTags, resolveTaskTags } from './tagUtils';
 
 /** 자동 아카이브 대기 일수 (백엔드와 동기화) */
 const AUTO_ARCHIVE_DAYS = 14;
@@ -168,13 +168,18 @@ export function calculateTaskStats(tasks: Task[]): TaskStats {
 }
 
 // 검색 필터
-export function filterBySearch(tasks: Task[], searchQuery: string): Task[] {
+/**
+ * 검색 — 제목·설명·태그 이름
+ * 태그 이름은 칩에 보이는 이름(팀 태그 기준, tagUtils.resolveTaskTags)으로 찾는다 — 이름이 바뀌어도 화면과 같은 결과
+ */
+export function filterBySearch(tasks: Task[], searchQuery: string, teamTags: readonly TeamTag[] | null = null): Task[] {
   if (!searchQuery.trim()) return tasks;
   const query = searchQuery.toLowerCase().trim();
   return tasks.filter(
     task =>
       task.taskName.toLowerCase().includes(query) ||
-      (task.taskDescription && task.taskDescription.toLowerCase().includes(query))
+      (task.taskDescription && task.taskDescription.toLowerCase().includes(query)) ||
+      resolveTaskTags(task.tags, teamTags).some(tag => tag.tagName.toLowerCase().includes(query))
   );
 }
 
@@ -238,10 +243,11 @@ export function applyAllFilters(
   assigneeId: number | null,
   period: PeriodFilter,
   status: StatusFilter,
-  tagIds: readonly number[] = []
+  tagIds: readonly number[] = [],
+  teamTags: readonly TeamTag[] | null = null
 ): Task[] {
   let filtered = tasks;
-  filtered = filterBySearch(filtered, searchQuery);
+  filtered = filterBySearch(filtered, searchQuery, teamTags);
   filtered = filterByAssignee(filtered, assigneeId);
   filtered = filterByPeriod(filtered, period);
   filtered = filterByStatus(filtered, status);

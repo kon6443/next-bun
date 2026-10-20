@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { Session } from "next-auth";
-import { TeamsPageLayout, TeamListSkeleton, TeamsHeaderSkeleton, ButtonLink, SectionLabel, FAB, IconButton, CountBadge } from "./components";
+import { TeamsPageLayout, TeamListSkeleton, TeamsHeaderSkeleton, Button, ButtonLink, SectionLabel, FAB, IconButton, CountBadge } from "./components";
 import { PlusIcon } from "../components/Icons";
 import { cardStyles } from "@/styles/teams";
 import type { TeamSummary } from "@/types/team";
@@ -13,6 +13,8 @@ type TeamsClientProps = {
   initialTeams: TeamSummary[];
   error: string | null;
   isLoading?: boolean;
+  /** 목록 조회 실패 시 다시 시도 */
+  onRetry?: () => void;
 };
 
 export default function TeamsClient({
@@ -20,6 +22,7 @@ export default function TeamsClient({
   initialTeams,
   error,
   isLoading = false,
+  onRetry,
 }: TeamsClientProps) {
   // 세션 존재 여부가 아닌, 실제 유효한 accessToken 존재 여부로 인증 판단
   // 세션은 있지만 accessToken이 없으면 미인증 상태로 처리
@@ -65,7 +68,7 @@ export default function TeamsClient({
             <TeamListSkeleton cardCount={3} />
           ) : isAuthenticated ? (
             error ? (
-              <ErrorMessage message={error} />
+              <ErrorMessage message={error} onRetry={onRetry} />
             ) : initialTeams.length ? (
               <TeamList teams={initialTeams} />
             ) : (
@@ -84,13 +87,19 @@ export default function TeamsClient({
 }
 
 /** 에러 메시지 컴포넌트 */
-function ErrorMessage({ message }: { message: string }) {
+function ErrorMessage({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div
       className={`${cardStyles.errorDashedContainer} px-6 py-14 text-center`}
+      role="alert"
     >
       <p className="text-base font-semibold text-red-400">오류가 발생했습니다</p>
       <p className="mt-2 text-sm text-slate-400">{message}</p>
+      {onRetry && (
+        <Button type="button" variant="secondary" className="mt-4" onClick={onRetry}>
+          다시 시도
+        </Button>
+      )}
     </div>
   );
 }
