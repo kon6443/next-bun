@@ -4,6 +4,8 @@ import { RIVER_FISH } from './fishing/data/fish';
 
 /** 빌드 시점 고정 — 콘텐츠 실제 변경 시에만 날짜를 갱신할 것 */
 const LAST_UPDATED = '2026-04-02';
+/** 게임 모음집·테트리스 추가일 */
+const GAMES_ADDED = '2026-10-21';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const fishPages: MetadataRoute.Sitemap = RIVER_FISH.map((fish) => ({
@@ -19,6 +21,24 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: LAST_UPDATED,
       changeFrequency: 'monthly',
       priority: 1.0,
+    },
+    {
+      url: `${SITE_CONFIG.url}/games`,
+      lastModified: GAMES_ADDED,
+      changeFrequency: 'monthly',
+      priority: 0.9,
+    },
+    {
+      url: `${SITE_CONFIG.url}/games/tetris`,
+      lastModified: GAMES_ADDED,
+      changeFrequency: 'monthly',
+      priority: 0.9,
+    },
+    {
+      url: `${SITE_CONFIG.url}/games/tetris/rankings`,
+      lastModified: GAMES_ADDED,
+      changeFrequency: 'daily',
+      priority: 0.7,
     },
     {
       url: `${SITE_CONFIG.url}/fishing`,
