@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { MypageSkeleton } from "@/app/teams/components";
 import { updateUserProfile } from "@/services/userService";
@@ -154,6 +155,12 @@ export default function Mypage() {
             </div>
           ) : (
             <div className="flex flex-col gap-3">
+              <Link
+                href="/feedback/me"
+                className={`${BASE_BUTTON_STYLES} bg-slate-700/40 text-slate-200 text-sm`}
+              >
+                내 피드백
+              </Link>
               <button
                 onClick={() => signOut()}
                 className={`${BASE_BUTTON_STYLES} gap-1 bg-gradient-to-r from-blue-500/35 to-indigo-500/40 text-slate-100 shadow-[0_18px_35px_rgba(59,130,246,0.35)]`}
