@@ -95,6 +95,7 @@ jobs:
           context: .
           push: true
           tags: ${{ secrets.REGISTRY_URL }}/prod_next:${{ steps.sha.outputs.short }}
+          build-args: NEXT_PUBLIC_BUILD_SHA=${{ steps.sha.outputs.short }}
           provenance: false
           sbom: false
           cache-from: type=gha
