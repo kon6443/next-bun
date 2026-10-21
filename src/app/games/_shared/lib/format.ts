@@ -1,16 +1,25 @@
-import { FRAMES_PER_SECOND } from '../engine';
+/** 초당 프레임 기본값 — 테트리스 엔진(60Hz). 다른 틱레이트 게임은 fps를 넘긴다 */
+const DEFAULT_FPS = 60;
 
-/** 프레임 수 → "m:ss" */
-export function formatFrames(frames: number): string {
-  const totalSeconds = Math.floor(frames / FRAMES_PER_SECOND);
+function formatMinutesSeconds(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
+/** 밀리초 → "m:ss" (랭킹 durationMs를 틱레이트와 무관하게 그대로 표시) */
+export function formatDurationMs(ms: number): string {
+  return formatMinutesSeconds(Math.floor(ms / 1000));
+}
+
+/** 프레임 수 → "m:ss" */
+export function formatFrames(frames: number, fps: number = DEFAULT_FPS): string {
+  return formatMinutesSeconds(Math.floor(frames / fps));
+}
+
 /** 프레임 → 밀리초 (설정 화면 표시) */
-export function framesToMs(frames: number): number {
-  return Math.round((frames * 1000) / FRAMES_PER_SECOND);
+export function framesToMs(frames: number, fps: number = DEFAULT_FPS): number {
+  return Math.round((frames * 1000) / fps);
 }
 
 export function formatScore(score: number): string {

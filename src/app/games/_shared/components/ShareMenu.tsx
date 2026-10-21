@@ -4,19 +4,12 @@ import { useId, useState } from "react";
 import toast from "react-hot-toast";
 import { useDialog } from "@/app/hooks";
 import { sendKakaoFeed } from "../lib/kakao";
-import {
-  type ShareTarget,
-  buildShareText,
-  canWebShare,
-  copyText,
-  replayHeadline,
-  replayImageUrl,
-  replayUrl,
-  webShare,
-} from "../lib/share";
+import { canWebShare, copyText, webShare } from "../lib/share";
+import type { ShareContent } from "../lib/shareSpec";
 
 type ShareMenuProps = {
-  target: ShareTarget;
+  /** 게임별 공유 사양으로 만든 내용 (buildShareContent) */
+  content: ShareContent;
   /** 카카오 SDK가 로드·초기화됐을 때만 카카오톡 버튼을 보인다 */
   kakaoReady: boolean;
   onClose: () => void;
@@ -32,22 +25,16 @@ const itemStyles =
  * 리플레이 공유 메뉴 — 모바일은 아래에서 올라오는 시트, 넓은 화면은 가운데 대화상자
  * [카카오톡](SDK 준비 시) · [링크 복사] · [더보기](Web Share 지원 시)
  */
-export function ShareMenu({ target, kakaoReady, onClose }: ShareMenuProps) {
+export function ShareMenu({ content, kakaoReady, onClose }: ShareMenuProps) {
   const titleId = useId();
   const dialogRef = useDialog<HTMLDivElement>(true, onClose);
   // Web Share 지원 여부는 열린 뒤(브라우저)에서만 판단한다
   const [webShareSupported] = useState(canWebShare);
 
-  const url = replayUrl(target.scoreId);
-  const text = buildShareText(target);
+  const { url, text } = content;
 
   const handleKakao = () => {
-    const sent = sendKakaoFeed({
-      title: replayHeadline(target),
-      description: `${target.detail.lines}줄 · 레벨 ${target.detail.level} — 리플레이로 플레이를 다시 보세요`,
-      imageUrl: replayImageUrl(target.scoreId),
-      url,
-    });
+    const sent = sendKakaoFeed({ ...content.kakao, url });
     if (sent) onClose();
     else toast.error("카카오톡 공유를 열지 못했습니다. 링크 복사를 이용해 주세요.");
   };
@@ -63,7 +50,7 @@ export function ShareMenu({ target, kakaoReady, onClose }: ShareMenuProps) {
   };
 
   const handleMore = async () => {
-    const result = await webShare({ title: replayHeadline(target), text, url });
+    const result = await webShare({ title: content.title, text, url });
     // 사용자가 공유 시트를 닫은 것(취소)은 실패가 아니다
     if (result === "failed") toast.error("공유하지 못했습니다. 링크 복사를 이용해 주세요.");
     if (result === "shared") onClose();

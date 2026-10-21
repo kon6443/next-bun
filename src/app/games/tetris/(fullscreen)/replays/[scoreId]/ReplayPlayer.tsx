@@ -2,20 +2,21 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import Script from "next/script";
 import { ApiError } from "@/types/api";
 import type { ReplayData } from "@/types/game";
 import { extractErrorMessage } from "@/app/utils/errorUtils";
 import { formatFullDateTime } from "@/app/utils/taskUtils";
 import { ACTION, ENGINE_VERSION, FRAMES_PER_SECOND, type GameState, createGame, stepFrame } from "../../../engine";
 import { TetrisCanvas } from "../../../components/TetrisCanvas";
-import { ShareMenu } from "../../../components/ShareMenu";
-import { KAKAO_JS_KEY, KAKAO_SDK_INTEGRITY, KAKAO_SDK_SRC, initKakao } from "../../../lib/kakao";
+import { ShareMenu } from "@/app/games/_shared/components/ShareMenu";
+import { useKakaoReady } from "@/app/games/_shared/hooks/useKakaoReady";
+import { buildShareContent } from "@/app/games/_shared/lib/shareSpec";
 import { ACTION_LABELS } from "../../../lib/controls";
-import { formatFrames, formatScore } from "../../../lib/format";
+import { formatFrames, formatScore } from "@/app/games/_shared/lib/format";
 import { cloneGameState } from "../../../lib/gameSnapshot";
 import { type EffectTracker, createEffectTracker, observeAfter, observeBefore } from "../../../lib/effects";
-import { loadReplay } from "../../../lib/replayLoader";
+import { loadReplay } from "@/app/games/_shared/lib/replayLoader";
+import { TETRIS_SHARE } from "../../../lib/share";
 import { type ReplayTimeline, buildTimeline, collectActions } from "../../../lib/replayTimeline";
 
 const SPEEDS = [0.5, 1, 2, 4] as const;
@@ -46,7 +47,7 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
   /** 공유 메뉴가 열려 있으면 재생기 키(Space·←→)를 쉰다 */
   const shareOpenRef = useRef(false);
   shareOpenRef.current = shareOpen;
-  const [kakaoReady, setKakaoReady] = useState(false);
+  const { kakaoReady, kakaoScript } = useKakaoReady();
 
   const stateRef = useRef<GameState | null>(null);
   const drawRef = useRef<(() => void) | null>(null);
@@ -63,7 +64,7 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
 
   useEffect(() => {
     let cancelled = false;
-    loadReplay(scoreId)
+    loadReplay("tetris", scoreId)
       .then((data) => {
         if (cancelled) return;
         if (data.engineVersion !== ENGINE_VERSION) {
@@ -276,21 +277,10 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
       </header>
 
       {/* 카카오 SDK — 키가 있을 때만, 공유 버튼이 있는 이 화면에서만 늦게 로드 */}
-      {KAKAO_JS_KEY && (
-        <Script
-          src={KAKAO_SDK_SRC}
-          integrity={KAKAO_SDK_INTEGRITY}
-          crossOrigin="anonymous"
-          strategy="lazyOnload"
-          // 로딩 중에 다시 마운트되면 next/script는 onReady 없이 onLoad만 부른다 — 둘 다에서 init (isInitialized 가드로 한 번만)
-          onLoad={() => setKakaoReady(initKakao(KAKAO_JS_KEY))}
-          onReady={() => setKakaoReady(initKakao(KAKAO_JS_KEY))}
-          onError={() => setKakaoReady(false)}
-        />
-      )}
+      {kakaoScript}
       {shareOpen && (
         <ShareMenu
-          target={{ scoreId: loaded.scoreId, playerName: loaded.playerName, score: loaded.score, detail: loaded.detail }}
+          content={buildShareContent(TETRIS_SHARE, loaded)}
           kakaoReady={kakaoReady}
           onClose={() => setShareOpen(false)}
         />

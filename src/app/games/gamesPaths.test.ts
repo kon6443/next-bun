@@ -3,7 +3,7 @@ import { isFullscreenGamePath, isGamesPath } from './gamesPaths';
 
 describe('isGamesPath — "게임" 탭 활성', () => {
   it('게임 목록·테트리스·낚시(URL 유지) 하위 전부', () => {
-    for (const path of ['/games', '/games/tetris', '/games/tetris/rankings', '/fishing', '/fishing/guide/carp']) {
+    for (const path of ['/games', '/games/tetris', '/games/tetris/rankings', '/games/defense', '/fishing', '/fishing/guide/carp']) {
       expect(isGamesPath(path)).toBe(true);
     }
   });
@@ -20,8 +20,30 @@ describe('isFullscreenGamePath — 하단 내비 숨김', () => {
     }
   });
 
+  it('디펜스도 같은 규칙 — 플레이(모드·스테이지 하위)·리플레이', () => {
+    for (const path of ['/games/defense/play/endless', '/games/defense/play/stage/s1', '/games/defense/replays/12', '/games/defense/replays/local/s1']) {
+      expect(isFullscreenGamePath(path)).toBe(true);
+    }
+  });
+
   it('목록·소개·도감·랭킹은 보인다', () => {
-    for (const path of ['/games', '/games/tetris', '/games/tetris/rankings', '/fishing/guide', '/fishing/about', '/games/tetris/battles']) {
+    for (const path of [
+      '/games',
+      '/games/tetris',
+      '/games/tetris/rankings',
+      '/games/defense',
+      '/games/defense/campaign',
+      '/games/defense/rankings',
+      '/fishing/guide',
+      '/fishing/about',
+      '/games/tetris/battles',
+    ]) {
+      expect(isFullscreenGamePath(path)).toBe(false);
+    }
+  });
+
+  it('경로 경계를 지킨다 — play·replays로 시작하는 다른 이름은 아니다', () => {
+    for (const path of ['/games/tetris/player', '/games/tetris/replaysX', '/games/play', '/gamesX/tetris/play']) {
       expect(isFullscreenGamePath(path)).toBe(false);
     }
   });
