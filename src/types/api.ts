@@ -32,6 +32,7 @@ export type ErrorCode =
   | 'BAD_REQUEST'
   | 'INTERNAL_SERVER_ERROR'
   | 'BAD_GATEWAY'
+  | 'TOO_MANY_REQUESTS'
   // Auth 에러
   | 'AUTH_UNAUTHORIZED'
   | 'AUTH_INVALID_TOKEN'
@@ -51,7 +52,10 @@ export type ErrorCode =
   | 'NOTIFICATION_TELEGRAM_CONFIG_ERROR'
   | 'NOTIFICATION_TELEGRAM_API_ERROR'
   | 'NOTIFICATION_TELEGRAM_LINK_INVALID'
-  | 'NOTIFICATION_TELEGRAM_ALREADY_LINKED';
+  | 'NOTIFICATION_TELEGRAM_ALREADY_LINKED'
+  // Feedback 에러
+  | 'FEEDBACK_NOT_FOUND'
+  | 'FEEDBACK_RATE_LIMITED';
 
 // ==================== 에러 코드별 메시지 매핑 ====================
 
@@ -64,6 +68,7 @@ export const ERROR_CODE_MESSAGES: Record<ErrorCode, string> = {
   BAD_REQUEST: '잘못된 요청입니다.',
   INTERNAL_SERVER_ERROR: '서버 내부 오류가 발생했습니다.',
   BAD_GATEWAY: '외부 서비스 오류가 발생했습니다.',
+  TOO_MANY_REQUESTS: '요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.',
   // Auth 에러
   AUTH_UNAUTHORIZED: '인증이 필요합니다. 다시 로그인해주세요.',
   AUTH_INVALID_TOKEN: '유효하지 않은 토큰입니다. 다시 로그인해주세요.',
@@ -84,6 +89,9 @@ export const ERROR_CODE_MESSAGES: Record<ErrorCode, string> = {
   NOTIFICATION_TELEGRAM_API_ERROR: '텔레그램 서비스 오류가 발생했습니다.',
   NOTIFICATION_TELEGRAM_LINK_INVALID: '유효하지 않은 텔레그램 연동 링크입니다.',
   NOTIFICATION_TELEGRAM_ALREADY_LINKED: '이미 텔레그램이 연동되어 있습니다.',
+  // Feedback 에러
+  FEEDBACK_NOT_FOUND: '피드백을 찾을 수 없습니다.',
+  FEEDBACK_RATE_LIMITED: '오늘 보낼 수 있는 피드백 수(24시간 20건)를 넘었습니다. 나중에 다시 시도해주세요.',
 };
 
 // ==================== API 에러 클래스 ====================

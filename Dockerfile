@@ -20,6 +20,10 @@ WORKDIR /app
 COPY . .
 
 COPY .env.build .env.local
+# 빌드 커밋 SHA — 피드백 buildSha 로 번들에 인라인된다(NEXT_PUBLIC_). CI 가 build-args 로 넘기고, 없으면 빈 값이라 생략된다
+# COPY 뒤에 둬서 SHA 가 바뀌어도 의존성·소스 복사 레이어 캐시는 그대로 쓴다
+ARG NEXT_PUBLIC_BUILD_SHA=""
+ENV NEXT_PUBLIC_BUILD_SHA=$NEXT_PUBLIC_BUILD_SHA
 # Next 컴파일 캐시를 빌드 간에 재사용한다
 RUN --mount=type=cache,target=/app/.next/cache node node_modules/next/dist/bin/next build
 

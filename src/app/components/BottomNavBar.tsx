@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import styles from "./BottomNavBar.module.css";
+import { FEEDBACK_PATH, buildFeedbackHref, isFeedbackPath } from "@/app/utils/feedbackUtils";
 
 type NavItem = {
   href: string;
@@ -45,6 +46,16 @@ function FishingIcon() {
   );
 }
 
+function FeedbackIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      <line x1="8" y1="9" x2="16" y2="9" />
+      <line x1="8" y1="13" x2="13" y2="13" />
+    </svg>
+  );
+}
+
 function MyPageIcon() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -69,6 +80,12 @@ const navItems: NavItem[] = [
     match: (path) => path.startsWith("/fishing"),
   },
   {
+    href: FEEDBACK_PATH,
+    label: "피드백",
+    icon: <FeedbackIcon />,
+    match: isFeedbackPath,
+  },
+  {
     href: "/mypage",
     label: "마이페이지",
     icon: <MyPageIcon />,
@@ -84,11 +101,13 @@ const BottomNavBar = () => {
       <ul className={styles.list}>
         {navItems.map(({ href, label, icon, match }) => {
           const isActive = match ? match(pathname) : pathname === href;
+          // 피드백 탭은 지금 경로를 ?from= 으로 넘긴다 (피드백 pagePath)
+          const linkHref = href === FEEDBACK_PATH ? buildFeedbackHref(pathname) : href;
 
           return (
             <li key={href} className={styles.item}>
               <Link
-                href={href}
+                href={linkHref}
                 className={`${styles.link} ${isActive ? styles.active : ""}`}
               >
                 <span className={styles.icon} aria-hidden="true">
