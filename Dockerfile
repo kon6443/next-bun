@@ -24,6 +24,10 @@ COPY .env.build .env.local
 # COPY 뒤에 둬서 SHA 가 바뀌어도 의존성·소스 복사 레이어 캐시는 그대로 쓴다
 ARG NEXT_PUBLIC_BUILD_SHA=""
 ENV NEXT_PUBLIC_BUILD_SHA=$NEXT_PUBLIC_BUILD_SHA
+# 카카오 JavaScript 키 — 리플레이 카카오톡 공유. 공개 키(번들에 들어감, 보호는 카카오 앱의 허용 도메인)
+# CI 가 GitHub Actions 시크릿 KAKAO_JS_KEY 를 build-args 로 넘기고, 없으면 빈 값이라 카카오톡 공유 버튼만 숨는다
+ARG NEXT_PUBLIC_KAKAO_JS_KEY=""
+ENV NEXT_PUBLIC_KAKAO_JS_KEY=$NEXT_PUBLIC_KAKAO_JS_KEY
 # Next 컴파일 캐시를 빌드 간에 재사용한다
 RUN --mount=type=cache,target=/app/.next/cache node node_modules/next/dist/bin/next build
 
