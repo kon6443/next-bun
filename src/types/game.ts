@@ -66,6 +66,9 @@ export type RankingItem = {
   createdAt: string;
 };
 
+/** 기록 1건 요약 (GET /games/:gameType/scores/:scoreId) — 랭킹 항목과 같은 형태, rank는 전체 기간 순위 */
+export type ScoreSummary = RankingItem;
+
 export type RankingList = {
   items: RankingItem[];
   /** 기간 시작 (ISO 8601 UTC) — 전체 기간이면 의미 없음 */
