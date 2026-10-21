@@ -15,13 +15,8 @@ export default function GameLayout({
   children: React.ReactNode;
 }) {
   return (
+    // 하단 내비는 BottomNavBar가 경로(isFullscreenGamePath)로 숨긴다
     <div className="fixed inset-0 bg-slate-950 overflow-hidden">
-      <style>{`
-        /* 낚시 게임 진입 시 BottomNavBar 숨기기 */
-        nav[aria-label="주요 탐색"] {
-          display: none !important;
-        }
-      `}</style>
       <FishingSocketWrapper>
         {children}
       </FishingSocketWrapper>
