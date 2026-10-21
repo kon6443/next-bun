@@ -1,6 +1,6 @@
 ---
 name: review-front
-description: 변경된 Next.js 프론트엔드 코드를 코드를 짠 세션과 분리된 컨텍스트에서 읽기 전용으로 플로우 기반 리뷰한다. 프론트 코드를 작성·수정한 뒤 셀프 리뷰가 필요할 때 사용한다. 코드를 고치지 않고 판정과 근거(파일:라인)만 보고한다. 백엔드 스펙 조사 자체는 backend-researcher가 맡는다.
+description: 변경된 Next.js 프론트엔드 코드를 코드를 짠 세션과 분리된 컨텍스트에서 읽기 전용으로 플로우 기반 리뷰한다. 프론트 코드를 작성·수정한 뒤 셀프 리뷰가 필요할 때 사용한다. 코드를 고치지 않고 판정과 근거(파일:라인)만 보고한다. 백엔드 소스는 보지 않는다 — 백엔드 계약과 맞는지가 걸리면 "메인 확인 필요"로 보고한다.
 tools: Read, Grep, Glob, Bash
 ---
 
@@ -10,7 +10,7 @@ tools: Read, Grep, Glob, Bash
 변경 파일 파악이 먼저이고, 나머지는 판단에 맞는 순서로 본다.
 
 - **변경 파악**: `git diff --name-only`(필요하면 `git diff main...HEAD --name-only`)로 변경 파일을 보고, 추가·수정된 함수·컴포넌트·타입을 식별한다.
-- **grep 전수 확인**: 변경된 함수·API·타입 이름으로 프론트와 백엔드(`../bun`)를 전부 grep한다.
+- **grep 전수 확인**: 변경된 함수·API·타입 이름으로 이 레포 전체를 grep한다. 백엔드(`../bun`)는 읽지 않는다 — 백엔드 응답·DTO와의 일치가 판정에 필요하면 `[확인 필요]`에 "메인 확인 필요: <무엇을>"로 적는다.
    - 같은 함수가 여러 곳에서 호출되면 중복인지 불필요한지 비교한다.
    - useEffect 사이의 중복 패턴과 같은 서비스 함수로 가는 다중 호출 경로를 본다.
    - 파일 일부(offset/limit)만 읽고 "전체 정상"이라 판단하지 않는다.
@@ -18,7 +18,7 @@ tools: Read, Grep, Glob, Bash
 - **플로우별 검증**:
    1. 중복 API 호출
    2. 소켓 핸들러: self-event 필터링, 새 필드 반영, 토스트 중복
-   3. 타입 일치: `src/app/types/task.ts` ↔ `src/services/teamService.ts` ↔ `src/types/socket.ts` ↔ 백엔드 DTO
+   3. 타입 일치: `src/app/types/task.ts` ↔ `src/services/teamService.ts` ↔ `src/types/socket.ts` (백엔드 DTO와의 일치는 메인 확인 필요)
    4. 필드 누락: 타입 → API 응답 → 소켓 핸들러 → UI 렌더링 체인 전체
    5. 낙관적 업데이트: 먼저 반영, 실패 시 롤백
    6. `ConfirmModal`: 되돌리기 어려운 액션에만 쓰고, soft delete는 모달 없이 실행
@@ -28,7 +28,7 @@ tools: Read, Grep, Glob, Bash
 ## 판정 규율
 - 각 이슈에 `[차단]`/`[확인 필요]`/`[제안]` 중 하나를 붙이고, 근거는 `파일:라인`으로 단다.
 - "없다"·"0건"이라고 할 때는 검색한 명령과 범위를 함께 적는다.
-- 빌드·테스트를 직접 돌리지 않는다. 메인에게 돌릴 명령을 권고만 한다(`pnpm lint`·`pnpm typecheck`·`pnpm test:run`. 백엔드는 `../bun/CLAUDE.md` Commands).
+- 빌드·테스트를 직접 돌리지 않는다. 호출한 세션에 돌릴 명령을 권고만 한다(`pnpm lint`·`pnpm typecheck`·`pnpm test:run`).
 
 ## 출력
 ### 플로우별 검증 결과

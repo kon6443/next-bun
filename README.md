@@ -11,13 +11,12 @@ Next.js 15 App Router 기반(운영 런타임 Node 24, 패키지 매니저 pnpm)
 - `src/app/api`: API 라우트 (NextAuth 포함)
 - `src/lib/auth.ts`: NextAuth 설정
 - `src/services`: 백엔드 API 호출 레이어
-- `docs`: 영역별 규칙/가이드 문서 (라우팅은 [`CLAUDE.md`](CLAUDE.md)) · `docs/tasks`: 작업별 진행 기록
-- `.claude`: Claude Code 팀 공유 설정 — `settings.json`(권한·훅), `rules/`(파일 종류별 규칙 — 자동 로드), `hooks/`(백엔드 규약 조건부 주입), `skills/`·`commands/`·`agents/`
+- `docs`: 절차·진단·참고 문서 (라우팅은 [`CLAUDE.md`](CLAUDE.md)) · `docs/tasks`: 작업별 진행 기록 · `docs/archive`: 지난 조사 기록
+- `.claude`: Claude Code 팀 공유 설정 — `settings.json`(권한·훅), `rules/`(파일 종류별 규칙 — 자동 로드), `commands/`·`agents/`
 
 ## 인증/세션 흐름
 - NextAuth를 통해 Kakao 로그인 수행
 - 세션 정보는 `getServerSession` 및 `useSession`으로 접근
-- 성능 이슈 시 `/api/auth/session` 호출 최소화 및 타이밍 측정
 
 ## 개발/빌드
 | 용도 | 명령 |

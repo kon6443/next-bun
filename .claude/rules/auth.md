@@ -20,4 +20,4 @@ paths:
 - 로그인 버튼은 `useKakaoLogin()`(`src/app/auth/useKakaoLogin.ts`)으로 만든다. 누르는 즉시 `disabled`·`aria-busy`, 시작 실패나 뒤로가기(bfcache) 복원 시 다시 활성화된다. 잠금 해제(bfcache 복원)는 `shared.ts`의 모듈 리스너가 맡으므로 버튼 없는 진입점도 `startKakaoLogin()`만 부르면 된다.
 - 콜백 처리 중의 전체 화면 로딩은 `AuthLoadingOverlay`(`src/app/layout.tsx`에 마운트)가 이 플래그로 표시한다. 로그인 진입점을 새로 만들 때도 이 함수를 거친다.
 - 로딩을 끝내거나 실패한 경로에서는 `clearAuthLoading()`으로 플래그를 지운다.
-- 지연 조사의 현재 결론은 `../bun/docs/tasks/tasks-kakao-login-latency.md`에 있다(`CLAUDE.md` 라우팅).
+- 지연 조사의 현재 결론은 백엔드 태스크 문서에 있다 — 필요하면 메인에 질의한다(프론트 측 기록은 `docs/tasks/kakao-login-latency-front.md`).
