@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import styles from "./BottomNavBar.module.css";
 import { FEEDBACK_PATH, buildFeedbackHref, isFeedbackPath } from "@/app/utils/feedbackUtils";
+import { GAMES_PATH, isFullscreenGamePath, isGamesPath } from "@/app/games/gamesPaths";
 
 type NavItem = {
   href: string;
@@ -33,15 +34,14 @@ function TeamIcon() {
   );
 }
 
-function FishingIcon() {
+function GameIcon() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 2l-2 8h-2l-2-8" />
-      <path d="M14 10v4a4 4 0 0 1-4 4v0" />
-      <path d="M10 18a2 2 0 1 1-4 0" />
-      <circle cx="10" cy="18" r="0.5" fill="currentColor" />
-      <path d="M3 22c2-2 4-3.5 7-3.5" />
-      <path d="M14 14c1.5 0 3 .5 4.5 2s2.5 3 3.5 4" />
+      <path d="M6 11h4" />
+      <path d="M8 9v4" />
+      <circle cx="15" cy="12" r="0.5" fill="currentColor" />
+      <circle cx="17.5" cy="10" r="0.5" fill="currentColor" />
+      <path d="M17.3 5H6.7a4 4 0 0 0-3.96 3.47l-.73 5.5A3 3 0 0 0 7.2 16.4L9 15h6l1.8 1.4a3 3 0 0 0 5.2-2.43l-.73-5.5A4 4 0 0 0 17.3 5z" />
     </svg>
   );
 }
@@ -74,10 +74,10 @@ const navItems: NavItem[] = [
     match: (path) => path.startsWith("/teams"),
   },
   {
-    href: "/fishing",
-    label: "낚시",
-    icon: <FishingIcon />,
-    match: (path) => path.startsWith("/fishing"),
+    href: GAMES_PATH,
+    label: "게임",
+    icon: <GameIcon />,
+    match: isGamesPath,
   },
   {
     href: FEEDBACK_PATH,
@@ -95,6 +95,9 @@ const navItems: NavItem[] = [
 
 const BottomNavBar = () => {
   const pathname = usePathname() ?? '';
+
+  // 전체화면 게임(낚시·테트리스 플레이·리플레이)에서는 숨긴다
+  if (isFullscreenGamePath(pathname)) return null;
 
   return (
     <nav className={styles.nav} aria-label="주요 탐색" data-fixed-bottom-overlay>

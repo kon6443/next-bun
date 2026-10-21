@@ -55,7 +55,15 @@ export type ErrorCode =
   | 'NOTIFICATION_TELEGRAM_ALREADY_LINKED'
   // Feedback 에러
   | 'FEEDBACK_NOT_FOUND'
-  | 'FEEDBACK_RATE_LIMITED';
+  | 'FEEDBACK_RATE_LIMITED'
+  // Game 에러
+  | 'GAME_NOT_FOUND'
+  | 'GAME_SESSION_UNAVAILABLE'
+  | 'GAME_SESSION_INVALID'
+  | 'GAME_REPLAY_INVALID'
+  | 'GAME_PLAYER_NAME_INVALID'
+  | 'GAME_PLAYER_NAME_FORBIDDEN'
+  | 'GAME_SCORE_NOT_FOUND';
 
 // ==================== 에러 코드별 메시지 매핑 ====================
 
@@ -92,6 +100,14 @@ export const ERROR_CODE_MESSAGES: Record<ErrorCode, string> = {
   // Feedback 에러
   FEEDBACK_NOT_FOUND: '피드백을 찾을 수 없습니다.',
   FEEDBACK_RATE_LIMITED: '오늘 보낼 수 있는 피드백 수(24시간 20건)를 넘었습니다. 나중에 다시 시도해주세요.',
+  // Game 에러
+  GAME_NOT_FOUND: '없는 게임입니다.',
+  GAME_SESSION_UNAVAILABLE: '지금은 랭킹 등록을 준비할 수 없습니다. 플레이는 그대로 할 수 있어요.',
+  GAME_SESSION_INVALID: '게임 세션이 만료되었거나 이미 사용되었습니다. 새 게임으로 다시 도전해주세요.',
+  GAME_REPLAY_INVALID: '플레이 기록을 확인할 수 없어 등록하지 못했습니다.',
+  GAME_PLAYER_NAME_INVALID: '이름은 1~12자의 한글·영문·숫자·공백·_·-만 쓸 수 있습니다.',
+  GAME_PLAYER_NAME_FORBIDDEN: '사용할 수 없는 이름입니다. 다른 이름을 입력해주세요.',
+  GAME_SCORE_NOT_FOUND: '기록을 찾을 수 없습니다.',
 };
 
 // ==================== API 에러 클래스 ====================

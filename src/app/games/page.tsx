@@ -1,0 +1,73 @@
+import Link from "next/link";
+import { TeamsPageLayout, SectionLabel } from "@/app/teams/components";
+import { cardStyles } from "@/styles/teams";
+
+type GameCard = {
+  title: string;
+  description: string;
+  emoji: string;
+  playHref: string;
+  playLabel: string;
+  secondary: { href: string; label: string };
+};
+
+const GAMES: GameCard[] = [
+  {
+    title: "테트리스",
+    description: "줄을 지우고 점수를 쌓아 일간·주간·전체 랭킹에 도전하세요. 로그인 없이도 등록할 수 있어요.",
+    emoji: "🧱",
+    playHref: "/games/tetris",
+    playLabel: "플레이",
+    secondary: { href: "/games/tetris/rankings", label: "랭킹 보기" },
+  },
+  {
+    title: "낚시",
+    description: "다른 사람들과 함께 강가에서 물고기를 낚는 방치형 멀티플레이 게임이에요.",
+    emoji: "🎣",
+    playHref: "/fishing",
+    playLabel: "플레이",
+    secondary: { href: "/fishing/guide", label: "물고기 도감" },
+  },
+];
+
+export default function GamesPage() {
+  return (
+    <TeamsPageLayout>
+      <section className={`${cardStyles.section} p-5`}>
+        <SectionLabel spacing="wide">Games</SectionLabel>
+        <h1 className="mt-4 text-3xl font-bold text-white">게임</h1>
+        <p className="mt-2 text-sm text-slate-400">브라우저에서 바로 즐기는 미니게임이에요.</p>
+      </section>
+
+      <ul className="grid gap-4">
+        {GAMES.map((game) => (
+          <li key={game.title} className={`${cardStyles.section} p-5`}>
+            <div className="flex items-start gap-4">
+              <span className="text-4xl" aria-hidden="true">
+                {game.emoji}
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-xl font-semibold text-white">{game.title}</h2>
+                <p className="mt-1.5 text-sm text-slate-400">{game.description}</p>
+              </div>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <Link
+                href={game.playHref}
+                className="flex min-h-11 flex-1 items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 hover:brightness-110"
+              >
+                {game.playLabel}
+              </Link>
+              <Link
+                href={game.secondary.href}
+                className="flex min-h-11 flex-1 items-center justify-center rounded-full border border-white/20 text-sm font-semibold text-slate-200 hover:border-white/40"
+              >
+                {game.secondary.label}
+              </Link>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </TeamsPageLayout>
+  );
+}

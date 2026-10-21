@@ -20,7 +20,7 @@ export default function FishingPage() {
       {/* 뒤로가기 버튼 */}
       <div className="absolute top-3 left-3 z-40">
         <Link
-          href="/"
+          href="/games"
           className="bg-slate-900/70 border border-slate-700/50 rounded-xl px-3 py-1.5
                      text-slate-400 hover:text-slate-200 text-xs transition-colors"
         >

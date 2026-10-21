@@ -38,6 +38,13 @@ describe('FetchClient (브라우저)', () => {
     expect(onUnauthorized).not.toHaveBeenCalled();
   });
 
+  it('notifyUnauthorized: false면 401이어도 이벤트를 발행하지 않는다 (호출부가 직접 처리)', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 401 }));
+    await new FetchClient('http://x').fetch('/t', { accessToken: 'tok', notifyUnauthorized: false });
+    expect(onUnauthorized).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls[0][1]).not.toHaveProperty('notifyUnauthorized');
+  });
+
   it('401이 아닌 실패(403)는 이벤트를 발행하지 않는다', async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 403 }));
     await new FetchClient('http://x').fetch('/t', { accessToken: 'tok' });
