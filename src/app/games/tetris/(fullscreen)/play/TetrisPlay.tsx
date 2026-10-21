@@ -1,0 +1,296 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useSession } from "next-auth/react";
+import { Button } from "@/app/teams/components";
+import { createGameSession } from "@/services/gameService";
+import { ApiError } from "@/types/api";
+import type { GameSession, ReplayPayload } from "@/types/game";
+import { extractErrorMessage } from "@/app/utils/errorUtils";
+import { ENGINE_VERSION, type GameState, MAX_FRAMES, MAX_INPUT_LENGTH } from "../../engine";
+import { normalizePlayerName, validatePlayerName } from "../../lib/playerName";
+import { TetrisCanvas } from "../../components/TetrisCanvas";
+import { TouchControls } from "../../components/TouchControls";
+import { type GameResult, GameOverPanel } from "../../components/GameOverPanel";
+import { useTetrisPlay } from "../../hooks/useTetrisPlay";
+import { CONTROL_GUIDE } from "../../lib/controls";
+import { formatFrames, formatScore } from "../../lib/format";
+import { type TetrisSettings, DEFAULT_SETTINGS, loadLastName, loadSettings, recordBestScore } from "../../lib/storage";
+
+type SessionState =
+  | { status: "loading" }
+  /** receivedAt: 이 기기 시계로 받은 시각 — 만료 판정은 이 기기에서 흐른 시간으로만 한다(기기 시계가 틀려도 안전) */
+  | { status: "ready"; session: GameSession; receivedAt: number }
+  /** 발급 실패 — 로컬 시드로 플레이만 한다 */
+  | { status: "failed"; seed: number; error: string };
+
+/** 세션 TTL(백엔드 2시간) − 판 최대 길이(60분) − 여유 1분: 받은 지 이만큼 지났으면 시작 전에 새로 받는다 */
+const SESSION_REFRESH_AFTER_MS = (120 - 61) * 60 * 1000;
+
+function randomSeed(): number {
+  return crypto.getRandomValues(new Uint32Array(1))[0];
+}
+
+function sessionErrorMessage(err: unknown): string {
+  if (err instanceof ApiError && err.code === "GAME_SESSION_UNAVAILABLE") return err.getDefaultMessage();
+  return `${extractErrorMessage(err, "랭킹 등록을 준비하지 못했습니다.")} 이번 판은 등록 없이 플레이해요.`;
+}
+
+export default function TetrisPlay() {
+  const { data: authSession, status: authStatus } = useSession();
+  const accessToken = authSession?.user?.accessToken ?? undefined;
+
+  const [settings, setSettings] = useState<TetrisSettings>(DEFAULT_SETTINGS);
+  const [isCoarse, setIsCoarse] = useState(false);
+  const [sessionState, setSessionState] = useState<SessionState>({ status: "loading" });
+  const [phase, setPhase] = useState<"ready" | "game">("ready");
+  const [result, setResult] = useState<{
+    result: GameResult;
+    replay: ReplayPayload;
+    overLimit: boolean;
+    defaultName: string;
+  } | null>(null);
+  const userNameRef = useRef("");
+  userNameRef.current = authSession?.user?.userName ?? "";
+  const startButtonRef = useRef<HTMLButtonElement>(null);
+
+  const onGameOver = useCallback((state: GameState, replay: ReplayPayload) => {
+    const isNewBest = recordBestScore(state.score);
+    // 이름 기본값은 판마다: 로그인 닉네임 → 마지막에 쓴 이름 (등록 규칙을 통과하는 것만)
+    const candidate = [userNameRef.current, loadLastName()].find((name) => name && validatePlayerName(name) === null);
+    setResult({
+      result: { score: state.score, lines: state.lines, level: state.level, frames: state.endFrame, isNewBest },
+      replay,
+      // 서버 상한(MAX_FRAMES·MAX_INPUT_LENGTH)을 넘은 판은 검증에서 거절된다 — 제출하지 않고 안내만
+      overLimit: replay.frames > MAX_FRAMES || replay.inputs.length > MAX_INPUT_LENGTH,
+      defaultName: candidate ? normalizePlayerName(candidate) : "",
+    });
+  }, []);
+
+  const play = useTetrisPlay({ vibration: settings.vibration, onGameOver });
+
+  useEffect(() => {
+    setSettings(loadSettings());
+    const media = window.matchMedia("(pointer: coarse)");
+    setIsCoarse(media.matches);
+    const onChange = (e: MediaQueryListEvent) => setIsCoarse(e.matches);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  const requestSession = useCallback(async () => {
+    setSessionState({ status: "loading" });
+    try {
+      const { data } = await createGameSession("tetris", accessToken);
+      if (data.engineVersion !== ENGINE_VERSION) {
+        setSessionState({
+          status: "failed",
+          seed: randomSeed(),
+          error: "게임이 업데이트되었어요. 새로고침하면 랭킹에 등록할 수 있어요.",
+        });
+        return;
+      }
+      setSessionState({ status: "ready", session: data, receivedAt: Date.now() });
+    } catch (err) {
+      setSessionState({ status: "failed", seed: randomSeed(), error: sessionErrorMessage(err) });
+    }
+  }, [accessToken]);
+
+  // 로그인 상태가 정해진 뒤 첫 세션을 받는다 (로그인이면 기록에 USER_ID가 남는다)
+  // 이후 세션은 판마다 restart가 새로 받는다
+  const firstSessionRequestedRef = useRef(false);
+  useEffect(() => {
+    if (authStatus === "loading" || firstSessionRequestedRef.current) return;
+    firstSessionRequestedRef.current = true;
+    requestSession();
+  }, [authStatus, requestSession]);
+
+  const { start: startPlay } = play;
+  const beginGame = useCallback(
+    (seed: number) => {
+      setResult(null);
+      setPhase("game");
+      startPlay(seed, settings.das, settings.arr);
+    },
+    [startPlay, settings.das, settings.arr],
+  );
+
+  /** 세션을 새로 받은 뒤 바로 시작할지 — "시작"을 한 번만 눌러도 되게 */
+  const startAfterSessionRef = useRef(false);
+
+  const startGame = () => {
+    if (sessionState.status === "loading") return;
+    // 준비 화면에 오래 두어 판 도중(최대 60분) 세션이 만료될 수 있으면 새로 받은 뒤 이어서 시작한다
+    if (sessionState.status === "ready" && Date.now() - sessionState.receivedAt > SESSION_REFRESH_AFTER_MS) {
+      startAfterSessionRef.current = true;
+      requestSession();
+      return;
+    }
+    beginGame(sessionState.status === "ready" ? sessionState.session.seed : sessionState.seed);
+  };
+
+  useEffect(() => {
+    if (!startAfterSessionRef.current || sessionState.status === "loading") return;
+    startAfterSessionRef.current = false;
+    // 재발급에 실패하면 자동으로 시작하지 않는다 — 준비 화면에서 "등록 불가" 안내를 보고 시작하게
+    if (sessionState.status === "ready") beginGame(sessionState.session.seed);
+  }, [beginGame, sessionState]);
+
+  const restart = () => {
+    play.reset();
+    setResult(null);
+    setPhase("ready");
+    requestSession();
+  };
+
+  // "시작" 버튼은 세션을 받는 동안 비활성이라 autoFocus가 안 먹는다 — 활성화될 때 포커스를 준다
+  const startEnabled = phase === "ready" && sessionState.status !== "loading";
+  useEffect(() => {
+    if (startEnabled) startButtonRef.current?.focus();
+  }, [startEnabled]);
+
+  const showControls = phase === "game" && play.status !== "over" && isCoarse;
+
+  return (
+    <div className="flex h-full flex-col pt-[env(safe-area-inset-top)]">
+      {/* 상단 — 나가기·점수판·일시정지 */}
+      <header className="flex items-center gap-3 px-3 py-2">
+        <Link
+          href="/games/tetris"
+          className="flex min-h-11 items-center rounded-xl border border-slate-700/60 bg-slate-900/70 px-3 text-xs text-slate-400 hover:text-slate-200"
+        >
+          ← 나가기
+        </Link>
+        <dl className="flex flex-1 justify-center gap-4 text-center text-xs tabular-nums sm:gap-8">
+          <div>
+            <dt className="text-slate-500">점수</dt>
+            <dd className="text-sm font-bold text-white">{formatScore(play.hud.score)}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">줄</dt>
+            <dd className="text-sm font-bold text-white">{play.hud.lines}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">레벨</dt>
+            <dd className="text-sm font-bold text-white">{play.hud.level}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">시간</dt>
+            <dd className="text-sm font-bold text-white">{formatFrames(play.hud.frame)}</dd>
+          </div>
+        </dl>
+        <button
+          type="button"
+          onClick={(e) => {
+            // 마우스로 누른 뒤 포커스가 남으면 Space가 이 버튼까지 누를 수 있다 — 포커스를 놓는다
+            e.currentTarget.blur();
+            if (play.status === "paused") play.resume();
+            else play.pause();
+          }}
+          disabled={play.status !== "playing" && play.status !== "paused"}
+          aria-label={play.status === "paused" ? "계속하기" : "일시정지"}
+          className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-700/60 bg-slate-900/70 text-slate-300 disabled:opacity-40"
+        >
+          {play.status === "paused" ? "▶" : "❚❚"}
+        </button>
+      </header>
+
+      {/* 판 */}
+      {/* 루트 layout이 이미 <main>으로 감싼다 — 중첩하지 않는다 */}
+      <div className="relative min-h-0 flex-1">
+        <TetrisCanvas stateRef={play.stateRef} drawRef={play.afterTickRef} />
+
+        {phase === "ready" && (
+          <Overlay>
+            <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900/95 p-6 text-center">
+              <p className="text-xs font-semibold tracking-[0.4em] text-slate-400">TETRIS</p>
+              <h1 className="mt-2 text-2xl font-bold text-white">준비됐나요?</h1>
+              <p className="mt-2 text-sm text-slate-400" role="status">
+                {sessionState.status === "loading"
+                  ? "랭킹 등록을 준비하는 중..."
+                  : sessionState.status === "failed"
+                    ? sessionState.error
+                    : "게임이 끝나면 이름을 적어 랭킹에 올릴 수 있어요."}
+              </p>
+              <Button
+                type="button"
+                size="md"
+                fullWidth
+                className="mt-5 min-h-11"
+                ref={startButtonRef}
+                onClick={startGame}
+                disabled={sessionState.status === "loading"}
+              >
+                시작
+              </Button>
+              {!isCoarse && <ControlGuide />}
+            </div>
+          </Overlay>
+        )}
+
+        {phase === "game" && play.status === "paused" && (
+          <Overlay>
+            <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900/95 p-6 text-center">
+              <h2 className="text-2xl font-bold text-white">일시정지</h2>
+              <div className="mt-5 flex flex-col gap-2">
+                <Button type="button" size="md" fullWidth className="min-h-11" onClick={play.resume} autoFocus>
+                  계속하기
+                </Button>
+                <Button type="button" variant="secondary" size="md" fullWidth className="min-h-11" onClick={restart}>
+                  처음부터
+                </Button>
+              </div>
+              {!isCoarse && <ControlGuide />}
+            </div>
+          </Overlay>
+        )}
+
+        {phase === "game" && play.status === "over" && result && (
+          <Overlay>
+            <GameOverPanel
+              result={result.result}
+              replay={result.replay}
+              sessionId={sessionState.status === "ready" && !result.overLimit ? sessionState.session.sessionId : null}
+              sessionError={
+                result.overLimit
+                  ? `플레이가 너무 길어(60분 또는 입력 ${(MAX_INPUT_LENGTH / 2).toLocaleString("ko-KR")}회 초과) 랭킹에 등록할 수 없어요.`
+                  : sessionState.status === "failed"
+                    ? sessionState.error
+                    : null
+              }
+              accessToken={accessToken}
+              defaultName={result.defaultName}
+              onRestart={restart}
+            />
+          </Overlay>
+        )}
+      </div>
+
+      {showControls && (
+        <TouchControls onHoldStart={play.press} onHoldEnd={play.release} onInstant={play.instant} />
+      )}
+    </div>
+  );
+}
+
+function Overlay({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="absolute inset-0 z-10 flex items-center justify-center overflow-y-auto bg-slate-950/70 p-4" style={{ touchAction: "auto" }}>
+      {children}
+    </div>
+  );
+}
+
+function ControlGuide() {
+  return (
+    <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-left text-xs">
+      {CONTROL_GUIDE.map(({ keys, label }) => (
+        <div key={keys} className="contents">
+          <dt className="font-mono font-semibold text-sky-300">{keys}</dt>
+          <dd className="text-slate-400">{label}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
