@@ -46,3 +46,6 @@ ssh-agent.sh
 
 # pnpm 이 홈 store 에 쓰지 못할 때(sandbox 등) 레포 루트에 만드는 store
 .pnpm-store
+
+# Claude Code worktree (작업별 격리 체크아웃)
+.claude/worktrees/
