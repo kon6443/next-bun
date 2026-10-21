@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import Script from "next/script";
 import { ApiError } from "@/types/api";
 import type { ReplayData } from "@/types/game";
 import { extractErrorMessage } from "@/app/utils/errorUtils";
 import { formatFullDateTime } from "@/app/utils/taskUtils";
 import { ACTION, ENGINE_VERSION, FRAMES_PER_SECOND, type GameState, createGame, stepFrame } from "../../../engine";
 import { TetrisCanvas } from "../../../components/TetrisCanvas";
+import { ShareMenu } from "../../../components/ShareMenu";
+import { KAKAO_JS_KEY, KAKAO_SDK_INTEGRITY, KAKAO_SDK_SRC, initKakao } from "../../../lib/kakao";
 import { ACTION_LABELS } from "../../../lib/controls";
 import { formatFrames, formatScore } from "../../../lib/format";
 import { cloneGameState } from "../../../lib/gameSnapshot";
@@ -38,6 +41,11 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
   const [load, setLoad] = useState<LoadState>({ status: "loading" });
   const [playback, setPlayback] = useState<Playback>({ playing: false, speed: 1, frame: 0 });
   const [pressed, setPressed] = useState<Record<number, boolean>>({});
+  const [shareOpen, setShareOpen] = useState(false);
+  /** 공유 메뉴가 열려 있으면 재생기 키(Space·←→)를 쉰다 */
+  const shareOpenRef = useRef(false);
+  shareOpenRef.current = shareOpen;
+  const [kakaoReady, setKakaoReady] = useState(false);
 
   const stateRef = useRef<GameState | null>(null);
   const drawRef = useRef<(() => void) | null>(null);
@@ -188,6 +196,7 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
   useEffect(() => {
     if (!data) return;
     const onKeyDown = (e: KeyboardEvent) => {
+      if (shareOpenRef.current) return;
       if (e.target instanceof HTMLInputElement && e.target.type !== "range") return;
       if (e.code === "Space") {
         // 포커스된 버튼(속도·처음부터 등)은 Space로 그 버튼이 눌리게 둔다
@@ -242,7 +251,43 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
             전체 {loaded.rank}위 · {formatFullDateTime(new Date(loaded.createdAt))}
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => setShareOpen(true)}
+          aria-label="리플레이 공유"
+          aria-haspopup="dialog"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-700/60 bg-slate-900/70 text-slate-300 hover:text-white"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="18" cy="5" r="3" />
+            <circle cx="6" cy="12" r="3" />
+            <circle cx="18" cy="19" r="3" />
+            <line x1="8.6" y1="13.5" x2="15.4" y2="17.5" />
+            <line x1="15.4" y1="6.5" x2="8.6" y2="10.5" />
+          </svg>
+        </button>
       </header>
+
+      {/* 카카오 SDK — 키가 있을 때만, 공유 버튼이 있는 이 화면에서만 늦게 로드 */}
+      {KAKAO_JS_KEY && (
+        <Script
+          src={KAKAO_SDK_SRC}
+          integrity={KAKAO_SDK_INTEGRITY}
+          crossOrigin="anonymous"
+          strategy="lazyOnload"
+          // 로딩 중에 다시 마운트되면 next/script는 onReady 없이 onLoad만 부른다 — 둘 다에서 init (isInitialized 가드로 한 번만)
+          onLoad={() => setKakaoReady(initKakao(KAKAO_JS_KEY))}
+          onReady={() => setKakaoReady(initKakao(KAKAO_JS_KEY))}
+          onError={() => setKakaoReady(false)}
+        />
+      )}
+      {shareOpen && (
+        <ShareMenu
+          target={{ scoreId: loaded.scoreId, playerName: loaded.playerName, score: loaded.score, detail: loaded.detail }}
+          kakaoReady={kakaoReady}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
 
       <dl className="flex justify-center gap-6 px-3 text-center text-xs tabular-nums">
         <div>
