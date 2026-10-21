@@ -26,6 +26,11 @@ type FetchClientOptions = Omit<ExtendedRequestInit, 'headers'> & {
    * true로 설정하면 response.ok가 false일 때 자동으로 에러 처리
    */
   throwOnError?: boolean;
+  /**
+   * 인증 헤더를 붙인 요청이 401이면 전역 로그아웃 이벤트를 낼지 (기본: true)
+   * 선택 인증 API처럼 호출부가 401을 직접 처리(토큰 없이 재시도)할 때만 false
+   */
+  notifyUnauthorized?: boolean;
 };
 
 type BackendFetchArgs = Omit<FetchClientOptions, 'body'> & {
@@ -85,6 +90,7 @@ class FetchClient {
       accessToken,
       tokenType,
       throwOnError,
+      notifyUnauthorized = true,
       ...rest
     } = options ?? {};
 
@@ -121,7 +127,7 @@ class FetchClient {
 
     // 브라우저에서 백엔드 인증 실패(401) 시: 전역 이벤트로 알려서 세션 정리/재로그인 유도
     // (인증 헤더를 붙였던 요청에 대해서만 처리)
-    if (typeof window !== 'undefined' && response.status === 401 && hasAuthHeader) {
+    if (typeof window !== 'undefined' && response.status === 401 && hasAuthHeader && notifyUnauthorized) {
       window.dispatchEvent(new CustomEvent('backend:unauthorized'));
     }
 
