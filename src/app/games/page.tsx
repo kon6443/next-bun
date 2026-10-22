@@ -24,6 +24,14 @@ const GAMES: GameCard[] = [
     feature: { href: "/games/tetris/battle", label: "친구와 대전" },
   },
   {
+    title: "타워 디펜스",
+    description: "돌 받침에 타워를 세워 몰려오는 적을 막아요. 캠페인 8스테이지를 하나씩 열어 가세요.",
+    emoji: "🏰",
+    playHref: "/games/defense",
+    playLabel: "플레이",
+    secondary: { href: "/games/defense/campaign/s1", label: "스테이지 1" },
+  },
+  {
     title: "낚시",
     description: "다른 사람들과 함께 강가에서 물고기를 낚는 방치형 멀티플레이 게임이에요.",
     emoji: "🎣",
