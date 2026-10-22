@@ -10,6 +10,7 @@ import type { ReplaySubmitStatus } from "../lib/replaySubmit";
 import type { useBattlePlay } from "../hooks/useBattlePlay";
 import { battleErrorMessage } from "../lib/battleErrors";
 import { BattleView } from "./BattleView";
+import { MatchRecordLinks } from "./MatchRecordLinks";
 
 type MatchScreenProps = {
   phase: MatchPhase;
@@ -60,6 +61,7 @@ export function MatchScreen({
       </div>
     ) : phase.kind === "ended" ? (
       <MatchResults
+        matchId={phase.matchId}
         results={phase.results}
         myPlayerId={myPlayerId}
         isHost={isHost}
@@ -139,6 +141,7 @@ const SUBMIT_LABELS: Record<ReplaySubmitStatus, { text: string; tone: string }> 
 };
 
 type MatchResultsProps = {
+  matchId: string | null;
   results: MatchResultEntry[];
   myPlayerId: string;
   isHost: boolean;
@@ -149,7 +152,7 @@ type MatchResultsProps = {
 };
 
 /** 결과 — 순위·KO·보낸/받은 줄·블록·최대 콤보, 방장은 재대결 */
-function MatchResults({ results, myPlayerId, isHost, submitStatus, onRematch, onExit }: MatchResultsProps) {
+function MatchResults({ matchId, results, myPlayerId, isHost, submitStatus, onRematch, onExit }: MatchResultsProps) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const mine = results.find((r) => r.playerId === myPlayerId);
@@ -210,6 +213,8 @@ function MatchResults({ results, myPlayerId, isHost, submitStatus, onRematch, on
             {SUBMIT_LABELS[submitStatus].text}
           </p>
         )}
+        {/* 내 기록이 저장됐을 때만 — 경기 전체가 저장(공개)될 때까지 기다린 뒤 연다 */}
+        {submitStatus === "saved" && matchId && <MatchRecordLinks matchId={matchId} />}
         {error && (
           <p role="alert" className="mt-2 text-center text-sm text-rose-300">
             {error}
