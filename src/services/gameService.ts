@@ -5,7 +5,9 @@ import type {
   GameType,
   RankingList,
   RankingPeriod,
-  ReplayData,
+  ReplayDataByGame,
+  ReplayPayloadByGame,
+  ScoreDetailByGame,
   SubmitScoreRequest,
   SubmitScoreResponse,
 } from '@/types/game';
@@ -67,6 +69,8 @@ const TOO_MANY = '요청이 너무 잦습니다. 잠시 후 다시 시도해주�
 /** 백엔드 short 스로틀 창(1000ms) + 경계 오차 여유 */
 const RETRY_AFTER_UNAUTHORIZED_MS = 1100;
 
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /**
  * 선택 인증 호출 — 만료·잘못된 토큰은 백엔드가 401로 막으므로(토큰이 없어야 비로그인 통과) 토큰 없이 1회 재시도한다
  * 제출도 가드가 먼저 막아 세션이 소모되지 않으니 재시도해도 안전하다
@@ -80,8 +84,53 @@ async function fetchWithOptionalAuth(
   const response = await fetchServiceInstance.backendFetch({ ...args, accessToken, notifyUnauthorized: false });
   if (response.status !== 401) return response;
   // 401로 거절된 요청도 IP 스로틀(제출 초당 1)에 집계된다 — 같은 1초 창을 피해 재시도
-  await new Promise((resolve) => setTimeout(resolve, RETRY_AFTER_UNAUTHORIZED_MS));
+  await wait(RETRY_AFTER_UNAUTHORIZED_MS);
   return fetchServiceInstance.backendFetch(args);
+}
+
+// ==================== 제출 — 게임별 본문·검증 대기 재시도 ====================
+
+/**
+ * 제출 본문의 replay — DTO 필드만 싣는다(점수 등 정의 밖 필드는 422)
+ * 테트리스는 das·arr를 최상위에, 그 밖의 게임은 게임별 값을 params에 싣는다 (defense D-018)
+ */
+const REPLAY_BODY_BUILDERS: { [G in GameType]: (replay: ReplayPayloadByGame[G]) => ReplayPayloadByGame[G] } = {
+  tetris: ({ engineVersion, das, arr, frames, inputs }) => ({ engineVersion, das, arr, frames, inputs }),
+  defense: ({ engineVersion, frames, inputs, params }) =>
+    params ? { engineVersion, frames, inputs, params } : { engineVersion, frames, inputs },
+};
+
+function buildReplayBody<G extends GameType>(gameType: G, replay: ReplayPayloadByGame[G]): ReplayPayloadByGame[G] {
+  const build: (replay: ReplayPayloadByGame[G]) => ReplayPayloadByGame[G] = REPLAY_BODY_BUILDERS[gameType];
+  return build(replay);
+}
+
+/** Retry-After가 없거나 읽을 수 없을 때 (백엔드는 2초를 준다 — defense D-018) */
+const VERIFY_BUSY_DEFAULT_WAIT_MS = 2000;
+/** 이보다 오래 기다리라면 자동 재시도하지 않고 보관·수동 재시도로 넘긴다 (결과 화면을 오래 붙잡지 않게) */
+const VERIFY_BUSY_MAX_WAIT_MS = 10_000;
+
+/** 503 GAME_VERIFY_BUSY — 검증 대기열이 차서 세션을 그대로 둔 채 거절됐다(defense §B4). 같은 세션으로 다시 내도 된다 */
+async function isVerifyBusy(response: Response): Promise<boolean> {
+  if (response.status !== 503) return false;
+  try {
+    const body = (await response.clone().json()) as Partial<ApiErrorResponse> | null;
+    return body?.code === 'GAME_VERIFY_BUSY';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 자동 재시도까지 기다릴 시간 — Retry-After는 0 이상 정수 초(delay-seconds)만 읽는다
+ * 없음·HTTP 날짜 형식·그 밖의 값은 기본값. 브라우저가 이 헤더를 못 읽는 경우(CORS 노출 헤더 아님)도 기본값이 된다
+ * 제출 IP 스로틀(초당 1)에 다시 걸리지 않게 최소 1.1초. 너무 길면 null (자동 재시도 안 함)
+ */
+function verifyBusyWaitMs(response: Response): number | null {
+  const raw = response.headers.get('Retry-After')?.trim() ?? '';
+  if (!/^\d+$/.test(raw)) return VERIFY_BUSY_DEFAULT_WAIT_MS;
+  const ms = Math.max(RETRY_AFTER_UNAUTHORIZED_MS, Number(raw) * 1000);
+  return ms > VERIFY_BUSY_MAX_WAIT_MS ? null : ms;
 }
 
 // ==================== API ====================
@@ -111,32 +160,32 @@ export async function createGameSession(
 
 /**
  * 리플레이 제출 — 점수는 서버가 리플레이로 계산한다(클라이언트 점수는 보내지 않는다)
+ * 503 GAME_VERIFY_BUSY면 Retry-After만큼 기다렸다 1회 다시 낸다 — 그래도 실패하면 호출부가 보관·재시도로 다룬다
  */
-export async function submitGameScore(
-  gameType: GameType,
-  request: SubmitScoreRequest,
+export async function submitGameScore<G extends GameType>(
+  gameType: G,
+  request: SubmitScoreRequest<G>,
   accessToken?: string,
-): Promise<ApiResponse<SubmitScoreResponse>> {
+): Promise<ApiResponse<SubmitScoreResponse<ScoreDetailByGame[G]>>> {
   const { sessionId, playerName, replay } = request;
-  // DTO 필드만 싣는다 — 점수 등 정의 밖 필드는 422 (replay 안도 마찬가지)
-  const response = await fetchWithOptionalAuth(
-    {
-      method: 'POST',
-      endpoint: `/api/v1/games/${gameType}/scores`,
-      body: {
-        sessionId,
-        playerName,
-        replay: {
-          engineVersion: replay.engineVersion,
-          das: replay.das,
-          arr: replay.arr,
-          frames: replay.frames,
-          inputs: replay.inputs,
-        },
+  const post = () =>
+    fetchWithOptionalAuth(
+      {
+        method: 'POST',
+        endpoint: `/api/v1/games/${gameType}/scores`,
+        body: { sessionId, playerName, replay: buildReplayBody(gameType, replay) },
       },
-    },
-    accessToken,
-  );
+      accessToken,
+    );
+
+  let response = await post();
+  if (await isVerifyBusy(response)) {
+    const waitMs = verifyBusyWaitMs(response);
+    if (waitMs !== null) {
+      await wait(waitMs);
+      response = await post();
+    }
+  }
 
   if (!response.ok) {
     await handleApiError(response, {
@@ -151,13 +200,15 @@ export async function submitGameScore(
   return response.json();
 }
 
-/** 기간별 랭킹 */
-export async function getGameRankings(
-  gameType: GameType,
+/** 기간별 랭킹 — board(보드 키)를 생략하면 그 게임의 기본 보드 (테트리스 URL은 board 없이 그대로) */
+export async function getGameRankings<G extends GameType>(
+  gameType: G,
   period: RankingPeriod,
   limit: number,
-): Promise<ApiResponse<RankingList>> {
+  board?: string,
+): Promise<ApiResponse<RankingList<ScoreDetailByGame[G]>>> {
   const params = new URLSearchParams({ period, limit: String(limit) });
+  if (board) params.set('board', board);
   const response = await fetchServiceInstance.backendFetch({
     method: 'GET',
     endpoint: `/api/v1/games/${gameType}/rankings?${params.toString()}`,
@@ -171,7 +222,10 @@ export async function getGameRankings(
 }
 
 /** 기록 1건의 리플레이 — 숨김·없는 기록은 404 */
-export async function getGameReplay(gameType: GameType, scoreId: number): Promise<ApiResponse<ReplayData>> {
+export async function getGameReplay<G extends GameType>(
+  gameType: G,
+  scoreId: number,
+): Promise<ApiResponse<ReplayDataByGame[G]>> {
   const response = await fetchServiceInstance.backendFetch({
     method: 'GET',
     endpoint: `/api/v1/games/${gameType}/scores/${scoreId}/replay`,

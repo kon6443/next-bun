@@ -1,11 +1,15 @@
 /**
- * 게임·랭킹 API 타입 (백엔드 /api/v1/games/:gameType 계약 — 백엔드 DESIGN §3·§7)
+ * 게임·랭킹 API 타입 (백엔드 /api/v1/games/:gameType 계약 — 백엔드 DESIGN §3·§7, 게임 일반화는 defense DESIGN §B)
+ * 게임별로 모양이 다른 값(기록 상세·제출 리플레이·재생 데이터)은 *ByGame 맵으로 gameType과 짝짓는다
  */
 
 /** 경로의 게임 종류 (소문자) */
-export type GameType = 'tetris';
+export type GameType = 'tetris' | 'defense';
 
 export type RankingPeriod = 'daily' | 'weekly' | 'all';
+
+/** 세션 모드 — 보드가 여러 개인 게임만 (테트리스는 null) */
+export type GameMode = 'endless' | 'weekly';
 
 export type GameSession = {
   sessionId: string;
@@ -14,6 +18,9 @@ export type GameSession = {
   engineVersion: number;
   /** ISO 8601 (UTC) */
   expiresAt: string;
+  /** 이 세션이 등록될 랭킹 보드 (테트리스 'default') — 백엔드 보드 일반화 배포 전에는 오지 않는다 */
+  boardKey?: string;
+  mode?: GameMode | null;
 };
 
 /** 테트리스 기록 상세 (DESIGN §1 DETAIL) */
@@ -29,7 +36,15 @@ export type TetrisScoreDetail = {
   arr: number;
 };
 
-/** 제출 리플레이 (DESIGN §4-1) */
+/** 테트리스 밖 게임의 기록 상세 — 게임별 정수 값 (백엔드 detail: Record<string, number>) */
+export type GenericScoreDetail = Record<string, number>;
+
+export type ScoreDetailByGame = {
+  tetris: TetrisScoreDetail;
+  defense: GenericScoreDetail;
+};
+
+/** 테트리스 제출 리플레이 (DESIGN §4-1) — das·arr를 최상위에 싣는다 */
 export type ReplayPayload = {
   engineVersion: number;
   das: number;
@@ -39,43 +54,56 @@ export type ReplayPayload = {
   inputs: number[];
 };
 
-export type SubmitScoreRequest = {
-  sessionId: string;
-  playerName: string;
-  replay: ReplayPayload;
+/** 테트리스 밖 게임의 제출 리플레이 — frames = 엔진 틱 수, 게임별 값은 params (defense D-018) */
+export type ParamsReplayPayload = {
+  engineVersion: number;
+  frames: number;
+  inputs: number[];
+  params?: Record<string, number>;
 };
 
-export type SubmitScoreResponse = {
+export type ReplayPayloadByGame = {
+  tetris: ReplayPayload;
+  defense: ParamsReplayPayload;
+};
+
+export type SubmitScoreRequest<G extends GameType = 'tetris'> = {
+  sessionId: string;
+  playerName: string;
+  replay: ReplayPayloadByGame[G];
+};
+
+export type SubmitScoreResponse<D = TetrisScoreDetail> = {
   scoreId: number;
   /** 서버가 리플레이로 다시 계산한 점수 */
   score: number;
-  detail: TetrisScoreDetail;
+  detail: D;
   /** 기록은 저장됐지만 순위 계산만 실패하면 null — 등록은 성공이다 */
   ranks: Record<RankingPeriod, number> | null;
 };
 
-export type RankingItem = {
+export type RankingItem<D = TetrisScoreDetail> = {
   rank: number;
   scoreId: number;
   playerName: string;
   score: number;
-  detail: TetrisScoreDetail;
-  /** 플레이 시간 (리플레이 프레임 × 1000 / 60) */
+  detail: D;
+  /** 플레이 시간 (리플레이 프레임 × 1000 / 게임의 초당 프레임 — 테트리스 60) */
   durationMs: number;
   /** ISO 8601 (UTC) */
   createdAt: string;
 };
 
 /** 기록 1건 요약 (GET /games/:gameType/scores/:scoreId) — 랭킹 항목과 같은 형태, rank는 전체 기간 순위 */
-export type ScoreSummary = RankingItem;
+export type ScoreSummary<D = TetrisScoreDetail> = RankingItem<D>;
 
-export type RankingList = {
-  items: RankingItem[];
+export type RankingList<D = TetrisScoreDetail> = {
+  items: RankingItem<D>[];
   /** 기간 시작 (ISO 8601 UTC) — 전체 기간이면 의미 없음 */
   periodStart: string | null;
 };
 
-/** 랭킹 항목 필드(rank = 전체 순위) + 재생 데이터 */
+/** 테트리스 재생 데이터 — 랭킹 항목 필드(rank = 전체 순위) + 재생 데이터 */
 export type ReplayData = RankingItem & {
   engineVersion: number;
   seed: number;
@@ -83,4 +111,19 @@ export type ReplayData = RankingItem & {
   arr: number;
   frames: number;
   inputs: number[];
+};
+
+/** 테트리스 밖 게임의 재생 데이터 — das·arr 대신 params, 보드 키 (defense DESIGN §B6) */
+export type ParamsReplayData = RankingItem<GenericScoreDetail> & {
+  engineVersion: number;
+  seed: number;
+  frames: number;
+  inputs: number[];
+  boardKey?: string;
+  params?: Record<string, number>;
+};
+
+export type ReplayDataByGame = {
+  tetris: ReplayData;
+  defense: ParamsReplayData;
 };

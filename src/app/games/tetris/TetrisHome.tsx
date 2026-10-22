@@ -8,11 +8,12 @@ import { getGameRankings, submitGameScore } from "@/services/gameService";
 import type { RankingItem } from "@/types/game";
 import { extractErrorMessage } from "@/app/utils/errorUtils";
 import { ARR_MAX, ARR_MIN, DAS_MAX, DAS_MIN } from "./engine";
-import { RankingTable } from "./components/RankingTable";
+import { RankingTable } from "@/app/games/_shared/components/RankingTable";
+import { TETRIS_GAME } from "./lib/game";
 import { CONTROL_GUIDE } from "./lib/controls";
-import { formatScore, framesToMs } from "./lib/format";
-import { normalizePlayerName, validatePlayerName } from "./lib/playerName";
-import { classifySubmitError } from "./lib/submitError";
+import { formatScore, framesToMs } from "@/app/games/_shared/lib/format";
+import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
+import { classifySubmitError } from "@/app/games/_shared/lib/submitError";
 import {
   type PendingSubmission,
   type TetrisSettings,
@@ -193,7 +194,7 @@ export default function TetrisHome() {
         ) : preview.length === 0 ? (
           <EmptyState message="오늘은 아직 기록이 없어요." description="첫 번째 주인공이 되어 보세요!" variant="minimal" />
         ) : (
-          <RankingTable items={preview} myScoreIds={myScoreIds} compact />
+          <RankingTable game={TETRIS_GAME} items={preview} myScoreIds={myScoreIds} compact />
         )}
       </section>
 

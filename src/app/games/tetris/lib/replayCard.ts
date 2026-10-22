@@ -1,26 +1,23 @@
-import type { ScoreSummary } from '@/types/game';
+import type { ScoreSummary, TetrisScoreDetail } from '@/types/game';
 import { FRAMES_PER_SECOND } from '../engine';
-import { formatFrames, formatScore } from './format';
+import { formatFrames, formatScore } from '@/app/games/_shared/lib/format';
+import { type ReplayCard, isAscii } from '@/app/games/_shared/lib/replayCard';
 
 /**
- * 기록 미리보기 카드(OG 이미지) 문구 — 한글 폰트를 못 받으면 ASCII만으로 그린다
- * (next/og 기본 폰트는 라틴 전용이라, 한글이 있으면 렌더 중 외부 폰트를 받으러 가고 실패하면 이미지가 깨진다)
+ * 테트리스 기록 문구 — 랭킹 행·공유·링크 미리보기·OG 카드가 같은 표현을 쓴다
  */
-/** 미리보기 카드 이미지 크기 — og 이미지 route와 페이지 og:image 메타가 함께 쓴다 */
-export const OG_SIZE = { width: 1200, height: 630 } as const;
 
-export type ReplayCard = {
-  eyebrow: string;
-  /** 플레이어 이름 — ASCII 모드에서 이름이 한글이면 null */
-  name: string | null;
-  score: string | null;
-  scoreUnit: string;
-  stats: string;
-  footer: string;
-};
+/** "40줄 · 레벨 5" */
+export function tetrisStatLine(detail: Pick<TetrisScoreDetail, 'lines' | 'level'>): string {
+  return `${detail.lines}줄 · 레벨 ${detail.level}`;
+}
 
-const isAscii = (text: string) => /^[\x20-\x7e]*$/.test(text);
+/** 랭킹 durationMs → "m:ss" (60Hz 프레임으로 되돌려 표시) */
+export function tetrisDuration(durationMs: number): string {
+  return formatFrames(Math.round((durationMs * FRAMES_PER_SECOND) / 1000));
+}
 
+/** 미리보기 카드 문구 — 한글 폰트가 없으면(korean=false) ASCII만 */
 export function buildReplayCard(summary: ScoreSummary | null, korean: boolean): ReplayCard {
   if (!summary) {
     return {
@@ -33,22 +30,13 @@ export function buildReplayCard(summary: ScoreSummary | null, korean: boolean): 
     };
   }
   const { lines, level } = summary.detail;
-  const time = formatFrames(Math.round((summary.durationMs * FRAMES_PER_SECOND) / 1000));
+  const time = tetrisDuration(summary.durationMs);
   return {
     eyebrow: korean ? `테트리스 리플레이 · 전체 ${summary.rank}위` : `TETRIS REPLAY · #${summary.rank}`,
     name: korean || isAscii(summary.playerName) ? summary.playerName : null,
     score: formatScore(summary.score),
     scoreUnit: korean ? '점' : 'PTS',
-    stats: korean ? `${lines}줄 · 레벨 ${level} · ${time}` : `${lines} LINES · LV ${level} · ${time}`,
+    stats: korean ? `${tetrisStatLine(summary.detail)} · ${time}` : `${lines} LINES · LV ${level} · ${time}`,
     footer: 'FiveSouth',
   };
-}
-
-/** 폰트 subset 요청에 넣을 글자 — 카드에 그리는 모든 문자 */
-export function cardText(card: ReplayCard): string {
-  return [card.eyebrow, card.name ?? '', card.score ?? '', card.scoreUnit, card.stats, card.footer].join('');
-}
-
-export function needsKoreanFont(summary: ScoreSummary | null): boolean {
-  return !isAscii(cardText(buildReplayCard(summary, true)));
 }

@@ -4,11 +4,13 @@ import {
   DEFAULT_SETTINGS,
   addMyScoreId,
   loadBestScore,
+  loadLastName,
   loadMyScoreIds,
   loadPendingSubmissions,
   loadSettings,
   recordBestScore,
   removePendingSubmission,
+  saveLastName,
   savePendingSubmission,
   saveSettings,
 } from './storage';
@@ -18,6 +20,29 @@ describe('테트리스 저장소', () => {
     window.localStorage.clear();
     window.sessionStorage.clear();
     vi.restoreAllMocks();
+  });
+
+  it('공용화 전에 저장된 값(tetris:* 키)을 그대로 읽는다', () => {
+    const replay = { engineVersion: 1, das: 10, arr: 2, frames: 10, inputs: [] };
+    window.localStorage.setItem('tetris:bestScore', '4200');
+    window.localStorage.setItem('tetris:lastName', '이전이름');
+    window.localStorage.setItem('tetris:myScoreIds', '[3,1]');
+    window.localStorage.setItem('tetris:settings', '{"das":12,"arr":1,"vibration":false}');
+    window.sessionStorage.setItem(
+      'tetris:pendingSubmission',
+      JSON.stringify([{ sessionId: 'old', playerName: 'n', replay, score: 5, savedAt: 1 }]),
+    );
+    expect(loadBestScore()).toBe(4200);
+    expect(loadLastName()).toBe('이전이름');
+    expect(loadMyScoreIds()).toEqual([3, 1]);
+    expect(loadSettings()).toEqual({ das: 12, arr: 1, vibration: false });
+    expect(loadPendingSubmissions().map((p) => p.sessionId)).toEqual(['old']);
+    // 쓰기도 같은 키·같은 저장소로 (이름은 localStorage, 보관 기록은 sessionStorage)
+    saveLastName('새이름');
+    savePendingSubmission({ sessionId: 'new', playerName: 'n', replay, score: 6, savedAt: 2 });
+    expect(window.localStorage.getItem('tetris:lastName')).toBe('새이름');
+    expect(window.localStorage.getItem('tetris:pendingSubmission')).toBeNull();
+    expect(JSON.parse(window.sessionStorage.getItem('tetris:pendingSubmission') ?? '[]')).toHaveLength(2);
   });
 
   it('설정: 저장값을 허용 범위로 자르고, 깨진 값이면 기본값', () => {

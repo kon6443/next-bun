@@ -10,7 +10,13 @@ vi.mock('react-hot-toast', () => ({ default: { success: (...a: unknown[]) => toa
 const sendKakaoFeed = vi.fn();
 vi.mock('../lib/kakao', () => ({ sendKakaoFeed: (...a: unknown[]) => sendKakaoFeed(...a) }));
 
-const target = { scoreId: 7, playerName: '홍길동', score: 1000, detail: { lines: 10, level: 2 } };
+// 게임별 문구는 각 게임의 공유 사양 테스트가 확인한다 — 여기서는 메뉴가 받은 내용을 그대로 쓰는지만
+const content = {
+  url: 'https://site/games/g/replays/7',
+  title: '홍길동님의 기록',
+  text: '홍길동님의 기록 (요약) — 리플레이 보기',
+  kakao: { title: '홍길동님의 기록', description: '요약 — 리플레이로 플레이를 다시 보세요', imageUrl: 'https://site/games/g/replays/7/og' },
+};
 
 const setNavigator = (nav: Partial<Navigator>) => {
   vi.stubGlobal('navigator', { ...window.navigator, clipboard: undefined, share: undefined, ...nav });
@@ -29,7 +35,7 @@ describe('ShareMenu', () => {
 
   it('카카오 SDK가 준비되지 않으면 카카오톡을 숨기고, Web Share가 없으면 더보기를 숨긴다', () => {
     setNavigator({});
-    render(<ShareMenu target={target} kakaoReady={false} onClose={() => {}} />);
+    render(<ShareMenu content={content} kakaoReady={false} onClose={() => {}} />);
     expect(screen.queryByRole('button', { name: /카카오톡/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /더보기/ })).toBeNull();
     expect(screen.getByRole('button', { name: /링크 복사/ })).toBeTruthy();
@@ -40,15 +46,9 @@ describe('ShareMenu', () => {
     setNavigator({});
     sendKakaoFeed.mockReturnValue(true);
     const onClose = vi.fn();
-    render(<ShareMenu target={target} kakaoReady onClose={onClose} />);
+    render(<ShareMenu content={content} kakaoReady onClose={onClose} />);
     fireEvent.click(screen.getByRole('button', { name: /카카오톡/ }));
-    expect(sendKakaoFeed).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: '홍길동님의 테트리스 1,000점',
-        imageUrl: expect.stringMatching(/\/games\/tetris\/replays\/7\/og$/),
-        url: expect.stringMatching(/\/games\/tetris\/replays\/7$/),
-      }),
-    );
+    expect(sendKakaoFeed).toHaveBeenCalledWith({ ...content.kakao, url: content.url });
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -56,18 +56,18 @@ describe('ShareMenu', () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     setNavigator({ clipboard: { writeText } as unknown as Clipboard });
     const onClose = vi.fn();
-    render(<ShareMenu target={target} kakaoReady={false} onClose={onClose} />);
+    render(<ShareMenu content={content} kakaoReady={false} onClose={onClose} />);
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /링크 복사/ }));
     });
-    expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/\/games\/tetris\/replays\/7$/));
+    expect(writeText).toHaveBeenCalledWith(content.url);
     expect(toastSuccess).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
   });
 
   it('링크 복사 미지원(비보안 컨텍스트)이면 길게 눌러 복사 안내', async () => {
     setNavigator({});
-    render(<ShareMenu target={target} kakaoReady={false} onClose={() => {}} />);
+    render(<ShareMenu content={content} kakaoReady={false} onClose={() => {}} />);
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /링크 복사/ }));
     });
@@ -78,11 +78,11 @@ describe('ShareMenu', () => {
     const share = vi.fn().mockRejectedValue(new DOMException('cancel', 'AbortError'));
     setNavigator({ share });
     const onClose = vi.fn();
-    render(<ShareMenu target={target} kakaoReady={false} onClose={onClose} />);
+    render(<ShareMenu content={content} kakaoReady={false} onClose={onClose} />);
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /더보기/ }));
     });
-    expect(share).toHaveBeenCalledWith(expect.objectContaining({ url: expect.stringMatching(/replays\/7$/), text: expect.stringContaining('리플레이 보기') }));
+    expect(share).toHaveBeenCalledWith({ title: content.title, text: content.text, url: content.url });
     expect(toastError).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
   });
@@ -90,7 +90,7 @@ describe('ShareMenu', () => {
   it('Esc로 닫는다', () => {
     setNavigator({});
     const onClose = vi.fn();
-    render(<ShareMenu target={target} kakaoReady={false} onClose={onClose} />);
+    render(<ShareMenu content={content} kakaoReady={false} onClose={onClose} />);
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
     expect(onClose).toHaveBeenCalled();
   });

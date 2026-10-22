@@ -63,7 +63,9 @@ export type ErrorCode =
   | 'GAME_REPLAY_INVALID'
   | 'GAME_PLAYER_NAME_INVALID'
   | 'GAME_PLAYER_NAME_FORBIDDEN'
-  | 'GAME_SCORE_NOT_FOUND';
+  | 'GAME_SCORE_NOT_FOUND'
+  | 'GAME_VERIFY_BUSY'
+  | 'GAME_WEEKLY_UNAVAILABLE';
 
 // ==================== 에러 코드별 메시지 매핑 ====================
 
@@ -108,6 +110,8 @@ export const ERROR_CODE_MESSAGES: Record<ErrorCode, string> = {
   GAME_PLAYER_NAME_INVALID: '이름은 1~12자의 한글·영문·숫자·공백·_·-만 쓸 수 있습니다.',
   GAME_PLAYER_NAME_FORBIDDEN: '사용할 수 없는 이름입니다. 다른 이름을 입력해주세요.',
   GAME_SCORE_NOT_FOUND: '기록을 찾을 수 없습니다.',
+  GAME_VERIFY_BUSY: '기록 확인이 밀려 있습니다. 잠시 후 다시 시도해주세요.',
+  GAME_WEEKLY_UNAVAILABLE: '지금은 주간 도전을 열 수 없습니다. 무한 모드는 그대로 할 수 있어요.',
 };
 
 // ==================== API 에러 클래스 ====================

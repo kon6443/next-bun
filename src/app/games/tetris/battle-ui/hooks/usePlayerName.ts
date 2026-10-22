@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { loadLastName, saveLastName } from "../../lib/storage";
-import { normalizePlayerName, validatePlayerName } from "../../lib/playerName";
+import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
 
 /**
  * 대전에서 쓸 이름 — 기본값은 마지막에 쓴 이름 → 로그인 닉네임(규칙을 통과하는 것만). 랭킹 등록 이름과 같은 저장값을 쓴다

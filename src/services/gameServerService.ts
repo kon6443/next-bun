@@ -1,6 +1,6 @@
 import serverFetchInstance from './serverFetch';
 import type { ApiResponse } from '@/types/api';
-import type { GameType, ScoreSummary } from '@/types/game';
+import type { GameType, ScoreDetailByGame, ScoreSummary } from '@/types/game';
 
 /**
  * 기록은 바뀌지 않는다 — 미리보기 메타·이미지가 같은 기록을 반복 조회해도 백엔드는 10분에 한 번만
@@ -18,7 +18,10 @@ const SUMMARY_TIMEOUT_MS = 3000;
  * 다른 서비스와 달리 실패를 던지지 않고 null을 돌려준다: 호출부(generateMetadata·opengraph-image)는
  * 없음·숨김(404)·네트워크 실패 모두 일반 테트리스 미리보기로 폴백하기만 하므로 실패 종류를 구분할 필요가 없다
  */
-export async function getGameScoreSummary(gameType: GameType, scoreId: number): Promise<ScoreSummary | null> {
+export async function getGameScoreSummary<G extends GameType>(
+  gameType: G,
+  scoreId: number,
+): Promise<ScoreSummary<ScoreDetailByGame[G]> | null> {
   try {
     const response = await serverFetchInstance.backendFetch({
       method: 'GET',
@@ -27,7 +30,7 @@ export async function getGameScoreSummary(gameType: GameType, scoreId: number): 
       signal: AbortSignal.timeout(SUMMARY_TIMEOUT_MS),
     });
     if (!response.ok) return null;
-    const body = (await response.json()) as ApiResponse<ScoreSummary>;
+    const body = (await response.json()) as ApiResponse<ScoreSummary<ScoreDetailByGame[G]>>;
     return body?.data ?? null;
   } catch {
     return null;

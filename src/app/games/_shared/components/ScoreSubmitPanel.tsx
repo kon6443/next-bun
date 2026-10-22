@@ -1,0 +1,229 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { Button, ButtonLink } from "@/app/teams/components";
+import { getGameRankings, submitGameScore } from "@/services/gameService";
+import type { GameType, RankingPeriod, ReplayPayloadByGame, ScoreDetailByGame, SubmitScoreResponse } from "@/types/game";
+import { estimateRank, formatScore } from "../lib/format";
+import type { GameUiConfig } from "../lib/gameConfig";
+import { classifySubmitError } from "../lib/submitError";
+import { PLAYER_NAME_MAX_LENGTH, normalizePlayerName, playerNameLength, validatePlayerName } from "../lib/playerName";
+
+type ScoreSubmitPanelProps<G extends GameType> = {
+  game: GameUiConfig<G>;
+  /** 엔진이 계산한 점수 — 등록하면 서버가 다시 계산한 점수로 바꿔 보인다 */
+  score: number;
+  isNewBest: boolean;
+  /** 점수 아래 게임별 기록 요약 (줄·레벨·시간 등) */
+  stats: React.ReactNode;
+  replay: ReplayPayloadByGame[G];
+  /** 등록할 보드 — 예상 순위 조회에 쓴다 (없으면 그 게임의 기본 보드) */
+  board?: string;
+  /** 세션이 없으면(발급 실패) 등록할 수 없다 */
+  sessionId: string | null;
+  sessionError: string | null;
+  accessToken?: string;
+  defaultName: string;
+  onRestart: () => void;
+};
+
+const PERIODS: { key: RankingPeriod; label: string }[] = [
+  { key: "daily", label: "오늘" },
+  { key: "weekly", label: "이번 주" },
+  { key: "all", label: "전체" },
+];
+const ESTIMATE_LIMIT = 100;
+
+/** 예상 순위: 숫자 = 예상 순위, null = 상위 100개 밖, "unavailable" = 조회 실패(429 등) */
+type Estimate = number | null | "unavailable";
+type Estimates = Partial<Record<RankingPeriod, Estimate>>;
+
+/**
+ * 순위 표시 — 등록 후에는 서버 순위(순위 계산만 실패해 ranks가 null이면 "확인 중"), 등록 전에는 예상
+ * 예상: undefined = 불러오는 중
+ */
+function rankLabel(registered: SubmitScoreResponse<unknown> | null, estimate: Estimate | undefined, period: RankingPeriod): string {
+  if (registered) return registered.ranks ? `${registered.ranks[period]}위` : "확인 중";
+  if (estimate === undefined) return "…";
+  if (estimate === "unavailable") return "—";
+  return estimate === null ? "100위 밖" : `예상 ${estimate}위`;
+}
+
+/** 게임 오버 패널 — 점수·예상 순위·이름 입력·등록·실패 보관(재시도) (게임별 요약은 stats로) */
+export function ScoreSubmitPanel<G extends GameType>({
+  game,
+  score,
+  isNewBest,
+  stats,
+  replay,
+  board,
+  sessionId,
+  sessionError,
+  accessToken,
+  defaultName,
+  onRestart,
+}: ScoreSubmitPanelProps<G>) {
+  const { gameType, storage } = game;
+  /** 게임마다 고정 id — 테트리스는 공용화 전과 같은 "tetris-player-name" */
+  const nameInputId = `${gameType}-player-name`;
+  const [name, setName] = useState(defaultName);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [canRetry, setCanRetry] = useState(false);
+  const [isFinalError, setIsFinalError] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+  const [registered, setRegistered] = useState<SubmitScoreResponse<ScoreDetailByGame[G]> | null>(null);
+  const [estimates, setEstimates] = useState<Estimates>({});
+  const titleRef = useRef<HTMLHeadingElement>(null);
+
+  // 패널이 뜨면 포커스를 옮긴다 (키보드·스크린리더 사용자가 결과를 바로 읽게)
+  useEffect(() => {
+    titleRef.current?.focus();
+  }, []);
+
+  // 등록 전 예상 순위 (상위 100개 기준) — 등록 후에는 서버가 준 순위를 쓴다
+  // 패널(=게임 오버)당 정확히 기간별 1회: StrictMode·Fast Refresh가 effect를 다시 돌려도 ref 가드로 재요청하지 않는다
+  // (요청을 취소하지 않으므로 첫 실행의 응답이 그대로 반영된다. 전역 스로틀(초당 5)에 걸리지 않게)
+  const estimatesRequestedRef = useRef(false);
+  useEffect(() => {
+    if (estimatesRequestedRef.current) return;
+    estimatesRequestedRef.current = true;
+    const myScore = score;
+    for (const { key } of PERIODS) {
+      getGameRankings(gameType, key, ESTIMATE_LIMIT, board)
+        .then(({ data }) => {
+          const scores = data.items.map((item) => item.score);
+          setEstimates((prev) => ({
+            ...prev,
+            [key]: estimateRank(scores, myScore, data.items.length < ESTIMATE_LIMIT),
+          }));
+        })
+        .catch(() => {
+          // 예상 순위는 참고용 — 실패(429 등)하면 재시도하지 않고 "—"
+          setEstimates((prev) => ({ ...prev, [key]: "unavailable" }));
+        });
+    }
+  }, [gameType, board, score]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sessionId || submittingRef.current || registered) return;
+    const message = validatePlayerName(name);
+    if (message) {
+      setNameError(message);
+      return;
+    }
+    const playerName = normalizePlayerName(name);
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    setNameError(null);
+    setSubmitError(null);
+    try {
+      const { data } = await submitGameScore(gameType, { sessionId, playerName, replay }, accessToken);
+      setRegistered(data);
+      storage.addMyScoreId(data.scoreId);
+      storage.saveLastName(playerName);
+      storage.removePendingSubmission(sessionId);
+    } catch (err) {
+      const { kind, message: text } = classifySubmitError(err, canRetry);
+      if (kind === "name") {
+        setNameError(text);
+      } else if (kind === "final") {
+        setSubmitError(text);
+        setIsFinalError(true);
+        storage.removePendingSubmission(sessionId);
+      } else {
+        // 네트워크·429·5xx — 결과를 보관하고 다시 시도할 수 있게
+        setSubmitError(text);
+        setCanRetry(true);
+        storage.savePendingSubmission({ sessionId, playerName, replay, score, savedAt: Date.now() });
+      }
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900/95 p-5 text-center shadow-[0_30px_60px_rgba(2,6,23,0.7)]">
+      <h2 ref={titleRef} tabIndex={-1} className="text-xs font-semibold tracking-[0.4em] text-slate-400 focus:outline-none">
+        GAME OVER
+      </h2>
+      <p className="mt-3 text-4xl font-bold text-white">{formatScore(registered?.score ?? score)}</p>
+      {isNewBest && <p className="mt-1 text-sm font-semibold text-amber-300">개인 최고 기록!</p>}
+      {stats}
+
+      {/* 순위 — 등록 전에는 예상, 등록 후에는 서버 순위 */}
+      <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-slate-950/40 p-3 text-sm">
+        {PERIODS.map(({ key, label }) => (
+          <div key={key}>
+            <p className="text-xs text-slate-500">{label}</p>
+            <p className="mt-0.5 font-semibold text-slate-100">{rankLabel(registered, estimates[key], key)}</p>
+          </div>
+        ))}
+      </div>
+
+      {registered ? (
+        <div className="mt-5 flex flex-col gap-2">
+          <p className="text-sm font-semibold text-emerald-300">랭킹에 등록했어요.</p>
+          <ButtonLink href={game.replayPath(registered.scoreId)} variant="secondary" size="md" fullWidth>
+            ▶ 내 플레이 다시보기
+          </ButtonLink>
+          <ButtonLink href={`${game.rankingsPath}?highlight=${registered.scoreId}`} variant="secondary" size="md" fullWidth>
+            랭킹 보기
+          </ButtonLink>
+        </div>
+      ) : sessionId && !isFinalError ? (
+        <form onSubmit={handleSubmit} className="mt-5 text-left" noValidate>
+          <label htmlFor={nameInputId} className="mb-1.5 block text-sm font-semibold text-slate-300">
+            랭킹에 올릴 이름
+          </label>
+          <input
+            id={nameInputId}
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              setNameError(null);
+            }}
+            maxLength={PLAYER_NAME_MAX_LENGTH * 2}
+            autoComplete="nickname"
+            aria-invalid={nameError ? true : undefined}
+            aria-describedby={`${nameInputId}-help`}
+            disabled={isSubmitting}
+            className="min-h-11 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 text-base text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+            placeholder="이름 (1~12자)"
+          />
+          <p id={`${nameInputId}-help`} className={`mt-1 text-xs ${nameError ? "text-red-400" : "text-slate-500"}`}>
+            {nameError ?? `${playerNameLength(normalizePlayerName(name))}/${PLAYER_NAME_MAX_LENGTH} · 한글·영문·숫자·공백·_·-`}
+          </p>
+          {submitError && (
+            <p role="alert" className="mt-2 rounded-xl border border-red-500/20 bg-red-500/10 p-2.5 text-sm text-red-300">
+              {submitError}
+            </p>
+          )}
+          <Button type="submit" size="md" fullWidth className="mt-3 min-h-11" disabled={isSubmitting} aria-busy={isSubmitting}>
+            {isSubmitting ? "등록 중..." : canRetry ? "다시 등록하기" : "랭킹 등록"}
+          </Button>
+        </form>
+      ) : (
+        <p role="status" className="mt-5 rounded-xl border border-white/10 bg-slate-950/40 p-3 text-sm text-slate-300">
+          {submitError ?? sessionError ?? "이번 판은 랭킹에 등록할 수 없어요."}
+        </p>
+      )}
+
+      <div className="mt-3 flex gap-2">
+        <Button type="button" size="md" className="min-h-11 flex-1" onClick={onRestart}>
+          다시 하기
+        </Button>
+        <Link
+          href={game.homePath}
+          className="flex min-h-11 flex-1 items-center justify-center rounded-full border border-white/20 text-sm font-semibold text-slate-200 hover:border-white/40"
+        >
+          나가기
+        </Link>
+      </div>
+    </div>
+  );
+}
