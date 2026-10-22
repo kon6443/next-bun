@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { WEEKLY_COMBOS } from '../../engine';
 import { type ReportSizes, campaignReport, endlessReport, reportMarkdown } from './report';
 import { withPool } from './pool';
+import { PAIR_SEEDS, WEEKLY_IMPACT_MAX, WEEKLY_IMPACT_MIN } from './weekly';
 
 /**
  * 밸런스 보고서 — 전체 매트릭스(§S5). CI에서 돌지 않는다
@@ -22,12 +23,20 @@ describe.runIf(process.env.DEFENSE_SIM === '1')('디펜스 밸런스 보고서',
     const { endless, impacts } = await withPool(async (pool) => {
       const endlessRows = await endlessReport(pool, sizes);
       // 기준(무규칙)과 쌍을 같은 seed로 — 같은 웨이브 구성·증강 제시로 비교해야 규칙 영향만 남는다
+      // 생성과 같은 정의(seed PAIR_SEEDS개 평균의 비)로, 생성에 쓰지 않은 seed(7000+)에서 잰다
       const args: [number, readonly number[], number][] = [];
-      sample.forEach((entry, i) => args.push([entry[0], entry.slice(1), 7000 + i], [entry[0], [0], 7000 + i]));
+      sample.forEach((entry, i) => {
+        for (let s = 0; s < PAIR_SEEDS; s++) args.push([entry[0], entry.slice(1), 7000 + i * PAIR_SEEDS + s], [entry[0], [0], 7000 + i * PAIR_SEEDS + s]);
+      });
       const scores = await pool.map<number>('weeklyCollapse', args);
-      return { endless: endlessRows, impacts: sample.map((_, i) => Math.round((scores[2 * i] * 1000) / Math.max(0.001, scores[2 * i + 1]))) };
+      const mean = (i: number, offset: number) => {
+        let sum = 0;
+        for (let s = 0; s < PAIR_SEEDS; s++) sum += scores[(i * PAIR_SEEDS + s) * 2 + offset];
+        return sum / PAIR_SEEDS;
+      };
+      return { endless: endlessRows, impacts: sample.map((_, i) => Math.round((mean(i, 0) * 1000) / Math.max(1, mean(i, 1)))) };
     });
-    const weekly = { evaluated: impacts.length, allowed: impacts.filter((x) => x >= 900 && x <= 1300).length, impacts };
+    const weekly = { evaluated: impacts.length, allowed: impacts.filter((x) => x >= WEEKLY_IMPACT_MIN && x <= WEEKLY_IMPACT_MAX).length, impacts };
     const markdown = reportMarkdown(campaign, endless, weekly, sizes);
     const out = process.env.DEFENSE_SIM_OUT ?? tmpdir();
     writeFileSync(join(out, 'defense-balance.md'), markdown + '\n');

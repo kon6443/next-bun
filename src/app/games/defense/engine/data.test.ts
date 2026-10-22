@@ -296,7 +296,7 @@ describe('주간 규칙 변형 15개 (§C8)', () => {
     for (let m = 0; m < WEEKLY_MAPS.length; m++) expect(WEEKLY_COMBOS.some((e) => e[0] === m)).toBe(true);
   });
 
-  // pickWeekly는 허용 목록(약 2900쌍)을 여러 번 훑는다 — 수천 seed 표본은 전체 실행(병렬 부하)에서 기본 5초를 넘길 수 있다
+  // pickWeekly는 허용 목록(수천 쌍)을 여러 번 훑는다 — 수천 seed 표본은 전체 실행(병렬 부하)에서 기본 5초를 넘길 수 있다
   const PICK_WEEKLY_TIMEOUT = 30_000;
 
   it('주간 맵은 풀 9개에 고르게 (허용 쌍 수와 무관 — 맵마다 4500 seed 중 대략 1/9)', () => {

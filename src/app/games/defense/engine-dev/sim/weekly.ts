@@ -11,8 +11,11 @@ import { runGame } from './runner';
 
 export const WEEKLY_IMPACT_MIN = 900;
 export const WEEKLY_IMPACT_MAX = 1300;
-/** 기준(무규칙)과 쌍 평가가 함께 쓰는 seed 수 — 같은 seed = 같은 웨이브 구성으로 비교한다 */
-const PAIR_SEEDS = 2;
+/**
+ * 기준(무규칙)과 쌍 평가가 함께 쓰는 seed 수 — 같은 seed = 같은 웨이브 구성으로 비교한다
+ * 2개일 때 다른 seed 재검증에서 허용 쌍의 40%만 대역 안이었다(D-031) — 6개 평균으로 구성·증강 운을 줄인다
+ */
+export const PAIR_SEEDS = 6;
 
 /** 조합 = [금지 타워 + 1, 규칙...] */
 export function allCombos(): number[][] {
