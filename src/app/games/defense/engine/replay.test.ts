@@ -31,7 +31,7 @@ describe('골든 리플레이 픽스처 (백엔드와 같은 파일)', () => {
     for (const c of cases.filter((x) => x.expected.ok)) {
       expect(simulateReplay(c.input)).toEqual(simulateReplay(c.input));
     }
-  });
+  }, 60_000); // 무한 판(5만 틱대)이 들어 있어 기본 5초를 넘을 수 있다
 });
 
 describe('실시간 기록 → 리플레이', () => {

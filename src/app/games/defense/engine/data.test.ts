@@ -6,6 +6,7 @@ import {
   KILL_REWARD_G_CAMPAIGN,
   MAX_ENEMY_HP,
   MAX_WAVE,
+  OP,
   PERMILLE,
   RANK,
   RARITY,
@@ -17,9 +18,15 @@ import {
 } from './constants';
 import { AUGMENTS } from './data/augments';
 import { ENEMIES, ENEMY_ID } from './data/enemies';
-import { MAP_E1, MAP_E2, type MapPath } from './data/maps';
-import { RULE_COUNT, RULE_ID, isWeeklyBoardKey, pickWeeklyRules, ruleEffects } from './data/rules';
-import { STAGES, resolveBoard } from './data/stages';
+import { MAP_E1, MAP_E2, MAP_ENDLESS, type MapPath } from './data/maps';
+import { RULE_COUNT, RULE_ID, WEIGHT_UNIT, conflicts, isWeeklyBoardKey, legalBans, pickWeekly, ruleEffects } from './data/rules';
+import { WEEKLY_COMBOS } from './data/weeklyCombos';
+import { CAMPAIGN_STAGES, STAGES, WEEKLY_MAPS, findStage, resolveBoard } from './data/stages';
+import { applyCommand, createGame, step } from './game';
+import { createEnemy } from './spawn';
+import { testProjectile } from '../engine-dev/fixtures';
+import { ENDLESS_DESIGNED_PRESSURE, ENDLESS_RAMP_PERMILLE } from './data/waves';
+import { DESIGNED_WAVES, endlessPressure } from './wavegen';
 import { TOWERS, TOWER_ID, type TowerStage, towerStage } from './data/towers';
 
 /** 테스트 파일은 결정성 규칙 밖 — 부동소수로 데이터를 검산한다 */
@@ -49,7 +56,7 @@ function allStages(): { kind: number; level: number; branch: number; stage: Towe
 }
 
 describe('맵 데이터 (D-021 세로 9×15 · §E1 정수 경로)', () => {
-  for (const map of [MAP_E1, MAP_E2]) {
+  for (const map of [MAP_E1, MAP_E2, ...CAMPAIGN_STAGES.map((s) => s.map), MAP_ENDLESS]) {
     it(`${map.id}: 9×15칸, 1칸 = 1000 밀리타일`, () => {
       expect(map.width).toBe(9 * TILE);
       expect(map.height).toBe(15 * TILE);
@@ -85,6 +92,19 @@ describe('맵 데이터 (D-021 세로 9×15 · §E1 정수 경로)', () => {
       }
     });
   }
+
+  it('캠페인 슬롯 8·9·10·10·11·12·12·13 (§L2) · 공중 경로는 S4부터 · 무한 슬롯 14 + 잠긴 2 · 경로는 출구(아래 끝)에서 끝난다', () => {
+    expect(CAMPAIGN_STAGES.map((s) => s.map.slots.length)).toEqual([8, 9, 10, 10, 11, 12, 12, 13]);
+    expect(CAMPAIGN_STAGES.map((s) => s.map.airPaths.length > 0)).toEqual([false, false, false, true, true, true, true, true]);
+    expect(MAP_ENDLESS.slots.filter((x) => !x.locked)).toHaveLength(14);
+    expect(MAP_ENDLESS.slots.filter((x) => x.locked)).toHaveLength(2);
+    for (const map of [...CAMPAIGN_STAGES.map((s) => s.map), MAP_ENDLESS]) {
+      for (const p of [...map.groundPaths, ...map.airPaths]) {
+        expect(p.points[1]).toBe(0);
+        expect(p.points[p.points.length - 1]).toBe(map.height);
+      }
+    }
+  });
 
   it('E1: 슬롯 8 · 공중 경로 없음 / E2: 지상 2갈래 · 공중 1 · 슬롯 14(잠긴 2개는 맨 뒤)', () => {
     expect(MAP_E1.slots).toHaveLength(8);
@@ -250,23 +270,64 @@ describe('주간 규칙 변형 15개 (§C8)', () => {
     expect(ruleEffects(0, 0)).toEqual([]);
   });
 
-  it('pickWeeklyRules: 같은 seed = 같은 결과, 2~3개, 중복·상충 없음, R6일 때만 금지 타워', () => {
-    const conflict = (a: number[], banned: number) =>
-      (a.includes(RULE_ID.GALE) && a.includes(RULE_ID.RELENTLESS)) ||
-      (a.includes(RULE_ID.RICH_START) && a.includes(RULE_ID.NO_REWARD)) ||
-      (a.includes(RULE_ID.SKY_RAID) && a.includes(RULE_ID.BAN) && (banned === TOWER_ID.CROSSBOW || banned === TOWER_ID.TESLA));
-    const sizes = new Set<number>();
-    for (let seed = 0; seed < 2000; seed++) {
-      const r = pickWeeklyRules(seed * 2654435761 % 4294967296);
-      expect(pickWeeklyRules(seed * 2654435761 % 4294967296)).toEqual(r);
-      sizes.add(r.rules.length);
-      expect(new Set(r.rules).size).toBe(r.rules.length);
-      expect(conflict(r.rules, r.bannedTower)).toBe(false);
-      expect(r.bannedTower >= 0).toBe(r.rules.includes(RULE_ID.BAN));
-      if (r.bannedTower >= 0) expect(TOWERS[r.bannedTower]).toBeDefined();
+  it('허용 목록 = (맵, 조합) 쌍: 맵 인덱스는 풀 안 · 규칙 2~3개 · 오름차순 중복 없음 · 상충 없음 · 금지 타워는 R6일 때만', () => {
+    expect(WEEKLY_COMBOS.length).toBeGreaterThan(50);
+    for (const entry of WEEKLY_COMBOS) {
+      expect(entry[0] >= 0 && entry[0] < WEEKLY_MAPS.length).toBe(true);
+      const banned = entry[1] - 1;
+      const rules = entry.slice(2);
+      expect(rules.length >= 2 && rules.length <= 3).toBe(true);
+      for (let i = 0; i < rules.length; i++) {
+        expect(rules[i] >= 1 && rules[i] <= RULE_COUNT).toBe(true);
+        if (i > 0) expect(rules[i]).toBeGreaterThan(rules[i - 1]);
+        for (let j = i + 1; j < rules.length; j++) expect(conflicts(rules[i], rules[j], banned)).toBe(false);
+      }
+      expect(banned >= 0).toBe(rules.includes(RULE_ID.BAN));
+      if (banned >= 0) expect(TOWERS[banned]).toBeDefined();
     }
-    expect([...sizes].sort()).toEqual([2, 3]);
   });
+
+  it('주간 뽑기 전제 — 규칙 id가 16진 한 자리(RULE_COUNT < 16) · R6 조합의 합법 금지 타워 수가 WEIGHT_UNIT을 나눠떨어뜨린다', () => {
+    expect(RULE_COUNT).toBeLessThan(16);
+    for (const entry of WEEKLY_COMBOS) if (entry[1] > 0) expect(WEIGHT_UNIT % legalBans(entry)).toBe(0);
+  });
+
+  it('주간 허용 목록: 풀의 맵 9개마다 허용 항목이 하나 이상 (어떤 주간 seed도 빈 목록에 닿지 않는다)', () => {
+    for (let m = 0; m < WEEKLY_MAPS.length; m++) expect(WEEKLY_COMBOS.some((e) => e[0] === m)).toBe(true);
+  });
+
+  // pickWeekly는 허용 목록(약 2900쌍)을 여러 번 훑는다 — 수천 seed 표본은 전체 실행(병렬 부하)에서 기본 5초를 넘길 수 있다
+  const PICK_WEEKLY_TIMEOUT = 30_000;
+
+  it('주간 맵은 풀 9개에 고르게 (허용 쌍 수와 무관 — 맵마다 4500 seed 중 대략 1/9)', () => {
+    const counts = WEEKLY_MAPS.map(() => 0);
+    for (let seed = 0; seed < 4500; seed++) counts[pickWeekly((seed * 2654435761) % 4294967296).mapIndex]++;
+    for (const c of counts) expect(c > 380 && c < 620).toBe(true);
+  }, PICK_WEEKLY_TIMEOUT);
+
+  it('주간 규칙 분포 — 규칙 2·3개가 대략 반반 · R6(금지) 조합이 금지 타워 변형 수만큼 부풀지 않는다', () => {
+    let three = 0;
+    let ban = 0;
+    const N = 6000;
+    for (let seed = 0; seed < N; seed++) {
+      const r = pickWeekly((seed * 2654435761) % 4294967296);
+      if (r.rules.length === 3) three++;
+      if (r.rules.includes(RULE_ID.BAN)) ban++;
+    }
+    expect(three / N).toBeGreaterThan(0.4);
+    expect(three / N).toBeLessThan(0.6);
+    expect(ban / N).toBeLessThan(0.3);
+  }, PICK_WEEKLY_TIMEOUT);
+
+  it('pickWeekly: 같은 seed = 같은 결과 · 허용 목록 안 (맵, 조합) 쌍', () => {
+    const listed = new Set(WEEKLY_COMBOS.map((c) => c.join(',')));
+    for (let seed = 0; seed < 500; seed++) {
+      const s = (seed * 2654435761) % 4294967296;
+      const r = pickWeekly(s);
+      expect(pickWeekly(s)).toEqual(r);
+      expect(listed.has([r.mapIndex, r.bannedTower + 1, ...r.rules].join(','))).toBe(true);
+    }
+  }, PICK_WEEKLY_TIMEOUT);
 
   it('isWeeklyBoardKey: weekly-YYYY-wNN (01~53)', () => {
     for (const key of ['weekly-2026-w01', 'weekly-2026-w43', 'weekly-2027-w53']) expect(isWeeklyBoardKey(key)).toBe(true);
@@ -301,12 +362,90 @@ describe('스테이지·보드', () => {
     for (let id = 0; id <= ENEMY_ID.DRAGON; id++) expect(used.has(id)).toBe(true);
   });
 
-  it('resolveBoard: 캠페인 = 스테이지 id · 무한·주간은 S1 전까지 null', () => {
-    expect(resolveBoard('campaign', 'e1')?.id).toBe('e1');
-    expect(resolveBoard('campaign', 'nope')).toBeNull();
-    expect(resolveBoard('endless', 'endless-s1')).toBeNull();
-    expect(resolveBoard('weekly', 'weekly-2026-w43')).toBeNull();
-    expect(resolveBoard('endless', 'e1')).toBeNull();
+  it('캠페인 웨이브 공중 비율 — 보스·첫 등장 단독 웨이브를 빼면 공중 HP 비중 ≤ 480‰ (§L3-5, 생성 데이터 회귀)', () => {
+    for (const stage of CAMPAIGN_STAGES) {
+      stage.waves.forEach((wave, i) => {
+        const hp = (g: { enemyId: number; hp: number; count: number }) => g.hp * g.count * ENEMIES[g.enemyId].swarm;
+        const all = wave.groups.reduce((s, g) => s + hp(g), 0);
+        const air = wave.groups.filter((g) => ENEMIES[g.enemyId].air).reduce((s, g) => s + hp(g), 0);
+        const solo = new Set(wave.groups.map((g) => g.enemyId)).size === 1;
+        const boss = i === stage.waves.length - 1 || wave.groups.some((g) => g.count === 1 && ENEMIES[g.enemyId].rank === 2);
+        if (!solo && !boss) expect((air * 1000) / all).toBeLessThanOrEqual(480);
+      });
+    }
+  });
+
+  it('캠페인 §L2: 웨이브 6·8·8·8·10·10·10·12 · 시작 골드 · 상한 Lv3/4/5 · 스테이지마다 새 타워', () => {
+    expect(CAMPAIGN_STAGES.map((s) => s.waves.length)).toEqual([6, 8, 8, 8, 10, 10, 10, 12]);
+    expect(CAMPAIGN_STAGES.map((s) => s.startGold)).toEqual([220, 260, 300, 340, 380, 420, 460, 500]);
+    expect(CAMPAIGN_STAGES.map((s) => s.maxLevel)).toEqual([3, 4, 4, 4, 5, 5, 5, 5]);
+    expect(CAMPAIGN_STAGES.map((s) => s.towers.length)).toEqual([2, 3, 4, 5, 5, 6, 6, 6]);
+    // 마지막 웨이브는 보스(호위 + 단일 대형), S8 최종은 용
+    for (const stage of CAMPAIGN_STAGES) expect(stage.waves[stage.waves.length - 1].groups.some((g) => g.count === 1)).toBe(true);
+    expect(CAMPAIGN_STAGES[7].waves[11].groups.some((g) => g.enemyId === ENEMY_ID.DRAGON)).toBe(true);
+  });
+
+  it('난이도 접미사 — 쉬움 HP 800·비용 850 / 어려움 HP 1200·비용 1080 (§L5) — 킬 보상은 난이도 HP 배율 전 기준이라 모드와 무관', () => {
+    expect([findStage('s3')?.effects, findStage('s3')?.difficultyHp]).toEqual([[], 1000]);
+    expect([findStage('s3-easy')?.effects.map((e) => e.value), findStage('s3-easy')?.difficultyHp]).toEqual([[850], 800]);
+    expect([findStage('s3-hard')?.effects.map((e) => e.value), findStage('s3-hard')?.difficultyHp]).toEqual([[1080], 1200]);
+    const rewards = (id: string) => {
+      const state = createGame(findStage(id)!, 1);
+      applyCommand(state, OP.CALL_WAVE);
+      for (let t = 0; t < 400; t++) step(state);
+      return state.enemies.map((e) => [e.maxHp, e.reward]);
+    };
+    const normal = rewards('s4');
+    const hard = rewards('s4-hard');
+    expect(hard.map((r) => r[1])).toEqual(normal.map((r) => r[1]));
+    expect(hard.every((r, i) => r[0] >= normal[i][0])).toBe(true);
+    expect(normal.every((r) => r[1] >= 1)).toBe(true);
+    // 분열 새끼(파생)도 — 부모 최대 HP(난이도 배율 포함)에서 나오지만 보상은 모드와 무관
+    const childRewards = (id: string, hp: number) => {
+      const stage = findStage(id)!;
+      const state = createGame(stage, 1);
+      const parent = createEnemy(state, stage, { kind: ENEMY_ID.SPLITTER, hp, wave: 1, path: 0, dist: 1000, derived: false, rewardHp: 1000 }, null);
+      state.projectiles.push(testProjectile(state, { targetId: parent.id, damage: 100000, damageType: 2 }));
+      step(state);
+      return state.enemies.filter((e) => e.kind === ENEMY_ID.SPLITLING).map((e) => [e.rewardHp, e.reward]);
+    };
+    const hardChildren = childRewards('s3-hard', 1200);
+    expect(hardChildren).toHaveLength(3);
+    expect(hardChildren).toEqual(childRewards('s3', 1000));
+    expect(findStage('s3-hard')?.waves).toBe(findStage('s3')?.waves);
+    expect(findStage('s9-hard')).toBeNull();
+  });
+
+  it('resolveBoard: 캠페인 = 스테이지 id · 무한 endless-s1 · 주간 weekly-YYYY-wNN — 그 밖은 null', () => {
+    expect(resolveBoard('campaign', 'e1', 1)?.id).toBe('e1');
+    expect(resolveBoard('campaign', 'nope', 1)).toBeNull();
+    expect(resolveBoard('endless', 'e1', 1)).toBeNull();
+    expect(resolveBoard('endless', 'endless-s2', 1)).toBeNull();
+    expect(resolveBoard('weekly', 'weekly-2026-w00', 1)).toBeNull();
+    expect(resolveBoard('versus', 'endless-s1', 1)).toBeNull();
+    const endless = resolveBoard('endless', 'endless-s1', 5)!;
+    expect([endless.id, endless.map.id, endless.waves.length, endless.augmentGuarantee, endless.rampFrom]).toEqual(['endless-s1', 'endless', MAX_WAVE, true, 30]);
+    const weekly = resolveBoard('weekly', 'weekly-2026-w43', 5)!;
+    expect([weekly.id, weekly.waves.length, weekly.augmentGuarantee]).toEqual(['weekly-2026-w43', MAX_WAVE, false]);
+    expect(weekly.rules.length >= 2).toBe(true);
+  });
+
+  it('무한 웨이브: 같은 seed = 같은 구성 · seed가 다르면 구성이 다르다 · 정수·상한 안', () => {
+    const a = resolveBoard('endless', 'endless-s1', 1)!.waves;
+    expect(resolveBoard('endless', 'endless-s1', 1)!.waves).toEqual(a);
+    expect(resolveBoard('endless', 'endless-s1', 2)!.waves).not.toEqual(a);
+    for (const wave of a) {
+      expect(wave.groups.length).toBeGreaterThan(0);
+      for (const g of wave.groups) expect(Number.isInteger(g.hp) && g.hp > 0 && g.hp <= MAX_ENEMY_HP && g.count > 0).toBe(true);
+    }
+  });
+
+  it('무한 압력: 설계 1~30 = 정적 표 · 31+ 램프는 같은 역할끼리 단조 증가', () => {
+    expect(ENDLESS_DESIGNED_PRESSURE).toHaveLength(DESIGNED_WAVES);
+    for (let n = 1; n <= DESIGNED_WAVES; n++) expect(endlessPressure(ENDLESS_DESIGNED_PRESSURE, n, ENDLESS_RAMP_PERMILLE)).toBe(ENDLESS_DESIGNED_PRESSURE[n - 1]);
+    for (let n = DESIGNED_WAVES + 1; n + 5 <= MAX_WAVE; n++) {
+      expect(endlessPressure(ENDLESS_DESIGNED_PRESSURE, n + 5, ENDLESS_RAMP_PERMILLE)).toBeGreaterThanOrEqual(endlessPressure(ENDLESS_DESIGNED_PRESSURE, n, ENDLESS_RAMP_PERMILLE));
+    }
   });
 });
 

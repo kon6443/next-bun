@@ -19,7 +19,8 @@ import {
 import { AUGMENTS } from './data/augments';
 import { ENEMY_ID } from './data/enemies';
 import { RULE_ID, ruleEffects } from './data/rules';
-import { STAGE_E2, STAGE_E2_RULES, type Stage } from './data/stages';
+import { STAGE_E2, STAGE_E2_RULES, type Stage, endlessBoard } from './data/stages';
+import { MAP_ENDLESS, MAP_S2 } from './data/maps';
 import { TOWER_ID } from './data/towers';
 import { computeDamage } from './damage';
 import { type Effect, flagValue, hasFlag, statValue } from './effects';
@@ -809,6 +810,21 @@ describe('증강 제시·선택', () => {
       const banned = offer((s) => (s.bannedTower = TOWER_ID.TESLA), 9, seed);
       for (const id of [10, 11, 13]) expect(banned).not.toContain(id);
     }
+  });
+
+  it('개척(23)은 잠긴 슬롯이 없는 맵(캠페인 맵 주간)에서는 제시하지 않는다 — 무한 맵에서는 나온다', () => {
+    const offered = (stage: Stage) => {
+      let seen = false;
+      for (let seed = 0; seed < 300; seed++) {
+        const s = createGame(stage, seed);
+        s.offersOpened = 9;
+        offerAugments(s, stage);
+        if (s.augmentChoices.includes(23)) seen = true;
+      }
+      return seen;
+    };
+    expect(offered(endlessBoard('weekly-test', MAP_S2, 1, [], -1, false))).toBe(false);
+    expect(offered(endlessBoard('weekly-test', MAP_ENDLESS, 1, [], -1, false))).toBe(true);
   });
 
   it('희귀 보장 카운터: 희귀 이상 없는 제시마다 +1, 있으면 0 · 희귀 이상이 남지 않으면 일반으로 채운다', () => {
