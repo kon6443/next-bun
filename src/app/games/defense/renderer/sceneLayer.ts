@@ -1,5 +1,5 @@
 import { interpolatePositions } from './interpolate';
-import { COLORS, DAMAGE_COLORS, ELEMENT_COLORS, ENEMY_COLORS, TOWER_COLORS } from './palette';
+import { COLORS, DAMAGE_COLORS, ELEMENT_COLORS, ENEMY_COLORS, ENEMY_SCALE, TOWER_COLORS } from './palette';
 import type { DamageNumberPool, ParticlePool } from './particles';
 import type { RenderEnemy, RenderView } from './renderView';
 import { type Viewport, toScreenX, toScreenY } from './viewport';
@@ -42,7 +42,7 @@ export function createSceneScratch(): SceneScratch {
 }
 
 /** 적 배열은 id 오름차순 — 포신이 겨눌 표적 인덱스 */
-function findEnemyIndex(list: readonly RenderEnemy[], id: number): number {
+export function findEnemyIndex(list: readonly RenderEnemy[], id: number): number {
   let lo = 0;
   let hi = list.length - 1;
   while (lo <= hi) {
@@ -53,6 +53,89 @@ function findEnemyIndex(list: readonly RenderEnemy[], id: number): number {
     else hi = mid - 1;
   }
   return -1;
+}
+
+/**
+ * 타워 몸 실루엣 (§F10 — 색만으로 구분하지 않는다): 궁수 삼각 지붕 · 대포 원통 · 마법 마름모 수정 · 서리 육각 결정 · 석궁 Y자 · 테슬라 코일
+ * 현재 path에 덧붙이기만 한다(같은 종류는 한 번에 fill)
+ */
+export function traceTowerBody(ctx: CanvasRenderingContext2D, kind: number, cx: number, cy: number, r: number): void {
+  switch (kind) {
+    case 1: // 대포 — 원통
+      ctx.moveTo(cx + r * 0.8, cy);
+      ctx.arc(cx, cy, r * 0.8, 0, Math.PI * 2);
+      return;
+    case 2: // 마법 — 마름모 수정
+      ctx.moveTo(cx, cy - r);
+      ctx.lineTo(cx + r * 0.65, cy);
+      ctx.lineTo(cx, cy + r);
+      ctx.lineTo(cx - r * 0.65, cy);
+      ctx.closePath();
+      return;
+    case 3: // 서리 — 육각 결정
+      for (let i = 0; i < 6; i++) {
+        const a = (Math.PI / 3) * i - Math.PI / 2;
+        const px = cx + Math.cos(a) * r * 0.85;
+        const py = cy + Math.sin(a) * r * 0.85;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      return;
+    case 4: // 석궁 — Y자
+      ctx.moveTo(cx - r * 0.9, cy - r * 0.8);
+      ctx.lineTo(cx - r * 0.45, cy - r * 0.8);
+      ctx.lineTo(cx, cy - r * 0.15);
+      ctx.lineTo(cx + r * 0.45, cy - r * 0.8);
+      ctx.lineTo(cx + r * 0.9, cy - r * 0.8);
+      ctx.lineTo(cx + r * 0.25, cy + r * 0.1);
+      ctx.lineTo(cx + r * 0.25, cy + r * 0.85);
+      ctx.lineTo(cx - r * 0.25, cy + r * 0.85);
+      ctx.lineTo(cx - r * 0.25, cy + r * 0.1);
+      ctx.closePath();
+      return;
+    case 5: // 테슬라 — 코일(기둥 + 구)
+      ctx.rect(cx - r * 0.3, cy - r * 0.2, r * 0.6, r);
+      ctx.moveTo(cx + r * 0.45, cy - r * 0.45);
+      ctx.arc(cx, cy - r * 0.45, r * 0.45, 0, Math.PI * 2);
+      return;
+    default: // 궁수 — 삼각 지붕
+      ctx.moveTo(cx, cy - r);
+      ctx.lineTo(cx + r * 0.87, cy + r * 0.5);
+      ctx.lineTo(cx - r * 0.87, cy + r * 0.5);
+      ctx.closePath();
+  }
+}
+
+/** 선택 오버레이 — 슬롯 강조 고리 + 사거리 원(미리보기). 맵 좌표(밀리타일) */
+export type SelectionOverlay = { x: number; y: number; range: number };
+
+export function drawSelection(ctx: CanvasRenderingContext2D, selection: SelectionOverlay, viewport: Viewport): void {
+  const cx = toScreenX(viewport, selection.x);
+  const cy = toScreenY(viewport, selection.y);
+  ctx.lineWidth = Math.max(1.5, 50 * viewport.scale);
+  ctx.strokeStyle = COLORS.levelPip;
+  ctx.beginPath();
+  ctx.arc(cx, cy, TOWER_BASE_RADIUS * 1.25 * viewport.scale, 0, Math.PI * 2);
+  ctx.stroke();
+  if (selection.range <= 0) return;
+  ctx.fillStyle = COLORS.rangeFill;
+  ctx.strokeStyle = COLORS.rangeEdge;
+  ctx.beginPath();
+  ctx.arc(cx, cy, selection.range * viewport.scale, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+}
+
+/** 누수 경고 — 화면 가장자리 빨간 맥동 (§F8). strength 0~1 */
+export function drawLeakPulse(ctx: CanvasRenderingContext2D, viewport: Viewport, strength: number): void {
+  if (strength <= 0) return;
+  const width = Math.max(4, Math.min(viewport.width, viewport.height) * 0.03);
+  ctx.globalAlpha = Math.min(1, strength) * 0.7;
+  ctx.strokeStyle = COLORS.hpLow;
+  ctx.lineWidth = width;
+  ctx.strokeRect(width / 2, width / 2, viewport.width - width, viewport.height - width);
+  ctx.globalAlpha = 1;
 }
 
 /** 글꼴 문자열 — 크기가 같으면 같은 문자열을 돌려줘 매 프레임 새로 만들지 않는다 */
@@ -86,21 +169,19 @@ export function drawSceneLayer(ctx: CanvasRenderingContext2D, frame: SceneFrame,
     ctx.arc(sx(t.x), sy(t.y), baseR, 0, Math.PI * 2);
   }
   ctx.fill();
+  // 종류별 한 path — 화면에 없는 종류는 fill하지 않는다(종류가 늘어도 fill 수 = 보이는 종류 수)
   for (let kind = 0; kind < TOWER_COLORS.length; kind++) {
-    ctx.fillStyle = TOWER_COLORS[kind];
-    ctx.beginPath();
+    let any = false;
     for (const t of curr.towers) {
       if (t.kind !== kind) continue;
-      // 궁수탑 = 삼각 지붕 (6종 실루엣은 E2에서 채운다)
-      const cx = sx(t.x);
-      const cy = sy(t.y);
-      const r = baseR * (0.7 + t.level * 0.06);
-      ctx.moveTo(cx, cy - r);
-      ctx.lineTo(cx + r * 0.87, cy + r * 0.5);
-      ctx.lineTo(cx - r * 0.87, cy + r * 0.5);
-      ctx.closePath();
+      if (!any) {
+        ctx.fillStyle = TOWER_COLORS[kind];
+        ctx.beginPath();
+        any = true;
+      }
+      traceTowerBody(ctx, kind, sx(t.x), sy(t.y), baseR * (0.7 + t.level * 0.06));
     }
-    ctx.fill();
+    if (any) ctx.fill();
   }
   ctx.strokeStyle = COLORS.background;
   ctx.lineWidth = Math.max(1.5, 90 * scale);
@@ -146,24 +227,29 @@ export function drawSceneLayer(ctx: CanvasRenderingContext2D, frame: SceneFrame,
       ctx.fill();
     }
     for (let kind = 0; kind < ENEMY_COLORS.length; kind++) {
-      ctx.fillStyle = ENEMY_COLORS[kind];
-      ctx.beginPath();
+      let any = false;
+      const r = enemyR * (ENEMY_SCALE[kind] ?? 1);
       for (let i = 0; i < curr.enemies.length; i++) {
         const e = curr.enemies[i];
         if (e.kind !== kind || e.air !== air) continue;
+        if (!any) {
+          ctx.fillStyle = ENEMY_COLORS[kind];
+          ctx.beginPath();
+          any = true;
+        }
         const ex = sx(enemyXY[i * 2]);
         const ey = sy(enemyXY[i * 2 + 1]) + wobble(e.id) - (air ? AIR_LIFT * scale : 0);
         if (air) {
-          ctx.moveTo(ex, ey - enemyR);
-          ctx.lineTo(ex + enemyR, ey + enemyR * 0.6);
-          ctx.lineTo(ex - enemyR, ey + enemyR * 0.6);
+          ctx.moveTo(ex, ey - r);
+          ctx.lineTo(ex + r, ey + r * 0.6);
+          ctx.lineTo(ex - r, ey + r * 0.6);
           ctx.closePath();
         } else {
-          ctx.moveTo(ex + enemyR, ey);
-          ctx.arc(ex, ey, enemyR, 0, Math.PI * 2);
+          ctx.moveTo(ex + r, ey);
+          ctx.arc(ex, ey, r, 0, Math.PI * 2);
         }
       }
-      ctx.fill();
+      if (any) ctx.fill();
     }
   }
 

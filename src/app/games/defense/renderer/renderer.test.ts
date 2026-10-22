@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { interpolatePositions } from './interpolate';
 import { DamageNumberPool, ParticlePool } from './particles';
+import { ENEMY_COLORS, TOWER_COLORS } from './palette';
 import { QUALITY_LEVELS, QualityController } from './quality';
 import { createRenderView, type RenderView } from './renderView';
 import { createSceneScratch, drawSceneLayer } from './sceneLayer';
@@ -151,6 +152,35 @@ describe('drawSceneLayer — 묶어 그리기·금지 API', () => {
     expect(big.calls.fill).toBe(small.calls.fill);
     expect(big.calls.fill).toBeLessThan(25);
     expect(big.calls.arc).toBeGreaterThan(small.calls.arc);
+  });
+
+  it('타워 6종·적 12종(지상·공중) 모두 제 색으로 그린다 — 없는 종류는 fill하지 않는다', () => {
+    const fills: string[] = [];
+    let style = '';
+    const ctx = new Proxy(
+      {},
+      {
+        get: (_t, prop: string) => () => {
+          if (prop === 'fill') fills.push(style);
+        },
+        set: (_t, prop: string, value) => {
+          if (prop === 'fillStyle') style = String(value);
+          return true;
+        },
+      },
+    ) as unknown as CanvasRenderingContext2D;
+    const v = createRenderView();
+    TOWER_COLORS.forEach((_, kind) => v.towers.push({ id: kind + 1, slot: kind, kind, level: 1, branch: 0, x: 1000 * kind, y: 1000, targetId: 0, ultCooldown: 0 }));
+    ENEMY_COLORS.forEach((_, kind) => v.enemies.push({ id: kind + 1, kind, x: 500 * kind, y: 5000, hp: 10, maxHp: 10, effects: 0, air: kind % 2 === 1 }));
+    drawSceneLayer(ctx, frame(v, false), vp, createSceneScratch());
+    for (const color of [...TOWER_COLORS, ...ENEMY_COLORS]) expect(fills).toContain(color);
+    const towersOnly = createRenderView();
+    towersOnly.towers.push({ id: 1, slot: 0, kind: 1, level: 1, branch: 0, x: 0, y: 0, targetId: 0, ultCooldown: 0 });
+    fills.length = 0;
+    // 파티클·투사체 없이 — 원소·피해 색이 타워 색과 겹친다(대포 = 물리, 서리 = 얼음, 테슬라 = 번개)
+    const empty = { prev: towersOnly, curr: towersOnly, alpha: 1, particles: new ParticlePool(1), numbers: new DamageNumberPool(1), showDamageNumbers: false, timeMs: 0 };
+    drawSceneLayer(ctx, empty, vp, createSceneScratch());
+    expect(fills.filter((c) => TOWER_COLORS.includes(c))).toEqual([TOWER_COLORS[1]]);
   });
 
   it('데미지 숫자를 그릴 때마다 글꼴을 대입한다 — 캔버스 리사이즈로 컨텍스트 상태가 초기화돼도 크기가 유지된다', () => {

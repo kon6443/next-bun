@@ -27,9 +27,19 @@ export const COLORS = {
   shadow: 'rgba(2, 6, 23, 0.55)',
   levelPip: '#fde68a',
   damageText: '#fef3c7',
+  /** 사거리 미리보기 */
+  rangeFill: 'rgba(253, 230, 138, 0.10)',
+  rangeEdge: 'rgba(253, 230, 138, 0.55)',
 } as const;
 
-/** 적 종류별 몸 색 — 인덱스 = ENEMY_ID */
-export const ENEMY_COLORS: readonly string[] = ['#e2e8f0'];
-/** 타워 종류별 몸 색 — 인덱스 = TOWER_ID */
-export const TOWER_COLORS: readonly string[] = ['#fbbf24'];
+/**
+ * 적 종류별 몸 색 — 인덱스 = ENEMY_ID
+ * 졸개 · 질주병 · 방패병 · 분열체 · 박쥐 떼 · 소환사 · 유령 · 와이번 · 사제 · 공성 거인 · 용 · 분열체 새끼
+ */
+export const ENEMY_COLORS: readonly string[] = [
+  '#e2e8f0', '#fca5a5', '#94a3b8', '#86efac', '#c4b5fd', '#f0abfc', '#bae6fd', '#fdba74', '#fef08a', '#a8a29e', '#f87171', '#bbf7d0',
+];
+/** 적 종류별 크기 배율 — 엘리트(공성 거인) 1.4 · 보스(소환사·용) 2 · 새끼 0.6 (§F8 보스는 2~3배) */
+export const ENEMY_SCALE: readonly number[] = [1, 0.9, 1.1, 1, 0.6, 2, 1, 1, 1, 1.4, 2, 0.6];
+/** 타워 종류별 몸 색 — 인덱스 = TOWER_ID (궁수 · 대포 · 마법 · 서리 · 석궁 · 테슬라) */
+export const TOWER_COLORS: readonly string[] = ['#fbbf24', '#cbd5e1', '#a78bfa', '#67e8f9', '#f472b6', '#facc15'];
