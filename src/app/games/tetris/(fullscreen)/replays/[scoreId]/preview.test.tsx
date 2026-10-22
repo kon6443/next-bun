@@ -4,11 +4,12 @@ const getGameScoreSummary = vi.fn();
 vi.mock('@/services/gameServerService', () => ({ getGameScoreSummary: (...a: unknown[]) => getGameScoreSummary(...a) }));
 // 폰트는 외부 네트워크 — 테스트에서는 못 받은 경우(ASCII 카드)로 고정
 const loadKoreanFont = vi.fn();
-vi.mock('../../../lib/ogFont', () => ({ loadKoreanFont: (...a: unknown[]) => loadKoreanFont(...a) }));
+vi.mock('@/app/games/_shared/lib/ogFont', () => ({ loadKoreanFont: (...a: unknown[]) => loadKoreanFont(...a) }));
 
 import { generateMetadata } from './page';
 import { GET } from '../../../replays/[scoreId]/og/route';
-import { replayImageUrl } from '../../../lib/share';
+import { absoluteUrl } from '@/app/games/_shared/lib/shareSpec';
+import { TETRIS_SHARE } from '../../../lib/share';
 
 const summary = {
   rank: 2,
@@ -43,7 +44,7 @@ describe('리플레이 링크 미리보기 (DESIGN §3)', () => {
     const meta = await generateMetadata(params('12'));
     const og = meta.openGraph as { images: { url: string }[]; siteName: string };
     expect(og.images[0].url).toBe('/games/tetris/replays/12/og');
-    expect(replayImageUrl(12).endsWith(og.images[0].url)).toBe(true);
+    expect(absoluteUrl(TETRIS_SHARE.imagePath(12)).endsWith(og.images[0].url)).toBe(true);
     expect(og.siteName).toBe('FiveSouth');
   });
 

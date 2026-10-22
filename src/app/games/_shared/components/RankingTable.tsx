@@ -1,11 +1,12 @@
 import Link from "next/link";
-import type { RankingItem } from "@/types/game";
+import type { GameType, RankingItem, ScoreDetailByGame } from "@/types/game";
 import { formatFullDateTime } from "@/app/utils/taskUtils";
-import { formatFrames, formatScore } from "../lib/format";
-import { FRAMES_PER_SECOND } from "../engine";
+import { formatScore } from "../lib/format";
+import type { GameUiConfig } from "../lib/gameConfig";
 
-type RankingTableProps = {
-  items: RankingItem[];
+type RankingTableProps<G extends GameType> = {
+  game: GameUiConfig<G>;
+  items: RankingItem<ScoreDetailByGame[G]>[];
   /** 이 브라우저에서 등록한 기록 — "나" 배지 */
   myScoreIds: ReadonlySet<number>;
   /** 링크로 가리킨 기록 (?highlight=) — 테두리 강조만, "나"로 단정하지 않는다 */
@@ -16,7 +17,7 @@ type RankingTableProps = {
 const medal = (rank: number) => (rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : null);
 
 /** 랭킹 목록 — 좁은 화면에서도 가로 스크롤 없이 카드형 행 */
-export function RankingTable({ items, myScoreIds, highlightId = null, compact = false }: RankingTableProps) {
+export function RankingTable<G extends GameType>({ game, items, myScoreIds, highlightId = null, compact = false }: RankingTableProps<G>) {
   return (
     <ol className="grid gap-2">
       {items.map((item) => {
@@ -44,16 +45,14 @@ export function RankingTable({ items, myScoreIds, highlightId = null, compact = 
               </p>
               {!compact && (
                 <p className="mt-0.5 truncate text-xs text-slate-500">
-                  {item.detail.lines}줄 · 레벨 {item.detail.level} ·{" "}
-                  {formatFrames(Math.round((item.durationMs * FRAMES_PER_SECOND) / 1000))} ·{" "}
-                  {formatFullDateTime(new Date(item.createdAt))}
+                  {game.rankingDetail(item)} · {formatFullDateTime(new Date(item.createdAt))}
                 </p>
               )}
             </div>
             <span className="shrink-0 text-sm font-bold tabular-nums text-white">{formatScore(item.score)}</span>
             {!compact && (
               <Link
-                href={`/games/tetris/replays/${item.scoreId}`}
+                href={game.replayPath(item.scoreId)}
                 aria-label={`${item.playerName} ${item.rank}위 리플레이 보기`}
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/15 text-sm text-slate-200 hover:border-sky-400/60"
               >

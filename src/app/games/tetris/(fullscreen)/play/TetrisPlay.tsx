@@ -9,14 +9,14 @@ import { ApiError } from "@/types/api";
 import type { GameSession, ReplayPayload } from "@/types/game";
 import { extractErrorMessage } from "@/app/utils/errorUtils";
 import { ENGINE_VERSION, type GameState, MAX_FRAMES, MAX_INPUT_LENGTH } from "../../engine";
-import { normalizePlayerName, validatePlayerName } from "../../lib/playerName";
+import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
 import { TetrisCanvas } from "../../components/TetrisCanvas";
 import { TouchControls } from "../../components/TouchControls";
 import { EffectsToggle } from "../../components/EffectsToggle";
 import { type GameResult, GameOverPanel } from "../../components/GameOverPanel";
 import { useTetrisPlay } from "../../hooks/useTetrisPlay";
 import { CONTROL_GUIDE } from "../../lib/controls";
-import { formatFrames, formatScore } from "../../lib/format";
+import { formatFrames, formatScore } from "@/app/games/_shared/lib/format";
 import { type TetrisSettings, DEFAULT_SETTINGS, loadLastName, loadSettings, recordBestScore } from "../../lib/storage";
 
 type SessionState =

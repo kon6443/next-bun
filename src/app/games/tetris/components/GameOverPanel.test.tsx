@@ -28,6 +28,7 @@ describe('GameOverPanel 예상 순위 요청', () => {
     getGameRankings.mockReset();
     submitGameScore.mockReset();
     window.sessionStorage.clear();
+    window.localStorage.clear();
   });
 
   it('StrictMode(effect 두 번 실행)에서도 게임 오버 1회에 기간별 1번씩 3요청', async () => {
@@ -59,6 +60,25 @@ describe('GameOverPanel 예상 순위 요청', () => {
       fireEvent.change(screen.getByLabelText('랭킹에 올릴 이름'), { target: { value: '다른이름' } });
     });
     expect(getGameRankings).toHaveBeenCalledTimes(3);
+  });
+
+  it('등록 성공: 서버 순위·다시보기·랭킹 강조 링크(테트리스 경로), 내 기록·이름 저장', async () => {
+    getGameRankings.mockResolvedValue(page([]));
+    submitGameScore.mockResolvedValue({ code: 'SUCCESS', message: 'ok', data: { scoreId: 9, score: 510, detail: {}, ranks: { daily: 1, weekly: 2, all: 3 } } });
+    await act(async () => {
+      render(<GameOverPanel {...props} />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    expect(submitGameScore).toHaveBeenCalledWith('tetris', { sessionId: 'session-1', playerName: '테스터', replay: props.replay }, undefined);
+    expect(screen.getByText('510')).toBeTruthy();
+    expect(screen.getAllByText(/^[123]위$/).map((el) => el.textContent)).toEqual(['1위', '2위', '3위']);
+    expect(screen.getByRole('link', { name: /내 플레이 다시보기/ }).getAttribute('href')).toBe('/games/tetris/replays/9');
+    expect(screen.getByRole('link', { name: '랭킹 보기' }).getAttribute('href')).toBe('/games/tetris/rankings?highlight=9');
+    expect(screen.getByRole('link', { name: '나가기' }).getAttribute('href')).toBe('/games/tetris');
+    expect(window.localStorage.getItem('tetris:myScoreIds')).toBe('[9]');
+    expect(window.localStorage.getItem('tetris:lastName')).toBe('테스터');
   });
 
   it('조회 실패(429)는 재시도하지 않고 "—"', async () => {

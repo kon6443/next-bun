@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import { Button, LoadingSpinnerSimple } from "@/app/teams/components";
 import { baseInputStyles } from "@/app/teams/components/FormInput";
 import { ROOM_PASSWORD_MAX_LENGTH, TetrisBattleErrorCodes } from "@/types/tetrisBattleSocket";
-import { PLAYER_NAME_MAX_LENGTH } from "../../lib/playerName";
+import { PLAYER_NAME_MAX_LENGTH } from "@/app/games/_shared/lib/playerName";
 import { useBattleSocket, useEnterScope } from "../contexts/BattleSocketContext";
 import { usePlayerName } from "../hooks/usePlayerName";
 import { battleErrorMessage } from "../lib/battleErrors";
