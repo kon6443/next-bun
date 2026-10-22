@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { ACTION, BOARD_WIDTH, type GameState, PIECE, SPAWN_Y, createGame, getBoardHash, getDropY, stepFrame } from '../engine';
 import {
+  MAX_CUES,
   MAX_PARTICLES,
   comboTier,
   createEffectTracker,
+  drainCues,
+  noteGarbageRise,
   observeAfter,
   observeBefore,
   resetEffects,
@@ -60,6 +63,7 @@ describe('연출 기록', () => {
     const g = newGame();
     const fx = createEffectTracker();
     for (let i = 0; i < 4; i++) fillRow(g, 39 - i, [9]);
+    g.board[34 * BOARD_WIDTH] = 7; // 남는 칸 — 퍼펙트 클리어가 아니게
     setVerticalI(g);
     step(fx, g, ACTION.HARD_DROP);
     expect(g.lastLock?.lines).toBe(4);
@@ -72,6 +76,7 @@ describe('연출 기록', () => {
     const g = newGame();
     const fx = createEffectTracker();
     for (let i = 0; i < 8; i++) fillRow(g, 39 - i, [9]);
+    g.board[30 * BOARD_WIDTH] = 7; // 남는 칸 — 퍼펙트 클리어가 아니게
     setVerticalI(g);
     step(fx, g, ACTION.HARD_DROP);
     while (!g.active) step(fx, g);
@@ -175,5 +180,122 @@ describe('연출 줄이기 설정', () => {
     expect(resolveReducedEffects('auto', false)).toBe(false);
     expect(resolveReducedEffects('on', false)).toBe(true);
     expect(resolveReducedEffects('off', true)).toBe(false);
+  });
+});
+
+describe('연출 2차 — 충격파·콤보 미터·퍼펙트 클리어·가비지 상승', () => {
+  it('줄 삭제는 지운 줄 가운데에서 충격파, 테트리스는 큰 충격파', () => {
+    const g = newGame();
+    const fx = createEffectTracker();
+    for (let i = 0; i < 4; i++) fillRow(g, 39 - i, [9]);
+    g.board[34 * BOARD_WIDTH] = 7;
+    setVerticalI(g);
+    step(fx, g, ACTION.HARD_DROP);
+    expect(fx.ring).toEqual({ frame: 0, row: 38, big: true });
+  });
+
+  it('판이 비면 PERFECT CLEAR 문구', () => {
+    const g = newGame();
+    const fx = createEffectTracker();
+    for (let i = 0; i < 4; i++) fillRow(g, 39 - i, [9]);
+    setVerticalI(g);
+    step(fx, g, ACTION.HARD_DROP);
+    expect(fx.text?.lines.map((l) => l.text)).toEqual(['TETRIS', 'PERFECT CLEAR']);
+  });
+
+  it('콤보 미터 — 줄을 지우면 이어지고, 줄을 못 지운 고정에서 끝난다', () => {
+    const g = newGame();
+    const fx = createEffectTracker();
+    for (let i = 0; i < 8; i++) fillRow(g, 39 - i, [9]);
+    g.board[30 * BOARD_WIDTH] = 7;
+    setVerticalI(g);
+    step(fx, g, ACTION.HARD_DROP);
+    expect(fx.combo).toMatchObject({ combo: 0, ended: false });
+    while (!g.active) step(fx, g);
+    setVerticalI(g);
+    step(fx, g, ACTION.HARD_DROP);
+    expect(fx.combo).toMatchObject({ combo: 1, ended: false });
+    while (!g.active) step(fx, g);
+    step(fx, g, ACTION.HARD_DROP); // 빈 판 위 고정 — 줄 없음
+    expect(fx.combo).toMatchObject({ combo: 1, ended: true });
+  });
+
+  it('가비지 상승은 연출과 경고음 신호를 남긴다 (0줄은 무시)', () => {
+    const fx = createEffectTracker();
+    noteGarbageRise(fx, 5, 0);
+    expect(fx.rise).toBeNull();
+    noteGarbageRise(fx, 5, 3);
+    expect(fx.rise).toEqual({ frame: 5, lines: 3 });
+    expect(drainCues(fx)).toEqual([{ kind: 'garbage', value: 3 }]);
+  });
+});
+
+describe('소리 신호 (연출과 같은 관찰)', () => {
+  it('이동·회전·홀드·하드 드롭 신호', () => {
+    const g = newGame();
+    const fx = createEffectTracker();
+    step(fx, g); // 생성
+    drainCues(fx);
+    step(fx, g, ACTION.LEFT_PRESS, ACTION.LEFT_RELEASE);
+    step(fx, g, ACTION.ROTATE_CW);
+    step(fx, g, ACTION.HOLD);
+    expect(drainCues(fx).map((c) => c.kind)).toEqual(['move', 'rotate', 'hold']);
+    while (!g.active) step(fx, g);
+    drainCues(fx);
+    step(fx, g, ACTION.HARD_DROP);
+    expect(drainCues(fx)).toEqual([{ kind: 'hardDrop' }]);
+  });
+
+  it('생성 지연 중 미리 누른 홀드(IHS)도 생성 프레임에 홀드 신호', () => {
+    const g = newGame();
+    const fx = createEffectTracker();
+    step(fx, g, ACTION.HARD_DROP);
+    while (!g.active) {
+      drainCues(fx);
+      step(fx, g, ACTION.HOLD);
+    }
+    expect(g.holdUsed).toBe(true);
+    expect(drainCues(fx).map((c) => c.kind)).toContain('hold');
+  });
+
+  it('테트리스 + B2B + 콤보 신호 — 줄 수·콤보 값을 담는다', () => {
+    const g = newGame();
+    const fx = createEffectTracker();
+    for (let i = 0; i < 8; i++) fillRow(g, 39 - i, [9]);
+    g.board[30 * BOARD_WIDTH] = 7;
+    setVerticalI(g);
+    step(fx, g, ACTION.HARD_DROP);
+    expect(drainCues(fx)).toEqual([{ kind: 'hardDrop' }, { kind: 'clear', value: 4 }]);
+    while (!g.active) step(fx, g);
+    drainCues(fx);
+    setVerticalI(g);
+    step(fx, g, ACTION.HARD_DROP);
+    expect(drainCues(fx)).toEqual([{ kind: 'hardDrop' }, { kind: 'clear', value: 4 }, { kind: 'b2b' }, { kind: 'combo', value: 1 }]);
+  });
+
+  it('꺼내지 않은 신호는 상한까지만 쌓인다 — 소리가 꺼져 있어도 메모리가 늘지 않게', () => {
+    const fx = createEffectTracker();
+    for (let i = 0; i < MAX_CUES + 20; i++) noteGarbageRise(fx, i, 1);
+    expect(fx.cues).toHaveLength(MAX_CUES);
+  });
+
+  it('연출·소리 기록은 엔진 결과를 바꾸지 않는다 (같은 입력 → 같은 판)', () => {
+    const run = (withFx: boolean) => {
+      const g = newGame();
+      const fx = createEffectTracker();
+      for (let f = 0; f < 1500; f++) {
+        const actions = f % 23 === 0 ? [ACTION.HARD_DROP] : f % 7 === 0 ? [ACTION.ROTATE_CW] : f % 5 === 0 ? [ACTION.LEFT_PRESS, ACTION.LEFT_RELEASE] : [];
+        if (withFx) {
+          observeBefore(fx, g);
+          const applied = stepFrame(g, actions, actions.length);
+          observeAfter(fx, g, actions, applied);
+          drainCues(fx);
+        } else {
+          stepFrame(g, actions, actions.length);
+        }
+      }
+      return getBoardHash(g);
+    };
+    expect(run(true)).toBe(run(false));
   });
 });

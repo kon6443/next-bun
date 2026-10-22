@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import type { GameState } from "../engine";
 import type { EffectTracker } from "../lib/effects";
 import { type GarbageGauge, computeLayout, drawGame } from "../lib/renderer";
+import type { EffectQuality } from "../lib/effectsRenderer";
 import { useReducedEffects } from "../hooks/useReducedEffects";
 
 type TetrisCanvasProps = {
@@ -20,6 +21,17 @@ type TetrisCanvasProps = {
   garbageRef?: React.RefObject<GarbageGauge | null>;
   className?: string;
 };
+
+/** 저사양 감지 — 그리기 간격 평균이 이보다 길면(약 40fps 미만) 이 세션 동안 가벼운 품질로 그린다 */
+const SLOW_FRAME_MS = 25;
+const SAMPLE_DRAWS = 90;
+/** 한 번 느리다고 판단하면 화면을 옮겨도 유지 — 판마다 다시 재며 깜빡이지 않게 */
+let sessionQuality: EffectQuality = "full";
+
+/** 테스트용 */
+export function __resetCanvasQualityForTests(): void {
+  sessionQuality = "full";
+}
 
 /**
  * 부모 크기에 맞춰 판을 그린다 (DPR 대응). 그리기만 하고 엔진을 진행하지 않는다
@@ -38,10 +50,34 @@ export function TetrisCanvas({ stateRef, drawRef, effectsRef, garbageRef, classN
     if (!container || !canvas || !ctx) return;
 
     let layout = computeLayout(1, 1);
+    // 연속으로 그려지는 동안의 간격만 잰다 — 멈춘 화면(일시정지·탭 전환)의 긴 간격은 버린다
+    let last = 0;
+    let sum = 0;
+    let samples = 0;
+    const measure = () => {
+      if (sessionQuality === "lite") return;
+      const now = performance.now();
+      const gap = now - last;
+      last = now;
+      if (gap <= 0 || gap > 200) return;
+      sum += gap;
+      samples++;
+      if (samples >= SAMPLE_DRAWS) {
+        if (sum / samples > SLOW_FRAME_MS) sessionQuality = "lite";
+        sum = 0;
+        samples = 0;
+      }
+    };
     const draw = () => {
       const state = stateRef.current;
       if (state) {
-        drawGame(ctx, state, layout, { effects: effectsRef?.current, reduced: reducedRef.current, garbage: garbageRef?.current });
+        if (!state.over && effectsRef) measure();
+        drawGame(ctx, state, layout, {
+          effects: effectsRef?.current,
+          reduced: reducedRef.current,
+          garbage: garbageRef?.current,
+          quality: sessionQuality,
+        });
       }
     };
     const resize = () => {

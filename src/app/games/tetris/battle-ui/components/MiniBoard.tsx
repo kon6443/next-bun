@@ -3,6 +3,8 @@
 import { useEffect, useRef } from "react";
 import { BOARD_COLS, BOARD_VISIBLE_ROWS } from "@/types/tetrisBattleSocket";
 import { CELL_COLORS } from "../../lib/blockSprites";
+import { useReducedEffects } from "../../hooks/useReducedEffects";
+import fx from "./battleFx.module.css";
 
 export type MiniBoardProps = {
   playerId: string;
@@ -25,6 +27,7 @@ export type MiniBoardProps = {
  * data-attack-anchor로 공격 궤적의 도착점이 된다
  */
 export function MiniBoard({ playerId, name, cells, pending, isTarget, place, kos, cell }: MiniBoardProps) {
+  const reduced = useReducedEffects();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const width = cell * BOARD_COLS;
   const height = cell * BOARD_VISIBLE_ROWS;
@@ -68,9 +71,11 @@ export function MiniBoard({ playerId, name, cells, pending, isTarget, place, kos
             aria-label={`가비지 ${pending}줄 대기`}
           />
         )}
+        {/* KO 폭발 — 탈락 순간 한 번 (연출 줄이기면 없음) */}
+        {out && !reduced && <span className={fx.koBurst} aria-hidden="true" />}
         {out && (
           <span
-            className="absolute inset-0 flex items-center justify-center text-lg font-black text-slate-200"
+            className={`absolute inset-0 flex items-center justify-center text-lg font-black text-slate-200 ${fx.koMark}`}
             role="img"
             aria-label={`${place}위로 탈락`}
           >
