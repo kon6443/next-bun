@@ -58,7 +58,22 @@ export function useDefenseCanvas(map: RenderMap, dprCap: number) {
     if (!container) return;
     const observer = new ResizeObserver(layout);
     observer.observe(container);
-    return () => observer.disconnect();
+    // 모니터를 옮기거나 확대 비율이 바뀌어 DPR만 바뀌면 크기 변화가 없다 — 현재 DPR 해상도 질의가 풀리면 다시 맞추고 새 DPR로 다시 건다
+    let media: MediaQueryList | null = null;
+    const watchDpr = () => {
+      media?.removeEventListener("change", onDpr);
+      media = typeof window.matchMedia === "function" ? window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`) : null;
+      media?.addEventListener("change", onDpr);
+    };
+    const onDpr = () => {
+      layout();
+      watchDpr();
+    };
+    watchDpr();
+    return () => {
+      observer.disconnect();
+      media?.removeEventListener("change", onDpr);
+    };
   }, [layout]);
 
   return { containerRef, bgRef, fgRef, viewportRef, fgContextRef, viewport };

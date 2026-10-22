@@ -1,6 +1,6 @@
 import { interpolatePositions } from './interpolate';
-import { COLORS, DAMAGE_COLORS, ELEMENT_COLORS, ENEMY_COLORS, ENEMY_SCALE, TOWER_COLORS } from './palette';
-import type { DamageNumberPool, ParticlePool } from './particles';
+import { BOSS_KINDS, COLORS, DAMAGE_COLORS, ELEMENT_COLORS, ENEMY_COLORS, ENEMY_MARKS, ENEMY_SCALE, MARK, TOWER_COLORS } from './palette';
+import { type DamageNumberPool, EFFECT_KIND, type EffectPool, type ParticlePool } from './particles';
 import type { RenderEnemy, RenderView } from './renderView';
 import { type Viewport, toScreenX, toScreenY } from './viewport';
 
@@ -32,6 +32,8 @@ export type SceneFrame = {
   showDamageNumbers: boolean;
   /** 연출용 시계 (ms) */
   timeMs: number;
+  /** 충격파·번개 (없으면 그리지 않는다 — 측정 화면) */
+  effects?: EffectPool;
 };
 
 /** 프레임 사이 재사용 버퍼 — 커질 때만 다시 만든다 */
@@ -138,6 +140,270 @@ export function drawLeakPulse(ctx: CanvasRenderingContext2D, viewport: Viewport,
   ctx.globalAlpha = 1;
 }
 
+/**
+ * 적 몸 실루엣 (§F8 — 색만으로 구분하지 않는다, §F0-4) — 졸개 원 · 질주병 마름모 · 방패병 사각 · 분열체 세 알 · 박쥐 날개 ·
+ * 소환사 오각 · 유령 반달(아래가 평평) · 와이번 화살촉 · 사제 십자 · 공성 거인 팔각 · 용 큰 날개 · 새끼 작은 원
+ */
+function tracePolygon(ctx: CanvasRenderingContext2D, x: number, y: number, sides: number, rotation: number, radius: number): void {
+  for (let i = 0; i < sides; i++) {
+    const a = rotation + (Math.PI * 2 * i) / sides;
+    if (i === 0) ctx.moveTo(x + Math.cos(a) * radius, y + Math.sin(a) * radius);
+    else ctx.lineTo(x + Math.cos(a) * radius, y + Math.sin(a) * radius);
+  }
+  ctx.closePath();
+}
+
+export function traceEnemyBody(ctx: CanvasRenderingContext2D, kind: number, x: number, y: number, r: number): void {
+  switch (kind) {
+    case 1: // 질주병 — 가로로 긴 마름모
+      ctx.moveTo(x + r * 1.15, y);
+      ctx.lineTo(x, y - r * 0.7);
+      ctx.lineTo(x - r * 1.15, y);
+      ctx.lineTo(x, y + r * 0.7);
+      ctx.closePath();
+      return;
+    case 2: // 방패병 — 사각
+      ctx.rect(x - r * 0.85, y - r * 0.85, r * 1.7, r * 1.7);
+      return;
+    case 3: // 분열체 — 세 알이 붙은 삼엽(외곽선 하나 — 겹친 원을 따로 그리면 안쪽 호가 테두리로 보인다)
+      for (let i = 0; i < 3; i++) {
+        const a = -Math.PI / 2 + (Math.PI * 2 * i) / 3;
+        const cx = x + Math.cos(a) * r * 0.45;
+        const cy = y + Math.sin(a) * r * 0.45;
+        if (i === 0) ctx.moveTo(cx + Math.cos(a - Math.PI / 2) * r * 0.5, cy + Math.sin(a - Math.PI / 2) * r * 0.5);
+        // 바깥쪽 반원만(중심에서 먼 쪽) — 세 반원이 이어져 하나의 외곽선
+        ctx.arc(cx, cy, r * 0.5, a - Math.PI / 2, a + Math.PI / 2);
+      }
+      ctx.closePath();
+      return;
+    case 4: // 박쥐 떼 — M자 날개
+    case 10: // 용 — 같은 날개(크기는 ENEMY_SCALE)
+      ctx.moveTo(x - r * 1.3, y - r * 0.4);
+      ctx.lineTo(x - r * 0.4, y + r * 0.1);
+      ctx.lineTo(x, y - r * 0.5);
+      ctx.lineTo(x + r * 0.4, y + r * 0.1);
+      ctx.lineTo(x + r * 1.3, y - r * 0.4);
+      ctx.lineTo(x + r * 0.6, y + r * 0.7);
+      ctx.lineTo(x, y + r * 0.3);
+      ctx.lineTo(x - r * 0.6, y + r * 0.7);
+      ctx.closePath();
+      return;
+    case 5: // 소환사 — 오각
+      tracePolygon(ctx, x, y, 5, -Math.PI / 2, r);
+      return;
+    case 6: // 유령 — 위는 반원, 아래는 평평
+      ctx.moveTo(x + r, y + r * 0.6);
+      ctx.arc(x, y, r, 0, Math.PI, true);
+      ctx.lineTo(x - r, y + r * 0.6);
+      ctx.closePath();
+      return;
+    case 7: // 와이번 — 화살촉
+      ctx.moveTo(x, y - r);
+      ctx.lineTo(x + r, y + r * 0.7);
+      ctx.lineTo(x, y + r * 0.25);
+      ctx.lineTo(x - r, y + r * 0.7);
+      ctx.closePath();
+      return;
+    case 8: { // 사제 — 십자(외곽선 하나 — 두 사각을 겹치면 테두리가 가운데에도 그어진다)
+      const a = r * 0.3;
+      ctx.moveTo(x - a, y - r);
+      ctx.lineTo(x + a, y - r);
+      ctx.lineTo(x + a, y - a);
+      ctx.lineTo(x + r, y - a);
+      ctx.lineTo(x + r, y + a);
+      ctx.lineTo(x + a, y + a);
+      ctx.lineTo(x + a, y + r);
+      ctx.lineTo(x - a, y + r);
+      ctx.lineTo(x - a, y + a);
+      ctx.lineTo(x - r, y + a);
+      ctx.lineTo(x - r, y - a);
+      ctx.lineTo(x - a, y - a);
+      ctx.closePath();
+      return;
+    }
+    case 9: // 공성 거인 — 팔각
+      tracePolygon(ctx, x, y, 8, Math.PI / 8, r);
+      return;
+    default: // 졸개·새끼 — 원
+      ctx.moveTo(x + r, y);
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+  }
+}
+
+/** 적 머리 위 표식 (§F4) — 물리 저항 방패(작은 사각) · 마법 저항 결정(작은 마름모) · 특수 고리. 표식 종류별 한 path */
+function drawEnemyMarks(ctx: CanvasRenderingContext2D, view: RenderView, xy: Float32Array, viewport: Viewport, enemyR: number, timeMs: number): void {
+  const m = Math.max(2, 70 * viewport.scale);
+  const scale = viewport.scale;
+  for (const [bit, color] of MARK_STYLE) {
+    let any = false;
+    for (let i = 0; i < view.enemies.length; i++) {
+      const e = view.enemies[i];
+      const marks = ENEMY_MARKS[e.kind] ?? 0;
+      if (!(marks & bit)) continue;
+      if (!any) {
+        ctx.beginPath();
+        any = true;
+      }
+      // 표식 자리: 방패 왼쪽 · 결정 가운데 · 특수 오른쪽 (몸 위)
+      const ox = bit === MARK.PHYSICAL ? -m * 2.4 : bit === MARK.MAGIC ? 0 : m * 2.4;
+      const x = toScreenX(viewport, xy[i * 2]) + ox;
+      // 몸과 같이 출렁인다
+      const y = toScreenY(viewport, xy[i * 2 + 1]) + enemyWobble(timeMs, e.id, enemyR) - enemyR * (ENEMY_SCALE[e.kind] ?? 1) - m * 3 - (e.air ? AIR_LIFT * scale : 0);
+      if (bit === MARK.PHYSICAL) ctx.rect(x - m, y - m, m * 2, m * 2);
+      else if (bit === MARK.MAGIC) {
+        ctx.moveTo(x, y - m * 1.3);
+        ctx.lineTo(x + m, y);
+        ctx.lineTo(x, y + m * 1.3);
+        ctx.lineTo(x - m, y);
+        ctx.closePath();
+      } else {
+        ctx.moveTo(x + m, y);
+        ctx.arc(x, y, m, 0, Math.PI * 2);
+      }
+    }
+    if (!any) continue;
+    if (bit === MARK.SPECIAL) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = Math.max(1, m * 0.6);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = color;
+      ctx.fill();
+    }
+  }
+}
+
+const MARK_STYLE: readonly (readonly [number, string])[] = [
+  [MARK.PHYSICAL, '#cbd5e1'],
+  [MARK.MAGIC, '#a78bfa'],
+  [MARK.SPECIAL, '#fde68a'],
+];
+
+/** 타워 레벨 표식 (§F4) — Lv4·5 분기 문양(A 삼각·B 사각) · 궁극 쿨다운 고리(주기 궁극이 있는 단계만 — 준비되면 전체, 쿨다운 중이면 찬 만큼) */
+function drawTowerMarks(ctx: CanvasRenderingContext2D, view: RenderView, viewport: Viewport, baseR: number): void {
+  const badge = Math.max(2, 85 * viewport.scale);
+  let any = false;
+  for (const t of view.towers) {
+    if (t.level < 4) continue;
+    if (!any) {
+      ctx.fillStyle = COLORS.levelPip;
+      ctx.beginPath();
+      any = true;
+    }
+    const x = toScreenX(viewport, t.x) + baseR * 0.85;
+    const y = toScreenY(viewport, t.y) - baseR * 0.85;
+    if (t.branch === 1) {
+      ctx.moveTo(x, y - badge);
+      ctx.lineTo(x + badge, y + badge * 0.8);
+      ctx.lineTo(x - badge, y + badge * 0.8);
+      ctx.closePath();
+    } else {
+      ctx.rect(x - badge * 0.8, y - badge * 0.8, badge * 1.6, badge * 1.6);
+    }
+  }
+  if (any) ctx.fill();
+  // 궁극 — 준비되면 밝은 고리 전체, 쿨다운 중이면 찬 만큼만
+  ctx.lineWidth = Math.max(1.5, 55 * viewport.scale);
+  ctx.strokeStyle = COLORS.levelPip;
+  ctx.beginPath();
+  any = false;
+  for (const t of view.towers) {
+    if (!t.ultimate) continue;
+    const ready = 1 - t.ultCooldown / 1000;
+    const x = toScreenX(viewport, t.x);
+    const y = toScreenY(viewport, t.y);
+    const start = -Math.PI / 2;
+    ctx.moveTo(x + Math.cos(start) * baseR * 1.18, y + Math.sin(start) * baseR * 1.18);
+    ctx.arc(x, y, baseR * 1.18, start, start + Math.PI * 2 * ready);
+    any = true;
+  }
+  if (any) ctx.stroke();
+}
+
+/** 충격파 고리(퍼지며 흐려짐)·연쇄 번개(지그재그) — 종류별 한 path */
+function drawEffects(ctx: CanvasRenderingContext2D, effects: EffectPool, viewport: Viewport): void {
+  const { scale, offsetX, offsetY } = viewport;
+  ctx.lineWidth = Math.max(1.5, 45 * viewport.scale);
+  ctx.strokeStyle = COLORS.shockwave;
+  ctx.beginPath();
+  let any = false;
+  for (let i = 0; i < effects.count; i++) {
+    if (effects.color[i] !== EFFECT_KIND.RING) continue;
+    const t = 1 - effects.life[i] / effects.maxLife[i];
+    const radius = effects.size[i] * t * scale;
+    const cx = offsetX + effects.x[i] * scale;
+    const cy = offsetY + effects.y[i] * scale;
+    ctx.moveTo(cx + radius, cy);
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    any = true;
+  }
+  if (any) ctx.stroke();
+  ctx.strokeStyle = ELEMENT_COLORS[3];
+  ctx.beginPath();
+  any = false;
+  for (let i = 0; i < effects.count; i++) {
+    if (effects.color[i] !== EFFECT_KIND.BOLT) continue;
+    const x1 = offsetX + effects.x[i] * scale;
+    const y1 = offsetY + effects.y[i] * scale;
+    const x2 = offsetX + effects.x2[i] * scale;
+    const y2 = offsetY + effects.y2[i] * scale;
+    const jitter = Math.max(2, Math.hypot(x2 - x1, y2 - y1) * 0.12);
+    ctx.moveTo(x1, y1);
+    for (let k = 1; k < 4; k++) {
+      const f = k / 4;
+      ctx.lineTo(x1 + (x2 - x1) * f + (Math.random() - 0.5) * jitter, y1 + (y2 - y1) * f + (Math.random() - 0.5) * jitter);
+    }
+    ctx.lineTo(x2, y2);
+    any = true;
+  }
+  if (any) ctx.stroke();
+}
+
+/** 보스 체력 막대 (§F2 오버레이) — 화면 위쪽 가로 막대 + 이름. 보스가 없으면 그리지 않고 false */
+export function drawBossBar(ctx: CanvasRenderingContext2D, viewport: Viewport, view: RenderView, names: readonly string[]): boolean {
+  let boss = -1;
+  for (let i = 0; i < view.enemies.length; i++) {
+    if (BOSS_KINDS.indexOf(view.enemies[i].kind) >= 0) {
+      boss = i;
+      break;
+    }
+  }
+  if (boss < 0) return false;
+  const e = view.enemies[boss];
+  const width = viewport.width * 0.7;
+  const x = (viewport.width - width) / 2;
+  const y = 10;
+  const height = 8;
+  ctx.fillStyle = COLORS.hpBack;
+  ctx.fillRect(x, y, width, height);
+  ctx.fillStyle = COLORS.bossHp;
+  ctx.fillRect(x, y, width * Math.max(0, e.hp / Math.max(1, e.maxHp)), height);
+  ctx.fillStyle = COLORS.damageText;
+  ctx.font = BOSS_FONT;
+  ctx.textAlign = 'center';
+  ctx.fillText(bossLabel(names, e.kind, view.bossPhase), viewport.width / 2, y + height + 14);
+  return true;
+}
+
+/** 보스 이름 문자열 — 종류·페이즈가 같으면 같은 문자열(매 프레임 새로 만들지 않는다) */
+const bossLabels = new Map<number, string>();
+function bossLabel(names: readonly string[], kind: number, phase: number): string {
+  const key = kind * 4 + phase;
+  let label = bossLabels.get(key);
+  if (label === undefined) {
+    label = `${names[kind] ?? '보스'}${phase === 2 ? ' · 분노' : ''}`;
+    bossLabels.set(key, label);
+  }
+  return label;
+}
+
+const BOSS_FONT = '700 12px system-ui, sans-serif';
+
+/** 걷기 흔들림 (§F8 사인 진동) — 몸과 머리 위 표식이 같이 쓴다 */
+function enemyWobble(timeMs: number, id: number, enemyR: number): number {
+  return Math.sin(timeMs / 120 + id) * enemyR * 0.12;
+}
+
 /** 글꼴 문자열 — 크기가 같으면 같은 문자열을 돌려줘 매 프레임 새로 만들지 않는다 */
 let cachedFont = { px: -1, value: '' };
 function damageFont(scale: number): string {
@@ -181,7 +447,13 @@ export function drawSceneLayer(ctx: CanvasRenderingContext2D, frame: SceneFrame,
       }
       traceTowerBody(ctx, kind, sx(t.x), sy(t.y), baseR * (0.7 + t.level * 0.06));
     }
-    if (any) ctx.fill();
+    if (any) {
+      ctx.fill();
+      // 어두운 테두리 — 밝은 받침·흙길 위에서도 실루엣이 또렷하게
+      ctx.strokeStyle = COLORS.background;
+      ctx.lineWidth = Math.max(1, 40 * scale);
+      ctx.stroke();
+    }
   }
   ctx.strokeStyle = COLORS.background;
   ctx.lineWidth = Math.max(1.5, 90 * scale);
@@ -209,10 +481,10 @@ export function drawSceneLayer(ctx: CanvasRenderingContext2D, frame: SceneFrame,
     }
   }
   ctx.fill();
+  drawTowerMarks(ctx, curr, viewport, baseR);
 
   // ---- 적: 지상(원) → 공중(그림자 + 삼각) — 종류별로 한 path ----
   const enemyR = ENEMY_RADIUS * scale;
-  const wobble = (id: number) => Math.sin(frame.timeMs / 120 + id) * enemyR * 0.12;
   for (const air of [false, true]) {
     if (air) {
       ctx.fillStyle = COLORS.shadow;
@@ -238,20 +510,19 @@ export function drawSceneLayer(ctx: CanvasRenderingContext2D, frame: SceneFrame,
           any = true;
         }
         const ex = sx(enemyXY[i * 2]);
-        const ey = sy(enemyXY[i * 2 + 1]) + wobble(e.id) - (air ? AIR_LIFT * scale : 0);
-        if (air) {
-          ctx.moveTo(ex, ey - r);
-          ctx.lineTo(ex + r, ey + r * 0.6);
-          ctx.lineTo(ex - r, ey + r * 0.6);
-          ctx.closePath();
-        } else {
-          ctx.moveTo(ex + r, ey);
-          ctx.arc(ex, ey, r, 0, Math.PI * 2);
-        }
+        const ey = sy(enemyXY[i * 2 + 1]) + enemyWobble(frame.timeMs, e.id, enemyR) - (air ? AIR_LIFT * scale : 0);
+        traceEnemyBody(ctx, kind, ex, ey, r);
       }
-      if (any) ctx.fill();
+      if (any) {
+        ctx.fill();
+        ctx.strokeStyle = COLORS.background;
+        // 모바일(scale ≈ 0.043)에서 1px 남짓이면 길·겹친 적 위에서 윤곽이 안 보인다 — 2px 이상
+        ctx.lineWidth = Math.max(2, 50 * scale);
+        ctx.stroke();
+      }
     }
   }
+  drawEnemyMarks(ctx, curr, enemyXY, viewport, enemyR, frame.timeMs);
 
   // 체력 막대 — 피해 입은 적만 (§F4): 바탕 → 녹색 → 빨강 세 번의 fill
   const barW = HP_BAR_WIDTH * scale;
@@ -294,6 +565,8 @@ export function drawSceneLayer(ctx: CanvasRenderingContext2D, frame: SceneFrame,
     }
     if (any) ctx.fill();
   }
+
+  if (frame.effects && frame.effects.count > 0) drawEffects(ctx, frame.effects, viewport);
 
   // ---- 파티클: 가산 합성, 색별 사각형 한 path ----
   const particles = frame.particles;

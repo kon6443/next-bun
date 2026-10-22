@@ -30,6 +30,8 @@ export type RenderTower = {
   targetId: number;
   /** 궁극 쿨다운 남은 비율 ‰ (0 = 준비됨·궁극 없음) — E1은 항상 0 */
   ultCooldown: number;
+  /** 주기 궁극이 있는 단계인가 — 쿨다운 고리는 이때만 (Lv5라도 궁극이 없는 분기가 있다) */
+  ultimate: boolean;
 };
 
 export type RenderProjectile = {

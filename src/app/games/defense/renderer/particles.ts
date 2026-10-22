@@ -99,3 +99,41 @@ export class DamageNumberPool extends ParticlePool {
     this.value[to] = this.value[from];
   }
 }
+
+/** 연출 효과 종류 — 충격파 고리(펄스·폭발·궁극) · 연쇄 번개 선 */
+export const EFFECT_KIND = { RING: 0, BOLT: 1 } as const;
+
+/**
+ * 충격파·번개 풀 (§F8 연출) — 고리는 (x, y)에서 반경 0 → size로 퍼지고, 번개는 (x, y) → (x2, y2) 지그재그. 둘 다 짧게 사라진다
+ * 같은 SoA 풀(color 칸 = 종류) — 움직이지 않으므로 속도는 0
+ */
+export class EffectPool extends ParticlePool {
+  readonly x2: Float32Array;
+  readonly y2: Float32Array;
+  readonly size: Float32Array;
+
+  constructor(capacity: number) {
+    super(capacity);
+    this.x2 = new Float32Array(capacity);
+    this.y2 = new Float32Array(capacity);
+    this.size = new Float32Array(capacity);
+  }
+
+  ring(x: number, y: number, radius: number, lifeMs: number): void {
+    const i = this.spawn(x, y, 0, 0, lifeMs, EFFECT_KIND.RING);
+    this.size[i] = radius;
+  }
+
+  bolt(x: number, y: number, x2: number, y2: number, lifeMs: number): void {
+    const i = this.spawn(x, y, 0, 0, lifeMs, EFFECT_KIND.BOLT);
+    this.x2[i] = x2;
+    this.y2[i] = y2;
+  }
+
+  protected override move(from: number, to: number): void {
+    super.move(from, to);
+    this.x2[to] = this.x2[from];
+    this.y2[to] = this.y2[from];
+    this.size[to] = this.size[from];
+  }
+}

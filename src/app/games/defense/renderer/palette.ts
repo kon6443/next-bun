@@ -30,16 +30,26 @@ export const COLORS = {
   /** 사거리 미리보기 */
   rangeFill: 'rgba(253, 230, 138, 0.10)',
   rangeEdge: 'rgba(253, 230, 138, 0.55)',
+  shockwave: 'rgba(254, 243, 199, 0.75)',
+  bossHp: '#f43f5e',
 } as const;
 
 /**
- * 적 종류별 몸 색 — 인덱스 = ENEMY_ID
+ * 적 종류별 몸 색 — 인덱스 = ENEMY_ID. 모양도 종류마다 다르다(sceneLayer traceEnemyBody — 색만으로 구분하지 않는다, §F0-4)
  * 졸개 · 질주병 · 방패병 · 분열체 · 박쥐 떼 · 소환사 · 유령 · 와이번 · 사제 · 공성 거인 · 용 · 분열체 새끼
  */
 export const ENEMY_COLORS: readonly string[] = [
-  '#e2e8f0', '#fca5a5', '#94a3b8', '#86efac', '#c4b5fd', '#f0abfc', '#bae6fd', '#fdba74', '#fef08a', '#a8a29e', '#f87171', '#bbf7d0',
+  '#e2e8f0', '#fb7185', '#60a5fa', '#4ade80', '#c084fc', '#f472b6', '#a5f3fc', '#fb923c', '#fde047', '#a8a29e', '#ef4444', '#86efac',
 ];
 /** 적 종류별 크기 배율 — 엘리트(공성 거인) 1.4 · 보스(소환사·용) 2 · 새끼 0.6 (§F8 보스는 2~3배) */
-export const ENEMY_SCALE: readonly number[] = [1, 0.9, 1.1, 1, 0.6, 2, 1, 1, 1, 1.4, 2, 0.6];
-/** 타워 종류별 몸 색 — 인덱스 = TOWER_ID (궁수 · 대포 · 마법 · 서리 · 석궁 · 테슬라) */
-export const TOWER_COLORS: readonly string[] = ['#fbbf24', '#cbd5e1', '#a78bfa', '#67e8f9', '#f472b6', '#facc15'];
+export const ENEMY_SCALE: readonly number[] = [1, 0.9, 1.1, 1, 0.75, 2, 1, 1, 1, 1.4, 2, 0.6];
+
+/** 적 머리 위 표식 비트 (§F4 — 아이콘 1개 = 규칙 1개): 물리 저항(방패) · 마법 저항(결정) · 특수(분열·치유·소환·페이즈) */
+export const MARK = { PHYSICAL: 1, MAGIC: 2, SPECIAL: 4 } as const;
+/** 인덱스 = ENEMY_ID — 저항 400‰ 이상·특수 능력 (엔진 데이터와 같은지는 lib/f1bData.test가 지킨다) */
+export const ENEMY_MARKS: readonly number[] = [0, 0, 1, 4, 0, 6, 1, 0, 6, 1, 5, 0];
+/** 보스 종류 — 화면 위 체력 막대 */
+export const BOSS_KINDS: readonly number[] = [5, 10];
+
+/** 타워 종류별 몸 색 — 인덱스 = TOWER_ID (궁수 초록 · 대포 주황 · 마법 보라 · 서리 하늘 · 석궁 장미 · 테슬라 노랑 — 색상환에서 멀리) */
+export const TOWER_COLORS: readonly string[] = ['#4ade80', '#fb923c', '#c084fc', '#7dd3fc', '#fb7185', '#fde047'];

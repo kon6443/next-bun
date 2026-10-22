@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { OP, STAGE_E1, applyCommand, createGame, step } from '../engine';
+import { OP, STAGE_E1, TOWERS, applyCommand, createGame, findStage, step, ultimatePeriod } from '../engine';
 import { testProjectile } from '../engine-dev/fixtures';
 import { createRenderView } from '../renderer/renderView';
 import { toRenderMap, toRenderView } from './toRenderView';
@@ -41,5 +41,23 @@ describe('toRenderView — 엔진 상태를 렌더 상태로', () => {
     expect(map).toMatchObject({ width: 9000, height: 15000 });
     expect(map.slots).toHaveLength(8);
     expect(map.groundPaths[0]).toEqual(STAGE_E1.map.groundPaths[0].points);
+  });
+});
+
+describe('toRenderView — 궁극 표시', () => {
+  it('주기 궁극이 있는 단계만 ultimate — 궁극 없는 Lv5 분기는 고리를 그리지 않는다', () => {
+    for (const kind of TOWERS.map((t) => t.id)) {
+      for (const branch of [1, 2]) {
+        const state = createGame(findStage('s8')!, 1);
+        state.gold = 1e6;
+        applyCommand(state, OP.BUILD, 0, kind);
+        applyCommand(state, OP.UPGRADE, 0);
+        applyCommand(state, OP.UPGRADE, 0);
+        applyCommand(state, OP.BRANCH, 0, branch - 1);
+        applyCommand(state, OP.UPGRADE, 0);
+        const view = toRenderView(state, createRenderView());
+        expect([kind, branch, view.towers[0].level, view.towers[0].ultimate]).toEqual([kind, branch, 5, ultimatePeriod(kind, 5, branch) > 0]);
+      }
+    }
   });
 });

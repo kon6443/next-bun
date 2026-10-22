@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { interpolatePositions } from './interpolate';
 import { DamageNumberPool, ParticlePool } from './particles';
-import { ENEMY_COLORS, TOWER_COLORS } from './palette';
+import { COLORS, ENEMY_COLORS, ENEMY_SCALE, TOWER_COLORS } from './palette';
 import { QUALITY_LEVELS, QualityController } from './quality';
 import { createRenderView, type RenderView } from './renderView';
-import { createSceneScratch, drawSceneLayer } from './sceneLayer';
+import { createSceneScratch, drawSceneLayer, traceEnemyBody } from './sceneLayer';
 import { backingSize, fitViewport } from './viewport';
 
 describe('fitViewport — 세로 9×15 맵 레터박스 (D-021)', () => {
@@ -130,7 +130,7 @@ function view(enemies: number, projectiles: number): RenderView {
   const v = createRenderView();
   for (let i = 0; i < enemies; i++) v.enemies.push({ id: i + 1, kind: 0, x: i * 10, y: i * 10, hp: i % 2 ? 50 : 100, maxHp: 100, effects: 0, air: i % 4 === 0 });
   for (let i = 0; i < projectiles; i++) v.projectiles.push({ id: 10000 + i, x: i, y: i, element: i % 5, damageType: i % 2 });
-  v.towers.push({ id: 1, slot: 0, kind: 0, level: 3, branch: 0, x: 3500, y: 3000, targetId: 2, ultCooldown: 0 });
+  v.towers.push({ id: 1, slot: 0, kind: 0, level: 3, branch: 0, x: 3500, y: 3000, targetId: 2, ultCooldown: 0, ultimate: false });
   return v;
 }
 
@@ -170,12 +170,12 @@ describe('drawSceneLayer — 묶어 그리기·금지 API', () => {
       },
     ) as unknown as CanvasRenderingContext2D;
     const v = createRenderView();
-    TOWER_COLORS.forEach((_, kind) => v.towers.push({ id: kind + 1, slot: kind, kind, level: 1, branch: 0, x: 1000 * kind, y: 1000, targetId: 0, ultCooldown: 0 }));
+    TOWER_COLORS.forEach((_, kind) => v.towers.push({ id: kind + 1, slot: kind, kind, level: 1, branch: 0, x: 1000 * kind, y: 1000, targetId: 0, ultCooldown: 0, ultimate: false }));
     ENEMY_COLORS.forEach((_, kind) => v.enemies.push({ id: kind + 1, kind, x: 500 * kind, y: 5000, hp: 10, maxHp: 10, effects: 0, air: kind % 2 === 1 }));
     drawSceneLayer(ctx, frame(v, false), vp, createSceneScratch());
     for (const color of [...TOWER_COLORS, ...ENEMY_COLORS]) expect(fills).toContain(color);
     const towersOnly = createRenderView();
-    towersOnly.towers.push({ id: 1, slot: 0, kind: 1, level: 1, branch: 0, x: 0, y: 0, targetId: 0, ultCooldown: 0 });
+    towersOnly.towers.push({ id: 1, slot: 0, kind: 1, level: 1, branch: 0, x: 0, y: 0, targetId: 0, ultCooldown: 0, ultimate: false });
     fills.length = 0;
     // 파티클·투사체 없이 — 원소·피해 색이 타워 색과 겹친다(대포 = 물리, 서리 = 얼음, 테슬라 = 번개)
     const empty = { prev: towersOnly, curr: towersOnly, alpha: 1, particles: new ParticlePool(1), numbers: new DamageNumberPool(1), showDamageNumbers: false, timeMs: 0 };
@@ -200,5 +200,61 @@ describe('drawSceneLayer — 묶어 그리기·금지 API', () => {
     const on = recordingContext();
     drawSceneLayer(on.ctx, frame(view(50, 50), true), vp, createSceneScratch());
     expect(on.calls.fillText).toBe(40);
+  });
+});
+
+/** 경로 명령 기록 — 이름과 반올림한 인자. fill·stroke 때 그 path와 스타일을 묶어 남긴다 */
+function pathRecorder() {
+  const ops: string[] = [];
+  const draws: { op: 'fill' | 'stroke'; style: string; lineWidth: number; path: string[] }[] = [];
+  const style = { fillStyle: '', strokeStyle: '', lineWidth: 1 };
+  const ctx = new Proxy(
+    {},
+    {
+      get: (_t, prop: string) =>
+        (...args: number[]) => {
+          if (prop === 'beginPath') ops.length = 0;
+          else if (prop === 'fill' || prop === 'stroke') draws.push({ op: prop, style: prop === 'fill' ? style.fillStyle : style.strokeStyle, lineWidth: style.lineWidth, path: [...ops] });
+          else ops.push(`${prop}(${args.map((a) => (typeof a === 'number' ? Math.round(a * 100) / 100 : a)).join(',')})`);
+        },
+      set: (_t, prop: string, value) => {
+        if (prop in style) (style as Record<string, unknown>)[prop] = value;
+        return true;
+      },
+    },
+  ) as unknown as CanvasRenderingContext2D;
+  return { ctx, ops, draws };
+}
+
+describe('적 종류별 모양 — 색만으로 구분하지 않는다 (§F0-4)', () => {
+  it('12종의 외곽 경로가 서로 다르다 (박쥐·용은 같은 날개, 크기로 다르다)', () => {
+    const shapes = ENEMY_COLORS.map((_, kind) => {
+      const rec = pathRecorder();
+      traceEnemyBody(rec.ctx, kind, 100, 100, 10 * (ENEMY_SCALE[kind] ?? 1));
+      return rec.ops.join(' ');
+    });
+    expect(new Set(shapes).size).toBe(ENEMY_COLORS.length);
+  });
+
+  it('졸개는 원(arc), 질주병은 직선 마름모 — 한 화면에 섞여도 각자 모양으로 그리고 2px 이상 어두운 윤곽을 두른다', () => {
+    const vp = fitViewport(390, 650, 9000, 15000, 2, 2);
+    const v = createRenderView();
+    v.enemies.push({ id: 1, kind: 0, x: 2000, y: 5000, hp: 10, maxHp: 10, effects: 0, air: false });
+    v.enemies.push({ id: 2, kind: 1, x: 4000, y: 5000, hp: 10, maxHp: 10, effects: 0, air: false });
+    const rec = pathRecorder();
+    drawSceneLayer(rec.ctx, { prev: v, curr: v, alpha: 1, particles: new ParticlePool(1), numbers: new DamageNumberPool(1), showDamageNumbers: false, timeMs: 0 }, vp, createSceneScratch());
+    const body = (color: string) => rec.draws.find((d) => d.op === 'fill' && d.style === color)!;
+    const grunt = body(ENEMY_COLORS[0]);
+    const runner = body(ENEMY_COLORS[1]);
+    expect(grunt.path.some((o) => o.startsWith('arc('))).toBe(true);
+    expect(grunt.path.some((o) => o.startsWith('lineTo('))).toBe(false);
+    expect(runner.path.filter((o) => o.startsWith('lineTo(')).length).toBe(3);
+    expect(runner.path.some((o) => o.startsWith('arc('))).toBe(false);
+    // 몸을 채운 바로 다음 같은 경로를 배경색으로 두른다
+    for (const fill of [grunt, runner]) {
+      const outline = rec.draws[rec.draws.indexOf(fill) + 1];
+      expect(outline).toMatchObject({ op: 'stroke', style: COLORS.background, path: fill.path });
+      expect(outline.lineWidth).toBeGreaterThanOrEqual(2);
+    }
   });
 });

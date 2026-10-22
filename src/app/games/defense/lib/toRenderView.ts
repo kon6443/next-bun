@@ -32,7 +32,7 @@ export function toRenderView(state: GameState, view: RenderView): RenderView {
   n = 0;
   for (const tower of state.towers) {
     const item: RenderTower =
-      view.towers[n] ?? (view.towers[n] = { id: 0, slot: 0, kind: 0, level: 0, branch: 0, x: 0, y: 0, targetId: 0, ultCooldown: 0 });
+      view.towers[n] ?? (view.towers[n] = { id: 0, slot: 0, kind: 0, level: 0, branch: 0, x: 0, y: 0, targetId: 0, ultCooldown: 0, ultimate: false });
     item.id = tower.id;
     item.slot = tower.slot;
     item.kind = tower.kind;
@@ -42,6 +42,7 @@ export function toRenderView(state: GameState, view: RenderView): RenderView {
     item.y = tower.y;
     item.targetId = tower.targetId;
     item.ultCooldown = ultCooldownPermille(tower.kind, tower.level, tower.branch, tower.ultTimer);
+    item.ultimate = ultimatePeriod(tower.kind, tower.level, tower.branch) > 0;
     n++;
   }
   view.towers.length = n;

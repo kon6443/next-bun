@@ -65,7 +65,7 @@ export function createSyntheticScene(initial: BenchCounts): BenchScene {
   let prev = createRenderView();
   let curr = createRenderView();
   const towers = STAGE_E1.map.slots.map((slot, i) => ({
-    id: i + 1, slot: i, kind: 0, level: 1 + (i % 3), branch: 0, x: slot.x, y: slot.y, targetId: 0, ultCooldown: 0,
+    id: i + 1, slot: i, kind: 0, level: 1 + (i % 3), branch: 0, x: slot.x, y: slot.y, targetId: 0, ultCooldown: 0, ultimate: false,
   }));
 
   const scene: BenchScene = {
