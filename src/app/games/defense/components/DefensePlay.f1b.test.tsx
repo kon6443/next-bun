@@ -171,6 +171,18 @@ describe('DefensePlay F1b — 학습·효과음·이어하기·나가기', () =>
     expect((await screen.findByTestId('defense-notice')).textContent).toContain('스테이지 1 쉬움');
   });
 
+  it('튜토리얼 중 시작 안내는 말풍선에 붙어 같은 쪽에 — 가리키는 슬롯 쪽으로 따로 뜨지 않는다', async () => {
+    saveResume({ engineVersion: ENGINE_VERSION, boardKey: 's1-easy', seed: 5, tick: 10, inputs: [0, OP.CALL_WAVE], savedAt: 1 });
+    render(<DefensePlay boardKey="s1" seed={1} fixedSeed />);
+    const tutorial = await screen.findByTestId('defense-tutorial');
+    expect(within(tutorial).getByTestId('defense-notice').textContent).toContain('스테이지 1 쉬움');
+    expect(screen.getAllByTestId('defense-notice')).toHaveLength(1);
+    // 건너뛰면 튜토리얼 밖 위쪽 안내로 — 여전히 한 장
+    fireEvent.click(screen.getByTestId('defense-tutorial-skip'));
+    expect(screen.queryByTestId('defense-tutorial')).toBeNull();
+    expect(screen.getAllByTestId('defense-notice')).toHaveLength(1);
+  });
+
   it('방향키 슬롯 커서 — 그 방향의 가장 가까운 슬롯, 없으면 -1', () => {
     const slots = [
       { x: 0, y: 0 },

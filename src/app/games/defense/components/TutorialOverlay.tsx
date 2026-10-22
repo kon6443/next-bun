@@ -19,10 +19,12 @@ type Props = {
   target: { x: number; y: number } | null;
   /** 말풍선을 위쪽에 둘지 — DefensePlay가 가리킬 곳·슬롯을 덜 덮는 쪽으로 고른다(lib/tutorial tutorialBubbleAbove) */
   above: boolean;
+  /** 시작 안내(이어하기 못 불러옴 등) — 말풍선과 같은 쪽에 붙여, 가리키는 곳을 덮지 않게 */
+  notice?: string | null;
   onSkip: () => void;
 };
 
-export function TutorialOverlay({ step, target, above, onSkip }: Props) {
+export function TutorialOverlay({ step, target, above, notice, onSkip }: Props) {
   return (
     <div className="pointer-events-none absolute inset-0 z-10" data-testid="defense-tutorial" data-step={step}>
       {target && (
@@ -32,21 +34,28 @@ export function TutorialOverlay({ step, target, above, onSkip }: Props) {
           style={{ left: target.x, top: target.y, width: TUTORIAL_TARGET_SIZE, height: TUTORIAL_TARGET_SIZE }}
         />
       )}
-      <div
-        role="status"
-        data-place={above ? "top" : "bottom"}
-        className={`absolute left-3 right-3 flex items-center gap-2 rounded-2xl border border-amber-300/50 bg-slate-900/95 px-3 py-2 text-sm text-amber-50 shadow-lg shadow-black/50 ${above ? "top-3" : "bottom-3"}`}
-      >
-        <span className="shrink-0 rounded-full bg-amber-400 px-2 text-xs font-bold text-slate-950">{step + 1}/3</span>
-        <span className="flex-1">{TEXT[step]}</span>
-        <button
-          type="button"
-          data-testid="defense-tutorial-skip"
-          onClick={onSkip}
-          className="pointer-events-auto min-h-11 shrink-0 rounded-full border border-white/20 px-3 text-xs text-slate-200"
+      <div className={`absolute left-3 right-3 flex gap-1 ${above ? "top-3 flex-col" : "bottom-3 flex-col-reverse"}`}>
+        <div
+          role="status"
+          data-place={above ? "top" : "bottom"}
+          className="flex items-center gap-2 rounded-2xl border border-amber-300/50 bg-slate-900/95 px-3 py-2 text-sm text-amber-50 shadow-lg shadow-black/50"
         >
-          건너뛰기
-        </button>
+          <span className="shrink-0 rounded-full bg-amber-400 px-2 text-xs font-bold text-slate-950">{step + 1}/3</span>
+          <span className="flex-1">{TEXT[step]}</span>
+          <button
+            type="button"
+            data-testid="defense-tutorial-skip"
+            onClick={onSkip}
+            className="pointer-events-auto min-h-11 shrink-0 rounded-full border border-white/20 px-3 text-xs text-slate-200"
+          >
+            건너뛰기
+          </button>
+        </div>
+        {notice && (
+          <p role="status" data-testid="defense-notice" className="mx-auto w-full max-w-[22rem] rounded-xl bg-amber-950/90 px-3 py-1 text-center text-xs text-amber-100">
+            {notice}
+          </p>
+        )}
       </div>
     </div>
   );

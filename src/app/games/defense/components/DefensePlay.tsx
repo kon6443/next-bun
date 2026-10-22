@@ -20,7 +20,7 @@ import { type ResumeSlot, clearResume, loadResume, saveResume } from "../lib/res
 import { type RestoredGame, restoreGame } from "../lib/restoreGame";
 import { type RingOption, currentRange, ringOptions, tapRing } from "../lib/ringOptions";
 import { toRenderMap } from "../lib/toRenderView";
-import { TUTORIAL_SLOT, tutorialBubbleAbove, tutorialStep } from "../lib/tutorial";
+import { TUTORIAL_BUBBLE_BAND, TUTORIAL_NOTICE_BAND, TUTORIAL_SLOT, tutorialBubbleAbove, tutorialStep } from "../lib/tutorial";
 import { nextWaveIndex, wavePreview } from "../lib/wavePreview";
 import { DamageNumberPool, EffectPool, ParticlePool } from "../renderer/particles";
 import type { RenderView } from "../renderer/renderView";
@@ -578,6 +578,8 @@ function PlaySession({ stage, meta, difficulty, boardKey, seed, restore, intro, 
   }, [viewport, stage]);
   const tutorialTarget = step === 0 && viewport ? { x: toScreenX(viewport, stage.map.slots[TUTORIAL_SLOT].x), y: toScreenY(viewport, stage.map.slots[TUTORIAL_SLOT].y) } : null;
   // 말풍선은 가리키는 곳(0단계 슬롯 고리·1단계 열린 링과 설명 카드)을 덮지 않고, 슬롯을 덜 덮는 쪽(위·아래) — 같으면 가리키는 곳의 반대편, 2단계는 위
+  // 시작 안내는 웨이브 전까지 — 튜토리얼 중에는 말풍선에 붙고(띠도 그만큼 두껍게), 아니면 위쪽에 따로
+  const noticeVisible = !!notice && hud.status === "ready" && !finished;
   const tutorialFocus = !viewport
     ? null
     : tutorialTarget
@@ -594,6 +596,8 @@ function PlaySession({ stage, meta, difficulty, boardKey, seed, restore, intro, 
           slotSize / 2,
           tutorialFocus,
           tutorialFocus ? tutorialFocus.top + tutorialFocus.bottom > viewport.height : true,
+          // 시작 안내가 말풍선에 붙으면 그만큼 띠가 두껍다
+          TUTORIAL_BUBBLE_BAND + (noticeVisible ? TUTORIAL_NOTICE_BAND : 0),
         );
 
   const leave = () => {
@@ -667,7 +671,7 @@ function PlaySession({ stage, meta, difficulty, boardKey, seed, restore, intro, 
           />
         )}
         {step !== null && !briefing && (
-          <TutorialOverlay step={step} target={tutorialTarget} above={tutorialAbove} onSkip={skipTutorial} />
+          <TutorialOverlay step={step} target={tutorialTarget} above={tutorialAbove} notice={noticeVisible ? notice : null} onSkip={skipTutorial} />
         )}
         {bossBanner && (
           <p
@@ -689,7 +693,7 @@ function PlaySession({ stage, meta, difficulty, boardKey, seed, restore, intro, 
               type="button"
               data-testid="defense-settings-open"
               onClick={() => setSettingsOpen(true)}
-              className="pointer-events-auto min-h-9 rounded-full border border-white/20 px-3 text-xs font-semibold text-slate-100"
+              className="pointer-events-auto min-h-11 rounded-full border border-white/20 px-3 text-xs font-semibold text-slate-100"
             >
               설정
             </button>
@@ -700,12 +704,12 @@ function PlaySession({ stage, meta, difficulty, boardKey, seed, restore, intro, 
             <p className="rounded-full bg-slate-900/90 px-3 py-1 text-xs text-slate-200">돌 받침을 눌러 타워를 짓고 웨이브를 시작하세요</p>
           </div>
         )}
-        {/* 시작 안내(이어하기 못 불러옴·다른 판 저장본이 바뀜) — 튜토리얼 중에도 웨이브 전까지 보인다 */}
-        {notice && hud.status === "ready" && !finished && !briefing && (
+        {/* 시작 안내(이어하기 못 불러옴·다른 판 저장본이 바뀜) — 웨이브 전까지. 튜토리얼 중에는 말풍선에 붙여 그린다(TutorialOverlay) */}
+        {noticeVisible && !briefing && step === null && (
           <p
             role="status"
             data-testid="defense-notice"
-            className={`pointer-events-none absolute left-1/2 w-[min(92%,22rem)] -translate-x-1/2 rounded-xl bg-amber-950/90 px-3 py-1 text-center text-xs text-amber-100 ${step !== null && tutorialAbove ? "bottom-3" : "top-12"}`}
+            className="pointer-events-none absolute left-1/2 top-12 w-[min(92%,22rem)] -translate-x-1/2 rounded-xl bg-amber-950/90 px-3 py-1 text-center text-xs text-amber-100"
           >
             {notice}
           </p>

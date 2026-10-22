@@ -10,13 +10,14 @@ const hud = { status: 'playing', speed: 3, tick: 0, lives: 20, gold: 9999, waves
 
 describe('Hud — 좁은 폭(320px)에서도 한 줄', () => {
   // jsdom은 배치를 계산하지 않는다 — 실제 폭 판정은 브라우저 스크린샷(320·390px). 여기서는 줄이 꺾일 자리가 없다는 것만 고정한다
-  it('수치 칸은 공백 없는 짧은 표기(W12/12)이고 머리줄은 줄바꿈 금지 — 이름은 보조기술에 남긴다', () => {
+  it('화면 표기는 공백 없는 짧은 기호·숫자(W12/12), 보조기술에는 이름과 "12 / 12" — 웨이브 칸은 줄이지 않는다', () => {
     const noop = () => {};
     render(<Hud hud={hud} exitHref="/x" soundOn={false} onToggleSound={noop} onTogglePause={noop} onCycleSpeed={noop} />);
-    const wave = screen.getByTestId('defense-wave');
-    expect(wave.textContent).toBe('W12/12');
-    for (const id of ['defense-lives', 'defense-gold', 'defense-wave']) expect(screen.getByTestId(id).textContent).not.toMatch(/\s/);
-    expect(wave.querySelector('dt')?.getAttribute('aria-label')).toBe('웨이브');
-    expect(wave.closest('header')?.className).toContain('whitespace-nowrap');
+    const visible = (id: string) => [...screen.getByTestId(id).querySelectorAll('[aria-hidden="true"]')].map((n) => n.textContent).join('');
+    const spoken = (id: string) => [...screen.getByTestId(id).querySelectorAll('.sr-only')].map((n) => n.textContent).join(' ');
+    expect(visible('defense-wave')).toBe('W12/12');
+    for (const id of ['defense-lives', 'defense-gold', 'defense-wave']) expect(visible(id)).not.toMatch(/\s/);
+    expect(spoken('defense-wave')).toBe('웨이브 12 / 12');
+    expect([spoken('defense-lives'), spoken('defense-gold')]).toEqual(['목숨', '골드']);
   });
 });

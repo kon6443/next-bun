@@ -38,20 +38,34 @@ export function Hud({ hud, exitHref, onRequestExit, soundOn, onToggleSound, onTo
         ←
       </Link>
       <dl className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-[clamp(0.75rem,3.6vw,0.875rem)] tabular-nums">
-        <div className="flex items-center gap-0.5" data-testid="defense-lives" data-value={hud.lives}>
-          <dt aria-label="목숨">♥</dt>
+        {/* 기호는 보조기술에서 숨기고 이름은 sr-only로 — dt의 aria-label은 iOS VoiceOver가 읽지 않는다. 좁으면 골드 칸부터 줄인다(웨이브는 안 자른다) */}
+        <div className="flex shrink-0 items-center gap-0.5" data-testid="defense-lives" data-value={hud.lives}>
+          <dt>
+            <span aria-hidden="true">♥</span>
+            <span className="sr-only">목숨</span>
+          </dt>
           <dd className="font-semibold text-rose-200">{hud.lives}</dd>
         </div>
-        <div className="flex items-center gap-0.5" data-testid="defense-gold" data-value={hud.gold}>
-          <dt aria-label="골드">◆</dt>
-          <dd className="font-semibold text-amber-200">{hud.gold}</dd>
+        <div className="flex min-w-0 items-center gap-0.5" data-testid="defense-gold" data-value={hud.gold}>
+          <dt>
+            <span aria-hidden="true">◆</span>
+            <span className="sr-only">골드</span>
+          </dt>
+          <dd className="truncate font-semibold text-amber-200">{hud.gold}</dd>
         </div>
-        <div className="flex items-center gap-0.5" data-testid="defense-wave" data-value={hud.wavesStarted} data-total={hud.totalWaves}>
-          <dt aria-label="웨이브" className="text-slate-400">
-            W
+        <div className="flex shrink-0 items-center gap-0.5" data-testid="defense-wave" data-value={hud.wavesStarted} data-total={hud.totalWaves}>
+          <dt className="text-slate-400">
+            <span aria-hidden="true">W</span>
+            <span className="sr-only">웨이브</span>
           </dt>
           <dd className="font-semibold">
-            {hud.wavesStarted}/{hud.totalWaves}
+            {/* 화면은 공백 없는 짧은 표기(줄이 꺾일 자리 없음), 읽기는 "12 / 12"(날짜로 읽히지 않게) */}
+            <span aria-hidden="true">
+              {hud.wavesStarted}/{hud.totalWaves}
+            </span>
+            <span className="sr-only">
+              {hud.wavesStarted} / {hud.totalWaves}
+            </span>
           </dd>
         </div>
       </dl>

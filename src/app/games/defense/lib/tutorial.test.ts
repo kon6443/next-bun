@@ -13,6 +13,10 @@ describe('tutorialBubbleAbove — 말풍선은 가리키는 곳·슬롯을 덮�
     expect(tutorialBubbleAbove(H, [350], 22, null, true)).toBe(true);
     expect(tutorialBubbleAbove(H, [350], 22, null, false)).toBe(false);
   });
+  it('띠 두께(band)를 넘기면 그만큼 더 덮는 것으로 센다 — 시작 안내가 붙은 말풍선', () => {
+    expect(tutorialBubbleAbove(H, [130], 22, null, true)).toBe(true);
+    expect(tutorialBubbleAbove(H, [130], 22, null, true, TUTORIAL_BUBBLE_BAND + 48)).toBe(false);
+  });
   it('띠 경계에 걸친 슬롯도 덮는 것으로 센다', () => {
     expect(tutorialBubbleAbove(H, [TUTORIAL_BUBBLE_BAND + 10], 22, null, true)).toBe(false);
   });

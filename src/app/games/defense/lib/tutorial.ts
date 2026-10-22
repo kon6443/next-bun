@@ -14,17 +14,19 @@ export function tutorialStep(view: { ringOpen: boolean; towers: number; wavesSta
 /** 첫 단계에서 가리킬 슬롯 — 조작 가이드(s1Guide) 첫 건설 자리 */
 export const TUTORIAL_SLOT = 7;
 
-/** 말풍선이 덮는 띠 높이(CSS px) — 가장자리 여백 12 + 두 줄 말풍선(320px 폭) */
-export const TUTORIAL_BUBBLE_BAND = 88;
+/** 말풍선이 덮는 띠 높이(CSS px) — 가장자리 여백 12 + 세 줄 말풍선(320px 폭, 1단계 문구) + 여유 */
+export const TUTORIAL_BUBBLE_BAND = 96;
+/** 말풍선에 붙는 시작 안내 한 장(두 줄 + 간격) */
+export const TUTORIAL_NOTICE_BAND = 48;
 
 /**
  * 말풍선을 위(true)·아래(false) 중 어디에 둘지 — 가리키는 곳(focus: 세로 범위)을 덮지 않는 쪽 중 슬롯을 덜 덮는 쪽
- * 둘이 같으면 preferAbove. 화면 좌표(CSS px), 슬롯은 중심 y와 반지름
+ * 둘이 같으면 preferAbove. 화면 좌표(CSS px), 슬롯은 중심 y와 반지름, band = 말풍선(+ 붙는 안내) 띠 높이
  */
-export function tutorialBubbleAbove(height: number, slotYs: readonly number[], slotRadius: number, focus: { top: number; bottom: number } | null, preferAbove: boolean): boolean {
+export function tutorialBubbleAbove(height: number, slotYs: readonly number[], slotRadius: number, focus: { top: number; bottom: number } | null, preferAbove: boolean, band = TUTORIAL_BUBBLE_BAND): boolean {
   const cost = (above: boolean) => {
-    const top = above ? 0 : height - TUTORIAL_BUBBLE_BAND;
-    const bottom = above ? TUTORIAL_BUBBLE_BAND : height;
+    const top = above ? 0 : height - band;
+    const bottom = above ? band : height;
     const covers = (from: number, to: number) => to > top && from < bottom;
     let n = focus && covers(focus.top, focus.bottom) ? 1000 : 0;
     for (const y of slotYs) if (covers(y - slotRadius, y + slotRadius)) n += 1;
