@@ -13,7 +13,8 @@ import {
   stepBattle,
 } from "../../battle-engine";
 import { KEY_BINDINGS } from "../../lib/controls";
-import { type EffectTracker, createEffectTracker, observeAfter, observeBefore, resetEffects } from "../../lib/effects";
+import { type EffectTracker, createEffectTracker, drainCues, noteGarbageRise, observeAfter, observeBefore, resetEffects } from "../../lib/effects";
+import { getSoundPlayer } from "../../lib/sound/soundPlayer";
 import type { GarbageGauge } from "../../lib/renderer";
 
 export type BattlePlayStatus = "ready" | "playing" | "over";
@@ -68,6 +69,14 @@ export function useBattlePlay(options: BattlePlayOptions = {}) {
   const setStatus = useCallback((next: BattlePlayStatus) => {
     statusRef.current = next;
     setStatusState(next);
+    // 배경음악은 경기 중에만 (설정이 꺼져 있으면 플레이어가 무시한다)
+    getSoundPlayer().setMusicPlaying(next === "playing");
+  }, []);
+
+  // 소리 플레이어를 화면에 들어올 때 만들어 둔다 — 첫 조작(오디오 시작 조건)을 놓치지 않게. 나가면 음악을 끈다
+  useEffect(() => {
+    const player = getSoundPlayer();
+    return () => player.setMusicPlaying(false);
   }, []);
 
   const start = useCallback(
@@ -148,7 +157,12 @@ export function useBattlePlay(options: BattlePlayOptions = {}) {
       const effects = effectsRef.current;
       if (effects) observeBefore(effects, game);
       const { applied, lock } = stepBattle(bs, actions, actions.length);
-      if (effects) observeAfter(effects, game, actions, applied);
+      if (effects) {
+        observeAfter(effects, game, actions, applied);
+        // 가비지가 판에 들어왔다 — 아래에서 밀려 올라오는 연출 + 경고음 신호
+        if (lock && lock.garbageApplied > 0) noteGarbageRise(effects, game.frame - 1, lock.garbageApplied);
+        getSoundPlayer().playCues(drainCues(effects));
+      }
       for (let i = 0; i < applied; i++) recordInput(recorder, frame, actions[i]);
 
       let active = 0;

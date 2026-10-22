@@ -12,6 +12,7 @@ import { RankingTable } from "@/app/games/_shared/components/RankingTable";
 import { TETRIS_GAME } from "./lib/game";
 import { BattleEntry } from "./battle-ui/components/BattleEntry";
 import { RecentBattles } from "./battle-ui/components/RecentBattles";
+import { SoundSettingsPanel } from "./components/SoundSettingsPanel";
 import { CONTROL_GUIDE } from "./lib/controls";
 import { formatScore, framesToMs } from "@/app/games/_shared/lib/format";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
@@ -128,7 +129,7 @@ export default function TetrisHome() {
             ← 게임 목록
           </ButtonLink>
         </div>
-        <h1 className="mt-4 text-3xl font-bold text-white">테트리스</h1>
+        <h1 className="mt-4 text-3xl font-bold text-white [text-shadow:0_0_14px_rgba(56,189,248,0.6)]">테트리스</h1>
         <p className="mt-2 text-sm text-slate-400">
           줄을 지우고 점수를 쌓으세요. 끝나면 이름을 적어 랭킹에 올릴 수 있어요. (로그인 없이도 가능)
         </p>
@@ -246,6 +247,7 @@ export default function TetrisHome() {
               className="h-5 w-5 accent-sky-400"
             />
           </label>
+          <SoundSettingsPanel />
         </div>
       </section>
     </TeamsPageLayout>

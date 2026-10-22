@@ -7,6 +7,7 @@ import { nextRandom } from '../engine/random';
  * 일시정지·배속 재생에서도 엔진과 같은 시간으로 움직이고, 탐색으로 프레임이 되돌아가면 비운다
  * 화면용 난수는 엔진 상태와 분리된 별도 시드를 쓴다 — 같은 판이면 같은 연출(스크린샷·테스트 재현)
  * 리플레이를 뒤로 탐색하면 가장 가까운 스냅샷부터 다시 관찰하므로, 스냅샷 이전에 시작된 연출은 빠질 수 있다(화면용이라 허용)
+ * 소리 신호(cues)도 여기서 만든다 — 소리를 내는 쪽(lib/sound)이 틱마다 꺼내 쓴다(drainCues). 엔진 결과에는 영향 없음
  */
 
 /** 동시에 살아 있는 파티클 상한 — 넘으면 오래된 것부터 버린다 */
@@ -15,6 +16,12 @@ export const PARTICLE_LIFE_FRAMES = 42;
 export const TRAIL_LIFE_FRAMES = 10;
 export const TEXT_LIFE_FRAMES = 60;
 export const LEVEL_FADE_FRAMES = 40;
+/** 줄 삭제 충격파 링 수명 */
+export const RING_LIFE_FRAMES = 24;
+/** 가비지가 들어온 뒤 판이 아래에서 밀려 올라오는 연출 */
+export const RISE_FRAMES = 10;
+/** 꺼내지 않은 소리 신호 상한 — 소리가 꺼져 있어 아무도 꺼내지 않아도 쌓이지 않게 */
+export const MAX_CUES = 32;
 /** 연출 난수 시작값 — 새 판·되감기마다 여기서 다시 시작한다 */
 const EFFECT_RNG_SEED = 0x2f6b1d3;
 
@@ -49,19 +56,61 @@ export type TextBurst = { frame: number; lines: EffectText[] };
 
 export type LevelChange = { frame: number; from: number; to: number };
 
+/** 줄 삭제 충격파 — 지운 줄 가운데에서 퍼진다 */
+export type ClearRing = { frame: number; row: number; big: boolean };
+
+/** 콤보 미터 — 마지막으로 줄을 지운 고정의 콤보(0 = 첫 삭제). 줄을 못 지운 고정에서 끝난다 */
+export type ComboMeter = { frame: number; combo: number; ended: boolean };
+
+/** 가비지 상승 — 대전 래퍼가 판에 넣은 줄 수 (noteGarbageRise) */
+export type GarbageRise = { frame: number; lines: number };
+
+/**
+ * 소리 신호 — 화면 연출과 같은 관찰에서 나온다. value: clear=지운 줄 수, combo=콤보 수, level=새 레벨
+ * 대전 신호(attack·garbage·ko·win·countdown·go)는 대전 화면이 직접 낸다
+ */
+export type SoundCueKind =
+  | 'move'
+  | 'rotate'
+  | 'hold'
+  | 'hardDrop'
+  | 'lock'
+  | 'clear'
+  | 'tspin'
+  | 'combo'
+  | 'b2b'
+  | 'perfectClear'
+  | 'levelUp'
+  | 'gameOver'
+  | 'attack'
+  | 'garbage'
+  | 'ko'
+  | 'win'
+  | 'countdown'
+  | 'go';
+export type SoundCue = { kind: SoundCueKind; value?: number };
+
 export type EffectTracker = {
   particles: Particle[];
   trail: Trail | null;
   shake: Shake | null;
   text: TextBurst | null;
   level: LevelChange | null;
+  ring: ClearRing | null;
+  combo: ComboMeter | null;
+  rise: GarbageRise | null;
+  /** 아직 소리로 내지 않은 신호 (drainCues) */
+  cues: SoundCue[];
   /** 마지막으로 관찰한 프레임 — 이보다 앞 프레임의 상태가 오면 새 판·되감기로 보고 비운다 */
   frame: number;
   rng: number;
   before: {
     active: boolean;
     holdUsed: boolean;
+    x: number;
     y: number;
+    rotation: number;
+    over: boolean;
     pieces: number;
     level: number;
     pendingHardDrop: boolean;
@@ -71,14 +120,30 @@ export type EffectTracker = {
 const EMPTY_BEFORE: EffectTracker['before'] = {
   active: false,
   holdUsed: false,
+  x: 0,
   y: 0,
+  rotation: 0,
+  over: false,
   pieces: 0,
   level: 1,
   pendingHardDrop: false,
 };
 
 export function createEffectTracker(): EffectTracker {
-  return { particles: [], trail: null, shake: null, text: null, level: null, frame: -1, rng: EFFECT_RNG_SEED, before: { ...EMPTY_BEFORE } };
+  return {
+    particles: [],
+    trail: null,
+    shake: null,
+    text: null,
+    level: null,
+    ring: null,
+    combo: null,
+    rise: null,
+    cues: [],
+    frame: -1,
+    rng: EFFECT_RNG_SEED,
+    before: { ...EMPTY_BEFORE },
+  };
 }
 
 export function resetEffects(fx: EffectTracker): void {
@@ -87,6 +152,10 @@ export function resetEffects(fx: EffectTracker): void {
   fx.shake = null;
   fx.text = null;
   fx.level = null;
+  fx.ring = null;
+  fx.combo = null;
+  fx.rise = null;
+  fx.cues.length = 0;
   fx.frame = -1;
   fx.rng = EFFECT_RNG_SEED;
   fx.before = { ...EMPTY_BEFORE };
@@ -98,7 +167,10 @@ export function observeBefore(fx: EffectTracker, state: GameState): void {
   const before = fx.before;
   before.active = state.active;
   before.holdUsed = state.holdUsed;
+  before.x = state.x;
   before.y = state.y;
+  before.rotation = state.rotation;
+  before.over = state.over;
   before.pieces = state.pieces;
   before.level = state.level;
   before.pendingHardDrop = state.pending.indexOf(ACTION.HARD_DROP) !== -1;
@@ -108,6 +180,33 @@ function random(fx: EffectTracker): number {
   const [next, value] = nextRandom(fx.rng);
   fx.rng = next;
   return value / 4294967296;
+}
+
+function pushCue(fx: EffectTracker, cue: SoundCue): void {
+  fx.cues.push(cue);
+  if (fx.cues.length > MAX_CUES) fx.cues.splice(0, fx.cues.length - MAX_CUES);
+}
+
+/** 쌓인 소리 신호를 꺼낸다 — 소리를 내는 쪽이 틱마다 부른다 */
+export function drainCues(fx: EffectTracker): SoundCue[] {
+  if (fx.cues.length === 0) return [];
+  return fx.cues.splice(0, fx.cues.length);
+}
+
+/** 대전 래퍼가 가비지를 판에 넣은 직후 부른다 — 판이 아래에서 밀려 올라오는 연출 + 경고음 */
+export function noteGarbageRise(fx: EffectTracker, frame: number, lines: number): void {
+  if (lines <= 0) return;
+  fx.rise = { frame, lines };
+  pushCue(fx, { kind: 'garbage', value: lines });
+}
+
+/** 퍼펙트 클리어 — 고정 직후(줄 제거 전) 비어 있지 않은 칸이 모두 지울 줄에 있다 (대전 래퍼 isPerfectClear와 같은 규칙) */
+function isPerfectClear(board: ArrayLike<number>, rows: readonly number[]): boolean {
+  if (rows.length === 0) return false;
+  for (let i = 0; i < board.length; i++) {
+    if (board[i] !== 0 && rows.indexOf(Math.floor(i / BOARD_WIDTH)) === -1) return false;
+  }
+  return true;
 }
 
 function clearLabel(lock: LockEvent): string | null {
@@ -158,10 +257,24 @@ export function observeAfter(fx: EffectTracker, state: GameState, actions: Array
 
   if (state.level > before.level) {
     fx.level = { frame, from: before.level, to: state.level };
+    pushCue(fx, { kind: 'levelUp', value: state.level });
   }
+  if (state.over && !before.over) pushCue(fx, { kind: 'gameOver' });
 
   const lock = state.lastLock;
-  if (state.pieces === before.pieces || !lock) return;
+  if (state.pieces === before.pieces || !lock) {
+    // 같은 블록을 조작 중 — 옆 이동·회전(자동 반복 이동 포함)·홀드
+    if (before.active && state.active) {
+      if (state.holdUsed && !before.holdUsed) pushCue(fx, { kind: 'hold' });
+      else if (state.rotation !== before.rotation) pushCue(fx, { kind: 'rotate' });
+      else if (state.x !== before.x) pushCue(fx, { kind: 'move' });
+    } else if (!before.active && state.active) {
+      // 생성 프레임 — 지연 중 미리 누른 홀드·회전(IHS·IRS)이 적용됐다 (생성 회전은 0)
+      if (state.holdUsed && !before.holdUsed) pushCue(fx, { kind: 'hold' });
+      else if (state.rotation !== 0) pushCue(fx, { kind: 'rotate' });
+    }
+    return;
+  }
 
   let hardDrop = before.pendingHardDrop && !before.active;
   let held = false;
@@ -180,12 +293,29 @@ export function observeAfter(fx: EffectTracker, state: GameState, actions: Array
     }
   }
 
-  if (lock.lines > 0) spawnClearParticles(fx, state, lock);
+  if (lock.lines > 0) {
+    spawnClearParticles(fx, state, lock);
+    const rows = lock.rows;
+    fx.ring = { frame, row: (rows[0] + rows[rows.length - 1] + 1) / 2, big: isBigClear(lock) };
+  }
+  const perfect = lock.lines > 0 && isPerfectClear(state.board, lock.rows);
+  if (lock.lines > 0) fx.combo = { frame, combo: lock.combo, ended: false };
+  else if (fx.combo && !fx.combo.ended) fx.combo = { ...fx.combo, frame, ended: true };
+
+  // 소리 — 한 고정에 가장 큰 사건 하나 + 덧붙는 B2B·콤보·퍼펙트
+  pushCue(fx, { kind: hardDrop ? 'hardDrop' : 'lock' });
+  if (lock.lines > 0) {
+    pushCue(fx, lock.tSpin !== 'none' ? { kind: 'tspin', value: lock.lines } : { kind: 'clear', value: lock.lines });
+    if (lock.backToBack) pushCue(fx, { kind: 'b2b' });
+    if (lock.combo >= 1) pushCue(fx, { kind: 'combo', value: lock.combo });
+    if (perfect) pushCue(fx, { kind: 'perfectClear' });
+  }
 
   const lines: EffectText[] = [];
   const label = clearLabel(lock);
   const tier = lock.lines > 0 ? comboTier(lock.combo) : 0;
   if (label) lines.push({ text: label, tier: Math.max(tier, 1) });
+  if (perfect) lines.push({ text: 'PERFECT CLEAR', tier: 4 });
   if (lock.backToBack) lines.push({ text: 'BACK-TO-BACK', tier: Math.max(tier, 1) });
   if (lock.lines > 0 && lock.combo >= 1) lines.push({ text: `COMBO ×${lock.combo}`, tier });
   if (fx.level && fx.level.frame === frame) lines.push({ text: `LEVEL ${state.level}`, tier: 0 });

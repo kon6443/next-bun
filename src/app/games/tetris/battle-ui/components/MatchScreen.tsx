@@ -10,6 +10,9 @@ import type { ReplaySubmitStatus } from "../lib/replaySubmit";
 import type { useBattlePlay } from "../hooks/useBattlePlay";
 import { battleErrorMessage } from "../lib/battleErrors";
 import { BattleView } from "./BattleView";
+import { useReducedEffects } from "../../hooks/useReducedEffects";
+import fx from "./battleFx.module.css";
+import { getSoundPlayer } from "../../lib/sound/soundPlayer";
 import { MatchRecordLinks } from "./MatchRecordLinks";
 
 type MatchScreenProps = {
@@ -40,6 +43,7 @@ export function MatchScreen({
   trailsRootRef,
   onExit,
 }: MatchScreenProps) {
+  const reduced = useReducedEffects();
   const { emotes, sendEmote, rematch } = useBattleSocket();
   const [confirmExit, setConfirmExit] = useState(false);
   // 경기 중 나가기는 기권(되돌릴 수 없음) — 확인을 받는다
@@ -53,12 +57,16 @@ export function MatchScreen({
     phase.kind === "countdown" ? (
       <Countdown startsAt={phase.startsAt} />
     ) : phase.kind === "out" ? (
-      <div className="pointer-events-none absolute inset-x-0 top-1/3 flex justify-center" role="status">
-        <p className="rounded-2xl border border-white/10 bg-slate-950/85 px-5 py-3 text-center text-sm text-slate-200">
-          <strong className="block text-2xl font-black text-white">{phase.place ? `${phase.place}위` : "탈락"}</strong>
-          남은 경기를 보고 있어요
-        </p>
-      </div>
+      <>
+        {/* 내 판 KO 폭발 — 탈락 순간 한 번 (연출 줄이기면 없음) */}
+        {!reduced && <span className={fx.koBurst} aria-hidden="true" />}
+        <div className="pointer-events-none absolute inset-x-0 top-1/3 flex justify-center" role="status">
+          <p className="rounded-2xl border border-white/10 bg-slate-950/85 px-5 py-3 text-center text-sm text-slate-200">
+            <strong className="block text-2xl font-black text-white">{phase.place ? `${phase.place}위` : "탈락"}</strong>
+            남은 경기를 보고 있어요
+          </p>
+        </div>
+      </>
     ) : phase.kind === "ended" ? (
       <MatchResults
         matchId={phase.matchId}
@@ -118,15 +126,23 @@ export function MatchScreen({
 
 /** 시작까지 남은 초 — 수신 시각 + startInMs 기준(performance.now) */
 function Countdown({ startsAt }: { startsAt: number }) {
+  const reduced = useReducedEffects();
   const [now, setNow] = useState(() => performance.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(performance.now()), 100);
     return () => clearInterval(timer);
   }, []);
   const seconds = Math.max(1, Math.ceil((startsAt - now) / 1000));
+  // 초가 바뀔 때마다 비프 (GO는 실제로 경기가 시작될 때 useBattleMatch가 낸다)
+  useEffect(() => {
+    getSoundPlayer().play({ kind: "countdown", value: seconds });
+  }, [seconds]);
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-slate-950/50" role="status" aria-label={`${seconds}초 뒤 시작`}>
-      <span className="text-6xl font-black text-white">{seconds}</span>
+      {/* key로 초마다 다시 튀어나오게 — 연출 줄이기면 정적 */}
+      <span key={seconds} className={`text-7xl font-black text-white ${reduced ? "" : fx.countdown}`}>
+        {seconds}
+      </span>
     </div>
   );
 }
@@ -168,7 +184,7 @@ function MatchResults({ matchId, results, myPlayerId, isHost, submitStatus, onRe
     <div className="absolute inset-0 z-10 flex items-center justify-center overflow-y-auto bg-slate-950/75 p-4" style={{ touchAction: "auto" }}>
       <section className="w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900/95 p-5" aria-labelledby="battle-result-title">
         <p className="text-center text-xs font-semibold tracking-[0.3em] text-slate-400">RESULT</p>
-        <h2 id="battle-result-title" className="mt-1 text-center text-3xl font-black text-white">
+        <h2 id="battle-result-title" className="mt-1 text-center text-3xl font-black text-white [text-shadow:0_0_14px_rgba(56,189,248,0.7),0_0_32px_rgba(56,189,248,0.35)]">
           {mine ? (mine.place === 1 ? "1위!" : `${mine.place}위`) : "경기 종료"}
         </h2>
         {results.length === 0 && (

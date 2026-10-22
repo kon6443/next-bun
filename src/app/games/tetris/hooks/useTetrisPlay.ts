@@ -13,7 +13,8 @@ import {
   stepFrame,
 } from "../engine";
 import { KEY_BINDINGS } from "../lib/controls";
-import { type EffectTracker, createEffectTracker, observeAfter, observeBefore, resetEffects } from "../lib/effects";
+import { type EffectTracker, createEffectTracker, drainCues, observeAfter, observeBefore, resetEffects } from "../lib/effects";
+import { getSoundPlayer } from "../lib/sound/soundPlayer";
 import type { ReplayPayload } from "@/types/game";
 
 export type PlayStatus = "ready" | "playing" | "paused" | "over";
@@ -68,6 +69,14 @@ export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state:
   const setStatus = useCallback((next: PlayStatus) => {
     statusRef.current = next;
     setStatusState(next);
+    // 배경음악은 진행 중에만 (설정이 꺼져 있으면 플레이어가 무시한다)
+    getSoundPlayer().setMusicPlaying(next === "playing");
+  }, []);
+
+  // 소리 플레이어를 화면에 들어올 때 만들어 둔다 — 첫 조작(오디오 시작 조건)을 놓치지 않게. 나가면 음악을 끈다
+  useEffect(() => {
+    const player = getSoundPlayer();
+    return () => player.setMusicPlaying(false);
   }, []);
 
   const start = useCallback(
@@ -142,7 +151,11 @@ export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state:
       const effects = effectsRef.current;
       if (effects) observeBefore(effects, state);
       const applied = stepFrame(state, actions, actions.length);
-      if (effects) observeAfter(effects, state, actions, applied);
+      if (effects) {
+        observeAfter(effects, state, actions, applied);
+        // 효과음 — 같은 관찰에서 나온 신호 (꺼져 있으면 아무것도 하지 않는다)
+        getSoundPlayer().playCues(drainCues(effects));
+      }
       for (let i = 0; i < applied; i++) recordInput(recorder, frame, actions[i]);
 
       const lock = state.lastLock;
