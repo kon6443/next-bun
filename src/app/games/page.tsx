@@ -42,7 +42,7 @@ export default function GamesPage() {
         <p className="mt-2 text-sm text-slate-400">브라우저에서 바로 즐기는 미니게임이에요.</p>
       </section>
 
-      <ul className="grid gap-4">
+      <ul className="grid grid-cols-1 gap-4">
         {GAMES.map((game) => (
           <li key={game.title} className={`${cardStyles.section} p-5`}>
             <div className="flex items-start gap-4">

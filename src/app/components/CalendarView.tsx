@@ -384,7 +384,7 @@ export function CalendarView({ tasks, teamId, initialMonth, onMonthChange }: Cal
           <p className="text-[0.7rem] uppercase tracking-[0.4em] text-slate-400">달력</p>
           <p className="mt-1 text-sm text-slate-400">마감일 기준 표시</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <button
             type="button"
             onClick={goToPrevMonth}
@@ -393,7 +393,7 @@ export function CalendarView({ tasks, teamId, initialMonth, onMonthChange }: Cal
           >
             ◀
           </button>
-          <span className="min-w-[120px] text-center text-sm font-semibold text-white">
+          <span className="min-w-[96px] whitespace-nowrap text-center text-sm font-semibold text-white sm:min-w-[120px]">
             {year}년 {month + 1}월
           </span>
           <button
@@ -406,7 +406,7 @@ export function CalendarView({ tasks, teamId, initialMonth, onMonthChange }: Cal
           </button>
           <button
             onClick={goToToday}
-            className="ml-2 min-h-[44px] rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-1.5 text-xs text-sky-400 hover:bg-sky-500/20"
+            className="min-h-[44px] shrink-0 whitespace-nowrap rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-1.5 text-xs text-sky-400 hover:bg-sky-500/20 sm:ml-2"
           >
             오늘
           </button>

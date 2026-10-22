@@ -140,7 +140,7 @@ function OnlineUsersMiniView({
       </div>
 
       {/* 인원 수 */}
-      <span className="text-xs font-medium text-emerald-400 group-hover:text-emerald-300">
+      <span className="shrink-0 whitespace-nowrap text-xs font-medium text-emerald-400 group-hover:text-emerald-300">
         {totalCount}명
       </span>
     </button>

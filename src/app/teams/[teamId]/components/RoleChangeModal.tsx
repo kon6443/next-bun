@@ -73,7 +73,7 @@ export function RoleChangeModal({
   const currentRoleMeta = getRoleMeta(targetUser.currentRole);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
       <div
         ref={dialogRef}
         role="dialog"
@@ -94,14 +94,14 @@ export function RoleChangeModal({
 
         {/* 대상 사용자 정보 */}
         <div className="mb-6 rounded-xl border border-white/10 bg-slate-950/30 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-lg font-semibold text-white">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="break-words text-lg font-semibold text-white">
                 {targetUser.userName || `사용자 ${targetUser.userId}`}
               </p>
               <p className="mt-1 text-sm text-slate-400">현재 역할</p>
             </div>
-            <span className={currentRoleMeta.className}>{currentRoleMeta.label}</span>
+            <span className={`shrink-0 ${currentRoleMeta.className}`}>{currentRoleMeta.label}</span>
           </div>
         </div>
 
@@ -123,7 +123,7 @@ export function RoleChangeModal({
               <label className="mb-3 block text-sm font-semibold text-slate-300">
                 변경할 역할 선택
               </label>
-              <div className="grid gap-2">
+              <div className="grid grid-cols-1 gap-2">
                 {availableRoles.map(role => {
                   const roleMeta = ROLES[role];
                   const isSelected = selectedRole === role;

@@ -292,7 +292,7 @@ export function TagModal({ isOpen, onClose, mode, selectedTagIds = [], onSelecte
 
   return createPortal(
     <>
-      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4">
+      <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4">
         <div
           ref={dialogRef}
           role="dialog"
@@ -714,7 +714,7 @@ function TagEditor({ formId, tag, allTags, onStatusChange, onCancel, onSave, onR
       <TagColorPicker value={color} onChange={setColor} />
 
       <div className="flex items-center gap-2">
-        <span className="text-xs text-slate-400">미리보기</span>
+        <span className="shrink-0 whitespace-nowrap text-xs text-slate-400">미리보기</span>
         <TagChip tag={{ tagName: normalizeTagName(name) || tag.tagName, tagColor: color }} size="md" className="min-w-0" />
       </div>
 

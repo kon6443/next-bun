@@ -635,7 +635,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
             {/* 본문 */}
             {taskDetail.taskDescription && (
               <div className='mb-4 rounded-2xl border border-sky-500/30 bg-slate-900/50 p-4 shadow-lg shadow-sky-500/10'>
-                <p className='whitespace-pre-wrap text-base leading-relaxed text-slate-200'>
+                <p className='whitespace-pre-wrap break-words text-base leading-relaxed text-slate-200'>
                   {taskDetail.taskDescription}
                 </p>
               </div>
@@ -765,15 +765,15 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
                   <div>
                     {/* 댓글 헤더: 닉네임 · 시간 (수정됨) + 아이콘 버튼 - 한 줄 */}
                     <div className='flex flex-wrap items-center justify-between gap-y-1'>
-                      <div className='flex items-center gap-2'>
-                        <span className='font-semibold text-sm text-white'>
+                      <div className='flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5'>
+                        <span className='min-w-0 break-words font-semibold text-sm text-white'>
                           {comment.userName || `사용자 ${comment.userId}`}
                         </span>
                         <span className='text-xs text-slate-400'>·</span>
                         <span className='text-xs text-slate-400'>
                           {formatCompactDateTime(comment.crtdAt)}
                         </span>
-                        {comment.mdfdAt && <span className='text-xs text-slate-400'>(수정됨)</span>}
+                        {comment.mdfdAt && <span className='shrink-0 whitespace-nowrap text-xs text-slate-400'>(수정됨)</span>}
                       </div>
                       {currentUserId === comment.userId && comment.status !== 0 && (
                         <div className='flex items-center gap-1'>
@@ -800,7 +800,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
                     {comment.status === 0 ? (
                       <p className='mt-2 text-sm italic text-slate-400'>삭제된 댓글입니다.</p>
                     ) : (
-                      <p className='mt-2 text-sm leading-relaxed text-slate-300 whitespace-pre-wrap'>
+                      <p className='mt-2 text-sm leading-relaxed text-slate-300 whitespace-pre-wrap break-words'>
                         {comment.commentContent}
                       </p>
                     )}
