@@ -12,6 +12,7 @@ import { RankingTable } from "@/app/games/_shared/components/RankingTable";
 import { TETRIS_GAME } from "./lib/game";
 import { BattleEntry } from "./battle-ui/components/BattleEntry";
 import { RecentBattles } from "./battle-ui/components/RecentBattles";
+import { SoundSettingsPanel } from "./components/SoundSettingsPanel";
 import { CONTROL_GUIDE } from "./lib/controls";
 import { formatScore, framesToMs } from "@/app/games/_shared/lib/format";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
@@ -246,6 +247,7 @@ export default function TetrisHome() {
               className="h-5 w-5 accent-sky-400"
             />
           </label>
+          <SoundSettingsPanel />
         </div>
       </section>
     </TeamsPageLayout>

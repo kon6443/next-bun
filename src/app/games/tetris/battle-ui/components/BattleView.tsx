@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { TetrisBattleEmoteId } from "@/types/tetrisBattleSocket";
 import { TetrisCanvas } from "../../components/TetrisCanvas";
 import { TouchControls } from "../../components/TouchControls";
+import { SoundToggle } from "../../components/SoundToggle";
 import type { ReceivedEmote } from "../contexts/BattleSocketContext";
 import type { useBattlePlay } from "../hooks/useBattlePlay";
 import { EmoteBar } from "./EmoteBar";
@@ -75,6 +76,7 @@ export function BattleView({ play, meId, opponents, emotes, trailsRootRef, onEmo
             </li>
           ))}
         </ul>
+        <SoundToggle className="shrink-0" />
         <button
           type="button"
           onClick={() => setEmoteOpen((v) => !v)}

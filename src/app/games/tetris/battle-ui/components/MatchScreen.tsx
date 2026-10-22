@@ -12,6 +12,7 @@ import { battleErrorMessage } from "../lib/battleErrors";
 import { BattleView } from "./BattleView";
 import { useReducedEffects } from "../../hooks/useReducedEffects";
 import fx from "./battleFx.module.css";
+import { getSoundPlayer } from "../../lib/sound/soundPlayer";
 import { MatchRecordLinks } from "./MatchRecordLinks";
 
 type MatchScreenProps = {
@@ -132,6 +133,10 @@ function Countdown({ startsAt }: { startsAt: number }) {
     return () => clearInterval(timer);
   }, []);
   const seconds = Math.max(1, Math.ceil((startsAt - now) / 1000));
+  // 초가 바뀔 때마다 비프 (GO는 실제로 경기가 시작될 때 useBattleMatch가 낸다)
+  useEffect(() => {
+    getSoundPlayer().play({ kind: "countdown", value: seconds });
+  }, [seconds]);
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-slate-950/50" role="status" aria-label={`${seconds}초 뒤 시작`}>
       {/* key로 초마다 다시 튀어나오게 — 연출 줄이기면 정적 */}

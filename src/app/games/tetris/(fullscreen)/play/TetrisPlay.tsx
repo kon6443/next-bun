@@ -13,6 +13,7 @@ import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib
 import { TetrisCanvas } from "../../components/TetrisCanvas";
 import { TouchControls } from "../../components/TouchControls";
 import { EffectsToggle } from "../../components/EffectsToggle";
+import { SoundToggle } from "../../components/SoundToggle";
 import { type GameResult, GameOverPanel } from "../../components/GameOverPanel";
 import { useTetrisPlay } from "../../hooks/useTetrisPlay";
 import { CONTROL_GUIDE } from "../../lib/controls";
@@ -181,6 +182,7 @@ export default function TetrisPlay() {
             <dd className="text-sm font-bold text-white">{formatFrames(play.hud.frame)}</dd>
           </div>
         </dl>
+        <SoundToggle />
         <button
           type="button"
           onClick={(e) => {

@@ -20,6 +20,10 @@ import type { MatchSync } from "../contexts/BattleSocketContext";
 import { decodeBoard, encodeBoard } from "../lib/boardCodec";
 import type { ReplaySubmitStatus } from "../lib/replaySubmit";
 import { useBattlePlay } from "./useBattlePlay";
+import { getSoundPlayer } from "../../lib/sound/soundPlayer";
+
+/** 승리음은 마지막 KO 폭발음 뒤에 */
+const WIN_SOUND_DELAY_MS = 450;
 
 const ACK_TIMEOUT_MS = 8000;
 /** 응답이 없던 보고를 다시 보내기까지 */
@@ -124,6 +128,8 @@ export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMat
   const onAttackRef = useRef(onAttack);
   onAttackRef.current = onAttack;
   const startTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 승리음 지연 — 화면을 떠나면 울리지 않게 정리한다 */
+  const winSoundTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevSocketRef = useRef<TetrisBattleSocket | null>(null);
 
   /**
@@ -313,6 +319,7 @@ export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMat
         startPlay(p.seed, das, arr);
         playingMatchIdRef.current = p.matchId;
         setPhase({ kind: "playing", matchId: p.matchId });
+        getSoundPlayer().play({ kind: "go" });
         flushGarbage(); // 시작 전에 온 가비지(상대가 먼저 시작한 경우)
       }, delay);
     };
@@ -324,7 +331,10 @@ export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMat
     };
 
     const onAttackEvent = (p: { matchId: string; from: string; to: string; lines: number }) => {
-      if (isCurrent(p.matchId)) onAttackRef.current?.(p.from, p.to, p.lines);
+      if (!isCurrent(p.matchId)) return;
+      onAttackRef.current?.(p.from, p.to, p.lines);
+      // 내가 보낸 공격 — 송신음 (받는 쪽 경고음은 가비지가 판에 들어올 때 useBattlePlay가 낸다)
+      if (p.from === myIdRef.current) getSoundPlayer().play({ kind: "attack", value: p.lines });
     };
 
     const onOpponent = (p: { matchId: string; playerId: string; board: string; pending: number }) => {
@@ -338,6 +348,8 @@ export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMat
     const onKo = (p: { matchId: string; playerId: string; by: string | null; place: number; reason: string }) => {
       if (!isCurrent(p.matchId)) return;
       if (p.by && p.by === myIdRef.current) setMyKos((k) => k + 1);
+      // 상대 탈락 폭발음 — 내 탈락은 내 판의 게임 오버 신호가 낸다
+      if (p.playerId !== myIdRef.current) getSoundPlayer().play({ kind: "ko" });
       setOpponents((prev) =>
         prev.map((o) => {
           if (o.playerId === p.playerId) return { ...o, place: p.place };
@@ -350,7 +362,11 @@ export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMat
         // 리플레이는 내 topOut으로 탈락했을 때(reason topout + 내 판이 끝남)만 낸다 — 끊김 KO는 서버 탈락 frame이 내 판과 달라 INVALID가 된다
         const selfTopOut = p.reason === "topout" && playingMatchIdRef.current === p.matchId && battleRef.current?.game.over;
         if (selfTopOut) selfTopOutRef.current.add(p.matchId);
-        else serverKoRef.current.add(p.matchId);
+        else {
+          serverKoRef.current.add(p.matchId);
+          // 서버가 정한 탈락(끊김·나감)은 내 판의 게임 오버 신호가 없다 — 여기서 낸다
+          getSoundPlayer().play({ kind: "gameOver" });
+        }
         clearStartTimer();
         stopPlay();
         setPhase({ kind: "out", matchId: p.matchId, place: p.place });
@@ -358,7 +374,15 @@ export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMat
     };
 
     const onEnded = (p: { matchId: string; results: MatchResultEntry[] }) => {
-      if (isCurrent(p.matchId)) endMatch(p.matchId, p.results);
+      if (!isCurrent(p.matchId)) return;
+      // 마지막 상대의 KO 폭발음과 겹치지 않게 조금 뒤에
+      if (p.results.find((r) => r.playerId === myIdRef.current)?.place === 1) {
+        winSoundTimerRef.current = setTimeout(() => {
+          winSoundTimerRef.current = null;
+          getSoundPlayer().play({ kind: "win" });
+        }, WIN_SOUND_DELAY_MS);
+      }
+      endMatch(p.matchId, p.results);
     };
 
     // 끊기면 재입장 응답까지 가비지를 모으고 요청을 멈춘다
@@ -389,6 +413,7 @@ export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMat
     () => () => {
       clearStartTimer();
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      if (winSoundTimerRef.current) clearTimeout(winSoundTimerRef.current);
     },
     [],
   );
