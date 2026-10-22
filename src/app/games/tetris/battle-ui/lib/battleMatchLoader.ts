@@ -1,8 +1,17 @@
 import { ApiError } from '@/types/api';
-import { type BattleMatch, type BattleReplayDetail, getBattleMatch, getBattleReplay } from '@/services/tetrisBattleService';
+import {
+  type BattleLobbyStats,
+  type BattleMatch,
+  type BattleMatchList,
+  type BattleReplayDetail,
+  getBattleLobbyStats,
+  getBattleMatch,
+  getBattleMatchList,
+  getBattleReplay,
+} from '@/services/tetrisBattleService';
 
 /**
- * 대전 경기·리플레이 조회 — 같은 요청은 진행 중인 것을 함께 쓴다 (_shared replayLoader와 같은 이유)
+ * 대전 조회(경기·리플레이·로비 방 수·최근 경기) — 같은 요청은 진행 중인 것을 함께 쓴다 (_shared replayLoader와 같은 이유)
  * StrictMode·Fast Refresh 재마운트로 같은 조회를 연달아 부르면 조회 스로틀(IP당 초당 3)에 걸린다
  * - 경기: 저장 대기 중 다시 물어야 하므로 진행 중인 요청만 함께 쓴다(끝나면 버린다)
  * - 리플레이: 저장된 뒤 바뀌지 않으므로 받아 둔 것을 재사용한다(입력 기록이 커서 최근 몇 개만)
@@ -14,19 +23,34 @@ const REPLAY_CACHE_LIMIT = 8;
 const REPLAY_RETRIES = 2;
 const REPLAY_RETRY_MS = 1500;
 
-const inflightMatches = new Map<string, Promise<BattleMatch>>();
+const inflight = new Map<string, Promise<unknown>>();
 const replays = new Map<string, Promise<BattleReplayDetail>>();
 
-export function loadBattleMatch(matchId: string): Promise<BattleMatch> {
-  const pending = inflightMatches.get(matchId);
+/** 진행 중인 같은 요청만 함께 쓴다 — 끝나면 버려 다음 조회는 새로 묻는다 */
+function shareInflight<T>(key: string, start: () => Promise<T>): Promise<T> {
+  const pending = inflight.get(key) as Promise<T> | undefined;
   if (pending) return pending;
-  const request = getBattleMatch(matchId).then(({ data }) => data);
-  inflightMatches.set(matchId, request);
+  const request = start();
+  inflight.set(key, request);
   const clear = () => {
-    if (inflightMatches.get(matchId) === request) inflightMatches.delete(matchId);
+    if (inflight.get(key) === request) inflight.delete(key);
   };
   request.then(clear, clear);
   return request;
+}
+
+export function loadBattleMatch(matchId: string): Promise<BattleMatch> {
+  return shareInflight(`match:${matchId}`, () => getBattleMatch(matchId).then(({ data }) => data));
+}
+
+/** 테트리스 홈의 방 수 (DESIGN §19) */
+export function loadBattleLobbyStats(): Promise<BattleLobbyStats> {
+  return shareInflight('lobby', () => getBattleLobbyStats().then(({ data }) => data));
+}
+
+/** 최근 경기 한 페이지 (DESIGN §19) */
+export function loadBattleMatchList(limit: number, cursor: string | null): Promise<BattleMatchList> {
+  return shareInflight(`list:${limit}:${cursor ?? ''}`, () => getBattleMatchList({ limit, cursor }).then(({ data }) => data));
 }
 
 export function isRetryableLoadError(err: unknown): boolean {
@@ -64,6 +88,6 @@ export function loadBattleReplay(
 
 /** 테스트용 */
 export function clearBattleMatchCache(): void {
-  inflightMatches.clear();
+  inflight.clear();
   replays.clear();
 }

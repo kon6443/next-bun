@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getBattleMatch, getBattleReplay, isBattleMatchId, submitBattleReplay } from './tetrisBattleService';
+import { getBattleLobbyStats, getBattleMatch, getBattleMatchList, getBattleReplay, isBattleMatchId, submitBattleReplay } from './tetrisBattleService';
 import { ApiError } from '@/types/api';
 import type { BattleReplayInput } from '@/app/games/tetris/battle-engine';
 
@@ -61,5 +61,25 @@ describe('tetrisBattleService', () => {
     expect(isBattleMatchId('oFDKsz2Gf-rpDFBa')).toBe(true);
     expect(isBattleMatchId('oFDKsz2Gf-rpDFB')).toBe(false);
     expect(isBattleMatchId('oFDKsz2Gf.rpDFBa')).toBe(false);
+  });
+
+  it('로비 방 수: GET /tetris-battle/lobby', async () => {
+    fetchMock.mockResolvedValueOnce(json({ code: 'SUCCESS', message: '', data: { waitingRooms: 2, playingRooms: 1 } }));
+    const { data } = await getBattleLobbyStats();
+    expect(data).toEqual({ waitingRooms: 2, playingRooms: 1 });
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/v1\/tetris-battle\/lobby$/);
+  });
+
+  it('최근 경기: limit·cursor 쿼리, 첫 페이지는 cursor 없이, 잘못된 cursor는 422', async () => {
+    fetchMock.mockImplementation(async () => json({ code: 'SUCCESS', message: '', data: { items: [], nextCursor: null } }));
+    await getBattleMatchList({ limit: 5 });
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/v1\/tetris-battle\/matches\?limit=5$/);
+    await getBattleMatchList({ limit: 10, cursor: 'abc=' });
+    const url = new URL(fetchMock.mock.calls[1][0], 'http://x');
+    expect(url.searchParams.get('limit')).toBe('10');
+    expect(url.searchParams.get('cursor')).toBe('abc=');
+
+    fetchMock.mockResolvedValueOnce(json({ code: 'VALIDATION_ERROR', message: 'x', timestamp: 't' }, 422));
+    await expect(getBattleMatchList({ cursor: 'bad' })).rejects.toMatchObject({ code: 'VALIDATION_ERROR', status: 422 });
   });
 });

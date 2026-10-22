@@ -9,6 +9,8 @@ type GameCard = {
   playHref: string;
   playLabel: string;
   secondary: { href: string; label: string };
+  /** 새 모드 입구 — NEW 배지와 함께 */
+  feature?: { href: string; label: string };
 };
 
 const GAMES: GameCard[] = [
@@ -19,6 +21,7 @@ const GAMES: GameCard[] = [
     playHref: "/games/tetris",
     playLabel: "플레이",
     secondary: { href: "/games/tetris/rankings", label: "랭킹 보기" },
+    feature: { href: "/games/tetris/battle", label: "친구와 대전" },
   },
   {
     title: "낚시",
@@ -65,6 +68,15 @@ export default function GamesPage() {
                 {game.secondary.label}
               </Link>
             </div>
+            {game.feature && (
+              <Link
+                href={game.feature.href}
+                className="mt-2 flex min-h-11 items-center justify-center gap-2 rounded-full border border-pink-400/40 bg-pink-500/10 text-sm font-semibold text-pink-100 hover:border-pink-300/60"
+              >
+                {game.feature.label}
+                <span className="rounded-full bg-pink-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">NEW</span>
+              </Link>
+            )}
           </li>
         ))}
       </ul>

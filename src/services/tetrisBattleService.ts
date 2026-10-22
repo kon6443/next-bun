@@ -189,3 +189,57 @@ export async function getBattleReplay(matchId: string, playerId: string): Promis
   }
   return response.json();
 }
+
+// ==================== 입구 — 로비 방 수·최근 경기 (DESIGN §19) ====================
+
+/** 지금 로비의 방 수 — 소켓 없이 테트리스 홈에서 쓴다 */
+export type BattleLobbyStats = {
+  /** 입장할 수 있는 대기 방 */
+  waitingRooms: number;
+  /** 경기 중인 방 */
+  playingRooms: number;
+};
+
+export async function getBattleLobbyStats(): Promise<ApiResponse<BattleLobbyStats>> {
+  const response = await fetchServiceInstance.backendFetch({ method: 'GET', endpoint: '/api/v1/tetris-battle/lobby' });
+  if (!response.ok) {
+    await handleApiError(response, {
+      429: '요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.',
+      default: '대전 방 정보를 불러오지 못했습니다.',
+    });
+  }
+  return response.json();
+}
+
+/** 최근 경기 목록 항목 — 저장된(VERIFIED·비숨김) 경기만 */
+export type BattleMatchListItem = {
+  matchId: string;
+  roomName: string;
+  playerCount: number;
+  /** UTC ISO 8601 */
+  endedAt: string;
+  winnerName: string;
+  /** 순위 오름차순 */
+  players: { name: string; place: number }[];
+};
+
+export type BattleMatchList = {
+  items: BattleMatchListItem[];
+  /** 다음 페이지 커서 — 마지막이면 null */
+  nextCursor: string | null;
+};
+
+/** 최근 경기 — 최신순 커서 페이지(limit 1~20, 기본 10). 잘못된 cursor는 422 VALIDATION_ERROR */
+export async function getBattleMatchList(params: { limit?: number; cursor?: string | null } = {}): Promise<ApiResponse<BattleMatchList>> {
+  const query: Record<string, string> = {};
+  if (params.limit !== undefined) query.limit = String(params.limit);
+  if (params.cursor) query.cursor = params.cursor;
+  const response = await fetchServiceInstance.backendFetch({ method: 'GET', endpoint: '/api/v1/tetris-battle/matches', query });
+  if (!response.ok) {
+    await handleApiError(response, {
+      429: '요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.',
+      default: '최근 대전을 불러오지 못했습니다.',
+    });
+  }
+  return response.json();
+}
