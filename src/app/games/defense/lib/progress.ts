@@ -10,8 +10,17 @@ import { CAMPAIGN, type Difficulty } from './campaign';
 const KEY = 'defense:progress';
 const VERSION = 1;
 
-/** 스테이지 id → 난이도별 최고 별 (깬 적 없으면 키 없음) */
-export type Progress = { v: number; stars: Record<string, Partial<Record<Difficulty, number>>> };
+/**
+ * 스테이지 id → 난이도별 최고 별 (깬 적 없으면 키 없음)
+ * 학습(§F5)·도감 기록은 선택 필드(v1 그대로 — 없으면 처음 상태): S1 튜토리얼 끝냄 · 본 브리핑 카드(스테이지 id) · 만난 적(ENEMY_ID)
+ */
+export type Progress = {
+  v: number;
+  stars: Record<string, Partial<Record<Difficulty, number>>>;
+  tutorialDone?: boolean;
+  briefingsSeen?: string[];
+  metEnemies?: number[];
+};
 
 export function emptyProgress(): Progress {
   return { v: VERSION, stars: {} };
@@ -51,4 +60,23 @@ export function isStageUnlocked(progress: Progress, stageId: string): boolean {
 export function isDifficultyUnlocked(progress: Progress, stageId: string, difficulty: Difficulty): boolean {
   if (!isStageUnlocked(progress, stageId)) return false;
   return difficulty !== 'hard' || (progress.stars[stageId]?.normal ?? 0) > 0;
+}
+
+export function markTutorialDone(progress: Progress): Progress {
+  return progress.tutorialDone ? progress : { ...progress, tutorialDone: true };
+}
+
+export function hasSeenBriefing(progress: Progress, stageId: string): boolean {
+  return (progress.briefingsSeen ?? []).includes(stageId);
+}
+
+export function markBriefingSeen(progress: Progress, stageId: string): Progress {
+  return hasSeenBriefing(progress, stageId) ? progress : { ...progress, briefingsSeen: [...(progress.briefingsSeen ?? []), stageId] };
+}
+
+/** 만난 적 추가 — 새로 만난 것이 없으면 같은 객체(저장 생략 판단용) */
+export function markEnemiesMet(progress: Progress, kinds: readonly number[]): Progress {
+  const met = progress.metEnemies ?? [];
+  const fresh = kinds.filter((k, i) => !met.includes(k) && kinds.indexOf(k) === i);
+  return fresh.length === 0 ? progress : { ...progress, metEnemies: [...met, ...fresh].sort((a, b) => a - b) };
 }

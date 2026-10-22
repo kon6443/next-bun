@@ -34,3 +34,19 @@ export const ENEMY_NAMES: readonly string[] = [
 export const TARGET_NAMES: readonly string[] = ['선두', '후미', '최강', '최근접'];
 
 export const DIFFICULTY_NAMES = { easy: '쉬움', normal: '보통', hard: '어려움' } as const;
+
+/** 적 한 줄 특징 — 도감·브리핑 (§C5) */
+export const ENEMY_TRAITS: readonly string[] = [
+  '가장 기본 적',
+  '빠르게 달린다',
+  '물리 피해에 강하다 — 마법으로',
+  '쓰러지면 새끼 셋으로 갈라진다',
+  '공중 · 떼로 온다 — 대공 석궁·궁수탑·테슬라로',
+  '중간 보스 · 졸개를 불러낸다',
+  '물리 피해를 거의 막는다 — 마법·테슬라로',
+  '공중 · 빠르다',
+  '주변 적을 치유한다 — 먼저 노려요',
+  '엘리트 · 아주 단단하다',
+  '최종 보스 · 공중 · 반쯤 다치면 저항이 바뀌고 박쥐를 부른다',
+  '분열체가 갈라져 나온 작은 적',
+];
