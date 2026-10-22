@@ -28,6 +28,8 @@ export default async function DefenseStagePage({ params }: StagePageProps) {
         ← 캠페인 지도
       </Link>
       <StageScreen stage={stage} />
+      {/* 하단 내비(떠 있는 카드형 — 바닥 띄움 + 안쪽 여백으로 공통 6rem 여백보다 조금 높다)에 마지막 항목이 가리지 않게 */}
+      <div aria-hidden="true" className="h-8" />
     </TeamsPageLayout>
   );
 }
