@@ -292,7 +292,7 @@ export function TagModal({ isOpen, onClose, mode, selectedTagIds = [], onSelecte
 
   return createPortal(
     <>
-      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4">
+      <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4">
         <div
           ref={dialogRef}
           role="dialog"

@@ -40,8 +40,11 @@ export const MOBILE_MAX_WIDTH = "max-w-lg";
 export const layoutStyles = {
   /** 페이지 루트 컨테이너 */
   pageContainer: "relative min-h-screen supports-[height:100dvh]:min-h-dvh overflow-hidden text-slate-100",
-  /** 메인 컨텐츠 영역 (모바일 최적화) — pb 는 TeamsPageLayout 에서 적용 */
-  mainContent: "relative z-10 mx-auto flex flex-col gap-3 sm:gap-6 px-4 pt-6 sm:pt-12",
+  /**
+   * 메인 컨텐츠 영역 (모바일 최적화) — pb 는 TeamsPageLayout 에서 적용
+   * z-index를 두지 않는다 — 쌓임 맥락이 생기면 안에서 여는 모달·시트가 하단 내비(z-50) 아래에 깔린다 (모달은 z-[60] 이상)
+   */
+  mainContent: "relative mx-auto flex flex-col gap-3 sm:gap-6 px-4 pt-6 sm:pt-12",
   /** FAB 미사용 페이지 하단 패딩 (BottomNavBar 회피) */
   bottomPaddingDefault: "pb-[calc(6rem+env(safe-area-inset-bottom))]",
   /** FAB 사용 페이지 하단 패딩 (FAB 영역 + BottomNavBar 회피) */

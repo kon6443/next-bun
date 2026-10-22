@@ -58,7 +58,7 @@ export function ShareMenu({ content, kakaoReady, onClose }: ShareMenuProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center sm:p-4"
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 sm:items-center sm:p-4"
       style={{ touchAction: "auto" }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
