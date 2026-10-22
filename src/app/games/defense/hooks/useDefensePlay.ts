@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  EVENT,
-  EVENT_STRIDE,
   OP,
   TICKS_PER_SECOND,
   type CommandRecorder,
@@ -16,6 +14,7 @@ import {
   recordCommand,
   step,
 } from "../engine";
+import { LeakTracker } from "../lib/leakTracker";
 import { toRenderView } from "../lib/toRenderView";
 import { type RenderView, createRenderView } from "../renderer/renderView";
 
@@ -69,6 +68,10 @@ export type FrameInfo = { prev: RenderView; curr: RenderView; alpha: number; now
 type Options = {
   stage: Stage;
   seed: number;
+  /** 이어하기 — 명령 로그를 다시 돌린 상태·누수 집계(lib/restoreGame). 있으면 일시정지 상태로 시작한다 */
+  restore?: { state: GameState; recorder: CommandRecorder; leaks: LeakTracker } | null;
+  /** 시작 배속 (설정 기본 배속) */
+  initialSpeed?: Speed;
   /** 틱마다 렌더 이벤트 — 파티클·누수 경고 연출 */
   onTickEvents?: (events: readonly number[], view: RenderView, prev: RenderView) => void;
   /** 매 프레임 그리기 */
@@ -123,28 +126,29 @@ function sameHud(a: HudSnapshot, state: GameState, status: PlayStatus, speed: Sp
   );
 }
 
-export function useDefensePlay({ stage, seed, onTickEvents, onFrame, onOver }: Options) {
+export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, onTickEvents, onFrame, onOver }: Options) {
   const stateRef = useRef<GameState>(null as unknown as GameState);
   const recorderRef = useRef<CommandRecorder>(null as unknown as CommandRecorder);
   if (stateRef.current === null) {
-    stateRef.current = createGame(stage, seed);
-    recorderRef.current = createCommandRecorder();
+    stateRef.current = restore ? restore.state : createGame(stage, seed);
+    recorderRef.current = restore ? restore.recorder : createCommandRecorder();
   }
+  const initialStatus: PlayStatus = stateRef.current.wavesStarted > 0 ? "paused" : "ready";
   const viewsRef = useRef<{ prev: RenderView; curr: RenderView } | null>(null);
   if (viewsRef.current === null) {
     const prev = toRenderView(stateRef.current, createRenderView());
     viewsRef.current = { prev, curr: toRenderView(stateRef.current, createRenderView()) };
   }
-  const statusRef = useRef<PlayStatus>("ready");
-  const speedRef = useRef<Speed>(1);
+  const statusRef = useRef<PlayStatus>(initialStatus);
+  const speedRef = useRef<Speed>(initialSpeed);
   const versionRef = useRef(0);
   const callbacksRef = useRef({ onTickEvents, onFrame, onOver });
   callbacksRef.current = { onTickEvents, onFrame, onOver };
-  /** 적 id → [종류, 웨이브] — 누수 이벤트 때 적은 이미 배열에서 빠져 있다 */
-  const spawnedRef = useRef(new Map<number, [number, number]>());
-  const leaksRef = useRef({ byEnemy: [] as number[], byWave: [] as number[] });
+  /** 누수 집계(실패 원인) — 이어한 판은 다시 돌리며 모은 것에서 이어 간다 */
+  const leaksRef = useRef<LeakTracker | null>(null);
+  if (leaksRef.current === null) leaksRef.current = restore ? restore.leaks : new LeakTracker();
 
-  const [hud, setHud] = useState<HudSnapshot>(() => snapshotOf(stateRef.current, stage, "ready", 1, 0));
+  const [hud, setHud] = useState<HudSnapshot>(() => snapshotOf(stateRef.current, stage, initialStatus, initialSpeed, 0));
   const hudRef = useRef(hud);
 
   const publish = useCallback(() => {
@@ -165,15 +169,13 @@ export function useDefensePlay({ stage, seed, onTickEvents, onFrame, onOver }: O
   const finish = useCallback(() => {
     const state = stateRef.current;
     statusRef.current = "over";
-    const byWave = leaksRef.current.byWave;
-    let worstWave = 0;
-    for (let w = 1; w < byWave.length; w++) if ((byWave[w] ?? 0) > (byWave[worstWave] ?? 0)) worstWave = w;
+    const leaks = leaksRef.current!;
     callbacksRef.current.onOver?.({
       victory: state.victory,
       livesLeft: state.lives,
       endTick: state.endTick,
-      leakedLivesByEnemy: leaksRef.current.byEnemy.slice(),
-      worstWave: (byWave[worstWave] ?? 0) > 0 ? worstWave : 0,
+      leakedLivesByEnemy: leaks.byEnemy.slice(),
+      worstWave: leaks.worstWave(),
       inputs: recorderRef.current.inputs.slice(),
     });
     publish();
@@ -231,29 +233,7 @@ export function useDefensePlay({ stage, seed, onTickEvents, onFrame, onOver }: O
           const swap = views.prev;
           views.prev = views.curr;
           views.curr = toRenderView(state, swap);
-          for (let i = 0; i < events.length; i += EVENT_STRIDE) {
-            if (events[i] === EVENT.SPAWN) {
-              // 새 적은 배열 끝에 붙는다 — 뒤에서부터 찾는다
-              let wave = 0;
-              for (let k = state.enemies.length - 1; k >= 0; k--) {
-                if (state.enemies[k].id === events[i + 1]) {
-                  wave = state.enemies[k].wave;
-                  break;
-                }
-              }
-              spawnedRef.current.set(events[i + 1], [events[i + 2], wave]);
-            } else if (events[i] === EVENT.LEAK) {
-              const spawned = spawnedRef.current.get(events[i + 1]);
-              if (spawned) {
-                const leaks = leaksRef.current;
-                leaks.byEnemy[spawned[0]] = (leaks.byEnemy[spawned[0]] ?? 0) + events[i + 2];
-                leaks.byWave[spawned[1]] = (leaks.byWave[spawned[1]] ?? 0) + events[i + 2];
-                spawnedRef.current.delete(events[i + 1]);
-              }
-            } else if (events[i] === EVENT.DEATH) {
-              spawnedRef.current.delete(events[i + 1]);
-            }
-          }
+          leaksRef.current!.onEvents(events, state);
           callbacksRef.current.onTickEvents?.(events, views.curr, views.prev);
           acc -= TICK_MS;
           ticks++;

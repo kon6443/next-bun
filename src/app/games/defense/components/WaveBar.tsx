@@ -12,10 +12,12 @@ import type { PreviewEntry } from "../lib/wavePreview";
 type Props = {
   hud: HudSnapshot;
   preview: readonly PreviewEntry[];
+  /** 대화상자(브리핑·설정·나가기 확인·결과)가 떠 있으면 호출을 막는다 */
+  blocked: boolean;
   onCall: () => void;
 };
 
-export function WaveBar({ hud, preview, onCall }: Props) {
+export function WaveBar({ hud, preview, blocked, onCall }: Props) {
   const first = hud.wavesStarted === 0;
   const seconds = Math.ceil(hud.countdown / TICKS_PER_SECOND);
   const label = first ? "웨이브 시작" : hud.earlyBonus > 0 ? `지금 호출 +${hud.earlyBonus}` : "웨이브 호출";
@@ -46,7 +48,7 @@ export function WaveBar({ hud, preview, onCall }: Props) {
       <button
         type="button"
         data-testid="defense-call-wave"
-        disabled={!hud.canCall}
+        disabled={!hud.canCall || blocked}
         onClick={onCall}
         aria-label={`${label} (Space)`}
         className="min-h-12 shrink-0 rounded-full bg-gradient-to-r from-rose-500 to-amber-500 px-4 text-sm font-bold text-white shadow-lg shadow-rose-500/30 disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-400 disabled:shadow-none"

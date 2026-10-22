@@ -12,6 +12,23 @@ import type { RingOption } from "../lib/ringOptions";
 const RADIUS = 64;
 const BUTTON = 52;
 const EDGE = 6;
+/** 링 중심에서 버튼 바깥 가장자리 + 여백까지 — 화면 가장자리 맞춤·튜토리얼 말풍선 자리 고르기 */
+export const RING_REACH = RADIUS + BUTTON / 2 + EDGE;
+/** 설명 카드 자리 높이 */
+const DETAIL_CARD = 72;
+
+/** 링 중심 y(화면 가장자리 안으로 당긴다)와 설명 카드가 링 아래로 가는지 */
+function ringLayout(anchorY: number, height: number) {
+  const cy = Math.min(Math.max(anchorY, RING_REACH), Math.max(RING_REACH, height - RING_REACH));
+  // 설명 카드는 링 반대편(위쪽 절반이면 아래로)
+  return { cy, cardBelow: cy < height / 2 };
+}
+
+/** 링 + 설명 카드가 차지하는 세로 범위(화면 CSS px) — 튜토리얼 말풍선이 덮지 않게 */
+export function ringSpan(anchorY: number, height: number): { top: number; bottom: number } {
+  const { cy, cardBelow } = ringLayout(anchorY, height);
+  return cardBelow ? { top: cy - RING_REACH, bottom: Math.min(height, cy + RING_REACH + DETAIL_CARD) } : { top: Math.max(0, cy - RING_REACH - DETAIL_CARD), bottom: cy + RING_REACH };
+}
 
 const HINT_TEXT = { good: "▲ 다음 웨이브에 유리", neutral: "■ 보통", bad: "▼ 다음 웨이브에 불리" } as const;
 
@@ -34,12 +51,10 @@ export function TowerRing({ options, anchor, bounds, armed, focusOnOpen, onTap }
   useEffect(() => {
     if (focusOnOpenRef.current) buttons.current.find((b) => b && !b.disabled)?.focus({ preventScroll: true });
   }, []);
-  const reach = RADIUS + BUTTON / 2 + EDGE;
+  const reach = RING_REACH;
   const cx = Math.min(Math.max(anchor.x, reach), Math.max(reach, bounds.width - reach));
-  const cy = Math.min(Math.max(anchor.y, reach), Math.max(reach, bounds.height - reach));
+  const { cy, cardBelow } = ringLayout(anchor.y, bounds.height);
   const armedOption = options.find((o) => o.id === armed) ?? null;
-  // 설명 카드는 링 반대편(위쪽 절반이면 아래로)
-  const cardBelow = cy < bounds.height / 2;
 
   return (
     <div className="pointer-events-none absolute inset-0" data-testid="defense-ring">
@@ -88,7 +103,7 @@ export function TowerRing({ options, anchor, bounds, armed, focusOnOpen, onTap }
           role="status"
           data-testid="defense-ring-detail"
           className="absolute left-2 right-2 rounded-xl border border-white/15 bg-slate-900/95 px-3 py-2 text-xs text-slate-200 shadow-lg shadow-black/40"
-          style={cardBelow ? { top: Math.min(bounds.height - 72, cy + reach) } : { top: Math.max(4, cy - reach - 68) }}
+          style={cardBelow ? { top: Math.min(bounds.height - DETAIL_CARD, cy + reach) } : { top: Math.max(4, cy - reach - DETAIL_CARD + 4) }}
         >
           <p className="font-semibold text-white">
             {armedOption.label} — 한 번 더 누르면 확정

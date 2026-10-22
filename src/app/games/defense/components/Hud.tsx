@@ -10,38 +10,62 @@ import type { HudSnapshot } from "../hooks/useDefensePlay";
 type Props = {
   hud: HudSnapshot;
   exitHref: string;
+  /** 판 중 나가기 확인 — 부르면 링크 이동을 막고 확인 대화상자를 띄운다(§F9b) */
+  onRequestExit?: () => void;
+  soundOn: boolean;
+  onToggleSound: () => void;
   onTogglePause: () => void;
   onCycleSpeed: () => void;
 };
 
-export function Hud({ hud, exitHref, onTogglePause, onCycleSpeed }: Props) {
+export function Hud({ hud, exitHref, onRequestExit, soundOn, onToggleSound, onTogglePause, onCycleSpeed }: Props) {
   const paused = hud.status === "paused";
+  // 320px까지 한 줄 — 글자는 폭 따라 12~14px, 줄바꿈 금지(넘치면 숫자 칸을 자른다), 버튼은 44px 높이·40px 폭
   return (
-    <header className="flex items-center gap-2 px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] text-sm">
+    <header className="flex items-center gap-1 whitespace-nowrap px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] text-sm">
       <Link
         replace
         href={exitHref}
+        data-testid="defense-exit"
+        onClick={(e) => {
+          if (!onRequestExit) return;
+          e.preventDefault();
+          onRequestExit();
+        }}
         aria-label="스테이지 화면으로 나가기"
-        className="flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/15 text-slate-300"
+        className="flex min-h-11 min-w-10 items-center justify-center rounded-full border border-white/15 text-slate-300"
       >
         ←
       </Link>
-      <dl className="flex flex-1 items-center gap-3 tabular-nums">
-        <div className="flex items-center gap-1" data-testid="defense-lives" data-value={hud.lives}>
+      <dl className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-[clamp(0.75rem,3.6vw,0.875rem)] tabular-nums">
+        <div className="flex items-center gap-0.5" data-testid="defense-lives" data-value={hud.lives}>
           <dt aria-label="목숨">♥</dt>
           <dd className="font-semibold text-rose-200">{hud.lives}</dd>
         </div>
-        <div className="flex items-center gap-1" data-testid="defense-gold" data-value={hud.gold}>
+        <div className="flex items-center gap-0.5" data-testid="defense-gold" data-value={hud.gold}>
           <dt aria-label="골드">◆</dt>
           <dd className="font-semibold text-amber-200">{hud.gold}</dd>
         </div>
-        <div className="flex items-center gap-1" data-testid="defense-wave" data-value={hud.wavesStarted} data-total={hud.totalWaves}>
-          <dt className="text-slate-400">웨이브</dt>
+        <div className="flex items-center gap-0.5" data-testid="defense-wave" data-value={hud.wavesStarted} data-total={hud.totalWaves}>
+          <dt aria-label="웨이브" className="text-slate-400">
+            W
+          </dt>
           <dd className="font-semibold">
-            {hud.wavesStarted} / {hud.totalWaves}
+            {hud.wavesStarted}/{hud.totalWaves}
           </dd>
         </div>
       </dl>
+      <button
+        type="button"
+        data-testid="defense-sound"
+        data-value={soundOn ? "on" : "off"}
+        aria-pressed={soundOn}
+        aria-label="효과음"
+        onClick={onToggleSound}
+        className="min-h-11 min-w-10 rounded-full border border-white/15 text-base"
+      >
+        <span aria-hidden="true">{soundOn ? "🔊" : "🔇"}</span>
+      </button>
       <button
         type="button"
         data-testid="defense-speed"
@@ -49,7 +73,7 @@ export function Hud({ hud, exitHref, onTogglePause, onCycleSpeed }: Props) {
         disabled={hud.status === "over"}
         onClick={onCycleSpeed}
         aria-label={`배속 ${hud.speed}배 — 누르면 바꿔요 (F)`}
-        className="min-h-11 min-w-11 rounded-full border border-white/15 px-2 font-semibold tabular-nums text-slate-100 disabled:opacity-40"
+        className="min-h-11 min-w-10 rounded-full border border-white/15 px-1.5 font-semibold tabular-nums text-slate-100 disabled:opacity-40"
       >
         {hud.speed}×
       </button>
@@ -60,7 +84,7 @@ export function Hud({ hud, exitHref, onTogglePause, onCycleSpeed }: Props) {
         disabled={hud.status === "over"}
         onClick={onTogglePause}
         aria-label={paused ? "계속하기 (P)" : "일시정지 (P)"}
-        className="min-h-11 min-w-11 rounded-full border border-white/15 font-semibold text-slate-100 disabled:opacity-40"
+        className="min-h-11 min-w-10 rounded-full border border-white/15 font-semibold text-slate-100 disabled:opacity-40"
       >
         {paused ? "▶" : "Ⅱ"}
       </button>

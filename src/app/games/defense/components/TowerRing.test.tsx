@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { createGame, findStage } from '../engine';
 import { type RingOption, ringOptions, tapRing } from '../lib/ringOptions';
-import { TowerRing } from './TowerRing';
+import { tutorialBubbleAbove } from '../lib/tutorial';
+import { TowerRing, ringSpan } from './TowerRing';
 
 const stage = findStage('s1')!;
 
@@ -73,5 +74,19 @@ describe('TowerRing (링 메뉴 2탭)', () => {
       expect(parseFloat(style.left)).toBeGreaterThanOrEqual(0);
       expect(parseFloat(style.top)).toBeGreaterThanOrEqual(0);
     }
+  });
+});
+
+describe('ringSpan — 링과 설명 카드 자리 (튜토리얼 1단계 말풍선이 피한다)', () => {
+  it('위쪽 링은 카드가 아래로, 아래쪽 링은 카드가 위로 — 말풍선은 그 범위를 덮지 않는 띠로', () => {
+    const H = 600;
+    const upper = ringSpan(150, H);
+    expect(upper).toEqual({ top: 54, bottom: 318 });
+    expect(tutorialBubbleAbove(H, [], 22, upper, true)).toBe(false);
+    const lower = ringSpan(450, H);
+    expect(lower).toEqual({ top: 282, bottom: 546 });
+    expect(tutorialBubbleAbove(H, [], 22, lower, false)).toBe(true);
+    // 가장자리 링은 화면 안으로 당긴 중심 기준
+    expect(ringSpan(0, H).top).toBe(0);
   });
 });

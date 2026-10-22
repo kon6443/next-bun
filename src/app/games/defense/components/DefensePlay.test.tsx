@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { buildCost, createGame, findStage, TOWER_ID } from '../engine';
 import DefensePlay from './DefensePlay';
 
+vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
 vi.mock('next/link', () => ({ default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...rest}>{children}</a> }));
 
 class FakeResizeObserver {
