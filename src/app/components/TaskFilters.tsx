@@ -173,7 +173,7 @@ export function TaskFilters({
             {currentUserId && (
               <button
                 onClick={handleMyTasksToggle}
-                className={`flex-1 py-2.5 rounded-lg text-base font-semibold transition ${
+                className={`flex-1 whitespace-nowrap px-3 py-2.5 rounded-lg text-base font-semibold transition ${
                   assigneeId === currentUserId
                     ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
                     : 'border border-white/10 bg-slate-900/50 text-slate-400 hover:bg-slate-800/50'
@@ -186,7 +186,7 @@ export function TaskFilters({
               value={assigneeId ?? ''}
               onChange={e => onAssigneeChange(e.target.value === '' ? null : Number(e.target.value))}
               aria-label="담당자"
-              className="flex-1 max-w-full box-border px-3 py-2.5 rounded-lg border border-white/10 bg-slate-900/50 text-base text-slate-200 focus:outline-none"
+              className="flex-1 min-w-0 max-w-full box-border px-3 py-2.5 rounded-lg border border-white/10 bg-slate-900/50 text-base text-slate-200 focus:outline-none"
             >
               <option value="">모든 담당자</option>
               {assignees.map(a => (

@@ -998,7 +998,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       <TeamsPageLayout hasFab>
         {/* 팀 헤더 섹션 */}
         <section className={`${cardStyles.section} p-4`}>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
             <SectionLabel>Team Kanban</SectionLabel>
             {/* 온라인 유저 미니뷰 */}
             <OnlineUsers
@@ -1013,7 +1013,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                 <h1 className="text-3xl font-bold text-white truncate">
                   {isLoading ? <Skeleton width="200px" height="2rem" /> : teamName || ''}
                 </h1>
-                {teamDescription && <p className="mt-2 text-sm text-slate-400">{teamDescription}</p>}
+                {teamDescription && <p className="mt-2 break-words text-sm text-slate-400">{teamDescription}</p>}
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <IconButton

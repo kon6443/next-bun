@@ -168,7 +168,7 @@ export function Kanban({ tasksByColumn, onStatusChange, teamId, isArchiveView, o
     <div className="flex flex-col h-full">
       {/* 상태 탭 바 (아이콘 + 숫자) - 가로 스크롤 */}
       <div className="overflow-x-auto scrollbar-hide mb-4">
-        <div className="flex gap-2 w-full rounded-2xl border border-white/10 bg-slate-950/50 p-1.5">
+        <div className="flex gap-2 w-max min-w-full rounded-2xl border border-white/10 bg-slate-950/50 p-1.5">
           {workflowStatuses.map((status, index) => {
             const isActive = index === activeColumnIndex;
             const columnKey = STATUS_TO_COLUMN[status.key];

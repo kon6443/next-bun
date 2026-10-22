@@ -78,7 +78,8 @@ export function MiniBoard({ playerId, name, cells, pending, isTarget, place, kos
           </span>
         )}
       </div>
-      <figcaption className="flex max-w-full items-center gap-1 text-[11px] leading-none text-slate-300">
+      {/* 이름이 길어도 판 폭을 넘지 않게 — 늘어난 캡션이 상대 줄을 넓혀 옆 버튼과 겹치지 않도록 */}
+      <figcaption className="flex items-center gap-1 text-[11px] leading-none text-slate-300" style={{ maxWidth: width + 6 }}>
         {isTarget && !out && (
           <span className="text-rose-300" role="img" aria-label="공격 대상">
             ▲

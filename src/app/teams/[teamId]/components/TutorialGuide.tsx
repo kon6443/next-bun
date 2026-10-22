@@ -93,7 +93,7 @@ export function TutorialGuide({ isOpen, onClose }: TutorialGuideProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4"
       onClick={onClose}
     >
       <div
@@ -144,7 +144,7 @@ export function TutorialGuide({ isOpen, onClose }: TutorialGuideProps) {
           <button
             onClick={handlePrev}
             disabled={isFirst}
-            className={`flex items-center gap-1 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
+            className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded-xl px-3 py-2.5 text-sm font-medium transition-colors sm:px-4 ${
               isFirst
                 ? 'text-slate-600 cursor-not-allowed'
                 : 'text-slate-300 hover:bg-white/5'
@@ -173,7 +173,7 @@ export function TutorialGuide({ isOpen, onClose }: TutorialGuideProps) {
           {/* 다음/완료 버튼 */}
           <button
             onClick={handleNext}
-            className="flex items-center gap-1 rounded-xl bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:brightness-110 active:scale-95"
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-xl bg-gradient-to-r from-indigo-500 to-sky-500 px-3 py-2.5 sm:px-4 text-sm font-semibold text-white transition-all hover:brightness-110 active:scale-95"
           >
             {isLast ? '시작하기' : '다음'}
             {!isLast && <ChevronRightIcon className="w-4 h-4" />}

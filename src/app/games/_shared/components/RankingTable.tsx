@@ -19,7 +19,7 @@ const medal = (rank: number) => (rank === 1 ? "🥇" : rank === 2 ? "🥈" : ran
 /** 랭킹 목록 — 좁은 화면에서도 가로 스크롤 없이 카드형 행 */
 export function RankingTable<G extends GameType>({ game, items, myScoreIds, highlightId = null, compact = false }: RankingTableProps<G>) {
   return (
-    <ol className="grid gap-2">
+    <ol className="grid grid-cols-1 gap-2">
       {items.map((item) => {
         const mine = myScoreIds.has(item.scoreId);
         const highlighted = item.scoreId === highlightId;

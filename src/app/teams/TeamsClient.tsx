@@ -107,7 +107,7 @@ function ErrorMessage({ message, onRetry }: { message: string; onRetry?: () => v
 /** 팀 목록 컴포넌트 */
 function TeamList({ teams }: { teams: TeamSummary[] }) {
   return (
-    <div className="grid gap-4">
+    <div className="grid grid-cols-1 gap-4">
       {teams.map((team) => (
         <Link
           key={team.teamId}
