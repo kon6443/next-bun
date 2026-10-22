@@ -8,19 +8,28 @@ import {
   VISIBLE_ROWS,
   getDropY,
 } from '../engine';
+import { CELL_COLORS, drawBlock } from './blockSprites';
+import { type EffectTracker, isBigClear } from './effects';
+import {
+  boardBackground,
+  drawClearFlash,
+  drawEffectText,
+  drawLevelGlow,
+  drawParticles,
+  drawTrail,
+  shakeOffset,
+} from './effectsRenderer';
 
 /**
  * 테트리스 캔버스 렌더러 — 엔진 상태를 읽기만 한다(연출은 엔진 프레임 안에서만)
  * 레이아웃: [홀드] [판 10×20 + 위쪽 생성 줄 2] [다음 5개]
+ * 칸 값 0 빈칸 · 1~7 블록 · 8 가비지(대전) — 색은 blockSprites.ts
  */
 
 /** 판 위에 보여 줄 숨은 줄 수 (생성 위치) */
 const SPAWN_ROWS_SHOWN = 2;
 const SIDE_COLUMNS = 3; // 옆 패널 폭 (판 칸 단위)
 const MINI_SCALE = 0.6;
-
-/** 가이드라인 색 — 칸 값(종류 + 1) 순서: I J L O S T Z */
-const PIECE_COLORS = ['#22d3ee', '#3b82f6', '#f97316', '#facc15', '#22c55e', '#a855f7', '#ef4444'];
 
 export type BoardLayout = {
   cell: number;
@@ -43,21 +52,18 @@ export function computeLayout(width: number, height: number): BoardLayout {
   return { cell, boardX, boardY, sideWidth, width, height };
 }
 
-function drawCell(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string, alpha = 1): void {
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = color;
-  ctx.fillRect(x + 1, y + 1, size - 2, size - 2);
-  // 위·왼쪽 밝은 테두리로 입체감
-  ctx.fillStyle = 'rgba(255,255,255,0.25)';
-  ctx.fillRect(x + 1, y + 1, size - 2, Math.max(1, size * 0.12));
-  ctx.fillRect(x + 1, y + 1, Math.max(1, size * 0.12), size - 2);
-  ctx.globalAlpha = 1;
-}
-
 /** 판 좌표(행) → 캔버스 y. 보이는 첫 줄(HIDDEN_ROWS)이 boardY */
 const rowToY = (layout: BoardLayout, row: number) => layout.boardY + (row - HIDDEN_ROWS) * layout.cell;
 
-function drawMiniPiece(ctx: CanvasRenderingContext2D, piece: number, cx: number, cy: number, size: number, alpha: number) {
+function drawMiniPiece(
+  ctx: CanvasRenderingContext2D,
+  piece: number,
+  cx: number,
+  cy: number,
+  size: number,
+  dpr: number,
+  alpha: number,
+) {
   const cells = PIECE_CELLS[piece][0];
   let minX = 4, maxX = 0, minY = 4, maxY = 0;
   for (let i = 0; i < 8; i += 2) {
@@ -66,26 +72,78 @@ function drawMiniPiece(ctx: CanvasRenderingContext2D, piece: number, cx: number,
     minY = Math.min(minY, cells[i + 1]);
     maxY = Math.max(maxY, cells[i + 1]);
   }
-  const offsetX = cx - ((maxX - minX + 1) * size) / 2;
-  const offsetY = cy - ((maxY - minY + 1) * size) / 2;
+  const offsetX = Math.round(cx - ((maxX - minX + 1) * size) / 2);
+  const offsetY = Math.round(cy - ((maxY - minY + 1) * size) / 2);
   for (let i = 0; i < 8; i += 2) {
-    drawCell(ctx, offsetX + (cells[i] - minX) * size, offsetY + (cells[i + 1] - minY) * size, size, PIECE_COLORS[piece], alpha);
+    drawBlock(ctx, offsetX + (cells[i] - minX) * size, offsetY + (cells[i + 1] - minY) * size, size, piece + 1, dpr, alpha);
   }
 }
 
 export type DrawOptions = {
   showGhost?: boolean;
+  /** 연출 기록 — 없으면 연출 없이 판만 그린다 */
+  effects?: EffectTracker | null;
+  /** 연출 줄이기 — 흔들림·파티클·잔상·확대를 끈다 */
+  reduced?: boolean;
+  /** 대전 가비지 게이지 — 판 왼쪽에 대기 줄(회색)과 곧 들어올 줄(빨강) */
+  garbage?: GarbageGauge | null;
 };
+
+export type GarbageGauge = {
+  /** 대기열 전체 줄 */
+  pending: number;
+  /** 그중 활성(다음 줄 없는 고정에 들어올) 줄 */
+  active: number;
+};
+
+/** 판 왼쪽 틈(반 칸)에 세로 게이지 — 아래에서부터 활성(빨강) → 대기(회색), 판 높이를 넘으면 자른다 */
+function drawGarbageGauge(ctx: CanvasRenderingContext2D, gauge: GarbageGauge, layout: BoardLayout) {
+  const { cell, boardX, boardY } = layout;
+  const width = Math.max(3, Math.round(cell * 0.3));
+  const x = boardX - Math.round(cell * 0.4) - Math.round(width / 2);
+  const height = cell * VISIBLE_ROWS;
+  const bottom = boardY + height;
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+  ctx.fillRect(x, boardY, width, height);
+  const active = Math.min(gauge.active, VISIBLE_ROWS);
+  const total = Math.min(gauge.pending, VISIBLE_ROWS);
+  if (total > active) {
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillRect(x, bottom - total * cell, width, (total - active) * cell);
+  }
+  if (active > 0) {
+    ctx.fillStyle = '#ef4444';
+    ctx.fillRect(x, bottom - active * cell, width, active * cell);
+  }
+}
+
+/** 캔버스 변환에 걸린 DPR — 스프라이트를 실제 픽셀 크기로 만든다 */
+function currentDpr(ctx: CanvasRenderingContext2D): number {
+  const scale = typeof ctx.getTransform === 'function' ? ctx.getTransform().a : 1;
+  return scale > 0 ? scale : 1;
+}
 
 export function drawGame(ctx: CanvasRenderingContext2D, state: GameState, layout: BoardLayout, options: DrawOptions = {}) {
   const { cell, boardX, boardY, sideWidth, width, height } = layout;
   const boardWidth = cell * BOARD_WIDTH;
   const boardHeight = cell * VISIBLE_ROWS;
+  // 게임이 끝나면 엔진 프레임이 멈춰 연출 나이도 멈춘다 — 움직이는 연출(흔들림·파티클·잔상)은 그리지 않는다
+  const effects = options.effects ?? null;
+  const reduced = options.reduced ?? false;
+  const still = reduced || state.over;
+  const frame = state.frame;
+  const dpr = currentDpr(ctx);
+  const firstRow = HIDDEN_ROWS - SPAWN_ROWS_SHOWN;
 
   ctx.clearRect(0, 0, width, height);
 
-  // 판 배경·격자
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+  // 판은 흔들림만큼 옮겨 그린다 (옆 패널·문구는 고정)
+  const [shakeX, shakeY] = shakeOffset(effects, frame, still);
+  ctx.save();
+  ctx.translate(shakeX, shakeY);
+
+  // 판 배경(레벨별 색)·격자
+  ctx.fillStyle = boardBackground(effects, state.level, frame, reduced);
   ctx.fillRect(boardX, boardY, boardWidth, boardHeight);
   ctx.strokeStyle = 'rgba(148, 163, 184, 0.08)';
   ctx.lineWidth = 1;
@@ -101,55 +159,70 @@ export function drawGame(ctx: CanvasRenderingContext2D, state: GameState, layout
   ctx.stroke();
   ctx.strokeStyle = 'rgba(148, 163, 184, 0.45)';
   ctx.strokeRect(boardX - 0.5, boardY - 0.5, boardWidth + 1, boardHeight + 1);
+  if (!still) drawLevelGlow(ctx, effects, frame, layout, boardWidth, boardHeight);
 
   // 고정된 칸 (생성 줄 2개까지 보인다)
-  const firstRow = HIDDEN_ROWS - SPAWN_ROWS_SHOWN;
   for (let row = firstRow; row < HIDDEN_ROWS + VISIBLE_ROWS; row++) {
     for (let col = 0; col < BOARD_WIDTH; col++) {
       const value = state.board[row * BOARD_WIDTH + col];
-      if (value !== 0) drawCell(ctx, boardX + col * cell, rowToY(layout, row), cell, PIECE_COLORS[value - 1], row < HIDDEN_ROWS ? 0.6 : 1);
+      if (value !== 0) drawBlock(ctx, boardX + col * cell, rowToY(layout, row), cell, value, dpr, row < HIDDEN_ROWS ? 0.6 : 1);
     }
   }
 
   // 줄 삭제 연출 — 지연 프레임 동안 흰빛이 사라진다
   if (state.clearingRows.length > 0 && !state.active) {
-    const alpha = Math.max(0, Math.min(1, state.delay / LINE_CLEAR_DELAY_FRAMES));
-    ctx.fillStyle = `rgba(255, 255, 255, ${0.85 * alpha})`;
-    for (const row of state.clearingRows) ctx.fillRect(boardX, rowToY(layout, row), boardWidth, cell);
+    const big = state.lastLock !== null && isBigClear(state.lastLock);
+    drawClearFlash(ctx, state.clearingRows, state.delay / LINE_CLEAR_DELAY_FRAMES, big, layout, boardWidth, reduced);
   }
+
+  if (!still) drawTrail(ctx, effects, frame, layout, firstRow);
 
   if (state.active) {
     const cells = PIECE_CELLS[state.piece][state.rotation];
-    const color = PIECE_COLORS[state.piece];
+    const color = CELL_COLORS[state.piece + 1];
     if (options.showGhost !== false) {
+      // 고스트 — 반투명 면 + 외곽선
       const ghostY = getDropY(state);
       ctx.strokeStyle = color;
-      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = color;
       for (let i = 0; i < 8; i += 2) {
         const row = ghostY + cells[i + 1];
         if (row < firstRow) continue;
-        ctx.strokeRect(boardX + (state.x + cells[i]) * cell + 1.5, rowToY(layout, row) + 1.5, cell - 3, cell - 3);
+        const x = boardX + (state.x + cells[i]) * cell;
+        const y = rowToY(layout, row);
+        ctx.globalAlpha = 0.14;
+        ctx.fillRect(x + 1, y + 1, cell - 2, cell - 2);
+        ctx.globalAlpha = 0.6;
+        ctx.strokeRect(x + 1.5, y + 1.5, cell - 3, cell - 3);
       }
       ctx.globalAlpha = 1;
     }
     for (let i = 0; i < 8; i += 2) {
       const row = state.y + cells[i + 1];
       if (row < firstRow) continue;
-      drawCell(ctx, boardX + (state.x + cells[i]) * cell, rowToY(layout, row), cell, color);
+      drawBlock(ctx, boardX + (state.x + cells[i]) * cell, rowToY(layout, row), cell, state.piece + 1, dpr);
     }
   }
+
+  if (!still) drawParticles(ctx, effects, frame, layout, boardWidth, boardHeight);
+  ctx.restore();
+
+  if (options.garbage) drawGarbageGauge(ctx, options.garbage, layout);
 
   // 홀드·다음
   const mini = Math.floor(cell * MINI_SCALE);
   ctx.fillStyle = 'rgba(148, 163, 184, 0.9)';
   ctx.font = `600 ${Math.max(10, Math.floor(cell * 0.5))}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
   const holdCenterX = boardX - cell / 2 - sideWidth / 2;
   const nextCenterX = boardX + boardWidth + cell / 2 + sideWidth / 2;
   ctx.fillText('HOLD', holdCenterX, boardY + cell * 0.6);
   ctx.fillText('NEXT', nextCenterX, boardY + cell * 0.6);
-  if (state.hold !== -1) drawMiniPiece(ctx, state.hold, holdCenterX, boardY + cell * 2, mini, state.holdUsed ? 0.35 : 1);
+  if (state.hold !== -1) drawMiniPiece(ctx, state.hold, holdCenterX, boardY + cell * 2, mini, dpr, state.holdUsed ? 0.35 : 1);
   for (let i = 0; i < PREVIEW_COUNT && i < state.queue.length; i++) {
-    drawMiniPiece(ctx, state.queue[i], nextCenterX, boardY + cell * 2 + i * mini * 3, mini, i === 0 ? 1 : 0.8);
+    drawMiniPiece(ctx, state.queue[i], nextCenterX, boardY + cell * 2 + i * mini * 3, mini, dpr, i === 0 ? 1 : 0.8);
   }
+
+  drawEffectText(ctx, effects, frame, layout, boardWidth, reduced);
 }
