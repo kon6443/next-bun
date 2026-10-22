@@ -15,13 +15,13 @@ describe('isGamesPath — "게임" 탭 활성', () => {
 
 describe('isFullscreenGamePath — 하단 내비 숨김', () => {
   it('낚시 플레이·테트리스 플레이·리플레이', () => {
-    for (const path of ['/fishing', '/games/tetris/play', '/games/tetris/replays/12']) {
+    for (const path of ['/fishing', '/games/tetris/play', '/games/tetris/replays/12', '/games/tetris/battle', '/games/tetris/battle/ABC234']) {
       expect(isFullscreenGamePath(path)).toBe(true);
     }
   });
 
   it('목록·소개·도감·랭킹은 보인다', () => {
-    for (const path of ['/games', '/games/tetris', '/games/tetris/rankings', '/fishing/guide', '/fishing/about']) {
+    for (const path of ['/games', '/games/tetris', '/games/tetris/rankings', '/fishing/guide', '/fishing/about', '/games/tetris/battles']) {
       expect(isFullscreenGamePath(path)).toBe(false);
     }
   });

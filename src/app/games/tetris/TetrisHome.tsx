@@ -135,6 +135,9 @@ export default function TetrisHome() {
         <ButtonLink href="/games/tetris/play" size="md" fullWidth className="mt-5 min-h-11">
           게임 시작
         </ButtonLink>
+        <ButtonLink href="/games/tetris/battle" variant="secondary" size="md" fullWidth className="mt-3 min-h-11">
+          친구와 대전
+        </ButtonLink>
       </section>
 
       {(pending || pendingMessage) && (
