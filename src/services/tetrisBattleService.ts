@@ -3,14 +3,15 @@ import { ApiError, type ApiErrorResponse, type ApiResponse, createApiError } fro
 import type { BattleReplayInput } from '@/app/games/tetris/battle-engine';
 
 /**
- * 테트리스 대전 REST — 경기 후 리플레이 제출 (DESIGN §17-1)
- * 실시간 진행은 소켓(/tetris-battle), 여기는 경기가 끝난 뒤 검증·저장용 제출만
+ * 테트리스 대전 REST — 경기 후 리플레이 제출(DESIGN §17-1)과 저장된 경기 조회(§17-3·§18)
+ * 실시간 진행은 소켓(/tetris-battle), 여기는 경기가 끝난 뒤의 제출·조회만
  */
 
 // ==================== 공통 에러 처리 ====================
 
 type ErrorMessageMap = {
   403?: string;
+  404?: string;
   409?: string;
   410?: string;
   413?: string;
@@ -110,5 +111,135 @@ export async function submitBattleReplay(
     });
   }
 
+  return response.json();
+}
+
+// ==================== 조회 ====================
+
+/** 탈락 이유 — 우승자는 null. 새로고침 기권(D-020)도 topout */
+export type BattleKoReason = 'topout' | 'disconnect' | 'leave';
+
+/** 경기 참가자 — 백엔드 BattleMatchPlayerDto */
+export type BattleMatchPlayer = {
+  playerId: string;
+  name: string;
+  /** 1 = 우승. 동순위 없음 */
+  place: number;
+  kos: number;
+  /** 보낸 줄 */
+  sent: number;
+  /** 받은 줄 */
+  received: number;
+  pieces: number;
+  maxCombo: number;
+  frames: number;
+  koReason: BattleKoReason | null;
+  /** MISSING = 리플레이 미제출(재생할 기록 없음) */
+  verdict: 'VERIFIED' | 'MISSING';
+};
+
+/** 저장된 경기 — 백엔드 BattleMatchDto. 숨김·DISPUTED·미저장 경기는 404 */
+export type BattleMatch = {
+  matchId: string;
+  roomName: string;
+  playerCount: number;
+  /** UTC ISO 8601 */
+  startedAt: string;
+  endedAt: string;
+  /** 순위 오름차순 */
+  players: BattleMatchPlayer[];
+};
+
+/** 한 참가자의 대전 리플레이 — 백엔드 BattleReplayDetailDto (VERIFIED만) */
+export type BattleReplayDetail = BattleReplayInput & { matchId: string; playerId: string };
+
+/** 경로의 matchId 형식 — 백엔드 MATCH_ID_PATTERN과 같다. 맞지 않으면 묻지 않고 404 */
+export function isBattleMatchId(raw: string): boolean {
+  return /^[A-Za-z0-9_-]{16}$/.test(raw);
+}
+
+/** 저장된 경기 요약 — 404 TETRIS_BATTLE_MATCH_NOT_FOUND(없음·숨김·DISPUTED·아직 저장 전) */
+export async function getBattleMatch(matchId: string): Promise<ApiResponse<BattleMatch>> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'GET',
+    endpoint: `/api/v1/tetris-battle/matches/${encodeURIComponent(matchId)}`,
+  });
+  if (!response.ok) {
+    await handleApiError(response, {
+      404: '공개되지 않은 경기예요.',
+      429: '요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.',
+      default: '경기 기록을 불러오지 못했습니다.',
+    });
+  }
+  return response.json();
+}
+
+/** 참가자 리플레이 — 404 TETRIS_BATTLE_REPLAY_NOT_FOUND(미제출·참가자 없음) */
+export async function getBattleReplay(matchId: string, playerId: string): Promise<ApiResponse<BattleReplayDetail>> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'GET',
+    endpoint: `/api/v1/tetris-battle/matches/${encodeURIComponent(matchId)}/replays/${encodeURIComponent(playerId)}`,
+  });
+  if (!response.ok) {
+    await handleApiError(response, {
+      404: '이 참가자의 기록이 없어요.',
+      429: '요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.',
+      default: '기록을 불러오지 못했습니다.',
+    });
+  }
+  return response.json();
+}
+
+// ==================== 입구 — 로비 방 수·최근 경기 (DESIGN §19) ====================
+
+/** 지금 로비의 방 수 — 소켓 없이 테트리스 홈에서 쓴다 */
+export type BattleLobbyStats = {
+  /** 입장할 수 있는 대기 방 */
+  waitingRooms: number;
+  /** 경기 중인 방 */
+  playingRooms: number;
+};
+
+export async function getBattleLobbyStats(): Promise<ApiResponse<BattleLobbyStats>> {
+  const response = await fetchServiceInstance.backendFetch({ method: 'GET', endpoint: '/api/v1/tetris-battle/lobby' });
+  if (!response.ok) {
+    await handleApiError(response, {
+      429: '요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.',
+      default: '대전 방 정보를 불러오지 못했습니다.',
+    });
+  }
+  return response.json();
+}
+
+/** 최근 경기 목록 항목 — 저장된(VERIFIED·비숨김) 경기만 */
+export type BattleMatchListItem = {
+  matchId: string;
+  roomName: string;
+  playerCount: number;
+  /** UTC ISO 8601 */
+  endedAt: string;
+  winnerName: string;
+  /** 순위 오름차순 */
+  players: { name: string; place: number }[];
+};
+
+export type BattleMatchList = {
+  items: BattleMatchListItem[];
+  /** 다음 페이지 커서 — 마지막이면 null */
+  nextCursor: string | null;
+};
+
+/** 최근 경기 — 최신순 커서 페이지(limit 1~20, 기본 10). 잘못된 cursor는 422 VALIDATION_ERROR */
+export async function getBattleMatchList(params: { limit?: number; cursor?: string | null } = {}): Promise<ApiResponse<BattleMatchList>> {
+  const query: Record<string, string> = {};
+  if (params.limit !== undefined) query.limit = String(params.limit);
+  if (params.cursor) query.cursor = params.cursor;
+  const response = await fetchServiceInstance.backendFetch({ method: 'GET', endpoint: '/api/v1/tetris-battle/matches', query });
+  if (!response.ok) {
+    await handleApiError(response, {
+      429: '요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.',
+      default: '최근 대전을 불러오지 못했습니다.',
+    });
+  }
   return response.json();
 }
