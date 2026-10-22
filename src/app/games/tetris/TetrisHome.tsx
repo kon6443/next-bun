@@ -10,6 +10,8 @@ import { extractErrorMessage } from "@/app/utils/errorUtils";
 import { ARR_MAX, ARR_MIN, DAS_MAX, DAS_MIN } from "./engine";
 import { RankingTable } from "@/app/games/_shared/components/RankingTable";
 import { TETRIS_GAME } from "./lib/game";
+import { BattleEntry } from "./battle-ui/components/BattleEntry";
+import { RecentBattles } from "./battle-ui/components/RecentBattles";
 import { CONTROL_GUIDE } from "./lib/controls";
 import { formatScore, framesToMs } from "@/app/games/_shared/lib/format";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
@@ -133,12 +135,12 @@ export default function TetrisHome() {
         <p className="mt-4 text-sm text-slate-300">
           내 최고 점수 <strong className="ml-1 text-lg text-amber-300">{best > 0 ? formatScore(best) : "-"}</strong>
         </p>
-        <ButtonLink href="/games/tetris/play" size="md" fullWidth className="mt-5 min-h-11">
-          게임 시작
-        </ButtonLink>
-        <ButtonLink href="/games/tetris/battle" variant="secondary" size="md" fullWidth className="mt-3 min-h-11">
-          친구와 대전
-        </ButtonLink>
+        <div className="mt-5 grid grid-cols-2 items-start gap-3">
+          <ButtonLink href="/games/tetris/play" size="md" fullWidth className="min-h-11">
+            게임 시작
+          </ButtonLink>
+          <BattleEntry />
+        </div>
       </section>
 
       {(pending || pendingMessage) && (
@@ -197,6 +199,8 @@ export default function TetrisHome() {
           <RankingTable game={TETRIS_GAME} items={preview} myScoreIds={myScoreIds} compact />
         )}
       </section>
+
+      <RecentBattles />
 
       {/* 조작·설정 */}
       <section className={`${cardStyles.section} p-4`}>

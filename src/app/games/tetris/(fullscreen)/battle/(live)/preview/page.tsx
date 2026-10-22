@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { BattlePreview } from "../../../battle-ui/components/BattlePreview";
+import { BattlePreview } from "../../../../battle-ui/components/BattlePreview";
 
 export const metadata: Metadata = {
   title: "테트리스 대전 미리보기",

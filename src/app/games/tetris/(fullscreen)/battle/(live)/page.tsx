@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { BattleLobby } from "../../battle-ui/components/BattleLobby";
+import { BattleLobby } from "../../../battle-ui/components/BattleLobby";
 
 export const metadata: Metadata = {
   title: "테트리스 대전",

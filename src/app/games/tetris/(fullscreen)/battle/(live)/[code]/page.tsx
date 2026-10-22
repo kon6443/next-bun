@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { BattleRoom } from "../../../battle-ui/components/BattleRoom";
-import { normalizeRoomCode } from "../../../battle-ui/lib/roomForm";
+import { BattleRoom } from "../../../../battle-ui/components/BattleRoom";
+import { normalizeRoomCode } from "../../../../battle-ui/lib/roomForm";
 
 type BattleRoomPageProps = {
   params: Promise<{ code: string }>;
