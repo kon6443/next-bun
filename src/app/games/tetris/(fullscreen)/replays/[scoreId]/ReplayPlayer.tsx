@@ -14,6 +14,7 @@ import { KAKAO_JS_KEY, KAKAO_SDK_INTEGRITY, KAKAO_SDK_SRC, initKakao } from "../
 import { ACTION_LABELS } from "../../../lib/controls";
 import { formatFrames, formatScore } from "../../../lib/format";
 import { cloneGameState } from "../../../lib/gameSnapshot";
+import { type EffectTracker, createEffectTracker, observeAfter, observeBefore } from "../../../lib/effects";
 import { loadReplay } from "../../../lib/replayLoader";
 import { type ReplayTimeline, buildTimeline, collectActions } from "../../../lib/replayTimeline";
 
@@ -49,6 +50,9 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
 
   const stateRef = useRef<GameState | null>(null);
   const drawRef = useRef<(() => void) | null>(null);
+  /** 플레이와 같은 연출 — 뒤로 탐색하면 프레임이 되돌아가 기록이 스스로 비워진다 */
+  const effectsRef = useRef<EffectTracker | null>(null);
+  if (effectsRef.current === null) effectsRef.current = createEffectTracker();
   const timelineRef = useRef<ReplayTimeline | null>(null);
   const cursorRef = useRef(0);
   const bufferRef = useRef<number[]>([]);
@@ -97,7 +101,10 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
     const frame = state.frame;
     cursorRef.current = collectActions(timeline, cursorRef.current, frame, bufferRef.current);
     for (const code of bufferRef.current) lastActionFrameRef.current[code] = frame;
-    stepFrame(state, bufferRef.current, bufferRef.current.length);
+    const effects = effectsRef.current;
+    if (effects) observeBefore(effects, state);
+    const applied = stepFrame(state, bufferRef.current, bufferRef.current.length);
+    if (effects) observeAfter(effects, state, bufferRef.current, applied);
     if (state.frame % SNAPSHOT_INTERVAL === 0 && !snapshotsRef.current.has(state.frame)) {
       snapshotsRef.current.set(state.frame, { state: cloneGameState(state), cursor: cursorRef.current });
     }
@@ -306,7 +313,7 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
 
       {/* 루트 layout이 이미 <main>으로 감싼다 — 중첩하지 않는다 */}
       <div className="relative min-h-0 flex-1">
-        <TetrisCanvas stateRef={stateRef} drawRef={drawRef} />
+        <TetrisCanvas stateRef={stateRef} drawRef={drawRef} effectsRef={effectsRef} />
         <KeyOverlay pressed={pressed} />
       </div>
 

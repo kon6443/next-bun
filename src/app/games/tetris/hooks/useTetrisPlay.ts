@@ -13,6 +13,7 @@ import {
   stepFrame,
 } from "../engine";
 import { KEY_BINDINGS } from "../lib/controls";
+import { type EffectTracker, createEffectTracker, observeAfter, observeBefore, resetEffects } from "../lib/effects";
 import type { ReplayPayload } from "@/types/game";
 
 export type PlayStatus = "ready" | "playing" | "paused" | "over";
@@ -55,6 +56,9 @@ export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state:
   const hudFrameRef = useRef(-HUD_TIME_STEP);
   /** 매 애니메이션 프레임 틱 직후 부른다 (그리기가 입력보다 한 프레임 늦지 않게) */
   const afterTickRef = useRef<(() => void) | null>(null);
+  /** 화면 연출 기록 — 틱마다 stepFrame 전후 상태를 넘긴다 (엔진 결과에는 영향 없음) */
+  const effectsRef = useRef<EffectTracker | null>(null);
+  if (effectsRef.current === null) effectsRef.current = createEffectTracker();
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
@@ -73,6 +77,7 @@ export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state:
       queueRef.current = [];
       heldRef.current.clear();
       lastLockRef.current = null;
+      if (effectsRef.current) resetEffects(effectsRef.current);
       hudFrameRef.current = -HUD_TIME_STEP;
       setHud(EMPTY_HUD);
       setStatus("playing");
@@ -84,6 +89,7 @@ export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state:
   const reset = useCallback(() => {
     queueRef.current = [];
     heldRef.current.clear();
+    if (effectsRef.current) resetEffects(effectsRef.current);
     setStatus("ready");
   }, [setStatus]);
 
@@ -133,7 +139,10 @@ export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state:
       const actions = queueRef.current;
       queueRef.current = [];
       const frame = state.frame;
+      const effects = effectsRef.current;
+      if (effects) observeBefore(effects, state);
       const applied = stepFrame(state, actions, actions.length);
+      if (effects) observeAfter(effects, state, actions, applied);
       for (let i = 0; i < applied; i++) recordInput(recorder, frame, actions[i]);
 
       const lock = state.lastLock;
@@ -221,5 +230,5 @@ export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state:
     };
   }, [instant, pause, press, release, resume]);
 
-  return { stateRef, afterTickRef, status, hud, start, reset, pause, resume, press, release, instant };
+  return { stateRef, afterTickRef, effectsRef, status, hud, start, reset, pause, resume, press, release, instant };
 }

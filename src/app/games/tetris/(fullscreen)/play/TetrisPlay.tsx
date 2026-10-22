@@ -12,6 +12,7 @@ import { ENGINE_VERSION, type GameState, MAX_FRAMES, MAX_INPUT_LENGTH } from "..
 import { normalizePlayerName, validatePlayerName } from "../../lib/playerName";
 import { TetrisCanvas } from "../../components/TetrisCanvas";
 import { TouchControls } from "../../components/TouchControls";
+import { EffectsToggle } from "../../components/EffectsToggle";
 import { type GameResult, GameOverPanel } from "../../components/GameOverPanel";
 import { useTetrisPlay } from "../../hooks/useTetrisPlay";
 import { CONTROL_GUIDE } from "../../lib/controls";
@@ -199,7 +200,7 @@ export default function TetrisPlay() {
       {/* 판 */}
       {/* 루트 layout이 이미 <main>으로 감싼다 — 중첩하지 않는다 */}
       <div className="relative min-h-0 flex-1">
-        <TetrisCanvas stateRef={play.stateRef} drawRef={play.afterTickRef} />
+        <TetrisCanvas stateRef={play.stateRef} drawRef={play.afterTickRef} effectsRef={play.effectsRef} />
 
         {phase === "ready" && (
           <Overlay>
@@ -224,6 +225,7 @@ export default function TetrisPlay() {
               >
                 시작
               </Button>
+              <EffectsToggle className="mt-3" />
               {!isCoarse && <ControlGuide />}
             </div>
           </Overlay>
@@ -241,6 +243,7 @@ export default function TetrisPlay() {
                   처음부터
                 </Button>
               </div>
+              <EffectsToggle className="mt-3" />
               {!isCoarse && <ControlGuide />}
             </div>
           </Overlay>
