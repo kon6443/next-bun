@@ -36,7 +36,7 @@ describe('isFullscreenGamePath — 하단 내비 숨김', () => {
       '/games/defense/rankings',
       '/fishing/guide',
       '/fishing/about',
-      '/games/tetris/battles',
+      '/games/tetris/battles', // battle 접두 경계 — 세그먼트 단위로만 대전으로 본다
     ]) {
       expect(isFullscreenGamePath(path)).toBe(false);
     }
