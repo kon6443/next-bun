@@ -17,7 +17,7 @@ export function EmoteBubble({ emote }: { emote: { emoteId: TetrisBattleEmoteId; 
   const label = EMOTE_LABELS[emote.emoteId];
   return (
     <span
-      className="absolute -top-3 right-2 rounded-full border border-white/15 bg-slate-950/90 px-2 py-1 text-sm shadow-[0_6px_16px_rgba(2,6,23,0.6)]"
+      className="pointer-events-none absolute -top-3 right-2 whitespace-nowrap rounded-full border border-white/15 bg-slate-950/90 px-2 py-1 text-sm shadow-[0_6px_16px_rgba(2,6,23,0.6)]"
       role="status"
     >
       {label.emoji} <span className="text-xs text-slate-200">{label.label}</span>

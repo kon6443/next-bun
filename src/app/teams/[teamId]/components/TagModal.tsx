@@ -714,7 +714,7 @@ function TagEditor({ formId, tag, allTags, onStatusChange, onCancel, onSave, onR
       <TagColorPicker value={color} onChange={setColor} />
 
       <div className="flex items-center gap-2">
-        <span className="text-xs text-slate-400">미리보기</span>
+        <span className="shrink-0 whitespace-nowrap text-xs text-slate-400">미리보기</span>
         <TagChip tag={{ tagName: normalizeTagName(name) || tag.tagName, tagColor: color }} size="md" className="min-w-0" />
       </div>
 

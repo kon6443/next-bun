@@ -134,7 +134,7 @@ export default function MyFeedbacksPage() {
           />
         ) : (
           <>
-            <ul className="grid gap-3">
+            <ul className="grid grid-cols-1 gap-3">
               {items.map((item) => (
                 <li key={item.feedbackId}>
                   <FeedbackListCard item={item} />

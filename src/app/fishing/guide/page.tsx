@@ -121,7 +121,7 @@ export default function FishingGuidePage() {
                       </span>
                     </div>
 
-                    <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-slate-400">
+                    <div className="mt-3 grid grid-cols-3 gap-2 break-keep text-xs text-slate-400">
                       <div>
                         <span className="block text-slate-400">크기</span>
                         {f.minSize}~{f.maxSize}cm

@@ -245,10 +245,10 @@ export function TeamManagementSection({
   return (
     <section className={`${cardStyles.section} p-4`}>
       {/* 컴팩트 헤더 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
           <SectionLabel>Team Management</SectionLabel>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {visibleTabs.map(tab => (
               <span key={tab.key} className="flex items-center gap-1 text-xs text-slate-400" title={tab.label}>
                 {tab.icon}
@@ -259,7 +259,7 @@ export function TeamManagementSection({
         </div>
         <button
           onClick={() => setIsExpanded(v => !v)}
-          className="p-2 rounded-lg hover:bg-white/5 transition text-slate-400 hover:text-slate-300"
+          className="shrink-0 p-2 rounded-lg hover:bg-white/5 transition text-slate-400 hover:text-slate-300"
           aria-label={isExpanded ? '접기' : '펼치기'}
         >
           {isExpanded ? <ChevronUpIcon className="w-5 h-5" /> : <ChevronDownIcon className="w-5 h-5" />}
@@ -355,10 +355,11 @@ export function TeamManagementSection({
                             : 'border-white/10 bg-slate-950/30'
                         }`}
                       >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex-1 min-w-0">
+                        {/* 좁은 폭에서는 버튼 묶음이 다음 줄로 — 이름·배지 칸이 버튼에 밀려 겹치지 않게 */}
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="min-w-0 flex-1 basis-32">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <p className={`text-lg font-semibold ${isInactive ? 'text-slate-400' : 'text-white'}`}>
+                              <p className={`min-w-0 break-words text-lg font-semibold ${isInactive ? 'text-slate-400' : 'text-white'}`}>
                                 {member.userName || `사용자 ${member.userId}`}
                               </p>
                               <span className={roleMeta.className}>{roleMeta.label}</span>
@@ -457,7 +458,7 @@ export function TeamManagementSection({
               {invites.length === 0 ? (
                 <EmptyState message="생성된 초대 링크가 없습니다." />
               ) : (
-                <div className="grid gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   {invites.map(invite => {
                     const isExpired = new Date(invite.endAt) < new Date();
                     const isMaxReached = invite.usageCurCnt >= invite.usageMaxCnt;
