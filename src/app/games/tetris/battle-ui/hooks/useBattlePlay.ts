@@ -13,7 +13,7 @@ import {
   stepBattle,
 } from "../../battle-engine";
 import { KEY_BINDINGS } from "../../lib/controls";
-import { type EffectTracker, createEffectTracker, observeAfter, observeBefore, resetEffects } from "../../lib/effects";
+import { type EffectTracker, createEffectTracker, noteGarbageRise, observeAfter, observeBefore, resetEffects } from "../../lib/effects";
 import type { GarbageGauge } from "../../lib/renderer";
 
 export type BattlePlayStatus = "ready" | "playing" | "over";
@@ -148,7 +148,11 @@ export function useBattlePlay(options: BattlePlayOptions = {}) {
       const effects = effectsRef.current;
       if (effects) observeBefore(effects, game);
       const { applied, lock } = stepBattle(bs, actions, actions.length);
-      if (effects) observeAfter(effects, game, actions, applied);
+      if (effects) {
+        observeAfter(effects, game, actions, applied);
+        // 가비지가 판에 들어왔다 — 아래에서 밀려 올라오는 연출 + 경고음 신호
+        if (lock && lock.garbageApplied > 0) noteGarbageRise(effects, game.frame - 1, lock.garbageApplied);
+      }
       for (let i = 0; i < applied; i++) recordInput(recorder, frame, actions[i]);
 
       let active = 0;

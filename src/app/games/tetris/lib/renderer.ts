@@ -8,15 +8,22 @@ import {
   VISIBLE_ROWS,
   getDropY,
 } from '../engine';
-import { CELL_COLORS, drawBlock } from './blockSprites';
+import { CELL_COLORS, drawBlock, drawGlow } from './blockSprites';
 import { type EffectTracker, isBigClear } from './effects';
 import {
+  type EffectQuality,
   boardBackground,
+  drawBoardFrame,
   drawClearFlash,
+  drawClearRing,
+  drawComboMeter,
   drawEffectText,
   drawLevelGlow,
   drawParticles,
+  drawRiseGlow,
+  drawStarfield,
   drawTrail,
+  riseOffset,
   shakeOffset,
 } from './effectsRenderer';
 
@@ -87,7 +94,13 @@ export type DrawOptions = {
   reduced?: boolean;
   /** 대전 가비지 게이지 — 판 왼쪽에 대기 줄(회색)과 곧 들어올 줄(빨강) */
   garbage?: GarbageGauge | null;
+  /** lite = 저사양 감지 — 칸 발광을 끄고 별을 줄인다 (연출 줄이기도 lite로 그린다) */
+  quality?: EffectQuality;
 };
+
+/** 칸 발광 세기 — 고정된 칸은 은은하게, 조작 중인 블록은 밝게 */
+const GLOW_ALPHA_LOCKED = 0.22;
+const GLOW_ALPHA_ACTIVE = 0.55;
 
 export type GarbageGauge = {
   /** 대기열 전체 줄 */
@@ -131,11 +144,14 @@ export function drawGame(ctx: CanvasRenderingContext2D, state: GameState, layout
   const effects = options.effects ?? null;
   const reduced = options.reduced ?? false;
   const still = reduced || state.over;
+  const glow = !reduced && (options.quality ?? 'full') === 'full';
   const frame = state.frame;
   const dpr = currentDpr(ctx);
   const firstRow = HIDDEN_ROWS - SPAWN_ROWS_SHOWN;
 
   ctx.clearRect(0, 0, width, height);
+  // 배경 별 — 판 뒤 전체, 레벨 색조
+  drawStarfield(ctx, frame, state.level, width, height, still, glow ? 'full' : 'lite');
 
   // 판은 흔들림만큼 옮겨 그린다 (옆 패널·문구는 고정)
   const [shakeX, shakeY] = shakeOffset(effects, frame, still);
@@ -157,9 +173,42 @@ export function drawGame(ctx: CanvasRenderingContext2D, state: GameState, layout
     ctx.lineTo(boardX + boardWidth, boardY + y * cell + 0.5);
   }
   ctx.stroke();
-  ctx.strokeStyle = 'rgba(148, 163, 184, 0.45)';
-  ctx.strokeRect(boardX - 0.5, boardY - 0.5, boardWidth + 1, boardHeight + 1);
+  // 매 프레임 그리는 테두리 — 저사양(lite)에서도 번짐을 줄인다
+  drawBoardFrame(ctx, layout, boardWidth, boardHeight, state.level, !glow);
   if (!still) drawLevelGlow(ctx, effects, frame, layout, boardWidth, boardHeight);
+
+  // 가비지 상승 — 판 내용이 아래에서 밀려 올라온다(판 안으로 자른다)
+  const rise = still ? 0 : riseOffset(effects, frame, cell, reduced);
+  if (rise > 0) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(boardX, boardY - cell * SPAWN_ROWS_SHOWN, boardWidth, boardHeight + cell * SPAWN_ROWS_SHOWN);
+    ctx.clip();
+    ctx.translate(0, rise);
+  }
+
+  // 칸 발광 — 블록보다 먼저 'lighter'로 깔아 네온처럼 번지게 (캐시 스프라이트 복사만)
+  if (glow) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = GLOW_ALPHA_LOCKED;
+    for (let row = HIDDEN_ROWS; row < HIDDEN_ROWS + VISIBLE_ROWS; row++) {
+      for (let col = 0; col < BOARD_WIDTH; col++) {
+        const value = state.board[row * BOARD_WIDTH + col];
+        if (value !== 0) drawGlow(ctx, boardX + col * cell, rowToY(layout, row), cell, value, dpr);
+      }
+    }
+    if (state.active) {
+      const cells = PIECE_CELLS[state.piece][state.rotation];
+      ctx.globalAlpha = GLOW_ALPHA_ACTIVE;
+      for (let i = 0; i < 8; i += 2) {
+        const row = state.y + cells[i + 1];
+        if (row < firstRow) continue;
+        drawGlow(ctx, boardX + (state.x + cells[i]) * cell, rowToY(layout, row), cell, state.piece + 1, dpr);
+      }
+    }
+    ctx.restore();
+  }
 
   // 고정된 칸 (생성 줄 2개까지 보인다)
   for (let row = firstRow; row < HIDDEN_ROWS + VISIBLE_ROWS; row++) {
@@ -181,21 +230,29 @@ export function drawGame(ctx: CanvasRenderingContext2D, state: GameState, layout
     const cells = PIECE_CELLS[state.piece][state.rotation];
     const color = CELL_COLORS[state.piece + 1];
     if (options.showGhost !== false) {
-      // 고스트 — 반투명 면 + 외곽선
+      // 고스트 — 옅은 면 + 네온 외곽선(발광은 한 번의 shadowBlur로)
       const ghostY = getDropY(state);
+      ctx.save();
       ctx.strokeStyle = color;
       ctx.fillStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.1;
       for (let i = 0; i < 8; i += 2) {
         const row = ghostY + cells[i + 1];
         if (row < firstRow) continue;
-        const x = boardX + (state.x + cells[i]) * cell;
-        const y = rowToY(layout, row);
-        ctx.globalAlpha = 0.14;
-        ctx.fillRect(x + 1, y + 1, cell - 2, cell - 2);
-        ctx.globalAlpha = 0.6;
-        ctx.strokeRect(x + 1.5, y + 1.5, cell - 3, cell - 3);
+        ctx.fillRect(boardX + (state.x + cells[i]) * cell + 1, rowToY(layout, row) + 1, cell - 2, cell - 2);
       }
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = 0.85;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = glow ? 8 : 0;
+      ctx.beginPath();
+      for (let i = 0; i < 8; i += 2) {
+        const row = ghostY + cells[i + 1];
+        if (row < firstRow) continue;
+        ctx.rect(boardX + (state.x + cells[i]) * cell + 1.5, rowToY(layout, row) + 1.5, cell - 3, cell - 3);
+      }
+      ctx.stroke();
+      ctx.restore();
     }
     for (let i = 0; i < 8; i += 2) {
       const row = state.y + cells[i + 1];
@@ -204,6 +261,9 @@ export function drawGame(ctx: CanvasRenderingContext2D, state: GameState, layout
     }
   }
 
+  if (rise > 0) ctx.restore();
+  if (!still) drawRiseGlow(ctx, effects, frame, layout, boardWidth, boardHeight);
+  if (!still) drawClearRing(ctx, effects, frame, layout, boardWidth);
   if (!still) drawParticles(ctx, effects, frame, layout, boardWidth, boardHeight);
   ctx.restore();
 
@@ -223,6 +283,8 @@ export function drawGame(ctx: CanvasRenderingContext2D, state: GameState, layout
   for (let i = 0; i < PREVIEW_COUNT && i < state.queue.length; i++) {
     drawMiniPiece(ctx, state.queue[i], nextCenterX, boardY + cell * 2 + i * mini * 3, mini, dpr, i === 0 ? 1 : 0.8);
   }
+  // 콤보 미터 — 홀드 아래
+  drawComboMeter(ctx, effects, frame, holdCenterX, boardY + cell * 4.6, cell, sideWidth, reduced);
 
   drawEffectText(ctx, effects, frame, layout, boardWidth, reduced);
 }

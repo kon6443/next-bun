@@ -128,7 +128,7 @@ export default function TetrisHome() {
             ← 게임 목록
           </ButtonLink>
         </div>
-        <h1 className="mt-4 text-3xl font-bold text-white">테트리스</h1>
+        <h1 className="mt-4 text-3xl font-bold text-white [text-shadow:0_0_14px_rgba(56,189,248,0.6)]">테트리스</h1>
         <p className="mt-2 text-sm text-slate-400">
           줄을 지우고 점수를 쌓으세요. 끝나면 이름을 적어 랭킹에 올릴 수 있어요. (로그인 없이도 가능)
         </p>

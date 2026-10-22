@@ -1,0 +1,90 @@
+/* 대전 네온 연출 (DESIGN §20) — 카운트다운·KO 폭발. 연출 줄이기는 JS(useReducedEffects)가 클래스를 빼서 막는다
+   — 앱 설정(기기 설정보다 우선)과 한 기준으로 맞추려고 media query는 두지 않는다 */
+
+/* 카운트다운 숫자 — 크게 나타나 제자리로, 네온 글로우 */
+.countdown {
+  color: #f0f9ff;
+  text-shadow:
+    0 0 12px rgba(56, 189, 248, 0.9),
+    0 0 32px rgba(56, 189, 248, 0.6);
+  animation: countdownPop 1s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes countdownPop {
+  0% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+  25% {
+    transform: scale(0.92);
+    opacity: 1;
+  }
+  45% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+}
+
+/* KO 폭발 — 판 가운데에서 빛 링이 퍼지고 판이 번쩍인다 (상대 미니보드·내 판 공통) */
+.koBurst {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.koBurst::before,
+.koBurst::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 40%;
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  transform: translate(-50%, -50%) scale(0.2);
+}
+
+.koBurst::before {
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0%, rgba(251, 113, 133, 0.7) 40%, rgba(251, 113, 133, 0) 70%);
+  animation: koFlash 0.7s ease-out both;
+}
+
+.koBurst::after {
+  border: 3px solid #fb7185;
+  box-shadow: 0 0 18px #f43f5e;
+  animation: koRing 0.8s ease-out both;
+}
+
+@keyframes koFlash {
+  0% {
+    transform: translate(-50%, -50%) scale(0.2);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(4);
+    opacity: 0;
+  }
+}
+
+@keyframes koRing {
+  0% {
+    transform: translate(-50%, -50%) scale(0.2);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(3.4);
+    opacity: 0;
+  }
+}
+
+/* KO 표시 글자 — 네온 붉은 글로우 */
+.koMark {
+  text-shadow:
+    0 0 8px rgba(244, 63, 94, 0.9),
+    0 0 20px rgba(244, 63, 94, 0.5);
+}
