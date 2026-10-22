@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { OP, STAGE_E1, applyCommand, createGame, step } from '../engine';
+import { testProjectile } from '../engine-dev/fixtures';
 import { createRenderView } from '../renderer/renderView';
 import { toRenderMap, toRenderView } from './toRenderView';
 
@@ -30,7 +31,7 @@ describe('toRenderView — 엔진 상태를 렌더 상태로', () => {
 
   it('투사체 위치는 발사 지점 → 표적 마지막 위치 사이 비율', () => {
     const state = createGame(STAGE_E1, 1);
-    state.projectiles.push({ id: 9, towerId: 1, targetId: 2, damage: 1, damageType: 0, element: 0, originX: 0, originY: 0, aimX: 1000, aimY: 2000, ticksLeft: 3, totalTicks: 4, status: 0, targetHint: 0 });
+    state.projectiles.push(testProjectile(state, { id: 9, towerId: 1, targetId: 2, aimX: 1000, aimY: 2000, ticksLeft: 3, totalTicks: 4 }));
     const view = toRenderView(state, createRenderView());
     expect(view.projectiles[0]).toMatchObject({ id: 9, x: 250, y: 500 });
   });

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { OP } from './constants';
 
-// 증강 대기 상태로 시작하는 판 — E1 데이터로는 만들 수 없어 createGame만 감싼다
+// 증강 대기 상태로 시작하는 판(후보 없음) — createGame만 감싼다
 vi.mock('./game', async (importOriginal) => {
   const original = await importOriginal<typeof import('./game')>();
   return {
@@ -23,7 +23,7 @@ describe('증강 대기 중 리플레이 — 틱이 멈춰도 끝난다 (무한 
     expect(simulateReplay({ ...base, inputs: [5, OP.CALL_WAVE] })).toEqual({ ok: false, reason: 'INVALID_COMMAND' });
   });
 
-  it('대기 중 같은 틱 명령도 PICK이 아니면 거부(E1은 PICK도 거부)', () => {
+  it('대기 중 같은 틱 명령도 PICK이 아니면 거부(후보가 없으면 PICK도 거부)', () => {
     expect(simulateReplay({ ...base, inputs: [0, OP.BUILD, 0, 0] })).toEqual({ ok: false, reason: 'INVALID_COMMAND' });
   });
 

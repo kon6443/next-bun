@@ -9,6 +9,7 @@ import {
   WAVE_COUNTDOWN_TICKS,
 } from './constants';
 import { STAGE_E1 } from './data/stages';
+import { injectEnemy as injectEnemyAt, testProjectile } from '../engine-dev/fixtures';
 import {
   ENEMY_STATUS,
   type Enemy,
@@ -28,44 +29,19 @@ const ARCHER = 0;
 
 const newGame = (seed = 1) => createGame(STAGE_E1, seed);
 
+/** 궁수탑을 짓고 바로 쏠 수 있게 — 건설 지연(첫 공격까지 1주기)은 별도 테스트가 본다 */
+function buildReady(state: GameState, slot: number): void {
+  expect(applyCommand(state, OP.BUILD, slot, ARCHER)).toBe(true);
+  state.towers[state.towers.length - 1].cooldown = 0;
+}
+
 function run(state: GameState, ticks: number): void {
   for (let i = 0; i < ticks && !state.over; i++) step(state);
 }
 
 /** 시험용 적 — 경로 위 거리 dist에 직접 둔다 */
 function injectEnemy(state: GameState, dist: number, hp = 100): Enemy {
-  const enemy: Enemy = {
-    id: state.nextId++,
-    kind: 0,
-    hp,
-    maxHp: hp,
-    path: 0,
-    dist,
-    segment: 0,
-    segmentStart: 0,
-    x: 0,
-    y: 0,
-    wave: 1,
-    reward: 1,
-    status: ENEMY_STATUS.ALIVE,
-  };
-  // 위치 계산은 step 4단계와 같게: 한 틱 이동 전 자리로 놓고 거리 0만큼 진행
-  const path = STAGE_E1.map.groundPaths[0];
-  let start = 0;
-  let seg = 0;
-  while (seg < path.segmentLengths.length - 1 && dist - start >= path.segmentLengths[seg]) start += path.segmentLengths[seg++];
-  const d = dist - start;
-  const len = path.segmentLengths[seg];
-  const [x0, y0, x1, y1] = path.points.slice(seg * 2, seg * 2 + 4);
-  enemy.segment = seg;
-  enemy.segmentStart = start;
-  enemy.x = x0 + Math.trunc(((x1 - x0) * d) / len);
-  enemy.y = y0 + Math.trunc(((y1 - y0) * d) / len);
-  state.enemies.push(enemy);
-  state.aliveEnemies += 1;
-  state.waves[0].total += 1;
-  state.waves[0].pending += 1;
-  return enemy;
+  return injectEnemyAt(state, STAGE_E1, dist, hp);
 }
 
 /** 궁수탑 Lv3 4개로 1웨이브를 막고, 적이 모두 사라진 카운트다운 중으로 — 준비 단계 */
@@ -73,7 +49,7 @@ function strongDefense(): GameState {
   const s = newGame();
   s.gold = 2000;
   for (const slot of [0, 1, 2, 3]) {
-    applyCommand(s, OP.BUILD, slot, ARCHER);
+    buildReady(s, slot);
     applyCommand(s, OP.UPGRADE, slot);
     applyCommand(s, OP.UPGRADE, slot);
   }
@@ -99,7 +75,7 @@ describe('명령 수락 규칙 (§E3)', () => {
   it('UPGRADE: Lv1→2(50)→3(80), 스테이지 상한 Lv3에서 거부', () => {
     const s = newGame();
     s.gold = 1000;
-    applyCommand(s, OP.BUILD, 0, ARCHER);
+    buildReady(s, 0);
     expect(upgradeCost(s, 0)).toBe(50);
     expect(applyCommand(s, OP.UPGRADE, 0)).toBe(true);
     expect(upgradeCost(s, 0)).toBe(80);
@@ -114,7 +90,7 @@ describe('명령 수락 규칙 (§E3)', () => {
 
   it('SET_TARGET: 0~3만, 타워가 있어야', () => {
     const s = newGame();
-    applyCommand(s, OP.BUILD, 0, ARCHER);
+    buildReady(s, 0);
     expect(applyCommand(s, OP.SET_TARGET, 0, TARGET.NEAREST)).toBe(true);
     expect(s.towers[0].targetMode).toBe(TARGET.NEAREST);
     expect(applyCommand(s, OP.SET_TARGET, 0, 4)).toBe(false);
@@ -124,7 +100,7 @@ describe('명령 수락 규칙 (§E3)', () => {
   it('BRANCH·PICK_AUGMENT는 E1 데이터에서 항상 거부', () => {
     const s = newGame();
     s.gold = 1000;
-    applyCommand(s, OP.BUILD, 0, ARCHER);
+    buildReady(s, 0);
     applyCommand(s, OP.UPGRADE, 0);
     applyCommand(s, OP.UPGRADE, 0);
     expect(applyCommand(s, OP.BRANCH, 0, 0)).toBe(false);
@@ -207,7 +183,7 @@ describe('판매 환급 (§L4)', () => {
   it('같은 준비 단계(지은 뒤 웨이브 시작 전)는 100%, 웨이브가 시작된 뒤는 70% 내림', () => {
     const s = newGame();
     s.gold = 1000;
-    applyCommand(s, OP.BUILD, 0, ARCHER);
+    buildReady(s, 0);
     applyCommand(s, OP.UPGRADE, 0);
     expect(sellRefund(s, 0)).toBe(120);
     applyCommand(s, OP.CALL_WAVE);
@@ -224,7 +200,7 @@ describe('판매 환급 (§L4)', () => {
     const s = strongDefense();
     expect(s.countdown).toBeGreaterThan(0);
     expect(s.aliveEnemies).toBe(0);
-    applyCommand(s, OP.BUILD, 7, ARCHER);
+    buildReady(s, 7);
     expect(sellRefund(s, 7)).toBe(70);
     applyCommand(s, OP.CALL_WAVE);
     expect(sellRefund(s, 7)).toBe(49);
@@ -235,7 +211,7 @@ describe('타게팅 (§C2)', () => {
   /** 슬롯 3(4500, 6500) 궁수탑 사거리 3000 — 구간 1(y=4500)·2(x=7500)·3(y=9500) 일부가 안에 든다 */
   function setup(mode: number) {
     const s = newGame();
-    applyCommand(s, OP.BUILD, 3, ARCHER);
+    buildReady(s, 3);
     applyCommand(s, OP.SET_TARGET, 3, mode);
     return s;
   }
@@ -277,7 +253,7 @@ describe('타게팅 (§C2)', () => {
 describe('전투·경제 (§C1·§L4)', () => {
   it('유도 투사체: 비행 틱 후 명중, 피해 = 기본 피해(저항 0) — 처치 시 보상 max(1, ⌊EHP×110×1000/10⁶⌋)', () => {
     const s = newGame();
-    applyCommand(s, OP.BUILD, 3, ARCHER);
+    buildReady(s, 3);
     const enemy = injectEnemy(s, 6000, 8);
     enemy.dist -= 33;
     enemy.reward = Math.max(1, Math.floor((8 * 110 * 1000) / 1000000));
@@ -295,8 +271,8 @@ describe('전투·경제 (§C1·§L4)', () => {
   it('표적이 먼저 죽으면 단일 투사체는 사라진다(피해 없음)', () => {
     const s = newGame();
     s.gold = 1000;
-    applyCommand(s, OP.BUILD, 3, ARCHER);
-    applyCommand(s, OP.BUILD, 2, ARCHER);
+    buildReady(s, 3);
+    buildReady(s, 2);
     const enemy = injectEnemy(s, 6000, 5);
     enemy.dist -= 33;
     step(s); // 두 탑이 같은 적에게 발사
@@ -335,14 +311,11 @@ describe('상한 (§E5)', () => {
 
   it(`날아가는 투사체 ${MAX_PROJECTILES}이면 발사를 보류 — 쿨다운 0 유지, 표적도 다시 고르지 않는다(포신은 직전 표적)`, () => {
     const s = newGame();
-    applyCommand(s, OP.BUILD, 3, ARCHER);
+    buildReady(s, 3);
     const enemy = injectEnemy(s, 6000, 1000000);
     enemy.dist -= 33;
     for (let i = 0; i < MAX_PROJECTILES; i++) {
-      s.projectiles.push({
-        id: s.nextId++, towerId: 0, targetId: enemy.id, damage: 1, damageType: 0, element: 0,
-        originX: 0, originY: 0, aimX: 0, aimY: 0, ticksLeft: 1000, totalTicks: 1000, status: 0, targetHint: 0,
-      });
+      s.projectiles.push(testProjectile(s, { targetId: enemy.id, ticksLeft: 1000, totalTicks: 1000 }));
     }
     s.towers[0].targetId = 777; // 직전 표적
     step(s);
@@ -361,7 +334,7 @@ describe('결정성 (§E7)', () => {
   it('같은 seed·같은 명령이면 상태 해시가 같고, seed가 다르면 다르다(스트림 시드가 상태에 있다)', () => {
     const play = (seed: number) => {
       const s = createGame(STAGE_E1, seed);
-      applyCommand(s, OP.BUILD, 0, ARCHER);
+      buildReady(s, 0);
       applyCommand(s, OP.CALL_WAVE);
       run(s, 5000);
       return getStateHash(s);
@@ -383,7 +356,7 @@ describe('결정성 (§E7)', () => {
     const b = newGame(3);
     const events: number[] = [];
     for (const s of [a, b]) {
-      applyCommand(s, OP.BUILD, 0, ARCHER);
+      buildReady(s, 0);
       applyCommand(s, OP.CALL_WAVE);
     }
     for (let i = 0; i < 3000; i++) {
@@ -401,10 +374,7 @@ describe('투사체 표적 조회 캐시', () => {
     const a = injectEnemy(s, 100, 1000);
     const b = injectEnemy(s, 200, 1000);
     for (const hint of [0, 1, 5, 99]) {
-      s.projectiles.push({
-        id: s.nextId++, towerId: 0, targetId: b.id, damage: 1, damageType: 0, element: 0,
-        originX: 0, originY: 0, aimX: 0, aimY: 0, ticksLeft: 1, totalTicks: 1, status: 0, targetHint: hint,
-      });
+      s.projectiles.push(testProjectile(s, { targetId: b.id, targetHint: hint }));
     }
     step(s);
     expect(b.hp).toBe(1000 - 4);
@@ -418,7 +388,7 @@ describe('리뷰 보강 — 경계 규칙', () => {
     applyCommand(s, OP.CALL_WAVE);
     run(s, 50); // 1웨이브 스폰 중
     expect(s.countdown).toBe(0);
-    applyCommand(s, OP.BUILD, 3, ARCHER);
+    buildReady(s, 3);
     expect(sellRefund(s, 3)).toBe(49);
     run(s, 14 * 24); // 스폰이 끝나 카운트다운
     expect(s.countdown).toBeGreaterThan(0);
@@ -429,7 +399,7 @@ describe('리뷰 보강 — 경계 규칙', () => {
     const s = newGame();
     s.gold = 2000;
     for (const slot of [0, 1, 2, 3]) {
-      applyCommand(s, OP.BUILD, slot, ARCHER);
+      buildReady(s, slot);
       applyCommand(s, OP.UPGRADE, slot);
       applyCommand(s, OP.UPGRADE, slot);
     }
@@ -437,7 +407,7 @@ describe('리뷰 보강 — 경계 규칙', () => {
     for (let i = 0; i < 2000 && s.countdown === 0; i++) step(s); // 스폰이 끝난 첫 틱 — 마지막 적이 막 나왔다
     expect(s.countdown).toBeGreaterThan(0);
     expect(s.aliveEnemies).toBeGreaterThan(0);
-    applyCommand(s, OP.BUILD, 6, ARCHER);
+    buildReady(s, 6);
     expect(sellRefund(s, 6)).toBe(49);
   });
 
@@ -457,7 +427,7 @@ describe('리뷰 보강 — 경계 규칙', () => {
 
   it('비행 N틱 투사체는 발사 N틱 뒤 틱에 명중한다 (발사 틱에는 날지 않는다)', () => {
     const s = newGame();
-    applyCommand(s, OP.BUILD, 3, ARCHER);
+    buildReady(s, 3);
     const enemy = injectEnemy(s, 6000, 1000);
     enemy.dist -= 33;
     const events: number[] = [];
@@ -503,6 +473,7 @@ describe('리뷰 보강 — 경계 규칙', () => {
     s.wavesStarted = 2;
     s.wavesCleared = 1;
     s.waves[0].cleared = true;
+    s.waves[1].total = 18; // 시작한 웨이브의 집계(startWave가 더한다)
     s.waves[1].kills = 7; // 18마리 중 7 — 388‰
     expect(scoreOf(s)).toEqual({ score: 1_388_000, wave: 1, progress: 388 });
     s.waves[1].total = 0; // 방어: 빈 웨이브는 0으로 나누지 않는다

@@ -1,11 +1,11 @@
 import {
-  ENEMY_STATUS,
   EVENT,
   EVENT_STRIDE,
   type GameState,
   OP,
   STAGE_E1,
   applyCommand,
+  createEnemy,
   createGame,
   step,
 } from '../engine';
@@ -148,11 +148,7 @@ export function createEngineScene(initial: BenchCounts): BenchScene {
   function refill(): void {
     for (let n = state.aliveEnemies; n < counts.enemies; n++) {
       const dist = state.tick === 0 ? (n * PATH.total) / Math.max(1, counts.enemies) / 1.6 : 0;
-      state.enemies.push({
-        id: state.nextId++, kind: 0, hp: 1000000, maxHp: 1000000, path: 0, dist: Math.floor(dist), segment: 0, segmentStart: 0,
-        x: PATH.points[0], y: PATH.points[1], wave: 1, reward: 0, status: ENEMY_STATUS.ALIVE,
-      });
-      state.aliveEnemies += 1;
+      createEnemy(state, STAGE_E1, { kind: 0, hp: 1000000, wave: 1, path: 0, dist: Math.floor(dist), derived: false }, null);
       state.waves[0].total += 1;
       state.waves[0].pending += 1;
     }

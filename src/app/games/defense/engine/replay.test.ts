@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { ENGINE_VERSION, OP } from './constants';
-import { STAGE_E1 } from './data/stages';
+import { STAGE_E1, STAGE_E2 } from './data/stages';
+import { playWithBot } from '../engine-dev/bot';
+import { GameDriver } from '../engine-dev/driver';
 import { applyCommand, createGame, getStateHash, step } from './game';
 import { type ReplayInput, type ReplayResult, buildReplay, createCommandRecorder, recordCommand, simulateReplay } from './replay';
 import golden from './__fixtures__/golden-replays.json';
@@ -56,6 +58,16 @@ describe('실시간 기록 → 리플레이', () => {
     expect(replay.engineVersion).toBe(ENGINE_VERSION);
     const result = simulateReplay({ mode: 'campaign', boardKey: 'e1', seed: 99, ticks: replay.frames, inputs: replay.inputs });
     expect(result).toMatchObject({ ok: true, endTick: state.endTick, stateHash: getStateHash(state), kills: state.kills, livesLeft: state.lives });
+  });
+
+  it('E2 아레나(분기·궁극·증강 PICK) 실시간 판 = 리플레이 결과 — wavesStarted·augments 포함', () => {
+    const driver = new GameDriver(STAGE_E2, 5);
+    playWithBot(driver, { kinds: [0, 1, 2, 3, 4, 5], branch: 1, pick: 2, earlyCallAbove: 200, maxTowers: 4 });
+    const s = driver.state;
+    expect(s.augments.length).toBeGreaterThan(0);
+    expect(s.towers.some((t) => t.level === 5)).toBe(true);
+    const result = simulateReplay(driver.toReplayInput());
+    expect(result).toMatchObject({ ok: true, stateHash: getStateHash(s), wavesStarted: s.wavesStarted, augments: s.augments, endTick: s.endTick });
   });
 
   it('기록 형식: [deltaTick, op, ...인자] — op별 인자 수 고정', () => {

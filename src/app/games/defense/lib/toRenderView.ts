@@ -1,8 +1,8 @@
-import { ENEMIES, ENEMY_STATUS, PROJECTILE_STATUS, type GameState, type Stage } from '../engine';
+import { ENEMIES, ENEMY_STATUS, PROJECTILE_STATUS, RANK, type GameState, type Stage, statusBits, ultimatePeriod } from '../engine';
 import type { RenderEnemy, RenderMap, RenderProjectile, RenderTower, RenderView } from '../renderer/renderView';
 
 /**
- * 엔진 상태 → 렌더 상태 어댑터 (엔진 버전 1) — 엔진 폴더는 외부 import가 금지라 엔진 밖에 둔다
+ * 엔진 상태 → 렌더 상태 어댑터 (엔진 버전 2) — 엔진 폴더는 외부 import가 금지라 엔진 밖에 둔다
  * 매 프레임 부르므로 view의 배열·객체를 재사용한다(프레임당 할당 0 목표 — 개수가 늘 때만 새 객체)
  * 구버전 엔진을 동결하면(engine-versions/vN) 그 버전용 어댑터를 옆에 함께 둔다
  * 보간: view 객체를 그대로 재사용하므로 이전 틱 위치가 필요하면 호출자가 view 두 개를 번갈아 넘기거나 id별 이전 좌표를 따로 둔다
@@ -21,8 +21,10 @@ export function toRenderView(state: GameState, view: RenderView): RenderView {
     item.y = enemy.y;
     item.hp = enemy.hp;
     item.maxHp = enemy.maxHp;
-    item.effects = 0;
-    item.air = ENEMIES[enemy.kind].air;
+    item.effects = statusBits(enemy);
+    item.air = enemy.air;
+    // 보스 페이즈 — 먼저 나온(생성 순번 작은) 보스 기준 1·2
+    if (view.bossPhase === 0 && ENEMIES[enemy.kind].rank === RANK.BOSS) view.bossPhase = enemy.phase + 1;
     n++;
   }
   view.enemies.length = n;
@@ -39,7 +41,7 @@ export function toRenderView(state: GameState, view: RenderView): RenderView {
     item.x = tower.x;
     item.y = tower.y;
     item.targetId = tower.targetId;
-    item.ultCooldown = 0;
+    item.ultCooldown = ultCooldownPermille(tower.kind, tower.level, tower.branch, tower.ultTimer);
     n++;
   }
   view.towers.length = n;
@@ -59,6 +61,12 @@ export function toRenderView(state: GameState, view: RenderView): RenderView {
   }
   view.projectiles.length = n;
   return view;
+}
+
+/** 궁극 쿨다운 남은 비율 ‰ — 궁극이 없거나 준비됐으면 0 */
+function ultCooldownPermille(kind: number, level: number, branch: number, ultTimer: number): number {
+  const every = ultimatePeriod(kind, level, branch);
+  return every > 0 && ultTimer > 0 ? Math.floor((ultTimer * 1000) / every) : 0;
 }
 
 /** 스테이지 맵 → 정적 렌더 맵 */

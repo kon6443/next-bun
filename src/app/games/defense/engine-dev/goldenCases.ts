@@ -3,7 +3,20 @@
  * 기대값은 생성 시점의 simulateReplay 결과 — 두 레포(프론트·백엔드)가 같은 파일로 같은 결과를 단정한다
  */
 
-import { MAX_INPUT_LENGTH, MAX_TICKS, OP, type ReplayInput, type ReplayResult, STAGE_E1, TARGET, simulateReplay } from '../engine';
+import {
+  MAX_INPUT_LENGTH,
+  MAX_TICKS,
+  OP,
+  type ReplayInput,
+  type ReplayResult,
+  STAGE_E1,
+  STAGE_E2,
+  STAGE_E2_RULES,
+  type Stage,
+  TARGET,
+  TOWER_ID,
+  simulateReplay,
+} from '../engine';
 import { playWithBot } from './bot';
 import { GameDriver } from './driver';
 
@@ -11,8 +24,8 @@ export type GoldenCase = { name: string; input: ReplayInput; expected: ReplayRes
 
 const ARCHER = 0;
 
-function botGame(seed: number, options: Parameters<typeof playWithBot>[1]): ReplayInput {
-  const driver = new GameDriver(STAGE_E1, seed);
+function botGame(seed: number, options: Parameters<typeof playWithBot>[1], stage: Stage = STAGE_E1): ReplayInput {
+  const driver = new GameDriver(stage, seed);
   playWithBot(driver, options);
   return driver.toReplayInput();
 }
@@ -51,6 +64,25 @@ function sellAndRetarget(): ReplayInput {
   return driver.toReplayInput();
 }
 
+const ALL_KINDS = [TOWER_ID.ARCHER, TOWER_ID.CANNON, TOWER_ID.MAGE, TOWER_ID.FROST, TOWER_ID.CROSSBOW, TOWER_ID.TESLA];
+
+/** E2 아레나 손작성 — 잠긴 슬롯은 막혀 있고, 증강 대기 중 같은 틱 PICK, 대상 지정·판매 */
+function e2Manual(): ReplayInput {
+  const driver = new GameDriver(STAGE_E2, 23);
+  driver.must(OP.BUILD, 0, TOWER_ID.FROST);
+  driver.must(OP.BUILD, 1, TOWER_ID.TESLA);
+  driver.must(OP.BUILD, 6, TOWER_ID.CANNON);
+  driver.must(OP.SET_TARGET, 6, TARGET.STRONGEST);
+  driver.must(OP.CALL_WAVE);
+  driver.runUntil((s) => s.augmentPending);
+  driver.must(OP.PICK_AUGMENT, 2);
+  driver.runUntil((s) => s.gold >= 200);
+  driver.must(OP.BUILD, 9, TOWER_ID.CROSSBOW);
+  driver.must(OP.SELL, 0);
+  playWithBot(driver, { kinds: ALL_KINDS, branch: 1, pick: 1, earlyCallAbove: 400 });
+  return driver.toReplayInput();
+}
+
 /** 실패 케이스의 바탕 — 짧게 이기는 판 */
 function baseWin(): ReplayInput {
   return botGame(5, { earlyCallAbove: 300 });
@@ -72,6 +104,15 @@ export function buildGoldenCases(): GoldenCase[] {
     ['sell-and-retarget', sellAndRetarget()],
     ['one-tower-no-upgrade-defeat', botGame(17, { maxTowers: 1, noUpgrade: true })],
     ['idle-until-max-ticks', { mode: 'campaign', boardKey: 'e1', seed: 0, ticks: MAX_TICKS, inputs: [] }],
+    // ---- E2 아레나: 타워 6종·분기·궁극·적 11종·증강·다중 경로 ----
+    ['e2-bot-branch-a', botGame(31, { kinds: ALL_KINDS, branch: 0, pick: 0 }, STAGE_E2)],
+    ['e2-bot-branch-b', botGame(37, { kinds: ALL_KINDS, branch: 1, pick: 2, earlyCallAbove: 300 }, STAGE_E2)],
+    ['e2-lv5-branch-a', botGame(53, { kinds: ALL_KINDS, branch: 0, pick: 1, maxTowers: 4 }, STAGE_E2)],
+    ['e2-lv5-branch-b', botGame(59, { kinds: [...ALL_KINDS].reverse(), branch: 1, pick: 0, maxTowers: 4, earlyCallAbove: 200 }, STAGE_E2)],
+    ['e2-bot-reverse-kinds', botGame(41, { kinds: [...ALL_KINDS].reverse(), branch: 1, pick: 1 }, STAGE_E2)],
+    ['e2-two-towers-defeat', botGame(43, { kinds: [TOWER_ID.ARCHER], maxTowers: 2, noUpgrade: true }, STAGE_E2)],
+    ['e2-manual', e2Manual()],
+    ['e2-rules-bot', botGame(47, { kinds: ALL_KINDS, branch: 0, pick: 0 }, STAGE_E2_RULES)],
     // ---- 실패 사유 (§E4) ----
     ['fail-header-mode-endless', { ...win, mode: 'endless' }],
     ['fail-header-unknown-board', { ...win, boardKey: 's9' }],
@@ -87,6 +128,12 @@ export function buildGoldenCases(): GoldenCase[] {
     ['fail-command-pick-augment', withInputs(win, [0, OP.PICK_AUGMENT, 0])],
     ['fail-command-call-while-spawning', withInputs(win, [0, OP.CALL_WAVE, 10, OP.CALL_WAVE])],
     ['fail-command-upgrade-empty', withInputs(win, [0, OP.UPGRADE, 5])],
+    ['fail-header-weekly-before-s1', { ...win, mode: 'weekly', boardKey: 'weekly-2026-w43' }],
+    ['fail-header-endless-before-s1', { ...win, mode: 'endless', boardKey: 'endless-s1' }],
+    ['fail-command-locked-slot', { mode: 'campaign', boardKey: 'e2', seed: 1, ticks: 100, inputs: [0, OP.BUILD, 12, TOWER_ID.ARCHER] }],
+    ['fail-command-banned-tower', { mode: 'campaign', boardKey: 'e2-rules', seed: 1, ticks: 100, inputs: [0, OP.BUILD, 0, TOWER_ID.TESLA] }],
+    ['fail-command-upgrade-needs-branch', { mode: 'campaign', boardKey: 'e2', seed: 1, ticks: 100, inputs: [0, OP.BUILD, 0, TOWER_ID.ARCHER, 0, OP.UPGRADE, 0, 0, OP.UPGRADE, 0, 0, OP.UPGRADE, 0] }],
+    ['fail-command-ceiling-branch', { mode: 'campaign', boardKey: 'e2-rules', seed: 1, ticks: 100, inputs: [0, OP.BUILD, 0, TOWER_ID.ARCHER, 0, OP.UPGRADE, 0, 0, OP.UPGRADE, 0, 0, OP.BRANCH, 0, 0, 0, OP.UPGRADE, 0] }],
     ['fail-after-end', withInputs(lose, [...lose.inputs, lose.ticks, OP.BUILD, 0, ARCHER])],
     // 게임은 안 끝났는데 선언 ticks 뒤에 명령 — INPUT_AFTER_END(선언한 끝 이후)
     ['fail-after-declared-ticks', { mode: 'campaign', boardKey: 'e1', seed: 1, ticks: 100, inputs: [200, OP.CALL_WAVE] }],

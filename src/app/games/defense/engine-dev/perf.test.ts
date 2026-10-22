@@ -1,17 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import {
-  ENEMY_STATUS,
   MAX_ALIVE_ENEMIES,
   MAX_PROJECTILES,
   MAX_TICKS,
   OP,
   STAGE_E1,
+  STAGE_E2,
   type GameState,
   type ReplayInput,
   simulateReplay,
   step,
 } from '../engine';
 import { GameDriver } from './driver';
+import { injectEnemy, testProjectile } from './fixtures';
 import { buildGoldenCases } from './goldenCases';
 
 /**
@@ -50,24 +51,39 @@ function saturatedState(projectiles: number): GameState {
   }
   const s = driver.state;
   s.lives = 1000000;
-  const path = STAGE_E1.map.groundPaths[0];
   for (let i = 0; i < MAX_ALIVE_ENEMIES; i++) {
-    s.enemies.push({
-      id: s.nextId++, kind: 0, hp: 1e9, maxHp: 1e9, path: 0, dist: i * 100, segment: 0, segmentStart: 0,
-      x: path.points[0], y: path.points[1], wave: 1, reward: 1, status: ENEMY_STATUS.ALIVE,
-    });
+    injectEnemy(s, STAGE_E1, i * 100, 1e9);
   }
-  s.aliveEnemies = MAX_ALIVE_ENEMIES;
-  s.waves[0].total += MAX_ALIVE_ENEMIES;
-  s.waves[0].pending += MAX_ALIVE_ENEMIES;
   for (let i = 0; i < projectiles; i++) {
     const target = s.enemies[i % MAX_ALIVE_ENEMIES];
-    s.projectiles.push({
-      id: s.nextId++, towerId: s.towers[i % 8].id, targetId: target.id, damage: 1, damageType: 0, element: 0,
-      originX: 0, originY: 0, aimX: 0, aimY: 0, ticksLeft: 100000, totalTicks: 100000, status: 0, targetHint: 0,
-    });
+    s.projectiles.push(testProjectile(s, { towerId: s.towers[i % 8].id, targetId: target.id, ticksLeft: 100000, totalTicks: 100000 }));
   }
   step(s); // 위치 계산
+  return s;
+}
+
+/**
+ * E2 최악 근사 — 슬롯 12개 전부 Lv5(6종 × 분기 2) + 적 200(두 갈래, 죽지 않는 HP) + 투사체 projectiles개
+ * 상태효과·장판·연쇄·궁극이 매 틱 돈다. 300틱 동안 끝에 닿지 않는다(최대 거리 7,960 + 300 × 33 < 18,000)
+ */
+function e2State(projectiles: number): GameState {
+  const driver = new GameDriver(STAGE_E2, 1);
+  driver.state.gold = 1000000;
+  for (let slot = 0; slot < 12; slot++) {
+    driver.must(OP.BUILD, slot, slot % 6);
+    driver.must(OP.UPGRADE, slot);
+    driver.must(OP.UPGRADE, slot);
+    driver.must(OP.BRANCH, slot, Math.floor(slot / 6));
+    driver.must(OP.UPGRADE, slot);
+  }
+  const s = driver.state;
+  s.lives = 1000000;
+  for (let i = 0; i < MAX_ALIVE_ENEMIES; i++) injectEnemy(s, STAGE_E2, i * 40, 1e9, 0, i % 2);
+  for (let i = 0; i < projectiles; i++) {
+    const target = s.enemies[i % MAX_ALIVE_ENEMIES];
+    s.projectiles.push(testProjectile(s, { towerId: s.towers[0].id, targetId: target.id, ticksLeft: 100000, totalTicks: 100000 }));
+  }
+  step(s);
   return s;
 }
 
@@ -117,5 +133,11 @@ describe.runIf(process.env.DEFENSE_PERF === '1')('디펜스 엔진 성능', () =
     });
     // 판정은 plain Node로 한다(이 파일 머리 주석) — vitest 안 수치는 기록만. 다만 계약의 2배를 넘으면 회귀로 본다
     expect(bound * MAX_TICKS).toBeLessThan(4000);
+  }, 120_000);
+
+  it('(b-E2) 타워 12개 Lv5 전 종류 + 적 200 + 투사체 400 — 상태효과·장판·연쇄·궁극 포함', () => {
+    const e2 = perTickMs(e2State(MAX_PROJECTILES));
+    console.log('[defense perf b-E2]', { usPerTick: (e2 * 1000).toFixed(1), ms: (e2 * MAX_TICKS).toFixed(0) });
+    expect(e2 * MAX_TICKS).toBeLessThan(4000);
   }, 120_000);
 });
