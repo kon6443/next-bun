@@ -18,6 +18,9 @@ import {
   simulateReplay,
 } from '../engine';
 import { playWithBot } from './bot';
+import { type Bot, greedyBot, noviceBot, scriptedBot } from './sim/bots';
+import { runGame } from './sim/runner';
+import { CAMPAIGN_SCRIPTS } from './sim/scripts';
 import { GameDriver } from './driver';
 
 export type GoldenCase = { name: string; input: ReplayInput; expected: ReplayResult };
@@ -83,6 +86,13 @@ function e2Manual(): ReplayInput {
   return driver.toReplayInput();
 }
 
+/** 시뮬레이터 봇으로 헤더(mode·boardKey·seed)의 판을 끝까지 */
+function simGame(mode: string, boardKey: string, seed: number, bot: Bot): ReplayInput {
+  const driver = GameDriver.fromBoard(mode, boardKey, seed);
+  runGame(driver, bot);
+  return driver.toReplayInput();
+}
+
 /** 실패 케이스의 바탕 — 짧게 이기는 판 */
 function baseWin(): ReplayInput {
   return botGame(5, { earlyCallAbove: 300 });
@@ -113,6 +123,16 @@ export function buildGoldenCases(): GoldenCase[] {
     ['e2-two-towers-defeat', botGame(43, { kinds: [TOWER_ID.ARCHER], maxTowers: 2, noUpgrade: true }, STAGE_E2)],
     ['e2-manual', e2Manual()],
     ['e2-rules-bot', botGame(47, { kinds: ALL_KINDS, branch: 0, pick: 0 }, STAGE_E2_RULES)],
+    // ---- S1: 캠페인 8스테이지(난이도 접미사) · 무한 · 주간 ----
+    ['campaign-s1-greedy', simGame('campaign', 's1', 1, greedyBot())],
+    ['campaign-s4-scripted', simGame('campaign', 's4', 2, scriptedBot(CAMPAIGN_SCRIPTS[3]))],
+    ['campaign-s3-easy-novice', simGame('campaign', 's3-easy', 3, noviceBot(3))],
+    ['campaign-s8-hard-greedy', simGame('campaign', 's8-hard', 4, greedyBot())],
+    ['endless-greedy', simGame('endless', 'endless-s1', 1, greedyBot())],
+    ['endless-greedy-early-call', simGame('endless', 'endless-s1', 2, greedyBot({ earlyCall: true }))],
+    ['endless-novice', simGame('endless', 'endless-s1', 3, noviceBot(3))],
+    ['weekly-w43-greedy', simGame('weekly', 'weekly-2026-w43', 123456789, greedyBot())],
+    ['weekly-w44-greedy', simGame('weekly', 'weekly-2026-w44', 987654321, greedyBot())],
     // ---- 실패 사유 (§E4) ----
     ['fail-header-mode-endless', { ...win, mode: 'endless' }],
     ['fail-header-unknown-board', { ...win, boardKey: 's9' }],
@@ -128,8 +148,9 @@ export function buildGoldenCases(): GoldenCase[] {
     ['fail-command-pick-augment', withInputs(win, [0, OP.PICK_AUGMENT, 0])],
     ['fail-command-call-while-spawning', withInputs(win, [0, OP.CALL_WAVE, 10, OP.CALL_WAVE])],
     ['fail-command-upgrade-empty', withInputs(win, [0, OP.UPGRADE, 5])],
-    ['fail-header-weekly-before-s1', { ...win, mode: 'weekly', boardKey: 'weekly-2026-w43' }],
-    ['fail-header-endless-before-s1', { ...win, mode: 'endless', boardKey: 'endless-s1' }],
+    ['fail-header-weekly-week-00', { ...win, mode: 'weekly', boardKey: 'weekly-2026-w00' }],
+    ['fail-header-endless-unknown-season', { ...win, mode: 'endless', boardKey: 'endless-s2' }],
+    ['fail-header-campaign-unknown-difficulty', { ...win, boardKey: 's3-nightmare' }],
     ['fail-command-locked-slot', { mode: 'campaign', boardKey: 'e2', seed: 1, ticks: 100, inputs: [0, OP.BUILD, 12, TOWER_ID.ARCHER] }],
     ['fail-command-banned-tower', { mode: 'campaign', boardKey: 'e2-rules', seed: 1, ticks: 100, inputs: [0, OP.BUILD, 0, TOWER_ID.TESLA] }],
     ['fail-command-upgrade-needs-branch', { mode: 'campaign', boardKey: 'e2', seed: 1, ticks: 100, inputs: [0, OP.BUILD, 0, TOWER_ID.ARCHER, 0, OP.UPGRADE, 0, 0, OP.UPGRADE, 0, 0, OP.UPGRADE, 0] }],
