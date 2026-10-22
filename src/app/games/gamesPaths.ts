@@ -16,6 +16,7 @@ export function isFullscreenGamePath(path: string): boolean {
   return (
     path === '/fishing' ||
     path === '/games/tetris/play' ||
-    path.startsWith('/games/tetris/replays/')
+    path.startsWith('/games/tetris/replays/') ||
+    startsWithSegment(path, '/games/tetris/battle')
   );
 }
