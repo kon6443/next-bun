@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { ApiError } from '@/types/api';
-import { ScoreSubmitPanel } from './ScoreSubmitPanel';
+import { ScoreSubmitPanel, rankingsHref } from './ScoreSubmitPanel';
 import { TEST_GAME } from './testGame';
 
 const getGameRankings = vi.fn();
@@ -59,7 +59,33 @@ describe('ScoreSubmitPanel — 게임 사양·보드를 따른다', () => {
     expect(window.localStorage.getItem('defense:myScoreIds')).toBe('[9]');
     expect(window.localStorage.getItem('defense:lastName')).toBe('수비왕');
     expect(screen.getByRole('link', { name: /내 플레이 다시보기/ }).getAttribute('href')).toBe('/games/defense/replays/9');
-    expect(screen.getByRole('link', { name: '랭킹 보기' }).getAttribute('href')).toBe('/games/defense/rankings?highlight=9');
+    // 보드가 있으면 그 보드 탭으로
+    expect(screen.getByRole('link', { name: '랭킹 보기' }).getAttribute('href')).toBe('/games/defense/rankings?highlight=9&board=endless-s1');
+  });
+
+  it('점수 표기는 게임 사양(formatScore)을 따르고, 없으면 숫자(테트리스와 같은 1,234 표기)', async () => {
+    const { unmount } = await act(async () => render(<ScoreSubmitPanel {...props} />));
+    expect(screen.getByTestId('score-submit-score').textContent).toBe(props.score.toLocaleString('ko-KR'));
+    unmount();
+    await act(async () => {
+      render(<ScoreSubmitPanel {...props} game={{ ...props.game, formatScore: (n: number) => `웨이브 ${Math.floor(n / 1_000_000)}` }} />);
+    });
+    expect(screen.getByTestId('score-submit-score').textContent).toBe(`웨이브 ${Math.floor(props.score / 1_000_000)}`);
+  });
+
+  it('보드가 없으면 랭킹 링크는 highlight만(테트리스 URL 불변), 기간을 하나만 주면 그 기간만 조회·표시, 다시보기 끄기', async () => {
+    expect(rankingsHref('/games/tetris/rankings', 5)).toBe('/games/tetris/rankings?highlight=5');
+    submitGameScore.mockResolvedValue({ code: 'SUCCESS', message: 'ok', data: { scoreId: 9, score: 3_000_000, detail: {}, ranks: { daily: 2, weekly: 2, all: 2 } } });
+    await act(async () => {
+      render(<ScoreSubmitPanel {...props} board="weekly-2026-w43" periods={[{ key: 'all', label: '주간 순위' }]} showReplay={false} />);
+    });
+    expect(getGameRankings.mock.calls).toEqual([['defense', 'all', 100, 'weekly-2026-w43']]);
+    expect(screen.getByText('주간 순위')).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    expect(screen.queryByRole('link', { name: /내 플레이 다시보기/ })).toBeNull();
+    expect(screen.getByText('2위')).toBeTruthy();
   });
 
   it('재시도할 실패(503 등)는 그 게임 저장소(사양의 위치)에 보관한다', async () => {

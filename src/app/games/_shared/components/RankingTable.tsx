@@ -12,12 +12,14 @@ type RankingTableProps<G extends GameType> = {
   /** 링크로 가리킨 기록 (?highlight=) — 테두리 강조만, "나"로 단정하지 않는다 */
   highlightId?: number | null;
   compact?: boolean;
+  /** 리플레이를 볼 수 없으면 그 이유 — 링크 대신 비활성 버튼(재생기 준비 전·진행 중인 주간 보드) */
+  replayUnavailable?: string | null;
 };
 
 const medal = (rank: number) => (rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : null);
 
 /** 랭킹 목록 — 좁은 화면에서도 가로 스크롤 없이 카드형 행 */
-export function RankingTable<G extends GameType>({ game, items, myScoreIds, highlightId = null, compact = false }: RankingTableProps<G>) {
+export function RankingTable<G extends GameType>({ game, items, myScoreIds, highlightId = null, compact = false, replayUnavailable = null }: RankingTableProps<G>) {
   return (
     <ol className="grid grid-cols-1 gap-2">
       {items.map((item) => {
@@ -49,8 +51,19 @@ export function RankingTable<G extends GameType>({ game, items, myScoreIds, high
                 </p>
               )}
             </div>
-            <span className="shrink-0 text-sm font-bold tabular-nums text-white">{formatScore(item.score)}</span>
-            {!compact && (
+            <span className="shrink-0 text-sm font-bold tabular-nums text-white">{(game.formatScore ?? formatScore)(item.score)}</span>
+            {!compact && replayUnavailable && (
+              <button
+                type="button"
+                disabled
+                aria-label={`${item.playerName} ${item.rank}위 리플레이 — ${replayUnavailable}`}
+                title={replayUnavailable}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 text-sm text-slate-600"
+              >
+                ▶
+              </button>
+            )}
+            {!compact && !replayUnavailable && (
               <Link
                 href={game.replayPath(item.scoreId)}
                 aria-label={`${item.playerName} ${item.rank}위 리플레이 보기`}

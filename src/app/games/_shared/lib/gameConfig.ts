@@ -16,5 +16,7 @@ export type GameUiConfig<G extends GameType> = {
   replayPath: (scoreId: number) => string;
   /** 랭킹 행 둘째 줄의 기록 요약 (날짜 앞) — "40줄 · 레벨 5 · 1:23" */
   rankingDetail: (item: RankingItem<ScoreDetailByGame[G]>) => string;
+  /** 점수 표시 — 없으면 숫자(1,234). 디펜스는 "웨이브 n · 진척 p%"(정렬은 서버 점수 그대로) */
+  formatScore?: (score: number) => string;
   storage: GameStorage<G>;
 };
