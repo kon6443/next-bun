@@ -162,4 +162,19 @@ describe('대전 경기 페이지 (DESIGN §18)', () => {
     expect(getBattleMatch).toHaveBeenCalledTimes(1);
     expect(getBattleReplay).toHaveBeenCalledTimes(1);
   });
+
+  it('판 하나만 기록을 못 받으면(일시 실패) 그 판의 "다시 받기"로 그 판만 다시 받는다 — 경기는 다시 묻지 않는다 (FE-23)', async () => {
+    getBattleMatch.mockResolvedValue({ data: { ...match, players: [match.players[0]] } });
+    getBattleReplay.mockRejectedValueOnce(new ApiError('FORBIDDEN', 'x', 403)).mockResolvedValue({ data: replay });
+    render(<BattleMatchViewer matchId={MATCH_ID} />);
+    const board = await screen.findByRole('region', { name: '1위 에이' });
+    await waitFor(() => expect(board).toHaveTextContent('기록을 불러오지 못했어요'));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '에이 기록 다시 받기' }));
+    });
+    await waitFor(() => expect(board).not.toHaveTextContent('기록을 불러오지 못했어요'));
+    expect(screen.queryByRole('button', { name: '에이 기록 다시 받기' })).toBeNull();
+    expect(getBattleReplay).toHaveBeenCalledTimes(2);
+    expect(getBattleMatch).toHaveBeenCalledTimes(1);
+  });
 });

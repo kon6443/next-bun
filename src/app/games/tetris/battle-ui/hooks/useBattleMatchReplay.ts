@@ -66,6 +66,27 @@ function seekTrack(track: ReplayTrack, target: number): void {
   track.garbageRef.current = garbageGaugeOf(runner.bs);
 }
 
+/** 판 하나의 리플레이를 받아 지금 프레임까지 맞춘다 — 화면을 떠났으면(isLive false) 아무것도 바꾸지 않고 false */
+async function fetchTrack(matchId: string, track: ReplayTrack, frame: () => number, isLive: () => boolean): Promise<boolean> {
+  try {
+    // StrictMode 재마운트로 두 번 불려도 같은 요청을 함께 쓴다(battleMatchLoader)
+    const replay = await loadBattleReplay(matchId, track.player.playerId);
+    if (!isLive()) return false;
+    if (replay.battleEngineVersion !== BATTLE_ENGINE_VERSION) {
+      track.status = "unsupported";
+    } else {
+      track.runner = createReplayRunner(replay);
+      track.status = "ready";
+      seekTrack(track, frame());
+      track.drawRef.current?.();
+    }
+  } catch (err) {
+    if (!isLive()) return false;
+    track.status = err instanceof ApiError && err.status === 404 ? "missing" : "error";
+  }
+  return true;
+}
+
 /**
  * 저장된 경기 조회 + 2~4판 동시 재생 (DESIGN §18)
  * 공통 프레임 축 하나로 모든 판을 진행한다 — 각 리플레이의 frame 0은 각자 카운트다운 종료라 근사 동기
@@ -80,10 +101,14 @@ export function useBattleMatchReplay(matchId: string) {
   const frameRef = useRef(0);
   const tracksRef = useRef<ReplayTrack[]>([]);
   tracksRef.current = tracks;
+  /** 지금 경기 조회가 살아 있나 — 판 하나 다시 받기가 화면을 떠난 뒤·다시 시도 뒤에 늦게 끝나면 버린다 */
+  const liveRef = useRef<() => boolean>(() => false);
 
   useEffect(() => {
     if (!isBattleMatchId(matchId)) return;
     let cancelled = false;
+    const isLive = () => !cancelled;
+    liveRef.current = isLive;
     setLoad({ status: "loading" });
     (async () => {
       let match: BattleMatch;
@@ -106,22 +131,7 @@ export function useBattleMatchReplay(matchId: string) {
         if (track.status !== "loading") continue;
         await sleep(REPLAY_FETCH_GAP_MS);
         if (cancelled) return;
-        try {
-          // StrictMode 재마운트로 이 루프가 두 번 돌아도 같은 요청을 함께 쓴다(battleMatchLoader)
-          const replay = await loadBattleReplay(matchId, track.player.playerId);
-          if (cancelled) return;
-          if (replay.battleEngineVersion !== BATTLE_ENGINE_VERSION) {
-            track.status = "unsupported";
-          } else {
-            track.runner = createReplayRunner(replay);
-            track.status = "ready";
-            seekTrack(track, frameRef.current);
-            track.drawRef.current?.();
-          }
-        } catch (err) {
-          if (cancelled) return;
-          track.status = err instanceof ApiError && err.status === 404 ? "missing" : "error";
-        }
+        if (!(await fetchTrack(matchId, track, () => frameRef.current, isLive))) return;
         setTrackVersion((v) => v + 1);
       }
     })();
@@ -151,5 +161,18 @@ export function useBattleMatchReplay(matchId: string) {
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
-  return { load, tracks, totalFrames, settled, frameRef, seekAll, retry };
+  /** 판 하나만 다시 받는다 — 그 판이 일시 실패(error)였을 때 (games-polish FE-23). 경기 전체를 다시 받지 않는다 */
+  const retryTrack = useCallback(
+    async (playerId: string) => {
+      const track = tracksRef.current.find((t) => t.player.playerId === playerId);
+      if (!track || track.status !== "error") return;
+      const isLive = liveRef.current;
+      track.status = "loading";
+      setTrackVersion((v) => v + 1);
+      if (await fetchTrack(matchId, track, () => frameRef.current, isLive)) setTrackVersion((v) => v + 1);
+    },
+    [matchId],
+  );
+
+  return { load, tracks, totalFrames, settled, frameRef, seekAll, retry, retryTrack };
 }

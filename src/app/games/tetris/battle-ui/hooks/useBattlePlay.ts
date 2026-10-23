@@ -216,6 +216,11 @@ export function useBattlePlay(options: BattlePlayOptions = {}) {
     const onKeyUp = (e: KeyboardEvent) => {
       const binding = KEY_BINDINGS[e.code];
       if (binding?.kind === "hold") release(binding.press);
+      // 판 조작 키의 keyup도 막는다 — 마우스로 누른 헤더 버튼(나가기·이모트·소리)에 포커스가 남아 있으면
+      // 브라우저에 따라 Space keyup이 그 버튼을 누른다(keydown만 막아서는 부족, games-polish FE-36)
+      if (binding && binding.kind !== "pause" && statusRef.current === "playing" && !isTypingTarget(e.target, { includeDialogs: true })) {
+        e.preventDefault();
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);

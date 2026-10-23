@@ -41,7 +41,7 @@ const KO_LABELS: Record<BattleKoReason, string> = {
  * 재생 방식(배속·탐색·처음부터·키보드)은 싱글 리플레이 재생기와 같다
  */
 export function BattleMatchViewer({ matchId }: { matchId: string }) {
-  const { load, tracks, totalFrames, settled, frameRef, seekAll, retry } = useBattleMatchReplay(matchId);
+  const { load, tracks, totalFrames, settled, frameRef, seekAll, retry, retryTrack } = useBattleMatchReplay(matchId);
   const [playback, setPlayback] = useState<Playback>({ playing: true, speed: 1, frame: 0 });
   const [shareOpen, setShareOpen] = useState(false);
   const shareOpenRef = useRef(false);
@@ -233,6 +233,7 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
             matchEnded={playback.frame >= totalFrames}
             hidden={focus.focusedId !== null && focus.focusedId !== track.player.playerId}
             boardProps={focus.boardProps(track.player.playerId, track.player.name)}
+            onRetry={() => void retryTrack(track.player.playerId)}
           />
         ))}
       </div>
@@ -335,7 +336,7 @@ const TRACK_MESSAGES: Partial<Record<ReplayTrack["status"], string>> = {
   missing: "기록 없음",
   invalid: "검증되지 않은 기록이라 재생하지 않아요",
   unsupported: "이전 버전 기록이라 재생할 수 없어요",
-  error: "기록을 불러오지 못했어요 · 새로고침하면 다시 받아요",
+  error: "기록을 불러오지 못했어요",
 };
 
 /** 판 하나 — 이름·순위 띠 + 캔버스(왼쪽 가비지 게이지) + 가비지 도착·KO·우승 표시 */
@@ -345,6 +346,7 @@ function ReplayBoard({
   matchEnded,
   hidden,
   boardProps,
+  onRetry,
 }: {
   track: ReplayTrack;
   frame: number;
@@ -353,6 +355,8 @@ function ReplayBoard({
   hidden: boolean;
   /** 크게 보기 버튼 역할 (useBoardFocus) */
   boardProps: ReturnType<ReturnType<typeof useBoardFocus>["boardProps"]>;
+  /** 이 판 기록만 다시 받기 — 일시 실패(error)일 때 */
+  onRetry: () => void;
 }) {
   const { player, runner } = track;
   const message = TRACK_MESSAGES[track.status];
@@ -369,6 +373,17 @@ function ReplayBoard({
       <p className="flex items-center gap-1 truncate px-1 text-xs">
         <span className={`font-bold ${player.place === 1 ? "text-amber-300" : "text-slate-400"}`}>{player.place}위</span>
         <span className="truncate font-semibold text-slate-100">{player.name}</span>
+        {/* 판(크게 보기 버튼) 안에 두면 버튼이 겹친다 — 이름 줄에 (FE-23) */}
+        {track.status === "error" && (
+          <button
+            type="button"
+            onClick={onRetry}
+            aria-label={`${player.name} 기록 다시 받기`}
+            className="ml-auto flex min-h-11 shrink-0 items-center px-2 text-xs font-semibold text-sky-300 hover:text-sky-200"
+          >
+            다시 받기
+          </button>
+        )}
       </p>
       <div
         {...boardProps}

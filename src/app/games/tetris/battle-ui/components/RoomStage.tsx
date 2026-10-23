@@ -71,6 +71,8 @@ export function RoomStage({ room, connection, onReconnect, onExit, onCopyInvite 
       trailsRootRef={rootRef}
       roomPlayers={room.players}
       roomStatus={room.status}
+      connection={connection}
+      onReconnect={onReconnect}
       onExit={onExit}
     />
   );

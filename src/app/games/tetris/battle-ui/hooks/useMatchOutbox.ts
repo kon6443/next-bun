@@ -32,7 +32,8 @@ type MatchOutboxOptions = {
 
 /**
  * 매치 보고 송신함 (useBattleMatch에서 분리, FE-24) — lock·topOut을 확인받을 때까지 보관하고 보낸다
- * - lock은 seq 순, topOut은 lock이 모두 끝난 뒤. 보내지 않은 항목은 순서대로 연달아 보낸다(서버는 같은 소켓 요청을 도착 순서대로 처리) — 항목마다 보내는 중 표시로 겹쳐 보내지 않는다
+ * - lock은 seq 순으로 한 번에 하나씩 — 앞 항목이 확인돼야 다음을 보낸다. topOut은 lock이 모두 끝난 뒤
+ *   (서버는 seq가 마지막보다 작으면 LOCK_OUT_OF_ORDER로 거절한다 — 연달아 보내 두면 앞 항목 재전송이 뒤 항목보다 늦게 닿아 그 공격을 잃는다, games-polish FE-10)
  * - 응답이 없거나(끊김·타임아웃) 서버 일시 장애면 보관했다가 잠시 뒤·재입장 응답 뒤 보낸 그대로 다시 보낸다(서버는 같은 seq를 중복으로 무시)
  * - NOT_IN_ROOM이면 재입장 뒤 다시 — 재입장 대기 중이 아니었으면 토큰 복귀를 부탁한다. 그 밖의 응답(성공·거절)이면 그 항목만 끝
  * - 응답은 먼저 같은 매치의 송신함인지 확인한다 — 이전 매치의 늦은 응답이 새 매치 항목을 건드리지 않게
@@ -76,14 +77,14 @@ export function useMatchOutbox({ socketRef, rejoiningRef, onTarget, onNotInRoom 
       }
       return true;
     };
-    for (const item of box.locks) {
-      if (item.sending) continue;
-      item.sending = true;
-      s.timeout(ACK_TIMEOUT_MS).emit(TetrisBattleClientEvents.LOCK, item.payload, (err: Error | null, response?: TetrisBattleAck<LockAckData>) => {
-        if (!settle(item, err, response)) return;
-        box.locks = box.locks.filter((other) => other !== item);
+    const head = box.locks[0];
+    if (head && !head.sending) {
+      head.sending = true;
+      s.timeout(ACK_TIMEOUT_MS).emit(TetrisBattleClientEvents.LOCK, head.payload, (err: Error | null, response?: TetrisBattleAck<LockAckData>) => {
+        if (!settle(head, err, response)) return;
+        box.locks = box.locks.filter((other) => other !== head);
         if (response?.ok) handlersRef.current.onTarget(response.data.targetId);
-        if (box.locks.length === 0) flushRef.current(); // 남은 topOut
+        flushRef.current(); // 다음 lock 또는 남은 topOut
       });
     }
     const topOut = box.topOut;
