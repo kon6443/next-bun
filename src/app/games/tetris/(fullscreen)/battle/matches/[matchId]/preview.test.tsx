@@ -33,6 +33,7 @@ const match: BattleMatch = {
   startedAt: '2026-10-22T06:52:32.841Z',
   endedAt: '2026-10-22T06:53:38.448Z',
   players: [player('p2', '비', 1, 2, null), player('p1', 'Alice', 2, 0, 'topout'), player('p3', '씨', 3, 0, 'disconnect')],
+  disputed: false,
 };
 const params = (matchId: string) => ({ params: Promise.resolve({ matchId }) });
 

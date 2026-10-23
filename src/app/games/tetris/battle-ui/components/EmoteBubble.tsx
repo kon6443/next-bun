@@ -4,15 +4,19 @@ import { useEffect, useState } from "react";
 import type { TetrisBattleEmoteId } from "@/types/tetrisBattleSocket";
 import { EMOTE_LABELS, EMOTE_SHOW_MS } from "../lib/emotes";
 
-/** 받은 이모트를 잠깐 보여 준다 — 같은 이모트를 다시 받아도 key가 바뀌어 다시 뜬다 */
+/**
+ * 받은 이모트를 잠깐 보여 준다 — 같은 이모트를 다시 받아도 key가 바뀌어 다시 뜬다
+ * 마운트 때 이미 있던 이모트(대기실에서 받은 것 등 — 컨텍스트가 방 수명 동안 둔다)는 다시 띄우지 않는다 (FE-16)
+ */
 export function EmoteBubble({ emote }: { emote: { emoteId: TetrisBattleEmoteId; key: number } | undefined }) {
   const [visibleKey, setVisibleKey] = useState<number | null>(null);
+  const [mountedKey] = useState(() => emote?.key);
   useEffect(() => {
-    if (!emote) return;
+    if (!emote || emote.key === mountedKey) return;
     setVisibleKey(emote.key);
     const timer = setTimeout(() => setVisibleKey(null), EMOTE_SHOW_MS);
     return () => clearTimeout(timer);
-  }, [emote]);
+  }, [emote, mountedKey]);
   if (!emote || visibleKey !== emote.key) return null;
   const label = EMOTE_LABELS[emote.emoteId];
   return (

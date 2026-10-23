@@ -134,11 +134,14 @@ export type BattleMatchPlayer = {
   maxCombo: number;
   frames: number;
   koReason: BattleKoReason | null;
-  /** MISSING = 리플레이 미제출(재생할 기록 없음) */
-  verdict: 'VERIFIED' | 'MISSING';
+  /**
+   * MISSING = 리플레이 미제출(재생할 기록 없음), INVALID = 제출했지만 검증 실패(기록·재생에서 빠진다 — 리플레이 GET 404, D-004·D-008)
+   * 통계(place·kos 등)는 서버 값 그대로다
+   */
+  verdict: 'VERIFIED' | 'MISSING' | 'INVALID';
 };
 
-/** 저장된 경기 — 백엔드 BattleMatchDto. 숨김·DISPUTED·미저장 경기는 404 */
+/** 저장된 경기 — 백엔드 BattleMatchDto. 숨김·미저장 경기는 404 (DISPUTED도 200 — 검증 실패 참가자만 빠진다, D-008) */
 export type BattleMatch = {
   matchId: string;
   roomName: string;
@@ -148,6 +151,8 @@ export type BattleMatch = {
   endedAt: string;
   /** 순위 오름차순 */
   players: BattleMatchPlayer[];
+  /** 검증 실패(INVALID) 참가자가 있다 */
+  disputed: boolean;
 };
 
 /** 한 참가자의 대전 리플레이 — 백엔드 BattleReplayDetailDto (VERIFIED만) */
@@ -211,16 +216,19 @@ export async function getBattleLobbyStats(): Promise<ApiResponse<BattleLobbyStat
   return response.json();
 }
 
-/** 최근 경기 목록 항목 — 저장된(VERIFIED·비숨김) 경기만 */
+/** 최근 경기 목록 항목 — 저장된 비숨김 경기(DISPUTED 포함, D-008) */
 export type BattleMatchListItem = {
   matchId: string;
   roomName: string;
   playerCount: number;
   /** UTC ISO 8601 */
   endedAt: string;
+  /** place 1 — 1위가 검증 실패여도 그대로 (D-008) */
   winnerName: string;
   /** 순위 오름차순 */
   players: { name: string; place: number }[];
+  /** 검증 실패(INVALID) 참가자가 있다 */
+  disputed: boolean;
 };
 
 export type BattleMatchList = {

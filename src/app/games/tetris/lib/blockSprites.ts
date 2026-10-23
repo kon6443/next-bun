@@ -4,6 +4,8 @@
  * 발광(글로우)도 같은 방식 — shadowBlur는 스프라이트를 만들 때 한 번만 쓰고, 매 프레임은 복사만 한다(모바일 fps)
  */
 
+import { GARBAGE_CELL } from '../battle-engine/constants';
+
 /** 칸 값(0 빈칸 · 1~7 블록 종류 + 1 · 8 가비지) → 색. 블록 색은 가이드라인 순서 I J L O S T Z */
 export const CELL_COLORS: readonly string[] = [
   '#000000',
@@ -17,8 +19,8 @@ export const CELL_COLORS: readonly string[] = [
   '#64748b',
 ];
 
-/** 대전 가비지 칸 값 — 블록 값 1~7과 구분 (대전 래퍼 GARBAGE_CELL과 같은 값) */
-export const GARBAGE_CELL_VALUE = 8;
+/** 대전 가비지 칸 값 — 블록 값 1~7과 구분 (대전 래퍼 값을 그대로 쓴다 — 두 곳에 따로 적어 어긋나지 않게) */
+export const GARBAGE_CELL_VALUE = GARBAGE_CELL;
 
 /** 크기가 바뀔 때마다 새로 만들므로 상한을 두고 넘으면 비운다 */
 const CACHE_LIMIT = 96;

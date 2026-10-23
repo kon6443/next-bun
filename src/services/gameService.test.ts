@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createGameSession, getGameRankings, getGameReplay, submitGameScore } from './gameService';
+import { createGameSession, getGameRankings, getGameReplay, SESSION_TIMEOUT_MS, submitGameScore } from './gameService';
 import { ApiError } from '@/types/api';
 
 // 서비스 → FetchService → fetch 경로 전체를 실제로 타고, 네트워크만 stub 한다 (백엔드 API 준비 전 mock)
@@ -30,6 +30,30 @@ describe('gameService', () => {
     expect(url).toMatch(/\/api\/v1\/games\/tetris\/sessions$/);
     expect(init.method).toBe('POST');
     expect(init.headers.Authorization).toBeUndefined();
+  });
+
+  it('세션·제출·리플레이 조회에는 응답 대기 상한(signal)이 붙는다 — 망이 멈춰도 실패 분기로 간다 (FE-08)', async () => {
+    fetchMock.mockImplementation(() => Promise.resolve(json({ code: 'SUCCESS', message: 'ok', data: {} }, 201)));
+    await createGameSession('tetris');
+    await submitGameScore('tetris', { sessionId: 's', playerName: '나', replay });
+    await getGameReplay('tetris', 1);
+    for (const [, init] of fetchMock.mock.calls) expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('응답이 상한까지 없으면 NetworkError로 끝난다 (다시 시도 대상)', async () => {
+    // 상한 타이머는 환경 내부 타이머라 직접 끊는다 — 상한 값으로 만든 신호가 끊기면 실패로 끝나는지만 본다
+    const controller = new AbortController();
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(controller.signal);
+    fetchMock.mockImplementation(
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => init.signal?.addEventListener('abort', () => reject(new DOMException('timed out', 'TimeoutError')))),
+    );
+    const pending = createGameSession('tetris').catch((err: unknown) => err);
+    expect(timeout).toHaveBeenCalledWith(SESSION_TIMEOUT_MS);
+    controller.abort();
+    const err = await pending;
+    timeout.mockRestore();
+    expect((err as Error).name).toBe('NetworkError');
   });
 
   it('세션: 만료 토큰이라 401이면 전역 로그아웃 없이, 스로틀 창(1.1초)을 피해 토큰 없이 1회 재시도', async () => {

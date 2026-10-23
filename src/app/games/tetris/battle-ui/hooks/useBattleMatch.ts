@@ -3,31 +3,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type GarbagePayload,
-  type LockAckData,
-  type LockPayload,
   type MatchResultEntry,
   type RejoinData,
   type RoomState,
-  type TetrisBattleAck,
   TetrisBattleClientEvents,
-  TetrisBattleErrorCodes,
   TetrisBattleServerEvents,
   type TetrisBattleSocket,
-  type TopOutPayload,
 } from "@/types/tetrisBattleSocket";
 import { type BattleReplayInput, type BattleState, pendingGarbageLines } from "../../battle-engine";
 import type { MatchSync } from "../contexts/BattleSocketContext";
 import { decodeBoard, encodeBoard } from "../lib/boardCodec";
 import type { ReplaySubmitStatus } from "../lib/replaySubmit";
 import { useBattlePlay } from "./useBattlePlay";
+import { ACK_TIMEOUT_MS, useMatchOutbox } from "./useMatchOutbox";
 import { getSoundPlayer } from "../../lib/sound/soundPlayer";
 
 /** 승리음은 마지막 KO 폭발음 뒤에 */
 const WIN_SOUND_DELAY_MS = 450;
 
-const ACK_TIMEOUT_MS = 8000;
-/** 응답이 없던 보고를 다시 보내기까지 */
-const RETRY_MS = 1500;
+/** 방이 RESULT가 됐는데 matchEnded가 아직 없으면 이만큼 기다린다 — 서버 경로에 따라 roomState가 먼저 온다(FE-17·BE-22) */
+export const RESULT_WAIT_MS = 1500;
 
 /**
  * 매치 진행 단계
@@ -55,6 +50,8 @@ export type OpponentState = {
   pending: number;
   /** 탈락 순위 — 살아 있으면 null */
   place: number | null;
+  /** 탈락했지만 순위를 아직 모른다 — 재입장 응답(alive=false)으로 알았고 순위는 뒤이은 playerKO가 채운다 */
+  out?: boolean;
   kos: number;
 };
 
@@ -65,6 +62,8 @@ type BattleMatchOptions = {
   das: number;
   arr: number;
   registerMatchSync: (sync: MatchSync) => () => void;
+  /** 서버가 이 소켓을 자리에서 뗐다(NOT_IN_ROOM) — 토큰 복귀를 부탁한다. 결과는 registerMatchSync의 onRejoin으로 온다 */
+  recoverSeat?: () => void;
   /** 공격 궤적 (attack 이벤트 — 내 공격 포함) */
   onAttack?: (from: string, to: string, lines: number) => void;
   /** 경기 후 리플레이 제출 (DESIGN §17-1) — 이 기기에 그 매치의 판이 있을 때만 매치당 1회 부른다 */
@@ -76,8 +75,6 @@ export type ReplaySubmitState = { matchId: string; status: ReplaySubmitStatus };
 
 type GarbageEvent = Pick<GarbagePayload, "id" | "lines" | "hole">;
 
-type OutboxItem<T> = { payload: T; sending: boolean };
-type Outbox = { locks: OutboxItem<LockPayload>[]; topOut: OutboxItem<TopOutPayload> | null };
 
 /**
  * 대전 매치 연동 — 서버 이벤트(matchStarting·garbage·attack·opponentUpdate·playerKO·matchEnded)를 받아
@@ -87,7 +84,7 @@ type Outbox = { locks: OutboxItem<LockPayload>[]; topOut: OutboxItem<TopOutPaylo
  * — 서버는 재입장 응답(missedGarbage)보다 실시간 garbage를 먼저 보낼 수 있고, receiveGarbage는 직전 id 이하를 버리므로 순서가 중요하다
  * lock·topOut은 송신함(outbox)으로 보낸다 — 끊긴 동안·재입장 대기 중에는 보내지 않고, 확인받을 때까지 보관했다가 다시 보낸다
  */
-export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMatchSync, onAttack, submitReplay }: BattleMatchOptions) {
+export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMatchSync, recoverSeat, onAttack, submitReplay }: BattleMatchOptions) {
   const [phase, setPhaseState] = useState<MatchPhase>({ kind: "idle" });
   const [opponents, setOpponents] = useState<OpponentState[]>([]);
   const [targetId, setTargetId] = useState<string | null>(null);
@@ -95,6 +92,8 @@ export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMat
   const [replaySubmit, setReplaySubmit] = useState<ReplaySubmitState | null>(null);
   const submitReplayRef = useRef(submitReplay);
   submitReplayRef.current = submitReplay;
+  const recoverSeatRef = useRef(recoverSeat);
+  recoverSeatRef.current = recoverSeat;
   /** 제출을 시작한 매치 — 같은 매치를 두 번 보내지 않는다 */
   const submittedRef = useRef(new Set<string>());
   /**
@@ -132,92 +131,39 @@ export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMat
   const winSoundTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevSocketRef = useRef<TetrisBattleSocket | null>(null);
 
-  /**
-   * 확인받지 못한 보고 — lock은 seq 순, topOut은 lock이 모두 끝난 뒤
-   * 보내지 않은 항목은 순서대로 연달아 보낸다(서버는 같은 소켓 요청을 도착 순서대로 처리) — 항목마다 보내는 중 표시로 겹쳐 보내지 않는다
-   * 응답이 없으면(끊김·타임아웃) 보관했다가 잠시 뒤·재입장 응답 뒤 보낸 그대로 다시 보낸다(서버는 같은 seq를 중복으로 무시)
-   * 재입장 대기 중 받은 NOT_IN_ROOM은 재입장 뒤 다시, 그 밖의 응답(성공·거절)이면 그 항목만 끝
-   * 응답은 먼저 같은 매치의 송신함인지 확인한다 — 이전 매치의 늦은 응답이 새 매치 항목을 건드리지 않게
-   */
-  const outboxRef = useRef<Outbox>({ locks: [], topOut: null });
-  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 방이 RESULT가 된 뒤 matchEnded를 기다리는 타이머 */
+  const resultWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const flushOutbox = useCallback(() => {
-    const s = socketRef.current;
-    if (!s || !s.connected || rejoiningRef.current) return;
-    const box = outboxRef.current;
-    const retryLater = () => {
-      if (retryTimerRef.current) return;
-      retryTimerRef.current = setTimeout(() => {
-        retryTimerRef.current = null;
-        flushOutboxRef.current();
-      }, RETRY_MS);
-    };
-    /** 응답 처리 — 이 항목이 끝났으면 true (다른 매치의 응답이면 아무것도 하지 않는다) */
-    const settle = (item: OutboxItem<unknown>, err: Error | null, response: TetrisBattleAck<unknown> | undefined): boolean => {
-      if (outboxRef.current !== box) return false;
-      item.sending = false;
-      if (err || !response) {
-        retryLater();
-        return false;
-      }
-      return !(!response.ok && response.code === TetrisBattleErrorCodes.NOT_IN_ROOM && rejoiningRef.current);
-    };
-    for (const item of box.locks) {
-      if (item.sending) continue;
-      item.sending = true;
-      s.timeout(ACK_TIMEOUT_MS).emit(TetrisBattleClientEvents.LOCK, item.payload, (err: Error | null, response?: TetrisBattleAck<LockAckData>) => {
-        if (!settle(item, err, response)) return;
-        box.locks = box.locks.filter((other) => other !== item);
-        if (response?.ok) setTargetId(response.data.targetId);
-        if (box.locks.length === 0) flushOutboxRef.current(); // 남은 topOut
-      });
-    }
-    const topOut = box.topOut;
-    if (topOut && box.locks.length === 0 && !topOut.sending) {
-      topOut.sending = true;
-      s.timeout(ACK_TIMEOUT_MS).emit(TetrisBattleClientEvents.TOP_OUT, topOut.payload, (err: Error | null, response?: TetrisBattleAck<unknown>) => {
-        if (settle(topOut, err, response) && box.topOut === topOut) box.topOut = null;
-      });
-    }
-  }, []);
-  const flushOutboxRef = useRef(flushOutbox);
-  flushOutboxRef.current = flushOutbox;
-
-  /** 새 매치·대기실로 — 이전 매치의 미확인 보고는 버린다 */
-  const resetOutbox = () => {
-    outboxRef.current = { locks: [], topOut: null };
-    if (retryTimerRef.current) {
-      clearTimeout(retryTimerRef.current);
-      retryTimerRef.current = null;
-    }
-  };
+  // lock·topOut 송신함 — 확인받을 때까지 보관·재전송 (useMatchOutbox)
+  const outbox = useMatchOutbox({
+    socketRef,
+    rejoiningRef,
+    onTarget: setTargetId,
+    onNotInRoom: () => recoverSeatRef.current?.(),
+  });
+  const { flush: flushOutbox, reset: resetOutbox, pushLock, setTopOut } = outbox;
 
   const queueLock = useCallback(
     (bs: BattleState, sent: number, perfectClear: boolean) => {
       const matchId = playingMatchIdRef.current;
       const engineLock = bs.game.lastLock;
       if (!matchId || !engineLock) return;
-      outboxRef.current.locks.push({
-        sending: false,
-        payload: {
-          matchId,
-          // 서버는 seq 건너뛰기를 허용한다 — 반드시 game.pieces 그대로
-          seq: bs.game.pieces,
-          frame: engineLock.frame,
-          sent,
-          combo: engineLock.combo,
-          b2b: engineLock.backToBack,
-          tSpin: engineLock.tSpin,
-          lines: engineLock.lines,
-          pc: perfectClear,
-          board: encodeBoard(bs.game.board),
-          pending: pendingGarbageLines(bs),
-        },
+      pushLock({
+        matchId,
+        // 서버는 seq 건너뛰기를 허용한다 — 반드시 game.pieces 그대로
+        seq: bs.game.pieces,
+        frame: engineLock.frame,
+        sent,
+        combo: engineLock.combo,
+        b2b: engineLock.backToBack,
+        tSpin: engineLock.tSpin,
+        lines: engineLock.lines,
+        pc: perfectClear,
+        board: encodeBoard(bs.game.board),
+        pending: pendingGarbageLines(bs),
       });
-      flushOutbox();
     },
-    [flushOutbox],
+    [pushLock],
   );
 
   /** 이 기기가 모르는 매치의 자리를 기권한다(D-020) — 판이 없으니 한 번만 보낸다 */
@@ -232,11 +178,17 @@ export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMat
       const matchId = playingMatchIdRef.current;
       if (!matchId) return;
       setPhase({ kind: "out", matchId, place: null });
-      outboxRef.current.topOut = { sending: false, payload: { matchId, frame: bs.game.endFrame } };
-      flushOutbox();
+      setTopOut({ matchId, frame: bs.game.endFrame });
     },
   });
   const { start: startPlay, stop: stopPlay, receive, battleRef, buildReplay } = play;
+
+  const clearResultWait = () => {
+    if (resultWaitTimerRef.current) {
+      clearTimeout(resultWaitTimerRef.current);
+      resultWaitTimerRef.current = null;
+    }
+  };
 
   const clearStartTimer = () => {
     if (startTimerRef.current) {
@@ -266,6 +218,7 @@ export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMat
   const endMatch = useCallback(
     (matchId: string | null, results: MatchResultEntry[]) => {
       clearStartTimer();
+      clearResultWait();
       stopPlay();
       heldGarbageRef.current = [];
       setPhase({ kind: "ended", matchId, results });
@@ -298,6 +251,7 @@ export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMat
 
     const onStarting = (p: { matchId: string; seed: number; startInMs: number; players: { playerId: string; name: string }[] }) => {
       clearStartTimer();
+      clearResultWait();
       stopPlay();
       matchIdRef.current = p.matchId;
       playingMatchIdRef.current = null;
@@ -406,14 +360,14 @@ export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMat
       socket.off(TetrisBattleServerEvents.MATCH_ENDED, onEnded);
       socket.off("disconnect", onDisconnect);
     };
-  }, [socket, das, arr, startPlay, stopPlay, flushGarbage, endMatch, setPhase, battleRef]);
+  }, [socket, das, arr, startPlay, stopPlay, flushGarbage, endMatch, setPhase, battleRef, resetOutbox]);
 
   // 언마운트 — 타이머 정리
   useEffect(
     () => () => {
       clearStartTimer();
-      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
       if (winSoundTimerRef.current) clearTimeout(winSoundTimerRef.current);
+      if (resultWaitTimerRef.current) clearTimeout(resultWaitTimerRef.current);
     },
     [],
   );
@@ -474,9 +428,13 @@ export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMat
               const snapshot = rejoin.opponents.find((r) => r.playerId === o.playerId);
               if (!snapshot) return o;
               const cells = decodeBoard(snapshot.board);
-              return { ...o, cells: cells ?? o.cells, pending: snapshot.pending };
+              // 끊긴 사이 탈락했으면 순위를 몰라도 탈락으로 그린다(순위는 서버가 뒤이어 보내는 playerKO가 채운다)
+              const out = o.out || (!snapshot.alive && o.place === null);
+              return { ...o, cells: cells ?? o.cells, pending: snapshot.pending, ...(out ? { out } : {}) };
             }),
           );
+          // 대상이 끊긴 사이 탈락했으면 다음 lock 응답이 새 대상을 정할 때까지 비운다
+          setTargetId((prev) => (prev && rejoin.opponents.some((r) => r.playerId === prev && !r.alive) ? null : prev));
           // 끊긴 동안 확인받지 못한 lock·topOut을 보낸 그대로 다시 보낸다
           flushOutbox();
         },
@@ -491,6 +449,7 @@ export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMat
     if (room.status === "WAITING" && current.kind !== "idle" && current.kind !== "countdown") {
       // 재대결 — 대기실로
       clearStartTimer();
+      clearResultWait();
       stopPlay();
       matchIdRef.current = null;
       playingMatchIdRef.current = null;
@@ -503,12 +462,24 @@ export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMat
       // 경기 중에 들어왔다(새로고침 등) — 이 기기에는 판이 없어 참여할 수 없다
       setPhase({ kind: "unavailable", forfeited: false });
     } else if (room.status === "RESULT" && (current.kind === "countdown" || current.kind === "playing" || current.kind === "out")) {
-      // matchEnded를 놓쳤다(끊긴 사이 종료) — 판을 멈추고 결과 없는 종료 화면으로
-      endMatch(matchIdRef.current, []);
+      // 경기가 끝났다 — 판은 바로 멈추고(카운트다운이면 시작하지 않는다), 결과는 matchEnded를 잠깐 기다린다
+      // (서버 경로에 따라 roomState가 matchEnded보다 먼저 온다). 끝내 안 오면(끊긴 사이 종료) 결과 없는 종료 화면으로
+      clearStartTimer();
+      stopPlay();
+      const matchId = matchIdRef.current;
+      if (!resultWaitTimerRef.current) {
+        resultWaitTimerRef.current = setTimeout(() => {
+          resultWaitTimerRef.current = null;
+          const now = phaseRef.current;
+          // 그사이 다음 매치로 넘어갔으면(재대결) 건드리지 않는다
+          if (matchIdRef.current !== matchId) return;
+          if (now.kind === "countdown" || now.kind === "playing" || now.kind === "out") endMatch(matchId, []);
+        }, RESULT_WAIT_MS);
+      }
     } else if (room.status !== "PLAYING" && current.kind === "unavailable") {
       setPhase({ kind: "idle" });
     }
-  }, [room.status, stopPlay, setPhase, endMatch]);
+  }, [room.status, stopPlay, setPhase, endMatch, resetOutbox]);
 
   return { phase, opponents, targetId, myKos, replaySubmit, play };
 }

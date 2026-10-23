@@ -13,7 +13,7 @@ export type MatchPublished =
   | { status: "idle" }
   | { status: "waiting" }
   | { status: "ready"; match: BattleMatch }
-  /** 한도까지 404 — 숨김·DISPUTED 또는 저장 실패 */
+  /** 한도까지 404 — 숨김 또는 저장 실패 (DISPUTED는 200이라 ready, D-008) */
   | { status: "unavailable" };
 
 /**

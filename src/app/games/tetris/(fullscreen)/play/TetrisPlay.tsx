@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Button } from "@/app/teams/components";
 import { createGameSession } from "@/services/gameService";
+import { useLatestRequest } from "../../hooks/useLatestRequest";
 import { ApiError } from "@/types/api";
 import type { GameSession, ReplayPayload } from "@/types/game";
 import { extractErrorMessage } from "@/app/utils/errorUtils";
@@ -81,10 +82,14 @@ export default function TetrisPlay() {
     return () => media.removeEventListener("change", onChange);
   }, []);
 
+  // "처음부터"를 연달아 눌러도 늦게 온 이전 세션 응답이 최신 상태를 덮지 않게 (FE-21)
+  const beginSessionRequest = useLatestRequest();
   const requestSession = useCallback(async () => {
+    const isLatest = beginSessionRequest();
     setSessionState({ status: "loading" });
     try {
       const { data } = await createGameSession("tetris", accessToken);
+      if (!isLatest()) return;
       if (data.engineVersion !== ENGINE_VERSION) {
         setSessionState({
           status: "failed",
@@ -95,9 +100,10 @@ export default function TetrisPlay() {
       }
       setSessionState({ status: "ready", session: data, receivedAt: Date.now() });
     } catch (err) {
+      if (!isLatest()) return;
       setSessionState({ status: "failed", seed: randomSeed(), error: sessionErrorMessage(err) });
     }
-  }, [accessToken]);
+  }, [accessToken, beginSessionRequest]);
 
   // 로그인 상태가 정해진 뒤 첫 세션을 받는다 (로그인이면 기록에 USER_ID가 남는다)
   // 이후 세션은 판마다 restart가 새로 받는다
@@ -157,32 +163,37 @@ export default function TetrisPlay() {
   return (
     <div className="flex h-full flex-col pt-[env(safe-area-inset-top)]">
       {/* 상단 — 나가기·점수판·일시정지 */}
-      <header className="flex items-center gap-3 px-3 py-2">
+      {/* 320px에서도 한 줄 — 휴대폰 폭(640px 미만)에서는 나가기를 화살표만, 여백·간격·라벨·숫자를 폭에 맞춰 줄인다(글자 꺾임·잘림 금지, 점수 9,999,999까지) */}
+      <header className="flex items-center gap-1.5 px-2 py-2 min-[360px]:gap-2 min-[360px]:px-3 sm:gap-3">
         <Link
           href="/games/tetris"
-          className="flex min-h-11 items-center rounded-xl border border-slate-700/60 bg-slate-900/70 px-3 text-xs text-slate-400 hover:text-slate-200"
+          aria-label="나가기"
+          className="flex min-h-11 min-w-11 shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-slate-700/60 bg-slate-900/70 px-3 text-xs text-slate-400 hover:text-slate-200"
         >
-          ← 나가기
+          <span aria-hidden="true">←</span>
+          <span aria-hidden="true" className="ml-1 hidden sm:inline">
+            나가기
+          </span>
         </Link>
-        <dl className="flex flex-1 justify-center gap-4 text-center text-xs tabular-nums sm:gap-8">
+        <dl className="flex min-w-0 flex-1 justify-center gap-[clamp(4px,2.5vw,16px)] overflow-hidden whitespace-nowrap text-center text-[clamp(10px,3.2vw,12px)] tabular-nums sm:gap-8">
           <div>
             <dt className="text-slate-500">점수</dt>
-            <dd className="text-sm font-bold text-white">{formatScore(play.hud.score)}</dd>
+            <dd className="text-[clamp(11px,3.4vw,14px)] font-bold tracking-tight text-white">{formatScore(play.hud.score)}</dd>
           </div>
           <div>
             <dt className="text-slate-500">줄</dt>
-            <dd className="text-sm font-bold text-white">{play.hud.lines}</dd>
+            <dd className="text-[clamp(11px,3.4vw,14px)] font-bold tracking-tight text-white">{play.hud.lines}</dd>
           </div>
           <div>
             <dt className="text-slate-500">레벨</dt>
-            <dd className="text-sm font-bold text-white">{play.hud.level}</dd>
+            <dd className="text-[clamp(11px,3.4vw,14px)] font-bold tracking-tight text-white">{play.hud.level}</dd>
           </div>
           <div>
             <dt className="text-slate-500">시간</dt>
-            <dd className="text-sm font-bold text-white">{formatFrames(play.hud.frame)}</dd>
+            <dd className="text-[clamp(11px,3.4vw,14px)] font-bold tracking-tight text-white">{formatFrames(play.hud.frame)}</dd>
           </div>
         </dl>
-        <SoundToggle />
+        <SoundToggle className="shrink-0" />
         <button
           type="button"
           onClick={(e) => {
@@ -193,7 +204,7 @@ export default function TetrisPlay() {
           }}
           disabled={play.status !== "playing" && play.status !== "paused"}
           aria-label={play.status === "paused" ? "계속하기" : "일시정지"}
-          className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-700/60 bg-slate-900/70 text-slate-300 disabled:opacity-40"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-700/60 bg-slate-900/70 text-slate-300 disabled:opacity-40"
         >
           {play.status === "paused" ? "▶" : "❚❚"}
         </button>

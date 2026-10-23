@@ -7,6 +7,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   // tsconfig 의 jsx: preserve 는 Next 가 변환한다 — 테스트에서는 React 17+ 자동 런타임으로 변환해 React import 없이 JSX 를 쓴다
   esbuild: { jsx: 'automatic' },
+  // CSS 모듈을 쓰는 컴포넌트도 테스트에서 import할 수 있게 — 프로젝트 PostCSS(Tailwind 플러그인)는 vitest에서 읽지 않는다(스타일은 검증 대상이 아니다)
+  css: { postcss: { plugins: [] } },
   test: {
     environment: 'node', // 순수 유틸 함수 테스트는 node 환경에서 실행
     globals: true,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { BattleKoReason, BattleMatch } from "@/services/tetrisBattleService";
 import { formatFullDateTime } from "@/app/utils/taskUtils";
@@ -10,14 +10,23 @@ import { formatFrames } from "@/app/games/_shared/lib/format";
 import { FRAMES_PER_SECOND } from "../../engine";
 import { TetrisCanvas } from "../../components/TetrisCanvas";
 import { type ReplayTrack, useBattleMatchReplay } from "../hooks/useBattleMatchReplay";
+import { useBoardFocus } from "../hooks/useBoardFocus";
 import { isRunnerDone, lastReceivedGarbage } from "../lib/battleReplayRunner";
 import { buildBattleShareContent } from "../lib/battleShare";
+import { advanceClock, createClock, resetClock } from "../../lib/fixedStep";
 
 const SPEEDS = [0.5, 1, 2, 4] as const;
+/** 재생은 탭이 잠들면 따라잡지 않는다 — 한 번에 이만큼만(배속 전) */
+const MAX_CATCH_UP_MS = 100;
 const FRAME_MS = 1000 / FRAMES_PER_SECOND;
 const SEEK_STEP_FRAMES = 5 * FRAMES_PER_SECOND;
 /** 가비지 도착 "+N" 표시를 남겨 둘 프레임 */
 const GARBAGE_FLASH_FRAMES = 45;
+/**
+ * 재생 중 화면(시간·슬라이더·판 표시)을 다시 그리는 간격(프레임) — 캔버스는 매 화면 프레임 그리고, React 상태는 약 10Hz로만 (FE-06)
+ * 탐색·끝에 닿음은 바로 반영한다
+ */
+const PLAYBACK_UI_STEP = 6;
 
 type Playback = { playing: boolean; speed: number; frame: number };
 
@@ -40,6 +49,8 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
   const playbackRef = useRef(playback);
   playbackRef.current = playback;
   const { kakaoReady, kakaoScript } = useKakaoReady();
+  // 판 하나 크게 보기 — 2판 이상일 때 (재생·컨트롤은 그대로 돈다)
+  const focus = useBoardFocus(tracks.length > 1);
 
   const ready = load.status === "ready";
   // 재생 루프는 리플레이를 다 받은 뒤에 — 일부만 온 상태로 흘러가지 않게
@@ -58,25 +69,23 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
   useEffect(() => {
     if (!playable || totalFrames === 0) return;
     let rafId = 0;
-    let last = 0;
-    let acc = 0;
+    const clock = createClock();
     const loop = (timestamp: number) => {
       const { playing, speed } = playbackRef.current;
       if (playing) {
-        if (last === 0) last = timestamp;
-        acc += Math.min(timestamp - last, 100) * speed;
-        last = timestamp;
+        advanceClock(clock, timestamp, MAX_CATCH_UP_MS, speed);
         let frame = frameRef.current;
-        while (acc >= FRAME_MS && frame < totalFrames) {
-          acc -= FRAME_MS;
+        while (clock.acc >= FRAME_MS && frame < totalFrames) {
+          clock.acc -= FRAME_MS;
           frame++;
         }
         if (frame !== frameRef.current) seekAll(frame);
         const ended = frame >= totalFrames;
-        setPlayback((p) => (p.frame === frame && !ended ? p : { ...p, frame, playing: ended ? false : p.playing }));
+        setPlayback((p) =>
+          !ended && Math.abs(frame - p.frame) < PLAYBACK_UI_STEP ? p : { ...p, frame, playing: ended ? false : p.playing },
+        );
       } else {
-        last = 0;
-        acc = 0;
+        resetClock(clock);
       }
       rafId = requestAnimationFrame(loop);
     };
@@ -92,8 +101,9 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
       setPlayback((p) => ({ ...p, playing: true }));
       return;
     }
-    setPlayback((p) => ({ ...p, playing: !p.playing }));
-  }, [seek, totalFrames]);
+    // 멈출 때는 화면 시간·슬라이더를 판의 실제 프레임에 맞춘다(재생 중에는 몇 프레임마다만 갱신한다)
+    setPlayback((p) => (p.playing ? { ...p, playing: false, frame: frameRef.current } : { ...p, playing: true }));
+  }, [seek, totalFrames, frameRef]);
 
   // 키보드: Space 재생/정지, ←/→ 5초 이동
   useEffect(() => {
@@ -190,11 +200,40 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
       {shareOpen && <ShareMenu content={buildBattleShareContent(match)} kakaoReady={kakaoReady} onClose={() => setShareOpen(false)} />}
 
       <ResultTable match={match} />
+      {match.disputed && (
+        <p className="mx-auto mt-1 w-[calc(100%-1.5rem)] max-w-xl text-xs text-amber-200/80" role="note">
+          검증되지 않은 기록이 있어 그 플레이어는 다시보기에서 빠졌어요.
+        </p>
+      )}
 
+      {focus.focusedId && (
+        <div className="flex px-2 pt-2">
+          <button
+            ref={focus.backRef}
+            type="button"
+            onClick={focus.close}
+            className="flex min-h-11 items-center rounded-xl border border-slate-700/60 bg-slate-900/70 px-3 text-xs text-slate-300 hover:text-white"
+          >
+            ← 모든 판 보기
+          </button>
+        </div>
+      )}
       {/* 루트 layout이 이미 <main>으로 감싼다 — 중첩하지 않는다 */}
-      <div className={`grid min-h-0 flex-1 grid-cols-2 gap-2 px-2 pt-2 ${tracks.length > 2 ? "grid-rows-2" : ""}`}>
+      {/* 크게 볼 때 다른 판은 숨기기만 한다 — 캔버스를 다시 만들지 않고 재생은 계속 따라간다 */}
+      <div
+        className={`grid min-h-0 flex-1 gap-2 px-2 pt-2 ${
+          focus.focusedId ? "grid-cols-1" : `grid-cols-2 ${tracks.length > 2 ? "grid-rows-2" : ""}`
+        }`}
+      >
         {tracks.map((track) => (
-          <ReplayBoard key={track.player.playerId} track={track} frame={playback.frame} matchEnded={playback.frame >= totalFrames} />
+          <ReplayBoard
+            key={track.player.playerId}
+            track={track}
+            frame={playback.frame}
+            matchEnded={playback.frame >= totalFrames}
+            hidden={focus.focusedId !== null && focus.focusedId !== track.player.playerId}
+            boardProps={focus.boardProps(track.player.playerId, track.player.name)}
+          />
         ))}
       </div>
 
@@ -257,8 +296,8 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
   );
 }
 
-/** 결과표 — 순위·이름·KO·보낸/받은 줄·최대 콤보 */
-function ResultTable({ match }: { match: BattleMatch }) {
+/** 결과표 — 순위·이름·KO·보낸/받은 줄·최대 콤보. 재생 중 다시 그릴 일이 없어 memo */
+const ResultTable = memo(function ResultTable({ match }: { match: BattleMatch }) {
   return (
     <table className="mx-auto w-[calc(100%-1.5rem)] max-w-xl text-xs tabular-nums">
       <caption className="sr-only">경기 결과</caption>
@@ -274,9 +313,12 @@ function ResultTable({ match }: { match: BattleMatch }) {
       </thead>
       <tbody>
         {match.players.map((p) => (
-          <tr key={p.playerId} className={p.place === 1 ? "text-amber-300" : "text-slate-200"}>
+          <tr key={p.playerId} className={p.verdict === "INVALID" ? "text-slate-500" : p.place === 1 ? "text-amber-300" : "text-slate-200"}>
             <td className="py-0.5 font-semibold">{p.place}</td>
-            <td className="max-w-0 truncate py-0.5">{p.name}</td>
+            <td className="max-w-0 truncate py-0.5">
+              {p.name}
+              {p.verdict === "INVALID" && <span className="ml-1 text-[10px] text-amber-300/80">검증 실패</span>}
+            </td>
             <td className="py-0.5 text-right">{p.kos}</td>
             <td className="py-0.5 text-right">{p.sent}</td>
             <td className="py-0.5 text-right">{p.received}</td>
@@ -286,17 +328,32 @@ function ResultTable({ match }: { match: BattleMatch }) {
       </tbody>
     </table>
   );
-}
+});
 
 const TRACK_MESSAGES: Partial<Record<ReplayTrack["status"], string>> = {
   loading: "기록을 불러오는 중...",
   missing: "기록 없음",
+  invalid: "검증되지 않은 기록이라 재생하지 않아요",
   unsupported: "이전 버전 기록이라 재생할 수 없어요",
   error: "기록을 불러오지 못했어요 · 새로고침하면 다시 받아요",
 };
 
 /** 판 하나 — 이름·순위 띠 + 캔버스(왼쪽 가비지 게이지) + 가비지 도착·KO·우승 표시 */
-function ReplayBoard({ track, frame, matchEnded }: { track: ReplayTrack; frame: number; matchEnded: boolean }) {
+function ReplayBoard({
+  track,
+  frame,
+  matchEnded,
+  hidden,
+  boardProps,
+}: {
+  track: ReplayTrack;
+  frame: number;
+  matchEnded: boolean;
+  /** 다른 판을 크게 보는 중 */
+  hidden: boolean;
+  /** 크게 보기 버튼 역할 (useBoardFocus) */
+  boardProps: ReturnType<ReturnType<typeof useBoardFocus>["boardProps"]>;
+}) {
   const { player, runner } = track;
   const message = TRACK_MESSAGES[track.status];
   // 기록이 있으면 그 판이 끝난 때(엔진 탈락 또는 리플레이 끝) — 서버 요약 frames는 마지막 고정 프레임이라 리플레이보다 짧을 수 있다
@@ -308,12 +365,17 @@ function ReplayBoard({ track, frame, matchEnded }: { track: ReplayTrack; frame: 
   const showGarbage = garbage !== null && runner !== null && runner.bs.game.frame - garbage.frame < GARBAGE_FLASH_FRAMES;
 
   return (
-    <section className="flex min-h-0 min-w-0 flex-col" aria-label={`${player.place}위 ${player.name}`}>
+    <section className={`min-h-0 min-w-0 flex-col ${hidden ? "hidden" : "flex"}`} aria-label={`${player.place}위 ${player.name}`}>
       <p className="flex items-center gap-1 truncate px-1 text-xs">
         <span className={`font-bold ${player.place === 1 ? "text-amber-300" : "text-slate-400"}`}>{player.place}위</span>
         <span className="truncate font-semibold text-slate-100">{player.name}</span>
       </p>
-      <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-white/5 bg-slate-950/40">
+      <div
+        {...boardProps}
+        className={`relative min-h-0 flex-1 overflow-hidden rounded-xl border border-white/5 bg-slate-950/40 ${
+          boardProps.role ? "cursor-zoom-in focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400" : ""
+        }`}
+      >
         {runner && <TetrisCanvas stateRef={track.stateRef} drawRef={track.drawRef} garbageRef={track.garbageRef} />}
         {message && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-2 text-center text-sm text-slate-500">

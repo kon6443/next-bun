@@ -68,8 +68,23 @@ export function TetrisCanvas({ stateRef, drawRef, effectsRef, garbageRef, classN
         samples = 0;
       }
     };
+    /** 마지막으로 그린 것 — 같으면 다시 그리지 않는다(준비·일시정지·게임오버·재생 정지 중 매 프레임 전체 그리기를 피한다, FE-11) */
+    let drawn: { state: GameState | null; frame: number; over: boolean; reduced: boolean; layoutVersion: number } | null = null;
+    let layoutVersion = 0;
     const draw = () => {
       const state = stateRef.current;
+      const next = { state, frame: state?.frame ?? -1, over: state?.over ?? false, reduced: reducedRef.current, layoutVersion };
+      if (
+        drawn &&
+        drawn.state === next.state &&
+        drawn.frame === next.frame &&
+        drawn.over === next.over &&
+        drawn.reduced === next.reduced &&
+        drawn.layoutVersion === next.layoutVersion
+      ) {
+        return;
+      }
+      drawn = next;
       if (state) {
         if (!state.over && effectsRef) measure();
         drawGame(ctx, state, layout, {
@@ -78,6 +93,12 @@ export function TetrisCanvas({ stateRef, drawRef, effectsRef, garbageRef, classN
           garbage: garbageRef?.current,
           quality: sessionQuality,
         });
+      } else {
+        // 판이 없다(새 판 준비) — 이전 판이 남아 보이지 않게 비운다
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
       }
     };
     const resize = () => {
@@ -89,6 +110,7 @@ export function TetrisCanvas({ stateRef, drawRef, effectsRef, garbageRef, classN
       canvas.style.height = `${rect.height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       layout = computeLayout(rect.width, rect.height);
+      layoutVersion++;
       draw();
     };
     resize();

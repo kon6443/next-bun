@@ -27,6 +27,7 @@ const item = (n: number): BattleMatchListItem => ({
     { name: `우승${n}`, place: 1 },
     { name: '상대', place: 2 },
   ],
+  disputed: false,
 });
 const page = (items: BattleMatchListItem[], nextCursor: string | null) => ({ data: { items, nextCursor } });
 
@@ -66,6 +67,12 @@ describe('대전 입구 (DESIGN §19)', () => {
     expect(link).toHaveTextContent('1분 전');
     expect(getBattleMatchList).toHaveBeenCalledWith({ limit: 5, cursor: null });
     expect(screen.getByRole('link', { name: '전체 보기' })).toHaveAttribute('href', '/games/tetris/battle/matches');
+  });
+
+  it('최근 대전: 검증 실패 참가자가 있는 경기도 목록에 나오고 표시가 붙는다 (D-008)', async () => {
+    getBattleMatchList.mockResolvedValue(page([{ ...item(1), disputed: true }], null));
+    render(<RecentBattles />);
+    expect(await screen.findByRole('link', { name: /방 1/ })).toHaveTextContent('우승1 우승 · 일부 기록 검증 실패');
   });
 
   it('최근 대전: 빈 목록 안내', async () => {
