@@ -172,6 +172,31 @@ describe('gameService', () => {
       expect(err).toMatchObject({ code: 'GAME_VERIFY_BUSY', status: 503 });
     });
 
+    it('토큰이 401로 거절된 제출은 BUSY 자동 재시도에 토큰을 다시 싣지 않는다 — 401 대기가 겹치지 않게 (FE-50)', async () => {
+      fetchMock
+        .mockResolvedValueOnce(json({ code: 'AUTH_UNAUTHORIZED', message: 'x', timestamp: 't' }, 401))
+        .mockResolvedValueOnce(busy({ 'Retry-After': '2' }))
+        .mockResolvedValueOnce(json({ code: 'SUCCESS', message: 'ok', data: { scoreId: 9 } }, 201));
+      const pending = submitGameScore('tetris', { sessionId: 's', playerName: 'n', replay }, 'expired');
+      await vi.advanceTimersByTimeAsync(1100 + 2000);
+      const { data } = await pending;
+      expect(data.scoreId).toBe(9);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(fetchMock.mock.calls[0][1].headers.Authorization).toBeDefined();
+      expect(fetchMock.mock.calls[2][1].headers.Authorization).toBeUndefined();
+    });
+
+    it('첫 시도가 이미 오래 걸렸으면 BUSY여도 자동 재시도하지 않는다 — 호출부가 보관·다시 등록으로 (FE-50)', async () => {
+      fetchMock.mockImplementationOnce(
+        () => new Promise((resolve) => setTimeout(() => resolve(busy({ 'Retry-After': '2' })), 29_000)),
+      );
+      const pending = submitGameScore('tetris', { sessionId: 's', playerName: 'n', replay }).catch((e: unknown) => e);
+      await vi.advanceTimersByTimeAsync(29_000);
+      const err = await pending;
+      expect(err).toMatchObject({ code: 'GAME_VERIFY_BUSY' });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
     it('Retry-After가 10초를 넘거나 다른 503이면 자동 재시도하지 않는다', async () => {
       fetchMock.mockResolvedValueOnce(busy({ 'Retry-After': '30' }));
       await expect(submitGameScore('tetris', { sessionId: 's', playerName: 'n', replay })).rejects.toMatchObject({ code: 'GAME_VERIFY_BUSY' });
