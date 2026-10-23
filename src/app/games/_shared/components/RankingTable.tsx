@@ -51,7 +51,7 @@ export function RankingTable<G extends GameType>({ game, items, myScoreIds, high
                 </p>
               )}
             </div>
-            <span className="shrink-0 text-sm font-bold tabular-nums text-white">{formatScore(item.score)}</span>
+            <span className="shrink-0 text-sm font-bold tabular-nums text-white">{(game.formatScore ?? formatScore)(item.score)}</span>
             {!compact && replayUnavailable && (
               <button
                 type="button"

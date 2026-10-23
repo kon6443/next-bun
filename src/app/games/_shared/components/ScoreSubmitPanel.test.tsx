@@ -63,6 +63,16 @@ describe('ScoreSubmitPanel — 게임 사양·보드를 따른다', () => {
     expect(screen.getByRole('link', { name: '랭킹 보기' }).getAttribute('href')).toBe('/games/defense/rankings?highlight=9&board=endless-s1');
   });
 
+  it('점수 표기는 게임 사양(formatScore)을 따르고, 없으면 숫자(테트리스와 같은 1,234 표기)', async () => {
+    const { unmount } = await act(async () => render(<ScoreSubmitPanel {...props} />));
+    expect(screen.getByTestId('score-submit-score').textContent).toBe(props.score.toLocaleString('ko-KR'));
+    unmount();
+    await act(async () => {
+      render(<ScoreSubmitPanel {...props} game={{ ...props.game, formatScore: (n: number) => `웨이브 ${Math.floor(n / 1_000_000)}` }} />);
+    });
+    expect(screen.getByTestId('score-submit-score').textContent).toBe(`웨이브 ${Math.floor(props.score / 1_000_000)}`);
+  });
+
   it('보드가 없으면 랭킹 링크는 highlight만(테트리스 URL 불변), 기간을 하나만 주면 그 기간만 조회·표시, 다시보기 끄기', async () => {
     expect(rankingsHref('/games/tetris/rankings', 5)).toBe('/games/tetris/rankings?highlight=5');
     submitGameScore.mockResolvedValue({ code: 'SUCCESS', message: 'ok', data: { scoreId: 9, score: 3_000_000, detail: {}, ranks: { daily: 2, weekly: 2, all: 2 } } });

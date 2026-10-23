@@ -24,6 +24,8 @@ type ScoreSubmitPanelProps<G extends GameType> = {
   periods?: readonly { key: RankingPeriod; label: string }[];
   /** 등록 뒤 "내 플레이 다시보기" — 재생기가 아직 없는 게임은 false */
   showReplay?: boolean;
+  /** 등록 뒤 링크 아래 게임별 동작(공유 등) */
+  registeredActions?: (registered: SubmitScoreResponse<ScoreDetailByGame[G]>, playerName: string) => React.ReactNode;
   /** 세션이 없으면(발급 실패) 등록할 수 없다 */
   sessionId: string | null;
   sessionError: string | null;
@@ -71,6 +73,7 @@ export function ScoreSubmitPanel<G extends GameType>({
   board,
   periods = PERIODS,
   showReplay = true,
+  registeredActions,
   sessionId,
   sessionError,
   accessToken,
@@ -164,7 +167,10 @@ export function ScoreSubmitPanel<G extends GameType>({
       <h2 ref={titleRef} tabIndex={-1} className="text-xs font-semibold tracking-[0.4em] text-slate-400 focus:outline-none">
         GAME OVER
       </h2>
-      <p className="mt-3 text-4xl font-bold text-white">{formatScore(registered?.score ?? score)}</p>
+      {/* 게임별 표기(디펜스 "웨이브 n · 진척 p%")는 글이 길어 한 단계 작게 */}
+      <p className={`mt-3 font-bold text-white ${game.formatScore ? "text-2xl" : "text-4xl"}`} data-testid="score-submit-score">
+        {(game.formatScore ?? formatScore)(registered?.score ?? score)}
+      </p>
       {isNewBest && <p className="mt-1 text-sm font-semibold text-amber-300">개인 최고 기록!</p>}
       {stats}
 
@@ -189,6 +195,8 @@ export function ScoreSubmitPanel<G extends GameType>({
           <ButtonLink href={rankingsHref(game.rankingsPath, registered.scoreId, board)} variant="secondary" size="md" fullWidth>
             랭킹 보기
           </ButtonLink>
+          {/* 등록한 이름 — 등록 뒤에는 입력이 사라지므로 마지막 입력값을 정리한 것 */}
+          {registeredActions?.(registered, normalizePlayerName(name))}
         </div>
       ) : sessionId && !isFinalError ? (
         <form onSubmit={handleSubmit} className="mt-5 text-left" noValidate>
