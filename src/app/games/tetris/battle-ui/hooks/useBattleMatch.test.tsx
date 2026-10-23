@@ -358,7 +358,7 @@ describe('useBattleMatch', () => {
     expect(socket.emitted.filter((e) => e.event === 'lock')).toHaveLength(3);
   });
 
-  it('송신함: 연달아 보내되 보내는 중인 항목은 다시 보내지 않고, 이전 매치의 늦은 응답은 새 매치 항목을 건드리지 않는다', () => {
+  it('송신함: lock은 앞 항목이 확인돼야 다음을 보내고(순서 역전 방지, FE-10), 이전 매치의 늦은 응답은 새 매치 항목을 건드리지 않는다', () => {
     const { result } = setup();
     const held: { seq: unknown; matchId: unknown; cb?: (err: Error | null, response: unknown) => void }[] = [];
     socket.emit = (event: string, payload: Record<string, unknown>, callback?: (err: Error | null, response: unknown) => void) => {
@@ -376,10 +376,11 @@ describe('useBattleMatch', () => {
     startMatch(result, 'm2');
     drop(); // m2 seq1
     act(() => held[0].cb?.(new Error('operation has timed out'), undefined)); // m1의 늦은 응답
-    drop(); // m2 seq2 — 응답을 기다리지 않고 바로 나간다
+    drop(); // m2 seq2 — seq1 확인 전이라 아직 보내지 않는다
     const m2 = () => socket.emitted.filter((e) => e.event === 'lock' && e.payload.matchId === 'm2').map((e) => e.payload.seq);
+    expect(m2()).toEqual([1]);
+    act(() => held[1].cb?.(null, { ok: true, data: { targetId: 'p2' } })); // m2 seq1 확인 → seq2가 나간다
     expect(m2()).toEqual([1, 2]);
-    act(() => held[1].cb?.(null, { ok: true, data: { targetId: 'p2' } })); // m2 seq1 확인
     act(() => held[2].cb?.(new Error('operation has timed out'), undefined)); // m2 seq2 응답 없음
     act(() => {
       vi.advanceTimersByTime(1600);
@@ -387,6 +388,35 @@ describe('useBattleMatch', () => {
     // seq1은 끝났고, seq2만 같은 내용으로 다시 나간다
     expect(m2()).toEqual([1, 2, 2]);
     expect(result.current.targetId).toBe('p2');
+  });
+
+  it('앞 lock이 응답 없이 끝나면 뒤 lock은 앞 lock 재전송이 확인될 때까지 기다린다 — seq가 거꾸로 닿지 않는다 (FE-10)', () => {
+    const { result } = setup();
+    const held: { seq: unknown; cb?: (err: Error | null, response: unknown) => void }[] = [];
+    socket.emit = (event: string, payload: Record<string, unknown>, callback?: (err: Error | null, response: unknown) => void) => {
+      socket.emitted.push({ event, payload });
+      if (event === 'lock') held.push({ seq: payload.seq, cb: callback });
+      else callback?.(null, { ok: true, data: {} });
+    };
+    startMatch(result);
+    for (let i = 0; i < 3; i++) {
+      act(() => {
+        result.current.play.instant(ACTION.HARD_DROP);
+        vi.advanceTimersByTime(200);
+      });
+    }
+    const seqs = () => socket.emitted.filter((e) => e.event === 'lock').map((e) => e.payload.seq);
+    expect(seqs()).toEqual([1]);
+    act(() => held[0].cb?.(new Error('operation has timed out'), undefined));
+    act(() => {
+      vi.advanceTimersByTime(1600);
+    });
+    expect(seqs()).toEqual([1, 1]);
+    act(() => held[1].cb?.(null, { ok: true, data: { targetId: 'p2' } }));
+    act(() => held[2].cb?.(null, { ok: true, data: { targetId: 'p2' } }));
+    act(() => held[3].cb?.(null, { ok: true, data: { targetId: 'p2' } }));
+    // 보낸 순서가 곧 seq 순서 — 1을 다시 보낸 뒤에야 2·3
+    expect(seqs()).toEqual([1, 1, 2, 3]);
   });
 
   it('끊긴 사이 내가 쌓여 끝났으면 복귀 후 topOut(endFrame)을 다시 보낸다', () => {
