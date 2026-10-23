@@ -2,12 +2,11 @@
 
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
-import { formatScore } from "@/app/games/_shared/lib/format";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
 import type { PendingSubmission } from "@/app/games/_shared/lib/storage";
 import { classifySubmitError } from "@/app/games/_shared/lib/submitError";
 import { submitGameScore } from "@/services/gameService";
-import { defenseStorage } from "../lib/defenseGame";
+import { defenseStorage, formatDefenseScore } from "../lib/defenseGame";
 
 /**
  * 등록하지 못한 기록 다시 등록 (defense DESIGN §F7·§B4) — 게임 오버 패널에서 보관한 제출(네트워크·429·503 BUSY)을 허브에서 다시 낸다
@@ -70,7 +69,7 @@ export function PendingSubmitCard() {
       {pending && (
         <>
           <p className="text-sm text-slate-200">
-            등록하지 못한 기록이 있어요{list.length > 1 ? ` (${list.length}건)` : ""} — <strong>{needsNewName ? name : pending.playerName}</strong> · {formatScore(pending.score)}점
+            등록하지 못한 기록이 있어요{list.length > 1 ? ` (${list.length}건)` : ""} — <strong>{needsNewName ? name : pending.playerName}</strong> · {formatDefenseScore(pending.score)}
           </p>
           {needsNewName && (
             <div className="mt-3">

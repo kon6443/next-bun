@@ -13,21 +13,37 @@ export const REPLAY_PLAYER_READY = false;
 
 export const defenseStorage = createGameStorage('defense', { pendingKind: 'local', pendingLimit: 3 });
 
+/** 점수 = 클리어 웨이브 × 10⁶ + 진척‰ × 10³ — 엔진 scoreOf(engine/game.ts)와 같아야 한다(허브·랭킹은 엔진을 불러오지 않는다) */
+export const SCORE_PER_WAVE = 1_000_000;
+const SCORE_PER_PERMILLE = 1_000;
+
+/** 점수 → 클리어 웨이브·진척(‰) */
+export function splitDefenseScore(score: number): { wave: number; progress: number } {
+  const safe = Math.max(0, Math.floor(score));
+  return { wave: Math.floor(safe / SCORE_PER_WAVE), progress: Math.floor((safe % SCORE_PER_WAVE) / SCORE_PER_PERMILLE) };
+}
+
+/** 점수 표기 (사용자 결정) — "웨이브 24 · 진척 52%" (진척 = 다음 웨이브 처치 비율, 내림). 결과·랭킹·공유 카드 공통 */
+export function formatDefenseScore(score: number): string {
+  const { wave, progress } = splitDefenseScore(score);
+  return `웨이브 ${wave} · 진척 ${Math.floor(progress / 10)}%`;
+}
+
 export const DEFENSE_GAME: GameUiConfig<'defense'> = {
   gameType: 'defense',
   name: '타워 디펜스',
   homePath: '/games/defense',
   playPath: '/games/defense/play/endless',
   rankingsPath: '/games/defense/rankings',
-  // 재생기는 F3 — 그 전에는 등록 패널·랭킹에서 다시보기를 숨긴다
   replayPath: (scoreId) => `/games/defense/replays/${scoreId}`,
   rankingDetail: (item) => defenseStatLine(item.detail, item.durationMs),
+  formatScore: formatDefenseScore,
   storage: defenseStorage,
 };
 
-/** 랭킹 행 요약 — "웨이브 24 · 처치 812 · 31:20" (detail 키: 백엔드 defense-verify) */
+/** 랭킹 행 둘째 줄 — "처치 812 · 31:20" (웨이브는 점수 칸 "웨이브 n · 진척 p%"에 있다. detail 키: 백엔드 defense-verify) */
 export function defenseStatLine(detail: Record<string, number>, durationMs: number): string {
-  const parts = [`웨이브 ${detail.wave ?? 0}`];
+  const parts: string[] = [];
   if (Number.isFinite(detail.kills)) parts.push(`처치 ${detail.kills}`);
   parts.push(formatDurationMs(durationMs));
   return parts.join(' · ');

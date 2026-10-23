@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getGameBoards } from "@/services/gameService";
 import type { GameBoard } from "@/types/game";
-import { loadBests } from "../lib/defenseGame";
+import { formatDefenseScore, loadBests } from "../lib/defenseGame";
 import { isRankedUnlocked, loadProgress } from "../lib/progress";
 import { ENDLESS_BOARD_KEY, boardShortTitle } from "../lib/rankedBoards";
 
@@ -12,8 +12,6 @@ import { ENDLESS_BOARD_KEY, boardShortTitle } from "../lib/rankedBoards";
  * 허브의 무한·주간 카드 (defense DESIGN §F1·§L7) — 스테이지 4를 깨면 열린다. 랭킹 보기는 누구나
  * 주간: 이번 주 보드(W43)·남은 시간 — /boards에 이번 주가 없으면(서버 설정) 시작을 막는다. 규칙은 세션 seed로 정해져 시작한 뒤 보인다
  */
-/** 점수 = 클리어 웨이브 × 10⁶ + 진척 — 엔진 scoreOf(engine/game.ts)와 같아야 한다(허브는 엔진을 불러오지 않는다) */
-const SCORE_PER_WAVE = 1_000_000;
 
 function remainingText(endsAt: string, now: number): string {
   const left = Date.parse(endsAt) - now;
@@ -36,8 +34,8 @@ export function RankedCards() {
   }, []);
 
   const weekly = boards?.find((b) => b.mode === "weekly" && b.current) ?? null;
-  const endlessBest = Math.floor((bests[ENDLESS_BOARD_KEY] ?? 0) / SCORE_PER_WAVE);
-  const weeklyBest = weekly ? Math.floor((bests[weekly.boardKey] ?? 0) / SCORE_PER_WAVE) : 0;
+  const endlessBest = bests[ENDLESS_BOARD_KEY] ?? 0;
+  const weeklyBest = weekly ? (bests[weekly.boardKey] ?? 0) : 0;
   // 보드 목록을 못 받아도 주간을 막지 않는다 — 세션 발급에서 다시 판정(실패면 로컬 판)
   const weeklyOpen = boards === null && !boardsFailed ? null : weekly !== null || boardsFailed;
 
@@ -46,7 +44,7 @@ export function RankedCards() {
       <article className="rounded-2xl border border-slate-700/50 bg-slate-800/50 p-4">
         <h2 className="text-lg font-semibold text-white">무한 모드</h2>
         <p className="mt-1 text-xs text-slate-400">{boardShortTitle(ENDLESS_BOARD_KEY)} · 5웨이브마다 증강</p>
-        <p className="mt-2 text-sm text-slate-300">내 최고 {endlessBest > 0 ? `웨이브 ${endlessBest}` : "—"}</p>
+        <p className="mt-2 text-sm text-slate-300">내 최고 {endlessBest > 0 ? formatDefenseScore(endlessBest) : "—"}</p>
         <RankedActions unlocked={unlocked} playHref="/games/defense/play/endless" rankingsHref={`/games/defense/rankings?board=${ENDLESS_BOARD_KEY}`} testId="endless" open />
       </article>
       <article className="rounded-2xl border border-slate-700/50 bg-slate-800/50 p-4">
@@ -54,7 +52,7 @@ export function RankedCards() {
         <p className="mt-1 text-xs text-slate-400">
           {weekly ? [boardShortTitle(weekly.boardKey), weekly.endsAt ? remainingText(weekly.endsAt, Date.now()) : null].filter(Boolean).join(" · ") : boards ? "이번 주 도전을 열 수 없어요" : "모두 같은 맵·규칙"}
         </p>
-        <p className="mt-2 text-sm text-slate-300">내 최고 {weeklyBest > 0 ? `웨이브 ${weeklyBest}` : "—"}</p>
+        <p className="mt-2 text-sm text-slate-300">내 최고 {weeklyBest > 0 ? formatDefenseScore(weeklyBest) : "—"}</p>
         <RankedActions unlocked={unlocked} playHref="/games/defense/play/weekly" rankingsHref="/games/defense/rankings?board=weekly" testId="weekly" open={weeklyOpen} />
       </article>
     </section>

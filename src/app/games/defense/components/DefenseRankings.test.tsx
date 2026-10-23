@@ -40,16 +40,20 @@ describe('디펜스 랭킹·허브 카드', () => {
     expect(screen.getByTestId('defense-board-tab-weekly-2026-w43').getAttribute('aria-current')).toBe('page');
     expect(screen.queryByRole('group', { name: '랭킹 기간' })).toBeNull();
     expect(screen.getByRole('button', { name: /주가 끝나면 공개돼요/ })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /리플레이 보기/ })).toBeNull();
   });
 
-  it('무한 기본 — 기간 탭(일간부터), 지난 주 탭은 재생기 준비 전이라 비활성 사유가 다르다', async () => {
+  it('무한 기본 — 기간 탭(일간부터), 재생기 준비 전이라 ▶ 비활성', async () => {
     await act(async () => {
       render(<DefenseRankings boardParam={null} highlightId={null} />);
     });
     expect(getGameRankings).toHaveBeenCalledWith('defense', 'daily', 50, 'endless-s1');
     expect(screen.getByRole('group', { name: '랭킹 기간' })).toBeTruthy();
     expect(screen.getByRole('button', { name: /리플레이는 준비 중이에요/ })).toBeTruthy();
-    expect(screen.getByText(/웨이브 24 · 처치 800/)).toBeTruthy();
+    expect(screen.getByText(/^처치 800 · 1:00 · /)).toBeTruthy();
+    // 점수 칸은 원점수 대신 "웨이브 n · 진척 p%"(사용자 결정) — 정렬은 서버 점수 그대로
+    expect(screen.getByText('웨이브 24 · 진척 50%')).toBeTruthy();
+    expect(screen.queryByText('24,500,000')).toBeNull();
     expect(screen.getByTestId('defense-board-tab-weekly-2026-w42').getAttribute('href')).toBe('/games/defense/rankings?board=weekly-2026-w42');
   });
 
@@ -83,7 +87,7 @@ describe('디펜스 랭킹·허브 카드', () => {
     expect(screen.getByTestId('defense-endless-play').getAttribute('href')).toBe('/games/defense/play/endless');
     expect(screen.getByTestId('defense-weekly-play').getAttribute('href')).toBe('/games/defense/play/weekly');
     expect(screen.getByText(/W43 · \d+일/)).toBeTruthy();
-    expect(screen.getByText('내 최고 웨이브 24')).toBeTruthy();
+    expect(screen.getByText('내 최고 웨이브 24 · 진척 50%')).toBeTruthy();
   });
 
   it('허브 카드 — /boards에 이번 주가 없으면(서버 설정) 주간 시작을 막는다', async () => {

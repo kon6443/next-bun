@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, it, expect } from 'vitest';
-import { defenseStatLine, loadBest, loadBests, recordBest } from './defenseGame';
+import { defenseStatLine, formatDefenseScore, loadBest, loadBests, recordBest, splitDefenseScore } from './defenseGame';
 
 describe('defenseGame — 보드별 최고 점수·랭킹 요약', () => {
   beforeEach(() => localStorage.clear());
@@ -24,8 +24,15 @@ describe('defenseGame — 보드별 최고 점수·랭킹 요약', () => {
     expect(loadBests()).toEqual({});
   });
 
-  it('랭킹 행 요약 — 웨이브·처치·시간', () => {
-    expect(defenseStatLine({ wave: 24, kills: 812 }, 1_880_000)).toBe('웨이브 24 · 처치 812 · 31:20');
-    expect(defenseStatLine({}, 0)).toBe('웨이브 0 · 0:00');
+  it('점수 표기 — 웨이브 n · 진척 p%(‰ 내림)', () => {
+    expect(splitDefenseScore(24_523_000)).toEqual({ wave: 24, progress: 523 });
+    expect(formatDefenseScore(24_523_000)).toBe('웨이브 24 · 진척 52%');
+    expect(formatDefenseScore(0)).toBe('웨이브 0 · 진척 0%');
+    expect(formatDefenseScore(1_999_000)).toBe('웨이브 1 · 진척 99%');
+  });
+
+  it('랭킹 행 요약 — 처치·시간(웨이브는 점수 칸)', () => {
+    expect(defenseStatLine({ wave: 24, kills: 812 }, 1_880_000)).toBe('처치 812 · 31:20');
+    expect(defenseStatLine({}, 0)).toBe('0:00');
   });
 });
