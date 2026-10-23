@@ -11,7 +11,10 @@ export type RankedMode = 'endless' | 'weekly';
  */
 export const DEFENSE_SESSION_TTL_MS = 4 * 60 * 60 * 1000;
 
-/** 현재 무한 시즌 보드 — 서버 resolveSessionBoard의 시즌과 같아야 로컬 판이 같은 맵·규칙이 된다 */
+/**
+ * 무한 시즌 보드 폴백 — 서버 시즌은 배포로만 오른다(Q-D2). 화면은 /boards의 current 무한 보드를 쓰고(currentEndlessBoardKey),
+ * 목록을 못 받았을 때·세션 없는 로컬 판에만 이 값
+ */
 export const ENDLESS_BOARD_KEY = 'endless-s1';
 
 const WEEKLY_KEY = /^weekly-(\d{4})-w(\d{2})$/;
@@ -30,6 +33,11 @@ export function weeklyBoardKeyAt(nowMs: number): string {
   const year = new Date(thursday).getUTCFullYear();
   const week = Math.floor((thursday - Date.UTC(year, 0, 1)) / (7 * DAY_MS)) + 1;
   return `weekly-${year}-w${String(week).padStart(2, '0')}`;
+}
+
+/** /boards의 현재 무한 시즌 키 — 목록이 없거나(실패·응답 전) 무한 current가 없으면 폴백 (games-polish FE-07) */
+export function currentEndlessBoardKey(boards: readonly { boardKey: string; mode: string | null; current: boolean }[] | null): string {
+  return boards?.find((b) => b.mode === 'endless' && b.current && ENDLESS_KEY.test(b.boardKey))?.boardKey ?? ENDLESS_BOARD_KEY;
 }
 
 export function modeOfBoardKey(boardKey: string): RankedMode | null {
