@@ -27,6 +27,11 @@ vi.mock('./BattleView', () => ({
   ),
 }));
 
+// 기록 링크는 공개 대기 폴링(fetch)을 한다 — 렌더 여부만 본다
+vi.mock('./MatchRecordLinks', () => ({
+  MatchRecordLinks: ({ matchId }: { matchId: string }) => <a data-testid="record-links">{matchId}</a>,
+}));
+
 import { MatchScreen } from './MatchScreen';
 
 const renderScreen = (phase: MatchPhase, connection: ConnectionStatus = 'connected', onReconnect = vi.fn()) =>
@@ -92,5 +97,19 @@ describe('MatchScreen 연결 상태 (games-polish FE-01)', () => {
     renderScreen({ kind: 'playing', matchId: 'm1' }, 'failed', onReconnect);
     fireEvent.click(screen.getByRole('button', { name: /다시 연결/ }));
     expect(onReconnect).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('MatchScreen 결과 기록 링크 (games-polish FE-24)', () => {
+  const ended: MatchPhase = { kind: 'ended', matchId: 'm1', results: [] };
+
+  it('내가 기록을 내지 못했어도(제출 없음·실패) 경기 기록 링크를 준다 — 경기는 마감 뒤 공개된다', () => {
+    renderScreen(ended);
+    expect(screen.getByTestId('record-links')).toHaveTextContent('m1');
+  });
+
+  it('매치 id를 모르면(끊긴 사이 종료) 링크가 없다', () => {
+    renderScreen({ kind: 'ended', matchId: null, results: [] });
+    expect(screen.queryByTestId('record-links')).toBeNull();
   });
 });

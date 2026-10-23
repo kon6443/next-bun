@@ -216,7 +216,7 @@ type MatchResultsProps = {
   results: MatchResultEntry[];
   myPlayerId: string;
   isHost: boolean;
-  /** 이 기기에서 이 경기 기록을 제출했을 때만 */
+  /** 이 기기에서 이 경기 기록을 제출했을 때만 — 제출 상태 한 줄 */
   submitStatus: ReplaySubmitStatus | null;
   onRematch: () => Promise<{ ok: true } | { ok: false; code: string }>;
   /** 방장이 내보낼 수 있는 참가자 — 방장이 아니거나 경기 중이면 null */
@@ -316,8 +316,8 @@ function MatchResults({ matchId, results, myPlayerId, isHost, submitStatus, onRe
             {SUBMIT_LABELS[submitStatus].text}
           </p>
         )}
-        {/* 내 기록을 냈을 때만(검증 실패여도 경기는 공개된다 — D-008) — 경기 전체가 저장(공개)될 때까지 기다린 뒤 연다 */}
-        {(submitStatus === "saved" || submitStatus === "invalid") && matchId && <MatchRecordLinks matchId={matchId} />}
+        {/* 경기는 내가 기록을 내지 못했어도(끊김 탈락·제출 실패) 마감 뒤 저장·공개된다(D-008·Q-B5) — 공개될 때까지 기다린 뒤 연다 (games-polish FE-24) */}
+        {matchId && <MatchRecordLinks matchId={matchId} />}
         {error && (
           <p role="alert" className="mt-2 text-center text-sm text-rose-300">
             {error}
