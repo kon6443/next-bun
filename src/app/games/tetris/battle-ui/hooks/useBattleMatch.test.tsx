@@ -7,7 +7,7 @@ import { ACTION, BOARD_ROWS, BOARD_WIDTH } from '../../engine';
 import { type BattleReplayInput, simulateBattleReplay } from '../../battle-engine';
 import type { MatchSync } from '../contexts/BattleSocketContext';
 import { encodeBoard } from '../lib/boardCodec';
-import { RESULT_WAIT_MS, useBattleMatch } from './useBattleMatch';
+import { RESULT_WAIT_MS, UNAVAILABLE_GRACE_MS, useBattleMatch } from './useBattleMatch';
 
 type Listener = (...args: unknown[]) => void;
 
@@ -739,10 +739,29 @@ describe('useBattleMatch', () => {
     expect(result.current.replaySubmit).toEqual({ matchId: 'm2', status: 'submitting' });
   });
 
-  it('방이 경기 중인데 이 기기에 판이 없으면(새로고침 등) 참여 불가 — 끝나면 대기실로', () => {
+  it('방이 경기 중인데 이 기기에 판이 없으면(새로고침 등) 잠깐 기다린 뒤 참여 불가 — 끝나면 대기실로', () => {
     const { result, rerender } = setup('PLAYING');
+    expect(result.current.phase).toEqual({ kind: 'idle' });
+    act(() => {
+      vi.advanceTimersByTime(UNAVAILABLE_GRACE_MS);
+    });
     expect(result.current.phase).toEqual({ kind: 'unavailable', forfeited: false });
     rerender({ r: room('RESULT') });
     expect(result.current.phase).toEqual({ kind: 'idle' });
+  });
+
+  it('방 상태(PLAYING)가 matchStarting보다 먼저 와도 "진행 중인 게임"을 띄우지 않고 카운트다운으로 간다 (FE-15)', () => {
+    const { result, rerender } = setup('WAITING');
+    rerender({ r: room('PLAYING') });
+    act(() => {
+      vi.advanceTimersByTime(UNAVAILABLE_GRACE_MS / 2);
+    });
+    expect(result.current.phase).toEqual({ kind: 'idle' });
+    act(() => socket.fire('matchStarting', { matchId: 'm1', seed: 7, startInMs: 3000, startAt: '', players: PLAYERS }));
+    expect(result.current.phase.kind).toBe('countdown');
+    act(() => {
+      vi.advanceTimersByTime(UNAVAILABLE_GRACE_MS);
+    });
+    expect(result.current.phase.kind).toBe('countdown');
   });
 });

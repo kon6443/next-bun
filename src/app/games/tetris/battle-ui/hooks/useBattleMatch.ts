@@ -25,6 +25,12 @@ const WIN_SOUND_DELAY_MS = 450;
 export const RESULT_WAIT_MS = 1500;
 
 /**
+ * 방이 PLAYING인데 이 기기가 매치를 모르면 이만큼 matchStarting을 기다린 뒤 "진행 중인 게임"으로 —
+ * 다른 레플리카의 방 변경 방송이 matchStarting보다 먼저 닿을 수 있다(드묾, games-polish FE-15·Q-B1)
+ */
+export const UNAVAILABLE_GRACE_MS = 1000;
+
+/**
  * 매치 진행 단계
  * - idle: 이 기기에 진행 중인 매치가 없다(대기실)
  * - countdown: matchStarting을 받아 시작 시각을 기다린다
@@ -133,6 +139,10 @@ export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMat
 
   /** 방이 RESULT가 된 뒤 matchEnded를 기다리는 타이머 */
   const resultWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 방이 PLAYING인데 매치를 모를 때 matchStarting을 기다리는 타이머 */
+  const unavailableTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const roomStatusRef = useRef(room.status);
+  roomStatusRef.current = room.status;
 
   // lock·topOut 송신함 — 확인받을 때까지 보관·재전송 (useMatchOutbox)
   const outbox = useMatchOutbox({
@@ -187,6 +197,13 @@ export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMat
     if (resultWaitTimerRef.current) {
       clearTimeout(resultWaitTimerRef.current);
       resultWaitTimerRef.current = null;
+    }
+  };
+
+  const clearUnavailableWait = () => {
+    if (unavailableTimerRef.current) {
+      clearTimeout(unavailableTimerRef.current);
+      unavailableTimerRef.current = null;
     }
   };
 
@@ -251,6 +268,7 @@ export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMat
 
     const onStarting = (p: { matchId: string; seed: number; startInMs: number; players: { playerId: string; name: string }[] }) => {
       clearStartTimer();
+      clearUnavailableWait();
       clearResultWait();
       stopPlay();
       matchIdRef.current = p.matchId;
@@ -368,6 +386,7 @@ export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMat
       clearStartTimer();
       if (winSoundTimerRef.current) clearTimeout(winSoundTimerRef.current);
       if (resultWaitTimerRef.current) clearTimeout(resultWaitTimerRef.current);
+      if (unavailableTimerRef.current) clearTimeout(unavailableTimerRef.current);
     },
     [],
   );
@@ -446,6 +465,7 @@ export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMat
 
   useEffect(() => {
     const current = phaseRef.current;
+    if (room.status !== "PLAYING") clearUnavailableWait();
     if (room.status === "WAITING" && current.kind !== "idle" && current.kind !== "countdown") {
       // 재대결 — 대기실로
       clearStartTimer();
@@ -458,9 +478,13 @@ export function useBattleMatch({ socket, room, myPlayerId, das, arr, registerMat
       setOpponents([]);
       setTargetId(null);
       setPhase({ kind: "idle" });
-    } else if (room.status === "PLAYING" && current.kind === "idle") {
+    } else if (room.status === "PLAYING" && current.kind === "idle" && !unavailableTimerRef.current) {
       // 경기 중에 들어왔다(새로고침 등) — 이 기기에는 판이 없어 참여할 수 없다
-      setPhase({ kind: "unavailable", forfeited: false });
+      // 방 상태가 matchStarting보다 먼저 닿았을 수도 있어 잠깐 기다린다 — 그사이 matchStarting이 오면 카운트다운으로 간다
+      unavailableTimerRef.current = setTimeout(() => {
+        unavailableTimerRef.current = null;
+        if (phaseRef.current.kind === "idle" && roomStatusRef.current === "PLAYING") setPhase({ kind: "unavailable", forfeited: false });
+      }, UNAVAILABLE_GRACE_MS);
     } else if (room.status === "RESULT" && (current.kind === "countdown" || current.kind === "playing" || current.kind === "out")) {
       // 경기가 끝났다 — 판은 바로 멈추고(카운트다운이면 시작하지 않는다), 결과는 matchEnded를 잠깐 기다린다
       // (서버 경로에 따라 roomState가 matchEnded보다 먼저 온다). 끝내 안 오면(끊긴 사이 종료) 결과 없는 종료 화면으로
