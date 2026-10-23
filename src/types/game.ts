@@ -23,6 +23,17 @@ export type GameSession = {
   mode?: GameMode | null;
 };
 
+/** 랭킹 보드 (GET /games/:gameType/boards — D-024) */
+export type GameBoard = {
+  boardKey: string;
+  mode: GameMode | null;
+  /** 지금 등록받는 보드 (지난 시즌·지난 주는 false) */
+  current: boolean;
+  /** 기간 있는 보드(주간)의 시작·끝 — ISO 8601 (UTC), 없으면 null */
+  startsAt: string | null;
+  endsAt: string | null;
+};
+
 /** 테트리스 기록 상세 (DESIGN §1 DETAIL) */
 export type TetrisScoreDetail = {
   lines: number;

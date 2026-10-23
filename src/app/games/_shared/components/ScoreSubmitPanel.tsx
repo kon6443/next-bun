@@ -18,8 +18,12 @@ type ScoreSubmitPanelProps<G extends GameType> = {
   /** 점수 아래 게임별 기록 요약 (줄·레벨·시간 등) */
   stats: React.ReactNode;
   replay: ReplayPayloadByGame[G];
-  /** 등록할 보드 — 예상 순위 조회에 쓴다 (없으면 그 게임의 기본 보드) */
+  /** 등록할 보드 — 예상 순위 조회·랭킹 링크에 쓴다 (없으면 그 게임의 기본 보드 — 링크도 board 없이) */
   board?: string;
+  /** 보일 순위 기간 — 기본 오늘·이번 주·전체. 보드 자체가 기간인 경우(디펜스 주간)는 하나만 */
+  periods?: readonly { key: RankingPeriod; label: string }[];
+  /** 등록 뒤 "내 플레이 다시보기" — 재생기가 아직 없는 게임은 false */
+  showReplay?: boolean;
   /** 세션이 없으면(발급 실패) 등록할 수 없다 */
   sessionId: string | null;
   sessionError: string | null;
@@ -28,7 +32,7 @@ type ScoreSubmitPanelProps<G extends GameType> = {
   onRestart: () => void;
 };
 
-const PERIODS: { key: RankingPeriod; label: string }[] = [
+const PERIODS: readonly { key: RankingPeriod; label: string }[] = [
   { key: "daily", label: "오늘" },
   { key: "weekly", label: "이번 주" },
   { key: "all", label: "전체" },
@@ -50,6 +54,13 @@ function rankLabel(registered: SubmitScoreResponse<unknown> | null, estimate: Es
   return estimate === null ? "100위 밖" : `예상 ${estimate}위`;
 }
 
+/** 등록 뒤 랭킹 링크 — 보드가 있으면 그 보드 탭으로(board 생략 게임은 URL이 그대로) */
+export function rankingsHref(rankingsPath: string, scoreId: number, board?: string): string {
+  const params = new URLSearchParams({ highlight: String(scoreId) });
+  if (board) params.set("board", board);
+  return `${rankingsPath}?${params.toString()}`;
+}
+
 /** 게임 오버 패널 — 점수·예상 순위·이름 입력·등록·실패 보관(재시도) (게임별 요약은 stats로) */
 export function ScoreSubmitPanel<G extends GameType>({
   game,
@@ -58,6 +69,8 @@ export function ScoreSubmitPanel<G extends GameType>({
   stats,
   replay,
   board,
+  periods = PERIODS,
+  showReplay = true,
   sessionId,
   sessionError,
   accessToken,
@@ -91,7 +104,7 @@ export function ScoreSubmitPanel<G extends GameType>({
     if (estimatesRequestedRef.current) return;
     estimatesRequestedRef.current = true;
     const myScore = score;
-    for (const { key } of PERIODS) {
+    for (const { key } of periods) {
       getGameRankings(gameType, key, ESTIMATE_LIMIT, board)
         .then(({ data }) => {
           const scores = data.items.map((item) => item.score);
@@ -105,7 +118,7 @@ export function ScoreSubmitPanel<G extends GameType>({
           setEstimates((prev) => ({ ...prev, [key]: "unavailable" }));
         });
     }
-  }, [gameType, board, score]);
+  }, [gameType, board, score, periods]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,8 +169,8 @@ export function ScoreSubmitPanel<G extends GameType>({
       {stats}
 
       {/* 순위 — 등록 전에는 예상, 등록 후에는 서버 순위 */}
-      <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-slate-950/40 p-3 text-sm">
-        {PERIODS.map(({ key, label }) => (
+      <div className={`mt-4 grid gap-2 rounded-2xl border border-white/10 bg-slate-950/40 p-3 text-sm ${periods.length === 3 ? "grid-cols-3" : "grid-cols-1"}`}>
+        {periods.map(({ key, label }) => (
           <div key={key}>
             <p className="text-xs text-slate-500">{label}</p>
             <p className="mt-0.5 font-semibold text-slate-100">{rankLabel(registered, estimates[key], key)}</p>
@@ -168,10 +181,12 @@ export function ScoreSubmitPanel<G extends GameType>({
       {registered ? (
         <div className="mt-5 flex flex-col gap-2">
           <p className="text-sm font-semibold text-emerald-300">랭킹에 등록했어요.</p>
-          <ButtonLink href={game.replayPath(registered.scoreId)} variant="secondary" size="md" fullWidth>
-            ▶ 내 플레이 다시보기
-          </ButtonLink>
-          <ButtonLink href={`${game.rankingsPath}?highlight=${registered.scoreId}`} variant="secondary" size="md" fullWidth>
+          {showReplay && (
+            <ButtonLink href={game.replayPath(registered.scoreId)} variant="secondary" size="md" fullWidth>
+              ▶ 내 플레이 다시보기
+            </ButtonLink>
+          )}
+          <ButtonLink href={rankingsHref(game.rankingsPath, registered.scoreId, board)} variant="secondary" size="md" fullWidth>
             랭킹 보기
           </ButtonLink>
         </div>
