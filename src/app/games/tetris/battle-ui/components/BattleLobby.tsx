@@ -6,9 +6,16 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { Button, LoadingSpinnerSimple } from "@/app/teams/components";
 import { baseInputStyles } from "@/app/teams/components/FormInput";
-import { ROOM_MAX_PLAYERS, ROOM_MIN_PLAYERS, ROOM_NAME_MAX_LENGTH, ROOM_PASSWORD_MAX_LENGTH, type RoomSummary } from "@/types/tetrisBattleSocket";
+import {
+  ROOM_MAX_PLAYERS,
+  ROOM_MIN_PLAYERS,
+  ROOM_NAME_MAX_LENGTH,
+  ROOM_PASSWORD_MAX_LENGTH,
+  type RoomSummary,
+  TetrisBattleErrorCodes,
+} from "@/types/tetrisBattleSocket";
 import { PLAYER_NAME_MAX_LENGTH } from "@/app/games/_shared/lib/playerName";
-import { useBattleSocket, useEnterScope } from "../contexts/BattleSocketContext";
+import { type ConnectionStatus, useBattleSocket, useEnterScope } from "../contexts/BattleSocketContext";
 import { usePlayerName } from "../hooks/usePlayerName";
 import { battleErrorMessage } from "../lib/battleErrors";
 import { normalizeRoomCode, normalizeRoomName, validateRoomName, validateRoomPassword } from "../lib/roomForm";
@@ -16,6 +23,14 @@ import { ConnectionBadge } from "./ConnectionBadge";
 
 const cardStyles = "rounded-3xl border border-slate-700/50 bg-slate-800/50 p-5";
 const PLAYER_COUNTS = Array.from({ length: ROOM_MAX_PLAYERS - ROOM_MIN_PLAYERS + 1 }, (_, i) => ROOM_MIN_PLAYERS + i);
+
+/**
+ * 연결 직후 목록 받기가 일시 거절이면 잠시 뒤 다시 — 실패하면 로비 구독도 안 돼 목록이 갱신되지 않는다
+ * (listRooms 한도 RATE_LIMITED·유저 조회 실패 SERVICE_UNAVAILABLE, BT-02·BT-03, games-polish 새로고침 버튼)
+ */
+const LIST_RETRYABLE_CODES = new Set<string>([TetrisBattleErrorCodes.RATE_LIMITED, TetrisBattleErrorCodes.SERVICE_UNAVAILABLE, "TIMEOUT"]);
+export const LIST_RETRY_MS = 2000;
+const LIST_RETRIES = 3;
 
 const roomPath = (code: string, locked = false) => `/games/tetris/battle/${code}${locked ? "?locked=1" : ""}`;
 
@@ -34,6 +49,8 @@ export function BattleLobby() {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
+  /** 새로고침 응답 대기 — 연타로 한도(RATE_LIMITED)에 걸리지 않게 그동안 버튼을 잠근다 */
+  const [listing, setListing] = useState(false);
 
   // 방에서 뒤로 왔으면 방을 나간다 — 로비와 방에 동시에 있지 않게.
   // 진입 시점의 방만 본다(여기서 방을 만들면 이동 전에 room이 생기므로 그 방은 나가면 안 된다)
@@ -53,13 +70,28 @@ export function BattleLobby() {
   useEffect(() => {
     if (status !== "connected") return;
     let cancelled = false;
-    listRooms().then((result) => {
-      if (!cancelled) setListError(result.ok ? null : battleErrorMessage(result.code));
-    });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const load = async (attempt: number) => {
+      const result = await listRooms();
+      if (cancelled) return;
+      setListError(result.ok ? null : battleErrorMessage(result.code));
+      if (!result.ok && LIST_RETRYABLE_CODES.has(result.code) && attempt < LIST_RETRIES) {
+        timer = setTimeout(() => void load(attempt + 1), LIST_RETRY_MS);
+      }
+    };
+    void load(0);
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
     };
   }, [status, listRooms]);
+
+  const refreshList = async () => {
+    setListing(true);
+    const result = await listRooms();
+    setListing(false);
+    setListError(result.ok ? null : battleErrorMessage(result.code));
+  };
 
   const submitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,23 +233,44 @@ export function BattleLobby() {
             </h2>
             <button
               type="button"
-              onClick={() => listRooms().then((r) => setListError(r.ok ? null : battleErrorMessage(r.code)))}
-              disabled={status !== "connected"}
+              onClick={refreshList}
+              disabled={status !== "connected" || listing}
+              aria-busy={listing}
               className="min-h-11 px-2 text-xs text-sky-300 disabled:opacity-40"
             >
               새로고침
             </button>
           </div>
-          <RoomList rooms={rooms} error={listError} loading={status === "connecting"} />
+          <RoomList rooms={rooms} error={listError} status={status} onReconnect={reconnect} />
         </section>
       </div>
     </div>
   );
 }
 
-function RoomList({ rooms, error, loading }: { rooms: RoomSummary[] | null; error: string | null; loading: boolean }) {
+type RoomListProps = { rooms: RoomSummary[] | null; error: string | null; status: ConnectionStatus; onReconnect: () => void };
+
+function RoomList({ rooms, error, status, onReconnect }: RoomListProps) {
   if (error) return <p className="mt-3 text-sm text-rose-300">{error}</p>;
-  if (rooms === null || loading) {
+  // 연결이 없으면 목록이 오지 않는다 — 끝없는 스피너 대신 상태를 알린다 (games-polish FE-33)
+  if (rooms === null && status === "failed") {
+    return (
+      <p className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-400" role="status">
+        서버에 연결되지 않았어요.
+        <button type="button" onClick={onReconnect} className="min-h-11 px-2 text-sm font-semibold text-sky-300 hover:text-sky-200">
+          다시 연결
+        </button>
+      </p>
+    );
+  }
+  if (rooms === null && status === "disconnected") {
+    return (
+      <p className="mt-3 text-sm text-slate-400" role="status">
+        서버에 다시 연결하는 중이에요…
+      </p>
+    );
+  }
+  if (rooms === null || status === "connecting") {
     return (
       <div className="mt-4 flex justify-center">
         <LoadingSpinnerSimple />
