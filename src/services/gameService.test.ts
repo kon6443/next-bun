@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createGameSession, getGameRankings, getGameReplay, SESSION_TIMEOUT_MS, submitGameScore } from './gameService';
+import { createGameSession, getGameBoards, getGameRankings, getGameReplay, SESSION_TIMEOUT_MS, submitGameScore } from './gameService';
 import { ApiError } from '@/types/api';
 
 // 서비스 → FetchService → fetch 경로 전체를 실제로 타고, 네트워크만 stub 한다 (백엔드 API 준비 전 mock)
@@ -30,6 +30,29 @@ describe('gameService', () => {
     expect(url).toMatch(/\/api\/v1\/games\/tetris\/sessions$/);
     expect(init.method).toBe('POST');
     expect(init.headers.Authorization).toBeUndefined();
+    // 테트리스는 본문 없이(보내면 422) — board 일반화 전과 같은 요청
+    expect(init.body).toBeUndefined();
+  });
+
+  it('세션: 디펜스는 플레이 방식을 본문 board로', async () => {
+    fetchMock.mockResolvedValue(json({ code: 'SUCCESS', message: 'ok', data: { sessionId: 's', seed: 1, engineVersion: 3, expiresAt: 'x', boardKey: 'weekly-2026-w43', mode: 'weekly' } }, 201));
+    const { data } = await createGameSession('defense', undefined, 'weekly');
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toMatch(/\/api\/v1\/games\/defense\/sessions$/);
+    expect(JSON.parse(init.body)).toEqual({ board: 'weekly' });
+    expect(data.boardKey).toBe('weekly-2026-w43');
+  });
+
+  it('세션: 주간 비활성 503은 백엔드 code 그대로(GAME_WEEKLY_UNAVAILABLE)', async () => {
+    fetchMock.mockResolvedValue(json({ code: 'GAME_WEEKLY_UNAVAILABLE', message: 'x', timestamp: 't' }, 503));
+    await expect(createGameSession('defense', undefined, 'weekly')).rejects.toMatchObject({ code: 'GAME_WEEKLY_UNAVAILABLE', status: 503 });
+  });
+
+  it('보드 목록: GET /games/:g/boards', async () => {
+    fetchMock.mockResolvedValue(json({ code: 'SUCCESS', message: 'ok', data: { items: [{ boardKey: 'endless-s1', mode: 'endless', current: true, startsAt: null, endsAt: null }] } }));
+    const { data } = await getGameBoards('defense');
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/v1\/games\/defense\/boards$/);
+    expect(data.items[0].boardKey).toBe('endless-s1');
   });
 
   it('세션·제출·리플레이 조회에는 응답 대기 상한(signal)이 붙는다 — 망이 멈춰도 실패 분기로 간다 (FE-08)', async () => {

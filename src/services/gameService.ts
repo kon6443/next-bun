@@ -1,6 +1,8 @@
 import fetchServiceInstance from './FetchService';
 import { ApiError, type ApiErrorResponse, type ApiResponse, createApiError } from '@/types/api';
 import type {
+  GameBoard,
+  GameMode,
   GameSession,
   GameType,
   RankingList,
@@ -154,13 +156,18 @@ function verifyBusyWaitMs(response: Response): number | null {
 
 /**
  * 게임 세션·시드 발급 — 로그인이면 토큰을 붙인다(선택 인증)
+ * board: 보드가 여러 개인 게임의 플레이 방식(디펜스 endless·weekly) — 생략하면 본문 없이(테트리스는 보내면 422)
+ * 503: GAME_SESSION_UNAVAILABLE(세션 저장소)·GAME_WEEKLY_UNAVAILABLE(주간만) — 플레이는 되고 등록만 안 된다
  */
 export async function createGameSession(
   gameType: GameType,
   accessToken?: string,
+  board?: GameMode,
 ): Promise<ApiResponse<GameSession>> {
   const response = await fetchWithOptionalAuth(
-    { method: 'POST', endpoint: `/api/v1/games/${gameType}/sessions`, timeoutMs: SESSION_TIMEOUT_MS },
+    board
+      ? { method: 'POST', endpoint: `/api/v1/games/${gameType}/sessions`, body: { board }, timeoutMs: SESSION_TIMEOUT_MS }
+      : { method: 'POST', endpoint: `/api/v1/games/${gameType}/sessions`, timeoutMs: SESSION_TIMEOUT_MS },
     accessToken,
   );
 
@@ -213,6 +220,20 @@ export async function submitGameScore<G extends GameType>(
       429: TOO_MANY,
       default: '기록을 등록하지 못했습니다.',
     });
+  }
+
+  return response.json();
+}
+
+/** 랭킹 보드 목록 (D-024) — 현재 등록받는 보드(current)와 지난 시즌·지난 주 */
+export async function getGameBoards(gameType: GameType): Promise<ApiResponse<{ items: GameBoard[] }>> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'GET',
+    endpoint: `/api/v1/games/${gameType}/boards`,
+  });
+
+  if (!response.ok) {
+    await handleApiError(response, { 429: TOO_MANY, default: '랭킹 보드를 불러오지 못했습니다.' });
   }
 
   return response.json();

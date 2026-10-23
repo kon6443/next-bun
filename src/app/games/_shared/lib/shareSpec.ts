@@ -13,6 +13,8 @@ export type ShareSubject<D> = {
   playerName: string;
   score: number;
   detail: D;
+  /** 기록의 랭킹 보드 — 보드가 여럿인 게임만 문구에 쓴다(테트리스는 무시) */
+  boardKey?: string;
 };
 
 export type ReplayShareSpec<D> = {
@@ -21,7 +23,7 @@ export type ReplayShareSpec<D> = {
   /** 미리보기 이미지 경로 — route group 밖 고정 route handler (replays/[scoreId]/og/route.tsx) */
   imagePath: (scoreId: number | string) => string;
   /** 제목 — "{이름}님의 테트리스 {점수}점" */
-  headline: (subject: Pick<ShareSubject<D>, 'playerName' | 'score'>) => string;
+  headline: (subject: Pick<ShareSubject<D>, 'playerName' | 'score' | 'boardKey'>) => string;
   /** 짧은 기록 요약 — 공유 문구·카카오 설명 ("40줄 · 레벨 5") */
   statLine: (detail: D) => string;
   /** 링크 미리보기 설명 (기록이 있을 때) */
