@@ -59,8 +59,11 @@ export function WaitingRoom({ room, connection, onReconnect, onExit, onCopyInvit
   const start = async () => {
     setStarting(true);
     const result = await startMatch();
+    // 성공이면 잠근 채 둔다 — matchStarting은 ack보다 먼저 와 곧 대전 화면으로 바뀐다(Q-B1).
+    // 풀어 두면 그 틈에 다시 눌러 MATCH_ALREADY_STARTED 문구가 번쩍인다 (games-polish FE-34)
+    if (result.ok) return;
     setStarting(false);
-    setError(result.ok ? null : battleErrorMessage(result.code));
+    setError(battleErrorMessage(result.code));
   };
 
   const toggleReady = async () => {
