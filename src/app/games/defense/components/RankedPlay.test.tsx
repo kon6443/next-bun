@@ -19,7 +19,7 @@ vi.mock('@/services/gameService', () => ({ createGameSession, getGameRankings, s
 const session = (mode: 'endless' | 'weekly', boardKey: string) => ({
   code: 'SUCCESS',
   message: '',
-  data: { sessionId: 'sess-1', seed: 3449748544, engineVersion: ENGINE_VERSION, expiresAt: '2026-10-23T00:00:00Z', boardKey, mode },
+  data: { sessionId: 'sess-1', seed: 3449748544, engineVersion: ENGINE_VERSION, expiresAt: '2099-01-01T00:00:00Z', boardKey, mode },
 });
 // next/link 전용 속성(replace·scroll)은 <a>에 넘기지 않는다
 const linkAttrs = (rest: Record<string, unknown>) => Object.fromEntries(Object.entries(rest).filter(([key]) => key !== 'replace' && key !== 'scroll'));
@@ -166,6 +166,20 @@ describe('RankedPlay — 무한·주간 입구', () => {
     render(<RankedPlay mode="endless" fixedSeed={null} />);
     fireEvent.click(await screen.findByTestId('defense-resume-continue'));
     await waitFor(() => expect(screen.getByTestId('defense-session-banner').dataset.expired).toBe('true'));
+  });
+
+  it('세션 남은 시간은 응답 expiresAt 기준 — 20분 남은 세션이면 바로 만료 예고 띠, 이어하기 저장에도 남은 시간이 함께 (games-polish P3)', async () => {
+    const soon = new Date(Date.now() + 20 * 60 * 1000).toISOString();
+    createGameSession.mockResolvedValue({ ...session('endless', 'endless-s1'), data: { ...session('endless', 'endless-s1').data, expiresAt: soon } });
+    render(<RankedPlay mode="endless" fixedSeed={null} />);
+    fireEvent.click(await screen.findByTestId('defense-ranked-play'));
+    await waitFor(() => expect(screen.getByTestId('defense-session-banner').dataset.expired).toBe('false'));
+    act(() => {
+      fireEvent.click(screen.getByTestId('defense-call-wave'));
+    });
+    const ttl = loadResume()?.sessionTtlMs ?? 0;
+    expect(ttl).toBeGreaterThan(19 * 60 * 1000);
+    expect(ttl).toBeLessThanOrEqual(20 * 60 * 1000);
   });
 
   it('스테이지 4를 깨기 전에는 잠김 — 랭킹 보기는 열려 있다', async () => {

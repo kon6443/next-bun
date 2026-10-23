@@ -9,7 +9,8 @@ import { createGameSession } from "@/services/gameService";
 import { ApiError } from "@/types/api";
 import { ENGINE_VERSION, MAX_INPUT_LENGTH, MAX_TICKS, resolveBoard, scoreOf } from "../engine";
 import { type PlayResult } from "../hooks/useDefensePlay";
-import { sessionClockAt, useSessionClock } from "../hooks/useSessionClock";
+import { SESSION_TTL_MS, sessionClockAt, useSessionClock } from "../hooks/useSessionClock";
+import { sessionTtlMs } from "@/app/games/_shared/lib/sessionTtl";
 import { randomSeed } from "../lib/campaign";
 import { defenseStorage, recordBest } from "../lib/defenseGame";
 import { isRankedUnlocked, loadProgress } from "../lib/progress";
@@ -32,7 +33,8 @@ type Props = {
   fixedSeed: number | null;
 };
 
-type Session = { sessionId: string; receivedAt: number };
+/** ttlMs: 받은 순간 남은 시간(응답 expiresAt 기준, 4시간 상한) — 만료 판정은 이것과 이 기기에서 흐른 시간으로 */
+type Session = { sessionId: string; receivedAt: number; ttlMs: number };
 type Run = { n: number; boardKey: string; seed: number; restore: RestoredGame | null; notice: string | null; session: Session | null; sessionError: string | null };
 type Over = { result: PlayResult; score: number; wave: number; kills: number; isNewBest: boolean; sessionId: string | null; sessionError: string | null };
 
@@ -64,7 +66,7 @@ export default function RankedPlay({ mode, fixedSeed }: Props) {
   const [requesting, setRequesting] = useState(false);
   const [run, setRun] = useState<Run | null>(null);
   const [over, setOver] = useState<Over | null>(null);
-  const clock = useSessionClock(run?.session?.receivedAt ?? null);
+  const clock = useSessionClock(run?.session?.receivedAt ?? null, run?.session?.ttlMs);
 
   useEffect(() => {
     setUnlocked(isRankedUnlocked(loadProgress()));
@@ -102,7 +104,9 @@ export default function RankedPlay({ mode, fixedSeed }: Props) {
       else if (!data.boardKey || modeOfBoardKey(data.boardKey) !== mode || !resolveBoard(mode, data.boardKey, data.seed)) local("랭킹 등록을 준비하지 못했어요. 이번 판은 등록 없이 플레이해요.");
       else {
         setOver(null);
-        setRun({ n, boardKey: data.boardKey, seed: data.seed, restore: null, notice, session: { sessionId: data.sessionId, receivedAt: Date.now() }, sessionError: null });
+        const receivedAt = Date.now();
+        const session = { sessionId: data.sessionId, receivedAt, ttlMs: sessionTtlMs(data.expiresAt, receivedAt, SESSION_TTL_MS) };
+        setRun({ n, boardKey: data.boardKey, seed: data.seed, restore: null, notice, session, sessionError: null });
       }
     } catch (err) {
       local(sessionErrorMessage(err));
@@ -122,7 +126,10 @@ export default function RankedPlay({ mode, fixedSeed }: Props) {
       setResumeFailed(true);
       return;
     }
-    const session = slot.sessionId && slot.sessionReceivedAt !== undefined ? { sessionId: slot.sessionId, receivedAt: slot.sessionReceivedAt } : null;
+    const session =
+      slot.sessionId && slot.sessionReceivedAt !== undefined
+        ? { sessionId: slot.sessionId, receivedAt: slot.sessionReceivedAt, ttlMs: slot.sessionTtlMs ?? SESSION_TTL_MS }
+        : null;
     setRun({ n: 0, boardKey: slot.boardKey, seed: slot.seed, restore: restored, notice: null, session, sessionError: session ? null : "이 판은 랭킹에 등록할 수 없어요." });
   };
 
@@ -133,7 +140,7 @@ export default function RankedPlay({ mode, fixedSeed }: Props) {
       const { score, wave } = scoreOf(state);
       // 서버 상한을 넘은 판은 검증에서 거절된다 — 제출하지 않고 안내만
       const overLimit = result.endTick > MAX_TICKS || result.inputs.length > MAX_INPUT_LENGTH;
-      const expired = run.session !== null && sessionClockAt(run.session.receivedAt, Date.now()) === "expired";
+      const expired = run.session !== null && sessionClockAt(run.session.receivedAt, Date.now(), run.session.ttlMs) === "expired";
       const sessionId = run.session && !overLimit && !expired ? run.session.sessionId : null;
       const sessionError = overLimit ? "판이 너무 길어 랭킹에 등록할 수 없어요." : expired ? EXPIRED_MESSAGE : run.sessionError;
       // 최고 기록은 등록할 수 있는 판만(세션이 있고 만료·상한 초과가 아닌 판) — 로컬·만료·너무 긴 판이 공식 보드 기록과 섞이지 않게
@@ -154,7 +161,7 @@ export default function RankedPlay({ mode, fixedSeed }: Props) {
         intro={null}
         notice={[run.notice, run.restore ? null : run.sessionError].filter(Boolean).join(" ") || null}
         exitHref={EXIT_HREF}
-        resumeFields={run.session ? { sessionId: run.session.sessionId, sessionReceivedAt: run.session.receivedAt } : undefined}
+        resumeFields={run.session ? { sessionId: run.session.sessionId, sessionReceivedAt: run.session.receivedAt, sessionTtlMs: run.session.ttlMs } : undefined}
         banner={!over && (clock === "warn" || clock === "expired") ? <SessionBanner expired={clock === "expired"} /> : null}
         onRankedOver={onRankedOver}
         rankedResult={
@@ -191,7 +198,8 @@ export default function RankedPlay({ mode, fixedSeed }: Props) {
 
   const title = mode === "endless" ? "무한 모드" : "주간 도전";
   const rankingsLink = (
-    <Link href={`/games/defense/rankings?board=${mode === "endless" ? ENDLESS_BOARD_KEY : "weekly"}`} className="flex min-h-11 items-center text-sm text-sky-300">
+    // 별칭 — 랭킹 화면이 /boards의 현재 보드로 고른다(무한 시즌이 올라도 맞다, FE-07)
+    <Link href={`/games/defense/rankings?board=${mode}`} className="flex min-h-11 items-center text-sm text-sky-300">
       랭킹 보기
     </Link>
   );

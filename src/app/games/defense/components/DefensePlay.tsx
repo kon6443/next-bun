@@ -176,7 +176,7 @@ export type SessionProps = {
   /** 판 위 안내 띠(세션 만료 예고 등) */
   banner?: ReactNode;
   /** 이어하기 저장에 함께 싣는 값(무한·주간 세션) */
-  resumeFields?: Pick<ResumeSlot, "sessionId" | "sessionReceivedAt">;
+  resumeFields?: Pick<ResumeSlot, "sessionId" | "sessionReceivedAt" | "sessionTtlMs">;
   /** 판 중 나가기 확인 문구 */
   exitMessage: string;
   boardKey: string;

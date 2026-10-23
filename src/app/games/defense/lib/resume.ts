@@ -23,6 +23,8 @@ export type ResumeSlot = {
   /** 무한·주간 — 이 판을 등록할 세션과 받은 시각(이 기기 Date.now). 없으면 로컬 판(등록 불가) */
   sessionId?: string;
   sessionReceivedAt?: number;
+  /** 받은 순간 세션의 남은 시간(응답 expiresAt 기준) — 없으면(이전 저장본) 4시간 */
+  sessionTtlMs?: number;
 };
 
 export function loadResume(): ResumeSlot | null {
@@ -30,6 +32,7 @@ export function loadResume(): ResumeSlot | null {
   if (!raw || raw.v !== VERSION || typeof raw.boardKey !== 'string' || !Array.isArray(raw.inputs)) return null;
   if (raw.mode !== undefined && raw.mode !== 'campaign' && raw.mode !== 'endless' && raw.mode !== 'weekly') return null;
   if (raw.sessionId !== undefined && (typeof raw.sessionId !== 'string' || !Number.isFinite(raw.sessionReceivedAt))) return null;
+  if (raw.sessionTtlMs !== undefined && !Number.isFinite(raw.sessionTtlMs)) return null;
   return Number.isInteger(raw.tick) && Number.isInteger(raw.seed) && Number.isInteger(raw.engineVersion) && raw.inputs.every(Number.isInteger) ? raw : null;
 }
 

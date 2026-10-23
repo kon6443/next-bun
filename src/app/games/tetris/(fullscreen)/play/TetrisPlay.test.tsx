@@ -10,7 +10,7 @@ vi.mock('next-auth/react', () => ({ useSession: () => ({ data: null, status: 'un
 // 판은 그리지 않는다 — 준비 화면·시작 흐름만 본다
 vi.mock('../../components/TetrisCanvas', () => ({ TetrisCanvas: () => null }));
 
-import TetrisPlay, { SLOW_SESSION_MS, sessionTtlMs } from './TetrisPlay';
+import TetrisPlay, { SLOW_SESSION_MS } from './TetrisPlay';
 
 const HOUR = 60 * 60 * 1000;
 const session = (expiresAt: string): GameSession => ({ sessionId: 's1', seed: 7, engineVersion: ENGINE_VERSION, expiresAt });
@@ -26,16 +26,6 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.useRealTimers();
-});
-
-describe('세션 남은 시간 (Q-T1)', () => {
-  it('응답 expiresAt까지 남은 시간 — 2시간 상한(기기 시계가 늦어도 길게 잡지 않는다), 읽을 수 없으면 상한', () => {
-    const now = Date.parse('2026-10-23T00:00:00Z');
-    expect(sessionTtlMs('2026-10-23T00:30:00Z', now)).toBe(HOUR / 2);
-    expect(sessionTtlMs('2026-10-23T05:00:00Z', now)).toBe(2 * HOUR);
-    expect(sessionTtlMs('2026-10-22T23:00:00Z', now)).toBe(0);
-    expect(sessionTtlMs('not-a-date', now)).toBe(2 * HOUR);
-  });
 });
 
 describe('TetrisPlay 시작 (games-polish FE-12)', () => {
