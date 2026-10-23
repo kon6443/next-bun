@@ -71,4 +71,21 @@ describe('도감·허브 보조 동작', () => {
     });
     expect(screen.getByTestId('defense-pending').textContent).toContain('등록했어요');
   });
+
+  it('허브 — 이름 없이 보관된 기록(게임 오버 순간 선보관, 기본 이름 없음)은 이름부터 받아 낸다 (games-polish FE-05)', async () => {
+    const replay = { engineVersion: ENGINE_VERSION, frames: 100, inputs: [0, 0] };
+    defenseStorage.savePendingSubmission({ sessionId: 'sess3', playerName: '', replay, score: 2_000_000, savedAt: 1 });
+    submitGameScore.mockReset().mockResolvedValue({ code: 'SUCCESS', message: '', data: { scoreId: 9, score: 2_000_000, detail: {}, ranks: null } });
+    render(<HubActions />);
+    const button = await screen.findByTestId('defense-pending-retry');
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    expect(submitGameScore).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText(/다른 이름으로 등록/), { target: { value: '새이름' } });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    expect(submitGameScore).toHaveBeenCalledWith('defense', { sessionId: 'sess3', playerName: '새이름', replay }, undefined);
+  });
 });

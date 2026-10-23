@@ -16,6 +16,8 @@ export type ApiErrorResponse = {
   code: string;
   message: string;
   timestamp: string;
+  /** 코드별 추가 정보(선택) — 예: 게임 제출 거절의 { reason, retryAfterSeconds }. 모양은 코드마다 다르니 쓰는 쪽이 좁혀 읽는다 */
+  details?: unknown;
 };
 
 // ==================== 에러 코드 타입 ====================
@@ -139,13 +141,16 @@ export class ApiError extends Error {
   readonly code: ErrorCode | string;
   readonly status: number;
   readonly timestamp?: string;
+  /** 백엔드 에러 응답의 details (없으면 undefined) */
+  readonly details?: unknown;
 
-  constructor(code: string, message: string, status: number, timestamp?: string) {
+  constructor(code: string, message: string, status: number, timestamp?: string, details?: unknown) {
     super(message);
     this.name = 'ApiError';
     this.code = code;
     this.status = status;
     this.timestamp = timestamp;
+    this.details = details;
   }
 
   /**
@@ -200,6 +205,7 @@ export function createApiError(errorResponse: ApiErrorResponse, status: number):
     errorResponse.message,
     status,
     errorResponse.timestamp,
+    errorResponse.details,
   );
 }
 

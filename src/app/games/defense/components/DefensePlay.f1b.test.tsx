@@ -10,6 +10,8 @@ import DefensePlay, { nearestSlotInDirection } from './DefensePlay';
 const replace = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace, push: vi.fn() }) }));
 vi.mock('next/link', () => ({ default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...rest}>{children}</a> }));
+const toast = vi.hoisted(() => vi.fn());
+vi.mock('react-hot-toast', () => ({ default: toast }));
 
 class FakeResizeObserver {
   observe() {}
@@ -201,5 +203,29 @@ describe('DefensePlay F1b — 학습·효과음·이어하기·나가기', () =>
     expect(nearestSlotInDirection(slots, 0, 0, 1)).toBe(2);
     expect(nearestSlotInDirection(slots, 1, 0, 1)).toBe(3);
     expect(nearestSlotInDirection(slots, 0, -1, 0)).toBe(-1);
+  });
+
+  it('이어하기 저장이 실패하면(저장소 차단·용량) 판당 한 번 알린다 (games-polish FE-46)', async () => {
+    localStorage.setItem('defense:progress', JSON.stringify({ v: 1, stars: {}, tutorialDone: true }));
+    toast.mockClear();
+    render(<DefensePlay boardKey="s1" seed={1} fixedSeed />);
+    await screen.findByTestId('defense-slot-0');
+    act(() => {
+      fireEvent.click(screen.getByTestId('defense-call-wave'));
+    });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    const hide = () => {
+      Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+    };
+    hide();
+    hide();
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(String(toast.mock.calls[0][0])).toContain('이어하기를 저장하지 못했어요');
   });
 });

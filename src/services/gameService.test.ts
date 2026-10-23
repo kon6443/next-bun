@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createGameSession, getGameBoards, getGameRankings, getGameReplay, SESSION_TIMEOUT_MS, submitGameScore } from './gameService';
+import { createGameSession, getGameBoards, getGameRankings, getGameReplay, RANKING_TIMEOUT_MS, SESSION_TIMEOUT_MS, submitGameScore } from './gameService';
 import { ApiError } from '@/types/api';
 
 // 서비스 → FetchService → fetch 경로 전체를 실제로 타고, 네트워크만 stub 한다 (백엔드 API 준비 전 mock)
@@ -61,6 +61,16 @@ describe('gameService', () => {
     await submitGameScore('tetris', { sessionId: 's', playerName: '나', replay });
     await getGameReplay('tetris', 1);
     for (const [, init] of fetchMock.mock.calls) expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('랭킹·보드 목록에도 응답 대기 상한이 붙는다 — skeleton·예상 순위에 머물지 않게 (games-polish FE-03)', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    fetchMock.mockImplementation(() => Promise.resolve(json({ code: 'SUCCESS', message: 'ok', data: { items: [] } })));
+    await getGameBoards('defense');
+    await getGameRankings('tetris', 'daily', 10);
+    for (const [, init] of fetchMock.mock.calls) expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(timeout.mock.calls.map(([ms]) => ms)).toEqual([RANKING_TIMEOUT_MS, RANKING_TIMEOUT_MS]);
+    timeout.mockRestore();
   });
 
   it('응답이 상한까지 없으면 NetworkError로 끝난다 (다시 시도 대상)', async () => {
@@ -162,6 +172,31 @@ describe('gameService', () => {
       expect(err).toMatchObject({ code: 'GAME_VERIFY_BUSY', status: 503 });
     });
 
+    it('토큰이 401로 거절된 제출은 BUSY 자동 재시도에 토큰을 다시 싣지 않는다 — 401 대기가 겹치지 않게 (FE-50)', async () => {
+      fetchMock
+        .mockResolvedValueOnce(json({ code: 'AUTH_UNAUTHORIZED', message: 'x', timestamp: 't' }, 401))
+        .mockResolvedValueOnce(busy({ 'Retry-After': '2' }))
+        .mockResolvedValueOnce(json({ code: 'SUCCESS', message: 'ok', data: { scoreId: 9 } }, 201));
+      const pending = submitGameScore('tetris', { sessionId: 's', playerName: 'n', replay }, 'expired');
+      await vi.advanceTimersByTimeAsync(1100 + 2000);
+      const { data } = await pending;
+      expect(data.scoreId).toBe(9);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(fetchMock.mock.calls[0][1].headers.Authorization).toBeDefined();
+      expect(fetchMock.mock.calls[2][1].headers.Authorization).toBeUndefined();
+    });
+
+    it('첫 시도가 이미 오래 걸렸으면 BUSY여도 자동 재시도하지 않는다 — 호출부가 보관·다시 등록으로 (FE-50)', async () => {
+      fetchMock.mockImplementationOnce(
+        () => new Promise((resolve) => setTimeout(() => resolve(busy({ 'Retry-After': '2' })), 29_000)),
+      );
+      const pending = submitGameScore('tetris', { sessionId: 's', playerName: 'n', replay }).catch((e: unknown) => e);
+      await vi.advanceTimersByTimeAsync(29_000);
+      const err = await pending;
+      expect(err).toMatchObject({ code: 'GAME_VERIFY_BUSY' });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
     it('Retry-After가 10초를 넘거나 다른 503이면 자동 재시도하지 않는다', async () => {
       fetchMock.mockResolvedValueOnce(busy({ 'Retry-After': '30' }));
       await expect(submitGameScore('tetris', { sessionId: 's', playerName: 'n', replay })).rejects.toMatchObject({ code: 'GAME_VERIFY_BUSY' });
@@ -205,6 +240,12 @@ describe('gameService', () => {
     const err = await submitGameScore('tetris', { sessionId: 's', playerName: 'n', replay }).catch((e) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect(err).toMatchObject({ code: 'GAME_PLAYER_NAME_FORBIDDEN', status: 422 });
+  });
+
+  it('제출: 에러 details(거절 이유)를 ApiError에 그대로 싣는다 — 새로고침 안내 등 분기용 (games-polish P2)', async () => {
+    fetchMock.mockResolvedValue(json({ code: 'GAME_SESSION_INVALID', message: 'x', timestamp: 't', details: { reason: 'ENGINE_VERSION' } }, 409));
+    const err = await submitGameScore('tetris', { sessionId: 's', playerName: 'n', replay }).catch((e) => e);
+    expect(err).toMatchObject({ code: 'GAME_SESSION_INVALID', status: 409, details: { reason: 'ENGINE_VERSION' } });
   });
 
   it('제출: 본문 없는 413·429는 상태 기반 코드', async () => {

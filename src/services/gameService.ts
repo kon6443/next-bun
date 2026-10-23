@@ -80,6 +80,8 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export const SESSION_TIMEOUT_MS = 10_000;
 export const SUBMIT_TIMEOUT_MS = 30_000;
 export const REPLAY_TIMEOUT_MS = 15_000;
+/** 랭킹·보드 목록 — 응답이 멈추면 skeleton·예상 순위 "…"에 머물지 않고 기존 오류·다시 시도로 (games-polish FE-03) */
+export const RANKING_TIMEOUT_MS = 10_000;
 
 /** AbortSignal.timeout이 없는 오래된 브라우저에서는 상한 없이 */
 function timeoutSignal(ms: number): AbortSignal | undefined {
@@ -93,6 +95,8 @@ function timeoutSignal(ms: number): AbortSignal | undefined {
 async function fetchWithOptionalAuth(
   args: { method: 'POST'; endpoint: string; body?: unknown; timeoutMs: number },
   accessToken?: string,
+  /** 토큰이 401로 거절돼 토큰 없이 다시 냈다 — 같은 제출의 다음 시도는 토큰 없이 보내게 알린다 */
+  onTokenRejected?: () => void,
 ): Promise<Response> {
   const { timeoutMs, ...request } = args;
   // 재시도마다 새 상한 — 첫 요청의 시간을 이어 쓰지 않는다
@@ -102,6 +106,7 @@ async function fetchWithOptionalAuth(
   // 게임 중 전역 로그아웃(로그인 화면 이동)으로 결과를 잃지 않게 401 이벤트를 끈다
   const response = await send({ accessToken, notifyUnauthorized: false });
   if (response.status !== 401) return response;
+  onTokenRejected?.();
   // 401로 거절된 요청도 IP 스로틀(제출 초당 1)에 집계된다 — 같은 1초 창을 피해 재시도
   await wait(RETRY_AFTER_UNAUTHORIZED_MS);
   return send({});
@@ -192,6 +197,8 @@ export async function submitGameScore<G extends GameType>(
   accessToken?: string,
 ): Promise<ApiResponse<SubmitScoreResponse<ScoreDetailByGame[G]>>> {
   const { sessionId, playerName, replay } = request;
+  // 한 번 401로 거절된 토큰은 자동 재시도에 다시 싣지 않는다 — 401·스로틀 대기가 겹쳐 쌓이지 않게(서버는 토큰 없는 제출을 익명으로 받는다, Q-S1)
+  let token = accessToken;
   const post = () =>
     fetchWithOptionalAuth(
       {
@@ -200,13 +207,18 @@ export async function submitGameScore<G extends GameType>(
         body: { sessionId, playerName, replay: buildReplayBody(gameType, replay) },
         timeoutMs: SUBMIT_TIMEOUT_MS,
       },
-      accessToken,
+      token,
+      () => {
+        token = undefined;
+      },
     );
 
+  const startedAt = Date.now();
   let response = await post();
   if (await isVerifyBusy(response)) {
     const waitMs = verifyBusyWaitMs(response);
-    if (waitMs !== null) {
+    // 첫 시도가 이미 오래 걸렸으면(응답 지연·401 재시도) 자동 재시도하지 않고 호출부의 보관·다시 등록으로 — "등록 중"을 끝없이 끌지 않게 (games-polish FE-50)
+    if (waitMs !== null && Date.now() - startedAt + waitMs <= SUBMIT_TIMEOUT_MS) {
       await wait(waitMs);
       response = await post();
     }
@@ -230,6 +242,7 @@ export async function getGameBoards(gameType: GameType): Promise<ApiResponse<{ i
   const response = await fetchServiceInstance.backendFetch({
     method: 'GET',
     endpoint: `/api/v1/games/${gameType}/boards`,
+    signal: timeoutSignal(RANKING_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -251,6 +264,7 @@ export async function getGameRankings<G extends GameType>(
   const response = await fetchServiceInstance.backendFetch({
     method: 'GET',
     endpoint: `/api/v1/games/${gameType}/rankings?${params.toString()}`,
+    signal: timeoutSignal(RANKING_TIMEOUT_MS),
   });
 
   if (!response.ok) {

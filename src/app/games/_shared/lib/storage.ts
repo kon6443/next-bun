@@ -129,22 +129,25 @@ export function createGameStorage<G extends GameType>(gameType: G, options: Game
     return Array.isArray(list) ? list.filter(isPending) : [];
   }
 
-  /** 용량을 넘으면(긴 판의 입력 기록은 수백 KB) 가장 오래된 기록부터 빼고 다시 저장 — 최신 기록을 우선 지킨다 */
-  function savePendingList(list: PendingSubmission<G>[]): void {
+  /**
+   * 용량을 넘으면(긴 판의 입력 기록은 수백 KB) 가장 오래된 기록부터 빼고 다시 저장 — 최신 기록을 우선 지킨다
+   * 최신 1건도 못 쓰면 false (저장소 차단·용량 초과) — 기존 보관 값은 그대로 둔다(setItem 실패는 기존 값을 바꾸지 않는다)
+   */
+  function savePendingList(list: PendingSubmission<G>[]): boolean {
     if (list.length === 0) {
       removeStorage(pendingKind, KEY.pending);
-      return;
+      return true;
     }
     for (let start = 0; start < list.length; start++) {
-      if (writeStorage(pendingKind, KEY.pending, JSON.stringify(list.slice(start)))) return;
+      if (writeStorage(pendingKind, KEY.pending, JSON.stringify(list.slice(start)))) return true;
     }
-    // 최신 1건도 못 쓰면 기존 보관 값은 그대로 둔다 (setItem 실패는 기존 값을 바꾸지 않는다)
+    return false;
   }
 
-  /** 같은 세션이면 갱신, 아니면 추가 (넘치면 가장 오래된 것부터 버린다) */
-  function savePendingSubmission(pending: PendingSubmission<G>): void {
+  /** 같은 세션이면 갱신, 아니면 추가 (넘치면 가장 오래된 것부터 버린다) — 이 기록을 보관하지 못했으면 false (games-polish FE-46) */
+  function savePendingSubmission(pending: PendingSubmission<G>): boolean {
     const others = loadPendingSubmissions().filter((p) => p.sessionId !== pending.sessionId);
-    savePendingList([...others, pending].slice(-pendingLimit));
+    return savePendingList([...others, pending].slice(-pendingLimit));
   }
 
   function removePendingSubmission(sessionId: string): void {

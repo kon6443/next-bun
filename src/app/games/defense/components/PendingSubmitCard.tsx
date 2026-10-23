@@ -21,6 +21,8 @@ export function PendingSubmitCard() {
   const [message, setMessage] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
   const pending = list[0] ?? null;
+  // 게임 오버 순간 이름 없이 보관한 기록(기본 이름이 없었다)이면 이름부터 묻는다 (games-polish FE-05)
+  const askName = needsNewName || pending?.playerName === "";
   /** 같은 렌더 안 연타도 막게 ref로 — 세션은 1회용이라 두 번째 제출은 실패하고 성공 문구를 덮는다 */
   const retryingRef = useRef(false);
 
@@ -35,7 +37,7 @@ export function PendingSubmitCard() {
   const retry = async () => {
     if (!pending || retryingRef.current) return;
     let playerName = pending.playerName;
-    if (needsNewName) {
+    if (askName) {
       const error = validatePlayerName(name);
       if (error) {
         setMessage(error);
@@ -73,9 +75,9 @@ export function PendingSubmitCard() {
       {pending && (
         <>
           <p className="text-sm text-slate-200">
-            등록하지 못한 기록이 있어요{list.length > 1 ? ` (${list.length}건)` : ""} — <strong>{needsNewName ? name : pending.playerName}</strong> · {formatDefenseScore(pending.score)}
+            등록하지 못한 기록이 있어요{list.length > 1 ? ` (${list.length}건)` : ""} — <strong>{askName ? name : pending.playerName}</strong> · {formatDefenseScore(pending.score)}
           </p>
-          {needsNewName && (
+          {askName && (
             <div className="mt-3">
               <label htmlFor="defense-pending-name" className="mb-1 block text-xs text-slate-400">
                 다른 이름으로 등록 (1~12자)

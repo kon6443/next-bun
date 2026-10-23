@@ -47,6 +47,8 @@ export default function TetrisHome() {
   /** 등록 못 한 기록 — 오래된 것부터 하나씩 재시도한다 */
   const [pendingList, setPendingList] = useState<PendingSubmission[]>([]);
   const pending = pendingList[0] ?? null;
+  // 게임 오버 순간 이름 없이 보관한 기록(기본 이름이 없었다)이면 이름부터 묻는다 (games-polish FE-05)
+  const askName = needsNewName || pending?.playerName === "";
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
 
@@ -82,7 +84,7 @@ export default function TetrisHome() {
   const retryPending = async () => {
     if (!pending || isRetrying) return;
     let playerName = pending.playerName;
-    if (needsNewName) {
+    if (askName) {
       const nameError = validatePlayerName(pendingName);
       if (nameError) {
         setPendingMessage(nameError);
@@ -150,9 +152,9 @@ export default function TetrisHome() {
             <>
               <p className="text-sm text-slate-200">
                 등록하지 못한 기록이 있어요{pendingList.length > 1 ? ` (${pendingList.length}건)` : ""} —{" "}
-                <strong>{needsNewName ? pendingName : pending.playerName}</strong> · {formatScore(pending.score)}점
+                <strong>{askName ? pendingName : pending.playerName}</strong> · {formatScore(pending.score)}점
               </p>
-              {needsNewName && (
+              {askName && (
                 <div className="mt-3">
                   <label htmlFor="tetris-pending-name" className="mb-1 block text-xs text-slate-400">
                     다른 이름으로 등록 (1~12자)

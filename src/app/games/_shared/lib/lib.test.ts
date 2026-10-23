@@ -81,6 +81,33 @@ describe('등록 실패 분류', () => {
     expect(classifySubmitError(api('GAME_SESSION_INVALID', 409), true).message).toContain('이미 등록');
   });
 
+  it('엔진 버전이 달라 거절되면(배포 뒤 옛 화면) final + 새로고침 안내 — 재시도 중이어도 (games-polish P2)', () => {
+    const err = new ApiError('GAME_SESSION_INVALID', '서버 메시지', 409, 't', { reason: 'ENGINE_VERSION' });
+    for (const isRetry of [false, true]) {
+      const result = classifySubmitError(err, isRetry);
+      expect(result).toMatchObject({ kind: 'final', reload: true });
+      expect(result.message).toContain('새로고침');
+    }
+    expect(classifySubmitError(new ApiError('GAME_SESSION_INVALID', 'x', 409, 't', { reason: 'NOT_FOUND' }), false).reload).toBeUndefined();
+  });
+
+  it('같은 리플레이 중복(GAME_REPLAY_DUPLICATE)은 final "이미 등록된 기록"', () => {
+    expect(classifySubmitError(api('GAME_REPLAY_DUPLICATE', 409), true)).toEqual({ kind: 'final', message: '이미 등록된 기록이에요.' });
+  });
+
+  it('엔진이 NOT_STARTED로 거절하면 웨이브를 시작해야 한다고 알린다, 그 밖의 검증 실패는 서버 문구', () => {
+    const notStarted = new ApiError('GAME_REPLAY_INVALID', '서버 메시지', 422, 't', { reason: 'REPLAY_REJECTED', engineReason: 'NOT_STARTED' });
+    expect(classifySubmitError(notStarted, false)).toEqual({ kind: 'final', message: '웨이브를 시작한 판만 등록할 수 있어요.' });
+    const elapsed = new ApiError('GAME_REPLAY_INVALID', '서버 메시지', 422, 't', { reason: 'ELAPSED_TIME' });
+    expect(classifySubmitError(elapsed, false)).toEqual({ kind: 'final', message: '서버 메시지' });
+  });
+
+  it('검증 대기열 503(GAME_VERIFY_BUSY — UNAVAILABLE·SAVE_FAILED 포함)은 세션이 그대로라 retry', () => {
+    for (const reason of ['UNAVAILABLE', 'SAVE_FAILED', 'IN_PROGRESS']) {
+      expect(classifySubmitError(new ApiError('GAME_VERIFY_BUSY', 'x', 503, 't', { reason, retryAfterSeconds: 30 }), false).kind).toBe('retry');
+    }
+  });
+
   it('네트워크·429·5xx는 retry', () => {
     expect(classifySubmitError(new TypeError('x'), false).kind).toBe('retry');
     expect(classifySubmitError(api('TOO_MANY_REQUESTS', 429), false).kind).toBe('retry');
