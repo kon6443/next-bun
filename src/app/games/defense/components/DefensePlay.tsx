@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmModal } from "@/app/components/ConfirmModal";
 import { SOUND, Sfx } from "../audio/sfx";
-import { ENGINE_VERSION, EVENT, EVENT_STRIDE, OP, findStage, type Stage } from "../engine";
+import { AUGMENTS, ENGINE_VERSION, EVENT, EVENT_STRIDE, OP, findStage, type GameState, type Stage } from "../engine";
 import { useDefenseCanvas } from "../hooks/useDefenseCanvas";
 import { type FrameInfo, type PlayResult, type Speed, useDefensePlay } from "../hooks/useDefensePlay";
 import { useDefenseSettings } from "../hooks/useDefenseSettings";
@@ -19,6 +19,7 @@ import { hasSeenBriefing, isDifficultyUnlocked, loadProgress, markBriefingSeen, 
 import { type ResumeSlot, clearResume, loadResume, saveResume } from "../lib/resume";
 import { type RestoredGame, restoreGame } from "../lib/restoreGame";
 import { type RingOption, currentRange, ringOptions, tapRing } from "../lib/ringOptions";
+import { boardTitle, modeOfBoardKey } from "../lib/rankedBoards";
 import { toRenderMap } from "../lib/toRenderView";
 import { TUTORIAL_BUBBLE_BAND, TUTORIAL_NOTICE_BAND, TUTORIAL_SLOT, tutorialBubbleAbove, tutorialStep } from "../lib/tutorial";
 import { nextWaveIndex, wavePreview } from "../lib/wavePreview";
@@ -26,8 +27,10 @@ import { DamageNumberPool, EffectPool, ParticlePool } from "../renderer/particle
 import type { RenderView } from "../renderer/renderView";
 import { createSceneScratch, drawBossBar, drawLeakPulse, drawSceneLayer, drawSelection } from "../renderer/sceneLayer";
 import { toScreenX, toScreenY } from "../renderer/viewport";
+import { AugmentPicker } from "./AugmentPicker";
 import { BriefingCard } from "./BriefingCard";
 import { Hud } from "./Hud";
+import { RankedStrip } from "./RankedStrip";
 import { ResultPanel } from "./ResultPanel";
 import { SettingsPanel } from "./SettingsPanel";
 import { TowerRing, ringSpan } from "./TowerRing";
@@ -35,7 +38,8 @@ import { TUTORIAL_TARGET_SIZE, TutorialOverlay } from "./TutorialOverlay";
 import { WaveBar } from "./WaveBar";
 
 /**
- * 캠페인 플레이 화면 (defense DESIGN §F1~§F9b) — 캔버스(엔진 렌더) 위에 DOM 슬롯 버튼·링 메뉴·HUD
+ * 플레이 화면 (defense DESIGN §F1~§F9b) — 캔버스(엔진 렌더) 위에 DOM 슬롯 버튼·링 메뉴·HUD
+ * 기본 내보내기는 캠페인 입구, PlaySession은 캠페인·무한·주간 공용(무한·주간 입구는 RankedPlay)
  * 슬롯은 DOM 버튼이라 키보드(Tab·Enter·방향키)·스크린리더·자동화(data-testid)로도 조작된다(§F10 입력: 캔버스 접근성)
  * F1b: 튜토리얼(S1)·브리핑 카드·효과음(기본 꺼짐)·설정·이어하기·연출(원소 파티클·충격파·번개·보스 막대·흔들림)
  */
@@ -51,15 +55,17 @@ const SHAKE_PX = 4;
 const BOSS_BANNER_MS = 2400;
 const DPR_CAP = 2;
 
-type Intro = "tutorial" | "briefing" | null;
+export type Intro = "tutorial" | "briefing" | null;
 /** notice = 시작 화면 한 줄 안내(이어하기를 못 불러옴·다른 판 저장본이 바뀜) */
 type Opening = { restore: RestoredGame | null; intro: Intro; notice: string | null };
+export type PlayMode = "campaign" | "endless" | "weekly";
 
 type Props = { boardKey: string; seed: number; fixedSeed: boolean };
 
 export default function DefensePlay({ boardKey, seed, fixedSeed }: Props) {
   const parsed = useMemo(() => parseBoardKey(boardKey), [boardKey]);
   const stage = useMemo(() => findStage(boardKey), [boardKey]);
+  const campaign = useMemo(() => (parsed ? { meta: parsed.stage, difficulty: parsed.difficulty } : null), [parsed]);
   const [attempt, setAttempt] = useState({ n: 0, seed });
   const [access, setAccess] = useState<"checking" | "ok" | "locked">("checking");
   /** 이 보드의 이어하기 저장 — 고를 때까지 판을 시작하지 않는다 */
@@ -84,13 +90,16 @@ export default function DefensePlay({ boardKey, seed, fixedSeed }: Props) {
     else {
       // 이어하기는 1슬롯(§F9b) — 다른 판 저장본이 있으면 이 판에서 웨이브를 부를 때 바뀐다는 것을 알린다
       // 쓸 수 없는 구버전 저장본은 알리지 않는다(허브에도 안 보인다)
-      const other = slot && slot.boardKey !== boardKey && slot.engineVersion === ENGINE_VERSION ? parseBoardKey(slot.boardKey) : null;
-      const notice = other ? `웨이브를 시작하면 스테이지 ${other.stage.number} ${DIFFICULTY_NAMES[other.difficulty]}의 이어하기 저장이 이 판으로 바뀌어요` : null;
+      // 무한·주간 저장본(세션 포함)도 같은 1슬롯 — 덮어쓰기 전에 알린다
+      const otherSlot = slot && slot.boardKey !== boardKey && slot.engineVersion === ENGINE_VERSION ? slot : null;
+      const other = otherSlot ? parseBoardKey(otherSlot.boardKey) : null;
+      const otherName = other ? `스테이지 ${other.stage.number} ${DIFFICULTY_NAMES[other.difficulty]}` : otherSlot && modeOfBoardKey(otherSlot.boardKey) ? boardTitle(otherSlot.boardKey) : null;
+      const notice = otherName ? `웨이브를 시작하면 ${otherName}의 이어하기 저장이 이 판으로 바뀌어요` : null;
       setOpening({ restore: null, intro: introFor(parsed.stage.id), notice });
     }
   }, [parsed, boardKey, introFor]);
 
-  if (!parsed || !stage) return null;
+  if (!parsed || !stage || !campaign) return null;
   const exitHref = stagePath(parsed.stage.id);
   if (access === "checking") return null;
   if (access === "locked") {
@@ -133,8 +142,10 @@ export default function DefensePlay({ boardKey, seed, fixedSeed }: Props) {
     <PlaySession
       key={attempt.n}
       stage={stage}
-      meta={parsed.stage}
-      difficulty={parsed.difficulty}
+      mode="campaign"
+      title={`스테이지 ${parsed.stage.number} ${DIFFICULTY_NAMES[parsed.difficulty]}`}
+      campaign={campaign}
+      exitMessage="지금까지의 판은 이어하기로 저장해 둘게요. 같은 스테이지·난이도로 다시 들어오면 이어서 할 수 있어요."
       boardKey={boardKey}
       seed={attempt.seed}
       restore={opening.restore}
@@ -150,10 +161,23 @@ export default function DefensePlay({ boardKey, seed, fixedSeed }: Props) {
   );
 }
 
-type SessionProps = {
+export type SessionProps = {
   stage: Stage;
-  meta: StageMeta;
-  difficulty: Difficulty;
+  mode: PlayMode;
+  /** 화면 이름 — main의 접근성 이름 */
+  title: string;
+  /** 캠페인이면 스테이지·난이도(별·진행도·다음 스테이지·브리핑) — 무한·주간은 null */
+  campaign: { meta: StageMeta; difficulty: Difficulty } | null;
+  /** 무한·주간 판이 끝나면 한 번 — 결과(점수·최고 기록)는 부르는 쪽이 정해 rankedResult로 그린다 */
+  onRankedOver?: (result: PlayResult, state: GameState) => void;
+  /** 무한·주간 결과 화면(웨이브·등록) — 캠페인은 ResultPanel */
+  rankedResult?: ReactNode;
+  /** 판 위 안내 띠(세션 만료 예고 등) */
+  banner?: ReactNode;
+  /** 이어하기 저장에 함께 싣는 값(무한·주간 세션) */
+  resumeFields?: Pick<ResumeSlot, "sessionId" | "sessionReceivedAt">;
+  /** 판 중 나가기 확인 문구 */
+  exitMessage: string;
   boardKey: string;
   seed: number;
   restore: Opening["restore"];
@@ -163,7 +187,7 @@ type SessionProps = {
   onRetry: () => void;
 };
 
-type Finished = { result: PlayResult; stars: number; replaySaved: boolean; progressSaved: boolean };
+type Finished = { result: PlayResult; campaign: { stars: number; replaySaved: boolean; progressSaved: boolean } | null };
 
 /**
  * 단축키 — 영문 글자면 e.key(AZERTY·Dvorak에서도 자판에 보이는 글자), 아니면(한글 'ㅔ'·IME 'Process') 물리 키 e.code
@@ -220,7 +244,7 @@ function prefersReducedMotion(): boolean {
   return typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-function PlaySession({ stage, meta, difficulty, boardKey, seed, restore, intro, notice, exitHref, onRetry }: SessionProps) {
+export function PlaySession({ stage, mode, title, campaign, onRankedOver, rankedResult, banner, resumeFields, exitMessage, boardKey, seed, restore, intro, notice, exitHref, onRetry }: SessionProps) {
   const router = useRouter();
   const renderMap = useMemo(() => toRenderMap(stage), [stage]);
   const canvas = useDefenseCanvas(renderMap, DPR_CAP);
@@ -249,7 +273,7 @@ function PlaySession({ stage, meta, difficulty, boardKey, seed, restore, intro, 
   const [armed, setArmed] = useState<string | null>(null);
   const [finished, setFinished] = useState<Finished | null>(null);
   const [bossBanner, setBossBanner] = useState<string | null>(null);
-  const [briefing, setBriefing] = useState<Briefing | null>(() => (intro === "briefing" ? briefingFor(meta.id) : null));
+  const [briefing, setBriefing] = useState<Briefing | null>(() => (intro === "briefing" && campaign ? briefingFor(campaign.meta.id) : null));
   const [tutorialOn, setTutorialOn] = useState(intro === "tutorial");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [confirmExit, setConfirmExit] = useState(false);
@@ -317,17 +341,22 @@ function PlaySession({ stage, meta, difficulty, boardKey, seed, restore, intro, 
     if (canvas.viewport && frame) onFrame({ ...frame, frameMs: 0 });
   }, [canvas.viewport, onFrame]);
 
+  /** 무한·주간 결과 콜백 — 부모가 렌더마다 새 함수를 넘겨도 onOver가 바뀌지 않게 최신 값만 */
+  const onRankedOverRef = useRef(onRankedOver);
+  onRankedOverRef.current = onRankedOver;
   const onOver = useCallback(
-    (result: PlayResult) => {
+    (result: PlayResult, state: GameState) => {
       clearResume();
       saveProgress(markEnemiesMet(loadProgress(), metRef.current));
-      const outcome = settleCampaign({ stageId: meta.id, difficulty, boardKey, seed, engineVersion: ENGINE_VERSION, ...result });
+      // 별·진행도·로컬 다시보기는 캠페인만 — 무한·주간 기록은 서버 등록(결과 화면)
+      const outcome = campaign ? settleCampaign({ stageId: campaign.meta.id, difficulty: campaign.difficulty, boardKey, seed, engineVersion: ENGINE_VERSION, ...result }) : null;
+      if (!campaign) onRankedOverRef.current?.(result, state);
       sfxRef.current!.play(result.victory ? SOUND.VICTORY : SOUND.DEFEAT, performance.now());
       setSelected(null);
       setArmed(null);
-      setFinished({ result, ...outcome });
+      setFinished({ result, campaign: outcome });
     },
-    [meta.id, difficulty, boardKey, seed],
+    [campaign, boardKey, seed],
   );
 
   const { hud, dispatch, togglePause, cycleSpeed, stateRef, recorderRef } = useDefensePlay({
@@ -346,7 +375,7 @@ function PlaySession({ stage, meta, difficulty, boardKey, seed, restore, intro, 
     saveDueRef.current = false;
     const state = stateRef.current;
     if (state.over || state.wavesStarted === 0) return;
-    saveResume({ engineVersion: ENGINE_VERSION, boardKey, seed, tick: state.tick, inputs: recorderRef.current.inputs.slice(), savedAt: Date.now() });
+    saveResume({ engineVersion: ENGINE_VERSION, mode, boardKey, seed, tick: state.tick, inputs: recorderRef.current.inputs.slice(), savedAt: Date.now(), ...resumeFields });
     const progress = loadProgress();
     const next = markEnemiesMet(progress, metRef.current);
     if (next !== progress) saveProgress(next);
@@ -501,10 +530,22 @@ function PlaySession({ stage, meta, difficulty, boardKey, seed, restore, intro, 
   };
   const closeBriefing = () => {
     setBriefing(null);
-    saveProgress(markBriefingSeen(loadProgress(), meta.id));
+    if (campaign) saveProgress(markBriefingSeen(loadProgress(), campaign.meta.id));
   };
 
-  const overlayOpen = !!finished || !!briefing || settingsOpen || confirmExit;
+  // 증강 대기 — 카드를 고르는 동안 링은 닫고 단축키·호출을 막는다(엔진도 카드 선택만 받는다)
+  const choosingAugment = hud.status === "augment" && !finished;
+  useEffect(() => {
+    if (choosingAugment) close();
+  }, [choosingAugment, close]);
+  const pickAugment = useCallback(
+    (index: number) => {
+      if (dispatch(OP.PICK_AUGMENT, index)) persistRef.current();
+    },
+    [dispatch],
+  );
+
+  const overlayOpen = !!finished || !!briefing || settingsOpen || confirmExit || choosingAugment;
   overlayOpenRef.current = overlayOpen;
 
   // 데스크톱 단축키 (§F3): 1~6 타워 · U 업그레이드 · A/B 분기 · S 판매 · T 타게팅 · Space 호출 · P/Esc 일시정지 · F 배속 · 방향키 슬롯 이동
@@ -566,7 +607,7 @@ function PlaySession({ stage, meta, difficulty, boardKey, seed, restore, intro, 
   const nextIndex = nextWaveIndex(stateRef.current, stage);
   const preview = useMemo(() => (nextIndex === null ? [] : wavePreview(stage, nextIndex)), [stage, nextIndex]);
   const viewport = canvas.viewport;
-  const nextMeta = CAMPAIGN[meta.number] ?? null;
+  const nextMeta = campaign ? (CAMPAIGN[campaign.meta.number] ?? null) : null;
   const slotSize = useMemo(() => {
     if (!viewport) return SLOT_BUTTON;
     let min = Infinity;
@@ -619,7 +660,7 @@ function PlaySession({ stage, meta, difficulty, boardKey, seed, restore, intro, 
   if (confirmExit && finished) setConfirmExit(false);
 
   return (
-    <main className="flex h-full flex-col" aria-label={`스테이지 ${meta.number} ${DIFFICULTY_NAMES[difficulty]}`}>
+    <main className="flex h-full flex-col" aria-label={title}>
       <Hud
         hud={hud}
         exitHref={exitHref}
@@ -628,7 +669,9 @@ function PlaySession({ stage, meta, difficulty, boardKey, seed, restore, intro, 
         onToggleSound={toggleSound}
         onTogglePause={togglePause}
         onCycleSpeed={cycleSpeed}
+        showTotalWaves={mode === "campaign"}
       />
+      {mode !== "campaign" && <RankedStrip rules={stateRef.current.rules} bannedTower={stateRef.current.bannedTower} augments={stateRef.current.augments} />}
       <div className="relative min-h-0 flex-1" ref={canvas.containerRef} data-testid="defense-board" data-status={hud.status}>
         <canvas ref={canvas.bgRef} className="absolute inset-0" aria-hidden="true" />
         <canvas ref={canvas.fgRef} className="absolute inset-0" aria-hidden="true" onPointerDown={close} />
@@ -715,12 +758,16 @@ function PlaySession({ stage, meta, difficulty, boardKey, seed, restore, intro, 
           </p>
         )}
         {briefing && <BriefingCard briefing={briefing} onClose={closeBriefing} />}
-        {finished && (
+        {/* 나가기 확인·설정이 위에 뜨면 카드 대화상자를 내린다(포커스 가둠·숫자 키가 겹치지 않게) — 닫으면 다시 */}
+        {choosingAugment && !confirmExit && !settingsOpen && <AugmentPicker key={hud.wavesCleared} choices={stateRef.current.augmentChoices} onPick={pickAugment} rarityOf={(id) => AUGMENTS[id]?.rarity ?? 0} />}
+        {banner}
+        {finished && !finished.campaign && rankedResult}
+        {finished?.campaign && (
           <ResultPanel
             result={finished.result}
-            stars={finished.stars}
-            replaySaved={finished.replaySaved}
-            progressSaved={finished.progressSaved}
+            stars={finished.campaign.stars}
+            replaySaved={finished.campaign.replaySaved}
+            progressSaved={finished.campaign.progressSaved}
             nextHref={nextMeta ? stagePath(nextMeta.id) : null}
             exitHref={exitHref}
             onRetry={onRetry}
@@ -734,7 +781,7 @@ function PlaySession({ stage, meta, difficulty, boardKey, seed, restore, intro, 
         onClose={cancelExit}
         onConfirm={leave}
         title="판을 나갈까요?"
-        message="지금까지의 판은 이어하기로 저장해 둘게요. 같은 스테이지·난이도로 다시 들어오면 이어서 할 수 있어요."
+        message={exitMessage}
         confirmLabel="나가기"
         cancelLabel="계속하기"
       />

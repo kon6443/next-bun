@@ -24,10 +24,10 @@ import { type RenderView, createRenderView } from "../renderer/renderView";
  * - dispatch = applyCommand 즉시 → 수락한 명령만 기록(리플레이 입력). 일시정지 중에도 조작 가능(§E3·§F3)
  * - 1웨이브를 부르기 전(ready)에는 틱을 돌리지 않는다 — 준비 시간은 판 길이·리플레이에 들어가지 않는다
  * - 화면이 가려지거나 창이 포커스를 잃으면 자동 일시정지
- * 캠페인(F1a) 전용 — 증강 대기(augment)·이어하기는 F1b·F2
+ * - 증강 대기(무한·주간 5웨이브마다, §F6): 엔진이 멈춘 동안 augment — 카드를 고르면(PICK_AUGMENT) 다시 진행
  */
 
-export type PlayStatus = "ready" | "playing" | "paused" | "over";
+export type PlayStatus = "ready" | "playing" | "paused" | "augment" | "over";
 export const SPEEDS = [1, 2, 3] as const;
 export type Speed = (typeof SPEEDS)[number];
 
@@ -47,6 +47,8 @@ export type HudSnapshot = {
   /** 웨이브 호출 가능 (1웨이브 전 또는 카운트다운 중) */
   canCall: boolean;
   victory: boolean;
+  /** 증강 카드를 골라야 진행된다(§F6) — 고를 카드는 stateRef.current.augmentChoices */
+  augmentPending: boolean;
   /** 엔진 상태가 바뀔 때마다 오른다 — 링 메뉴처럼 상태를 직접 읽는 UI의 다시 그리기 신호 */
   version: number;
 };
@@ -76,7 +78,8 @@ type Options = {
   onTickEvents?: (events: readonly number[], view: RenderView, prev: RenderView) => void;
   /** 매 프레임 그리기 */
   onFrame?: (frame: FrameInfo) => void;
-  onOver?: (result: PlayResult) => void;
+  /** 판이 끝나면 한 번 — 끝난 엔진 상태도 넘긴다(점수·처치 등) */
+  onOver?: (result: PlayResult, state: GameState) => void;
 };
 
 const TICK_MS = 1000 / TICKS_PER_SECOND;
@@ -87,7 +90,7 @@ const FRAMES_AFTER_OVER = 90;
 
 function snapshotOf(state: GameState, stage: Stage, status: PlayStatus, speed: Speed, version: number): HudSnapshot {
   const totalWaves = stage.waves.length;
-  const canCall = !state.over && state.wavesStarted < totalWaves && (state.wavesStarted === 0 || state.countdown > 0);
+  const canCall = !state.over && !state.augmentPending && state.wavesStarted < totalWaves && (state.wavesStarted === 0 || state.countdown > 0);
   return {
     status,
     speed,
@@ -101,6 +104,7 @@ function snapshotOf(state: GameState, stage: Stage, status: PlayStatus, speed: S
     earlyBonus: state.wavesStarted > 0 ? earlyCallBonus(state) : 0,
     canCall,
     victory: state.victory,
+    augmentPending: state.augmentPending,
     version,
   };
 }
@@ -121,6 +125,7 @@ function sameHud(a: HudSnapshot, state: GameState, status: PlayStatus, speed: Sp
     Math.ceil(a.countdown / TICKS_PER_SECOND) === Math.ceil(state.countdown / TICKS_PER_SECOND) &&
     a.earlyBonus === (state.wavesStarted > 0 ? earlyCallBonus(state) : 0) &&
     a.victory === state.victory &&
+    a.augmentPending === state.augmentPending &&
     // canCall은 위 값(웨이브 수·카운트다운 0 여부)에서 나온다 — 카운트다운이 0이 되는 순간만 따로
     a.countdown > 0 === state.countdown > 0
   );
@@ -133,7 +138,8 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
     stateRef.current = restore ? restore.state : createGame(stage, seed);
     recorderRef.current = restore ? restore.recorder : createCommandRecorder();
   }
-  const initialStatus: PlayStatus = stateRef.current.wavesStarted > 0 ? "paused" : "ready";
+  // 이어한 판은 일시정지로 연다 — 증강 대기 중에 저장한 판이면 카드 선택부터
+  const initialStatus: PlayStatus = stateRef.current.augmentPending ? "augment" : stateRef.current.wavesStarted > 0 ? "paused" : "ready";
   const viewsRef = useRef<{ prev: RenderView; curr: RenderView } | null>(null);
   if (viewsRef.current === null) {
     const prev = toRenderView(stateRef.current, createRenderView());
@@ -177,7 +183,7 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
       leakedLivesByEnemy: leaks.byEnemy.slice(),
       worstWave: leaks.worstWave(),
       inputs: recorderRef.current.inputs.slice(),
-    });
+    }, state);
     publish();
   }, [publish]);
 
@@ -190,8 +196,8 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
       versionRef.current += 1;
       // 일시정지 중 건설도 바로 보이게 — 현재 렌더 상태만 다시 담는다(적은 그대로라 보간에 영향 없음)
       if (viewsRef.current) toRenderView(state, viewsRef.current.curr);
-      // 웨이브를 부르면 시작한다 — 일시정지 중에 불러도(부른 뜻이 진행)
-      if (op === OP.CALL_WAVE) statusRef.current = "playing";
+      // 웨이브를 부르면 시작한다 — 일시정지 중에 불러도(부른 뜻이 진행). 증강을 고르면 이어서 진행
+      if (op === OP.CALL_WAVE || (op === OP.PICK_AUGMENT && statusRef.current === "augment")) statusRef.current = "playing";
       publish();
       return true;
     },
@@ -200,7 +206,8 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
 
   const togglePause = useCallback(() => {
     const status = statusRef.current;
-    if (status === "over") return;
+    // 증강 대기는 카드를 골라야 풀린다(일시정지로 바꾸지 않는다)
+    if (status === "over" || status === "augment") return;
     if (status === "paused") setStatus(stateRef.current.wavesStarted > 0 ? "playing" : "ready");
     else setStatus("paused");
   }, [setStatus]);
@@ -227,7 +234,7 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
       if (statusRef.current === "playing") {
         acc += Math.min(frameMs, MAX_CATCH_UP_MS) * speedRef.current;
         let ticks = 0;
-        while (acc >= TICK_MS && ticks < MAX_TICKS_PER_FRAME && !state.over) {
+        while (acc >= TICK_MS && ticks < MAX_TICKS_PER_FRAME && !state.over && !state.augmentPending) {
           events.length = 0;
           step(state, events);
           const swap = views.prev;
@@ -240,14 +247,18 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
         }
         if (ticks === MAX_TICKS_PER_FRAME) acc = 0;
         if (state.over) finish();
-        else publish();
-      } else if (statusRef.current === "ready") {
+        else if (state.augmentPending) {
+          // 카드를 고르는 동안 시간이 쌓이지 않게 — 고른 뒤 밀린 틱을 한꺼번에 돌리지 않는다
+          acc = 0;
+          setStatus("augment");
+        } else publish();
+      } else if (statusRef.current === "ready" || statusRef.current === "augment") {
         acc = 0;
       }
       // 일시정지 중에는 acc를 그대로 둔다 — 멈춘 위치(보간 비율)가 재개 순간 튀지 않게
       frame.prev = views.prev;
       frame.curr = views.curr;
-      frame.alpha = statusRef.current === "ready" ? 1 : acc / TICK_MS;
+      frame.alpha = statusRef.current === "ready" || statusRef.current === "augment" ? 1 : acc / TICK_MS;
       frame.now = now;
       frame.frameMs = frameMs;
       callbacksRef.current.onFrame?.(frame);

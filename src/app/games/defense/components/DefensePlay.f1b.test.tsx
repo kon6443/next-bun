@@ -183,6 +183,13 @@ describe('DefensePlay F1b — 학습·효과음·이어하기·나가기', () =>
     expect(screen.getAllByTestId('defense-notice')).toHaveLength(1);
   });
 
+  it('무한·주간 저장본이 있어도 캠페인 판에서 바뀐다고 알린다(세션 붙은 저장본을 말없이 덮지 않게)', async () => {
+    localStorage.setItem('defense:progress', JSON.stringify({ v: 1, stars: { s1: { normal: 3 } }, tutorialDone: true, briefingsSeen: ['s2'] }));
+    saveResume({ engineVersion: ENGINE_VERSION, mode: 'weekly', boardKey: 'weekly-2026-w43', seed: 5, tick: 10, inputs: [0, OP.CALL_WAVE], savedAt: 1, sessionId: 's', sessionReceivedAt: 1 });
+    render(<DefensePlay boardKey="s2" seed={1} fixedSeed />);
+    expect((await screen.findByTestId('defense-notice')).textContent).toContain('W43 주간 도전');
+  });
+
   it('방향키 슬롯 커서 — 그 방향의 가장 가까운 슬롯, 없으면 -1', () => {
     const slots = [
       { x: 0, y: 0 },

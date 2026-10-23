@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { HudSnapshot } from "../hooks/useDefensePlay";
 
 /**
- * 플레이 화면 상단 (defense DESIGN §F2) — 목숨 ♥ · 골드 · 웨이브 n/N · 일시정지 · 배속(1→2→3×)
+ * 플레이 화면 상단 (defense DESIGN §F2) — 목숨 ♥ · 골드 · 웨이브 n/N(무한·주간은 n) · 일시정지 · 배속(1→2→3×)
  * 숫자는 data-value로도 싣는다(메인 Playwright가 골드를 읽어 건설 시점을 정한다)
  */
 type Props = {
@@ -16,9 +16,11 @@ type Props = {
   onToggleSound: () => void;
   onTogglePause: () => void;
   onCycleSpeed: () => void;
+  /** 웨이브 총수를 보일지 — 무한·주간은 끝이 정해지지 않아 n만(§F2) */
+  showTotalWaves?: boolean;
 };
 
-export function Hud({ hud, exitHref, onRequestExit, soundOn, onToggleSound, onTogglePause, onCycleSpeed }: Props) {
+export function Hud({ hud, exitHref, onRequestExit, soundOn, onToggleSound, onTogglePause, onCycleSpeed, showTotalWaves = true }: Props) {
   const paused = hud.status === "paused";
   // 320px까지 한 줄 — 글자는 폭 따라 12~14px, 줄바꿈 금지(넘치면 숫자 칸을 자른다), 버튼은 44px 높이·40px 폭
   return (
@@ -61,10 +63,10 @@ export function Hud({ hud, exitHref, onRequestExit, soundOn, onToggleSound, onTo
           <dd className="font-semibold">
             {/* 화면은 공백 없는 짧은 표기(줄이 꺾일 자리 없음), 읽기는 "12 / 12"(날짜로 읽히지 않게) */}
             <span aria-hidden="true">
-              {hud.wavesStarted}/{hud.totalWaves}
+              {showTotalWaves ? `${hud.wavesStarted}/${hud.totalWaves}` : hud.wavesStarted}
             </span>
             <span className="sr-only">
-              {hud.wavesStarted} / {hud.totalWaves}
+              {showTotalWaves ? `${hud.wavesStarted} / ${hud.totalWaves}` : hud.wavesStarted}
             </span>
           </dd>
         </div>

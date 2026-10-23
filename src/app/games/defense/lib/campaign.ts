@@ -59,6 +59,13 @@ export function randomSeed(): number {
   return 1 + Math.floor(Math.random() * 0x7ffffffe);
 }
 
+/** ?seed= 쿼리 — 1 이상 2³¹ 미만 정수만, 그 밖은 null(무작위로) */
+export function parseSeedParam(raw: string | undefined): number | null {
+  if (!raw || !/^\d{1,10}$/.test(raw)) return null;
+  const seed = Number(raw);
+  return seed >= 1 && seed < 2 ** 31 ? seed : null;
+}
+
 export function playPath(stageId: string, difficulty: Difficulty): string {
   return `/games/defense/play/stage/${boardKeyOf(stageId, difficulty)}`;
 }
