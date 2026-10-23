@@ -80,6 +80,8 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export const SESSION_TIMEOUT_MS = 10_000;
 export const SUBMIT_TIMEOUT_MS = 30_000;
 export const REPLAY_TIMEOUT_MS = 15_000;
+/** 랭킹·보드 목록 — 응답이 멈추면 skeleton·예상 순위 "…"에 머물지 않고 기존 오류·다시 시도로 (games-polish FE-03) */
+export const RANKING_TIMEOUT_MS = 10_000;
 
 /** AbortSignal.timeout이 없는 오래된 브라우저에서는 상한 없이 */
 function timeoutSignal(ms: number): AbortSignal | undefined {
@@ -230,6 +232,7 @@ export async function getGameBoards(gameType: GameType): Promise<ApiResponse<{ i
   const response = await fetchServiceInstance.backendFetch({
     method: 'GET',
     endpoint: `/api/v1/games/${gameType}/boards`,
+    signal: timeoutSignal(RANKING_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -251,6 +254,7 @@ export async function getGameRankings<G extends GameType>(
   const response = await fetchServiceInstance.backendFetch({
     method: 'GET',
     endpoint: `/api/v1/games/${gameType}/rankings?${params.toString()}`,
+    signal: timeoutSignal(RANKING_TIMEOUT_MS),
   });
 
   if (!response.ok) {
