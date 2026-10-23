@@ -207,6 +207,12 @@ describe('gameService', () => {
     expect(err).toMatchObject({ code: 'GAME_PLAYER_NAME_FORBIDDEN', status: 422 });
   });
 
+  it('제출: 에러 details(거절 이유)를 ApiError에 그대로 싣는다 — 새로고침 안내 등 분기용 (games-polish P2)', async () => {
+    fetchMock.mockResolvedValue(json({ code: 'GAME_SESSION_INVALID', message: 'x', timestamp: 't', details: { reason: 'ENGINE_VERSION' } }, 409));
+    const err = await submitGameScore('tetris', { sessionId: 's', playerName: 'n', replay }).catch((e) => e);
+    expect(err).toMatchObject({ code: 'GAME_SESSION_INVALID', status: 409, details: { reason: 'ENGINE_VERSION' } });
+  });
+
   it('제출: 본문 없는 413·429는 상태 기반 코드', async () => {
     fetchMock.mockResolvedValueOnce(new Response(null, { status: 413 }));
     await expect(submitGameScore('tetris', { sessionId: 's', playerName: 'n', replay })).rejects.toMatchObject({
