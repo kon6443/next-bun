@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import type { MatchPhase } from '../hooks/useBattleMatch';
 import type { useBattlePlay } from '../hooks/useBattlePlay';
+import type { ConnectionStatus } from '../contexts/BattleSocketContext';
 
 const sendChat = vi.fn();
 vi.mock('../contexts/BattleSocketContext', () => ({
@@ -28,7 +29,7 @@ vi.mock('./BattleView', () => ({
 
 import { MatchScreen } from './MatchScreen';
 
-const renderScreen = (phase: MatchPhase) =>
+const renderScreen = (phase: MatchPhase, connection: ConnectionStatus = 'connected', onReconnect = vi.fn()) =>
   render(
     <MatchScreen
       phase={phase}
@@ -42,6 +43,8 @@ const renderScreen = (phase: MatchPhase) =>
       trailsRootRef={{ current: null }}
       roomPlayers={[]}
       roomStatus="PLAYING"
+      connection={connection}
+      onReconnect={onReconnect}
       onExit={vi.fn()}
     />,
   );
@@ -70,5 +73,24 @@ describe('MatchScreen 경기 중 채팅 (D-016)', () => {
   it('판이 없어 관전 중이어도 채팅할 수 있다', () => {
     renderScreen({ kind: 'unavailable', forfeited: false });
     expect(screen.getByLabelText('채팅 입력')).toBeEnabled();
+  });
+});
+
+describe('MatchScreen 연결 상태 (games-polish FE-01)', () => {
+  it('연결돼 있으면 연결 표시를 띄우지 않는다', () => {
+    renderScreen({ kind: 'playing', matchId: 'm1' });
+    expect(screen.queryByText('다시 연결하는 중')).toBeNull();
+  });
+
+  it('경기 중 끊기면 판 위에 "다시 연결하는 중"을 알린다', () => {
+    renderScreen({ kind: 'playing', matchId: 'm1' }, 'disconnected');
+    expect(screen.getByTestId('overlay')).toHaveTextContent('다시 연결하는 중');
+  });
+
+  it('자동 재시도가 끝나면(failed) 다시 연결 버튼을 준다 — 나가기 말고도 복구할 수 있다', () => {
+    const onReconnect = vi.fn();
+    renderScreen({ kind: 'playing', matchId: 'm1' }, 'failed', onReconnect);
+    fireEvent.click(screen.getByRole('button', { name: /다시 연결/ }));
+    expect(onReconnect).toHaveBeenCalledTimes(1);
   });
 });
