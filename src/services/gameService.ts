@@ -74,20 +74,37 @@ const RETRY_AFTER_UNAUTHORIZED_MS = 1100;
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
+ * 응답 대기 상한 — 망이 멈추면 "준비 중"·"등록 중"·로딩에 영원히 머물지 않고 기존 실패·재시도 분기로 간다(FE-08)
+ * 제출은 서버 검증이 오래 걸릴 수 있어 넉넉히. 시간이 지나면 TimeoutError → NetworkError(다시 시도 대상)
+ */
+export const SESSION_TIMEOUT_MS = 10_000;
+export const SUBMIT_TIMEOUT_MS = 30_000;
+export const REPLAY_TIMEOUT_MS = 15_000;
+
+/** AbortSignal.timeout이 없는 오래된 브라우저에서는 상한 없이 */
+function timeoutSignal(ms: number): AbortSignal | undefined {
+  return typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(ms) : undefined;
+}
+
+/**
  * 선택 인증 호출 — 만료·잘못된 토큰은 백엔드가 401로 막으므로(토큰이 없어야 비로그인 통과) 토큰 없이 1회 재시도한다
  * 제출도 가드가 먼저 막아 세션이 소모되지 않으니 재시도해도 안전하다
  */
 async function fetchWithOptionalAuth(
-  args: { method: 'POST'; endpoint: string; body?: unknown },
+  args: { method: 'POST'; endpoint: string; body?: unknown; timeoutMs: number },
   accessToken?: string,
 ): Promise<Response> {
-  if (!accessToken) return fetchServiceInstance.backendFetch(args);
+  const { timeoutMs, ...request } = args;
+  // 재시도마다 새 상한 — 첫 요청의 시간을 이어 쓰지 않는다
+  const send = (auth: { accessToken?: string; notifyUnauthorized?: boolean }) =>
+    fetchServiceInstance.backendFetch({ ...request, ...auth, signal: timeoutSignal(timeoutMs) });
+  if (!accessToken) return send({});
   // 게임 중 전역 로그아웃(로그인 화면 이동)으로 결과를 잃지 않게 401 이벤트를 끈다
-  const response = await fetchServiceInstance.backendFetch({ ...args, accessToken, notifyUnauthorized: false });
+  const response = await send({ accessToken, notifyUnauthorized: false });
   if (response.status !== 401) return response;
   // 401로 거절된 요청도 IP 스로틀(제출 초당 1)에 집계된다 — 같은 1초 창을 피해 재시도
   await wait(RETRY_AFTER_UNAUTHORIZED_MS);
-  return fetchServiceInstance.backendFetch(args);
+  return send({});
 }
 
 // ==================== 제출 — 게임별 본문·검증 대기 재시도 ====================
@@ -149,8 +166,8 @@ export async function createGameSession(
 ): Promise<ApiResponse<GameSession>> {
   const response = await fetchWithOptionalAuth(
     board
-      ? { method: 'POST', endpoint: `/api/v1/games/${gameType}/sessions`, body: { board } }
-      : { method: 'POST', endpoint: `/api/v1/games/${gameType}/sessions` },
+      ? { method: 'POST', endpoint: `/api/v1/games/${gameType}/sessions`, body: { board }, timeoutMs: SESSION_TIMEOUT_MS }
+      : { method: 'POST', endpoint: `/api/v1/games/${gameType}/sessions`, timeoutMs: SESSION_TIMEOUT_MS },
     accessToken,
   );
 
@@ -181,6 +198,7 @@ export async function submitGameScore<G extends GameType>(
         method: 'POST',
         endpoint: `/api/v1/games/${gameType}/scores`,
         body: { sessionId, playerName, replay: buildReplayBody(gameType, replay) },
+        timeoutMs: SUBMIT_TIMEOUT_MS,
       },
       accessToken,
     );
@@ -250,6 +268,7 @@ export async function getGameReplay<G extends GameType>(
   const response = await fetchServiceInstance.backendFetch({
     method: 'GET',
     endpoint: `/api/v1/games/${gameType}/scores/${scoreId}/replay`,
+    signal: timeoutSignal(REPLAY_TIMEOUT_MS),
   });
 
   if (!response.ok) {

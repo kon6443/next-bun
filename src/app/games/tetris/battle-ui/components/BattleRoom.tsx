@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -11,6 +11,7 @@ import { PLAYER_NAME_MAX_LENGTH } from "@/app/games/_shared/lib/playerName";
 import { useBattleSocket, useEnterScope } from "../contexts/BattleSocketContext";
 import { usePlayerName } from "../hooks/usePlayerName";
 import { battleErrorMessage } from "../lib/battleErrors";
+import { consumeReloadEntry } from "../lib/pageReload";
 import { loadRoomSession } from "../lib/roomSession";
 import { ConnectionBadge } from "./ConnectionBadge";
 import { RoomStage } from "./RoomStage";
@@ -20,14 +21,15 @@ const LOBBY_PATH = "/games/tetris/battle";
 type JoinState =
   | { status: "auto" }
   | { status: "form"; needPassword: boolean }
-  | { status: "joining" };
+  /** waitingSeat = 다른 탭·기기가 아직 그 자리를 쥐고 있어(SEAT_IN_USE) 잠시 간격으로 다시 묻는 중 */
+  | { status: "joining"; waitingSeat?: boolean };
 
 /**
  * 방 화면 — 들어가 있지 않으면 입장(저장된 재연결 정보가 있으면 자동, 없으면 이름·비밀번호 입력), 들어가 있으면 대기실·대전
  */
 export function BattleRoom({ code, lockedHint }: { code: string; lockedHint: boolean }) {
   const router = useRouter();
-  const { status, room, roomNotice, joinRoom, leaveRoom, reconnect } = useBattleSocket();
+  const { status, room, roomNotice, clearRoomNotice, joinRoom, leaveRoom, reconnect } = useBattleSocket();
   const player = usePlayerName();
   const [join, setJoin] = useState<JoinState>(() => ({ status: "auto" }));
   const [password, setPassword] = useState("");
@@ -39,7 +41,41 @@ export function BattleRoom({ code, lockedHint }: { code: string; lockedHint: boo
   // 이 화면을 떠나면 아직 응답이 안 온 입장은 버린다(늦게 성공하면 컨텍스트가 바로 나간다)
   const enterScope = useEnterScope();
 
-  // 저장된 재연결 정보로 한 번 자동 입장 (새로고침·직접 링크)
+  // 다른 탭·기기가 자리를 넘겨받았다 — 자동으로 되찾지 않고 사용자가 고른다
+  const replacedHere = roomNotice?.code === code && roomNotice.replaced === true;
+  // 방장이 내보냈다 — 안내하고 로비로 (다시 들어오면 새 자리)
+  const kickedHere = roomNotice?.code === code && roomNotice.kicked === true;
+  useEffect(() => {
+    if (!kickedHere) return;
+    toast(roomNotice.message, { id: "battle-kicked" });
+    router.replace(LOBBY_PATH);
+  }, [kickedHere, roomNotice, router]);
+
+  // 방 화면을 떠나면 이 방 안내(넘겨받힘 등)를 지운다 — 나중에 다시 들어오면 자동 입장부터
+  useEffect(() => () => clearRoomNotice(code), [code, clearRoomNotice]);
+
+  /**
+   * 저장된 재연결 정보로 입장 — 없으면 입력 폼
+   * 다른 탭·기기가 경기 중이면(SEAT_IN_USE) 새로고침 직후의 첫 자동 입장(retrySeatInUse)에서만 잠시 간격으로 다시 묻는다(이전 연결이 아직 안 끊김)
+   * 새 탭·링크·"이 탭에서 계속하기"·복귀 실패 뒤 다시 자동 입장은 다시 묻지 않는다 — 그쪽이 잠깐 끊긴 틈에 자리를 가져가 진행 중인 판을 기권시키지 않게
+   */
+  const joinWithSaved = useCallback(async (retrySeatInUse: boolean) => {
+    const saved = loadRoomSession(code);
+    if (!saved) {
+      setJoin({ status: "form", needPassword: lockedHint });
+      return;
+    }
+    setJoin({ status: "joining" });
+    const result = await joinRoom({ code, playerName: saved.playerName, playerToken: saved.playerToken }, enterScope, {
+      retrySeatInUse,
+      onSeatWait: () => setJoin({ status: "joining", waitingSeat: true }),
+    });
+    if (result.ok || enterScope.cancelled) return;
+    setJoin({ status: "form", needPassword: lockedHint });
+    if (result.code !== TetrisBattleErrorCodes.INVALID_PLAYER_TOKEN) setError(battleErrorMessage(result.code));
+  }, [code, joinRoom, lockedHint, enterScope]);
+
+  // 저장된 재연결 정보로 한 번 자동 입장 (새로고침·직접 링크·새 탭)
   const autoTriedRef = useRef(false);
   // 들어가 있다가 빠지면(재연결 복귀 실패) 자동 입장을 다시 시도할 수 있게 되돌린다 — 저장값이 없으면 입력 폼으로
   useEffect(() => {
@@ -49,20 +85,17 @@ export function BattleRoom({ code, lockedHint }: { code: string; lockedHint: boo
     setError(null);
   }, [inRoom]);
   useEffect(() => {
-    if (inRoom || status !== "connected" || autoTriedRef.current) return;
+    if (inRoom || status !== "connected" || autoTriedRef.current || replacedHere || kickedHere) return;
     autoTriedRef.current = true;
-    const saved = loadRoomSession(code);
-    if (!saved) {
-      setJoin({ status: "form", needPassword: lockedHint });
-      return;
-    }
-    setJoin({ status: "joining" });
-    joinRoom({ code, playerName: saved.playerName, playerToken: saved.playerToken }, enterScope).then((result) => {
-      if (result.ok) return;
-      setJoin({ status: "form", needPassword: lockedHint });
-      if (result.code !== TetrisBattleErrorCodes.INVALID_PLAYER_TOKEN) setError(battleErrorMessage(result.code));
-    });
-  }, [inRoom, status, code, joinRoom, lockedHint, enterScope]);
+    void joinWithSaved(consumeReloadEntry());
+  }, [inRoom, status, replacedHere, kickedHere, joinWithSaved]);
+
+  /** 넘겨받힌 탭에서 "여기서 계속" — 저장된 토큰으로 다시 넘겨받는다 */
+  const resumeHere = () => {
+    autoTriedRef.current = true;
+    setError(null);
+    void joinWithSaved(false);
+  };
 
   const submitJoin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,10 +103,14 @@ export function BattleRoom({ code, lockedHint }: { code: string; lockedHint: boo
     if (resolved.error !== null) return setError(resolved.error);
     setError(null);
     setJoin({ status: "joining" });
-    const result = await joinRoom(
-      { code, playerName: resolved.name, password: password.length > 0 ? password : undefined },
-      enterScope,
-    );
+    const base = { code, playerName: resolved.name, password: password.length > 0 ? password : undefined };
+    // 이 브라우저에 그 방 자리가 있으면 같은 자리로 들어간다 — 토큰 없이 들어가면 자리가 하나 더 생긴다(FE-01)
+    const saved = loadRoomSession(code);
+    let result = await joinRoom(saved ? { ...base, playerToken: saved.playerToken } : base, enterScope);
+    // 저장된 토큰이 무효였으면(지워졌다) 새로 들어간다
+    if (saved && !result.ok && result.code === TetrisBattleErrorCodes.INVALID_PLAYER_TOKEN && !enterScope.cancelled) {
+      result = await joinRoom(base, enterScope);
+    }
     if (result.ok) {
       player.remember(resolved.name);
       return;
@@ -106,7 +143,7 @@ export function BattleRoom({ code, lockedHint }: { code: string; lockedHint: boo
     }
   };
 
-  if (leaving) return null;
+  if (leaving || kickedHere) return null;
 
   if (inRoom && room) {
     return <RoomStage room={room} connection={status} onReconnect={reconnect} onExit={exit} onCopyInvite={copyInvite} />;
@@ -134,9 +171,16 @@ export function BattleRoom({ code, lockedHint }: { code: string; lockedHint: boo
               {roomNotice.message}
             </p>
           )}
-          {join.status !== "form" ? (
-            <div className="mt-6 flex justify-center" role="status" aria-label="입장하는 중">
+          {replacedHere && join.status === "auto" ? (
+            <Button type="button" size="md" fullWidth className="mt-4 min-h-11" onClick={resumeHere} disabled={status !== "connected"}>
+              이 탭에서 계속하기
+            </Button>
+          ) : join.status !== "form" ? (
+            <div className="mt-6 flex flex-col items-center gap-2" role="status" aria-label="입장하는 중">
               <LoadingSpinnerSimple />
+              {join.status === "joining" && join.waitingSeat && (
+                <p className="text-center text-sm text-slate-400">이전 연결을 정리하는 중…</p>
+              )}
             </div>
           ) : (
             <form onSubmit={submitJoin} className="mt-4">

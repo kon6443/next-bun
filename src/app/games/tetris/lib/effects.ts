@@ -1,5 +1,6 @@
 import { ACTION, BOARD_WIDTH, type GameState, type LockEvent, SPAWN_Y } from '../engine';
 import { nextRandom } from '../engine/random';
+import { isPerfectClear } from '../battle-engine/battle';
 
 /**
  * 화면 연출 기록 — 엔진 프레임 전후 상태를 비교해 연출 이벤트(줄 삭제 파티클·하드 드롭 잔상·흔들림·문구)를 만든다
@@ -198,15 +199,6 @@ export function noteGarbageRise(fx: EffectTracker, frame: number, lines: number)
   if (lines <= 0) return;
   fx.rise = { frame, lines };
   pushCue(fx, { kind: 'garbage', value: lines });
-}
-
-/** 퍼펙트 클리어 — 고정 직후(줄 제거 전) 비어 있지 않은 칸이 모두 지울 줄에 있다 (대전 래퍼 isPerfectClear와 같은 규칙) */
-function isPerfectClear(board: ArrayLike<number>, rows: readonly number[]): boolean {
-  if (rows.length === 0) return false;
-  for (let i = 0; i < board.length; i++) {
-    if (board[i] !== 0 && rows.indexOf(Math.floor(i / BOARD_WIDTH)) === -1) return false;
-  }
-  return true;
 }
 
 function clearLabel(lock: LockEvent): string | null {

@@ -12,10 +12,11 @@ import {
   recordInput,
   stepFrame,
 } from "../engine";
-import { KEY_BINDINGS } from "../lib/controls";
+import { KEY_BINDINGS, isTypingTarget } from "../lib/controls";
 import { type EffectTracker, createEffectTracker, drainCues, observeAfter, observeBefore, resetEffects } from "../lib/effects";
 import { getSoundPlayer } from "../lib/sound/soundPlayer";
 import type { ReplayPayload } from "@/types/game";
+import { advanceClock, createClock, resetClock } from "../lib/fixedStep";
 
 export type PlayStatus = "ready" | "playing" | "paused" | "over";
 
@@ -36,10 +37,6 @@ function vibrate(pattern: number | number[]): void {
   }
 }
 
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
-}
 
 /**
  * 실시간 플레이 — 화면 주사율과 무관하게 60Hz 논리 프레임으로 엔진을 진행하고, 넘긴 입력을 그대로 기록한다
@@ -96,6 +93,8 @@ export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state:
 
   /** 판을 버리고 준비 상태로 — 이전 판이 다시 진행되거나 입력을 받지 않게 */
   const reset = useCallback(() => {
+    // 이전 판을 지운다 — 준비 화면 뒤로 끝난 판이 얼어붙어 보이지 않게 (FE-20)
+    stateRef.current = null;
     queueRef.current = [];
     heldRef.current.clear();
     if (effectsRef.current) resetEffects(effectsRef.current);
@@ -141,8 +140,7 @@ export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state:
 
   useEffect(() => {
     let rafId = 0;
-    let last = 0;
-    let acc = 0;
+    const clock = createClock();
 
     const tick = (state: GameState, recorder: InputRecorder) => {
       const actions = queueRef.current;
@@ -175,12 +173,10 @@ export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state:
       const state = stateRef.current;
       const recorder = recorderRef.current;
       if (statusRef.current === "playing" && state && recorder) {
-        if (last === 0) last = timestamp;
-        acc += Math.min(timestamp - last, MAX_CATCH_UP_MS);
-        last = timestamp;
-        while (acc >= FRAME_MS && statusRef.current === "playing") {
+        advanceClock(clock, timestamp, MAX_CATCH_UP_MS);
+        while (clock.acc >= FRAME_MS && statusRef.current === "playing") {
           tick(state, recorder);
-          acc -= FRAME_MS;
+          clock.acc -= FRAME_MS;
         }
         const timeChanged = state.frame - hudFrameRef.current >= HUD_TIME_STEP;
         if (timeChanged) hudFrameRef.current = state.frame;
@@ -190,8 +186,7 @@ export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state:
             : { score: state.score, lines: state.lines, level: state.level, frame: state.frame },
         );
       } else {
-        last = 0;
-        acc = 0;
+        resetClock(clock);
       }
       afterTickRef.current?.();
       rafId = requestAnimationFrame(loop);
@@ -217,10 +212,10 @@ export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state:
       // 일시정지 화면에서는 Space·Enter가 포커스된 버튼("계속하기" 등)을 누르게 둔다
       if (statusRef.current !== "playing") return;
       e.preventDefault();
-      if (e.repeat) return; // 키 반복은 엔진의 DAS/ARR이 맡는다
+      // 키 반복은 엔진의 DAS/ARR이 맡는다 — 단 누른 채 일시정지·재개한 키(일시정지가 뗐다)는 반복 신호로 다시 누른다(press가 중복을 거른다, FE-09)
       if (binding.kind === "hold") {
         press(binding.press, binding.release);
-      } else {
+      } else if (!e.repeat) {
         instant(binding.action);
       }
     };

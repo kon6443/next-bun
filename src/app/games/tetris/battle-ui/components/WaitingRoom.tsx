@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { ConfirmModal } from "@/app/components/ConfirmModal";
 import { Button } from "@/app/teams/components";
-import { baseInputStyles } from "@/app/teams/components/FormInput";
-import { CHAT_TEXT_MAX_LENGTH, ROOM_MIN_PLAYERS, type RoomState } from "@/types/tetrisBattleSocket";
+import { ROOM_MIN_PLAYERS, type RoomState } from "@/types/tetrisBattleSocket";
 import { type ConnectionStatus, useBattleSocket } from "../contexts/BattleSocketContext";
 import { battleErrorMessage } from "../lib/battleErrors";
-import { normalizeChatText } from "../lib/roomForm";
+import { ChatPanel } from "./ChatPanel";
 import { ConnectionBadge } from "./ConnectionBadge";
 import { EmoteBar } from "./EmoteBar";
 import { EmoteBubble } from "./EmoteBubble";
+import { PresenceDot } from "./PresenceDot";
+import { useOfflineCountdown } from "../hooks/useOfflineCountdown";
 
 /** 매치 시작을 연다 — 백엔드 매치(P2)가 없는 환경에서 막아야 하면 false */
 export const BATTLE_MATCH_AVAILABLE = true;
@@ -26,13 +28,30 @@ type WaitingRoomProps = {
  * 대기실 — 플레이어·준비·방장 시작·초대·채팅·이모트
  */
 export function WaitingRoom({ room, connection, onReconnect, onExit, onCopyInvite }: WaitingRoomProps) {
-  const { myPlayerId, chat, emotes, setReady, startMatch, sendChat, sendEmote } = useBattleSocket();
+  const { myPlayerId, chat, emotes, setReady, startMatch, sendChat, sendEmote, kickPlayer } = useBattleSocket();
   const [error, setError] = useState<string | null>(null);
+  /** 내보내기 확인 중인 참가자 */
+  const [kickTarget, setKickTarget] = useState<{ playerId: string; name: string } | null>(null);
+  const [kicking, setKicking] = useState(false);
   const [pendingReady, setPendingReady] = useState(false);
   const [starting, setStarting] = useState(false);
 
   const me = room.players.find((p) => p.playerId === myPlayerId) ?? null;
   const isHost = room.hostId === myPlayerId;
+  // 방장이 끊기면 서버가 유예(10초) 뒤 연결된 사람에게 넘긴다(D-009) — 그동안 시작을 기다리는 사람에게 알린다
+  const hostDisconnected = !isHost && room.players.some((p) => p.playerId === room.hostId && !p.connected);
+  // 대기·결과 단계의 오프라인 자리는 유예 뒤 정리된다 — 남은 초 (경기 중에는 빼지 않는다)
+  const offlineLeft = useOfflineCountdown(room.players, room.status !== "PLAYING");
+  const canKick = isHost && room.status !== "PLAYING";
+
+  const confirmKick = async () => {
+    if (!kickTarget) return;
+    setKicking(true);
+    const result = await kickPlayer(kickTarget.playerId);
+    setKicking(false);
+    setKickTarget(null);
+    setError(result.ok ? null : battleErrorMessage(result.code));
+  };
   // 서버 시작 조건(D-019)과 같다: 2명 이상, 방장 포함 전원 연결, 방장 외 전원 준비
   const everyoneReady =
     room.players.length >= ROOM_MIN_PLAYERS && room.players.every((p) => p.connected && (p.ready || p.playerId === room.hostId));
@@ -93,7 +112,7 @@ export function WaitingRoom({ room, connection, onReconnect, onExit, onCopyInvit
                   key={p.playerId}
                   className={`relative rounded-2xl border px-3 py-3 ${
                     p.playerId === myPlayerId ? "border-sky-400/50 bg-sky-500/10" : "border-slate-700/50 bg-slate-900/60"
-                  } ${p.connected ? "" : "opacity-50"}`}
+                  } ${p.connected ? "" : "opacity-60"}`}
                 >
                   <p className="truncate text-sm font-semibold text-white">
                     {p.playerId === room.hostId && (
@@ -107,8 +126,24 @@ export function WaitingRoom({ room, connection, onReconnect, onExit, onCopyInvit
                   <p className="mt-1 text-xs text-slate-400">
                     {p.playerId === room.hostId ? "방장" : p.ready ? <span className="text-emerald-300">준비 완료</span> : "대기 중"}
                     {p.isGuest && " · 게스트"}
-                    {!p.connected && " · 연결 끊김"}
                   </p>
+                  <p className="mt-1 flex items-center gap-1 text-xs text-slate-400">
+                    <PresenceDot online={p.connected} />
+                    {p.connected ? "온라인" : "오프라인"}
+                    {!p.connected && offlineLeft[p.playerId] !== undefined && offlineLeft[p.playerId] > 0 && (
+                      <span className="text-slate-500"> · 곧 자리 정리 {offlineLeft[p.playerId]}초</span>
+                    )}
+                  </p>
+                  {canKick && p.playerId !== myPlayerId && (
+                    <button
+                      type="button"
+                      onClick={() => setKickTarget({ playerId: p.playerId, name: p.name })}
+                      aria-label={`${p.name} 내보내기`}
+                      className="mt-1 min-h-11 text-xs font-semibold text-rose-300 hover:text-rose-200"
+                    >
+                      내보내기
+                    </button>
+                  )}
                   <EmoteBubble emote={emotes[p.playerId]} />
                 </li>
               ))}
@@ -157,6 +192,11 @@ export function WaitingRoom({ room, connection, onReconnect, onExit, onCopyInvit
                 {me?.ready ? "준비 취소" : "준비"}
               </Button>
             )}
+            {hostDisconnected && room.status === "WAITING" && (
+              <p className="mt-2 text-center text-xs text-amber-200" role="status">
+                방장이 오프라인이에요. 곧 다른 사람에게 방장이 넘어가요.
+              </p>
+            )}
             {error && (
               <p role="alert" className="mt-2 text-sm text-rose-300">
                 {error}
@@ -182,81 +222,16 @@ export function WaitingRoom({ room, connection, onReconnect, onExit, onCopyInvit
           if (!result.ok) setError(battleErrorMessage(result.code));
         }}
       />
+      <ConfirmModal
+        isOpen={kickTarget !== null}
+        onClose={() => setKickTarget(null)}
+        onConfirm={confirmKick}
+        title="플레이어를 내보낼까요?"
+        message={`${kickTarget?.name ?? ""}님을 방에서 내보내요. 다시 들어오면 새로 입장해요.`}
+        confirmLabel="내보내기"
+        isLoading={kicking}
+        variant="danger"
+      />
     </div>
-  );
-}
-
-function ChatPanel({
-  messages,
-  myPlayerId,
-  enabled,
-  onSend,
-}: {
-  messages: { playerId: string; name: string; text: string; key: number }[];
-  myPlayerId: string | null;
-  enabled: boolean;
-  onSend: (text: string) => Promise<string | null>;
-}) {
-  const [text, setText] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
-  const listRef = useRef<HTMLOListElement>(null);
-
-  // 새 메시지가 오면 맨 아래로
-  useEffect(() => {
-    const list = listRef.current;
-    if (list) list.scrollTop = list.scrollHeight;
-  }, [messages.length]);
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const normalized = normalizeChatText(text);
-    if (!normalized) return;
-    setSending(true);
-    const problem = await onSend(normalized);
-    setSending(false);
-    setError(problem);
-    if (!problem) setText("");
-  };
-
-  return (
-    <section className="rounded-3xl border border-slate-700/50 bg-slate-800/50 p-4" aria-labelledby="battle-chat">
-      <h2 id="battle-chat" className="text-sm font-semibold text-white">
-        채팅
-      </h2>
-      <ol ref={listRef} className="mt-2 flex h-40 flex-col gap-1 overflow-y-auto text-sm" aria-live="polite">
-        {messages.length === 0 && <li className="text-xs text-slate-500">입장한 뒤의 대화만 보여요.</li>}
-        {messages.map((m) => (
-          <li key={m.key} className="break-words">
-            <span className={`font-semibold ${m.playerId === myPlayerId ? "text-sky-300" : "text-slate-300"}`}>{m.name}</span>{" "}
-            <span className="text-slate-100">{m.text}</span>
-          </li>
-        ))}
-      </ol>
-      <form onSubmit={submit} className="mt-2 flex gap-2">
-        <label htmlFor="battle-chat-input" className="sr-only">
-          채팅 입력
-        </label>
-        <input
-          id="battle-chat-input"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          maxLength={CHAT_TEXT_MAX_LENGTH}
-          disabled={!enabled}
-          placeholder={enabled ? "메시지 입력" : "게임 중에는 이모트만 보낼 수 있어요"}
-          autoComplete="off"
-          enterKeyHint="send"
-          className={`${baseInputStyles} min-h-11 flex-1 px-4 py-2`}
-        />
-        <Button type="submit" variant="secondary" size="sm" className="min-h-11 shrink-0" disabled={!enabled || sending || text.trim().length === 0}>
-          보내기
-        </Button>
-      </form>
-      {error && (
-        <p role="alert" className="mt-2 text-xs text-rose-300">
-          {error}
-        </p>
-      )}
-    </section>
   );
 }

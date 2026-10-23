@@ -24,6 +24,10 @@ export const TetrisBattleClientEvents = {
   REMATCH: 'rematch',
   LOCK: 'lock',
   TOP_OUT: 'topOut',
+  /** 방 안에서 presencePing을 받을 때마다 — ack 없음 (D-010·D-012) */
+  HEARTBEAT: 'heartbeat',
+  /** 방장 — 대기·결과 단계에서 다른 참가자를 내보낸다 (D-011) */
+  KICK_PLAYER: 'kickPlayer',
 } as const;
 
 /** 서버 → 클라이언트 */
@@ -41,6 +45,12 @@ export const TetrisBattleServerEvents = {
   OPPONENT_UPDATE: 'opponentUpdate',
   PLAYER_KO: 'playerKO',
   MATCH_ENDED: 'matchEnded',
+  /** 내 자리를 다른 탭·기기가 넘겨받았다 — 넘겨받힌 이전 소켓에만 (D-007) */
+  SESSION_REPLACED: 'sessionReplaced',
+  /** 서버가 4초마다 — 방 안이면 곧바로 heartbeat로 답한다(숨긴 탭의 타이머 제한을 피한다, D-012). 페이로드 없음 */
+  PRESENCE_PING: 'presencePing',
+  /** 방장이 나를 내보냈다 — 내보내진 소켓에만. 토큰은 서버에서 이미 무효 (D-011) */
+  KICKED: 'kicked',
 } as const;
 
 // ===== 에러 코드 =====
@@ -69,6 +79,10 @@ export const TetrisBattleErrorCodes = {
   INTERNAL_ERROR: 'INTERNAL_ERROR',
   /** 이미 탈락한 플레이어의 lock (탈락 후 늦게 도착한 보고) */
   PLAYER_NOT_ALIVE: 'PLAYER_NOT_ALIVE',
+  /** 넘겨받을 자리가 다른 탭·기기에서 경기 중 (D-007) */
+  SEAT_IN_USE: 'SEAT_IN_USE',
+  /** 내보낼 대상이 없거나 방장 자신 (D-011) */
+  PLAYER_NOT_FOUND: 'PLAYER_NOT_FOUND',
 } as const;
 
 export type TetrisBattleErrorCode = (typeof TetrisBattleErrorCodes)[keyof typeof TetrisBattleErrorCodes];
@@ -118,6 +132,10 @@ export interface CreateRoomPayload {
   maxPlayers: number;
   password?: string;
   playerName: string;
+  /** 이 탭의 식별자 — 경기 중 같은 탭의 재연결만 자리를 넘겨받는다 (D-007, `/^[A-Za-z0-9-]{1,64}$/`) */
+  tabId?: string;
+  /** presencePing에 답하는 클라이언트라는 선언 — 늘 true (D-010) */
+  heartbeat?: true;
 }
 
 export interface JoinRoomPayload {
@@ -128,6 +146,15 @@ export interface JoinRoomPayload {
   playerToken?: string;
   /** 재연결 — 이 id 이후의 가비지를 ack rejoin.missedGarbage로 받는다 (P2) */
   lastGarbageId?: number;
+  /** 이 탭의 식별자 — CreateRoomPayload.tabId와 같다 */
+  tabId?: string;
+  /** CreateRoomPayload.heartbeat와 같다 */
+  heartbeat?: true;
+}
+
+export interface KickPlayerPayload {
+  code: string;
+  playerId: string;
 }
 
 export interface RoomCodePayload {
@@ -223,6 +250,14 @@ export interface EmoteReceivedPayload {
   emoteId: TetrisBattleEmoteId;
   /** ISO 8601 (UTC) */
   at: string;
+}
+
+export interface SessionReplacedPayload {
+  code: string;
+}
+
+export interface KickedPayload {
+  code: string;
 }
 
 export interface TetrisBattleErrorPayload {
@@ -335,6 +370,9 @@ export interface TetrisBattleServerToClientEvents {
   [TetrisBattleServerEvents.OPPONENT_UPDATE]: (payload: OpponentUpdatePayload) => void;
   [TetrisBattleServerEvents.PLAYER_KO]: (payload: PlayerKOPayload) => void;
   [TetrisBattleServerEvents.MATCH_ENDED]: (payload: MatchEndedPayload) => void;
+  [TetrisBattleServerEvents.SESSION_REPLACED]: (payload: SessionReplacedPayload) => void;
+  [TetrisBattleServerEvents.PRESENCE_PING]: () => void;
+  [TetrisBattleServerEvents.KICKED]: (payload: KickedPayload) => void;
 }
 
 export interface TetrisBattleClientToServerEvents {
@@ -349,6 +387,8 @@ export interface TetrisBattleClientToServerEvents {
   [TetrisBattleClientEvents.REMATCH]: (payload: RoomCodePayload, ack: Ack<EmptyAckData>) => void;
   [TetrisBattleClientEvents.LOCK]: (payload: LockPayload, ack: Ack<LockAckData>) => void;
   [TetrisBattleClientEvents.TOP_OUT]: (payload: TopOutPayload, ack: Ack<EmptyAckData>) => void;
+  [TetrisBattleClientEvents.HEARTBEAT]: (payload: RoomCodePayload) => void;
+  [TetrisBattleClientEvents.KICK_PLAYER]: (payload: KickPlayerPayload, ack: Ack<EmptyAckData>) => void;
 }
 
 export type TetrisBattleSocket = Socket<TetrisBattleServerToClientEvents, TetrisBattleClientToServerEvents>;

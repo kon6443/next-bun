@@ -18,8 +18,13 @@ import { type EffectTracker, createEffectTracker, observeAfter, observeBefore } 
 import { loadReplay } from "@/app/games/_shared/lib/replayLoader";
 import { TETRIS_SHARE } from "../../../lib/share";
 import { type ReplayTimeline, buildTimeline, collectActions } from "../../../lib/replayTimeline";
+import { advanceClock, createClock, resetClock } from "../../../lib/fixedStep";
 
+/** 재생 중 React 상태를 갱신하는 간격(프레임) — 탐색·끝은 바로 */
+const PLAYBACK_UI_STEP = 6;
 const SPEEDS = [0.5, 1, 2, 4] as const;
+/** 재생은 탭이 잠들면 따라잡지 않는다 — 한 번에 이만큼만(배속 전) */
+const MAX_CATCH_UP_MS = 100;
 const FRAME_MS = 1000 / FRAMES_PER_SECOND;
 /** 즉시 동작(회전·하드드롭·홀드) 키를 눌린 것으로 보여 줄 프레임 */
 const FLASH_FRAMES = 8;
@@ -158,18 +163,15 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
   useEffect(() => {
     if (!data) return;
     let rafId = 0;
-    let last = 0;
-    let acc = 0;
+    const clock = createClock();
     const loop = (timestamp: number) => {
       const { playing, speed } = playbackRef.current;
       const state = stateRef.current;
       if (playing && state) {
-        if (last === 0) last = timestamp;
-        acc += Math.min(timestamp - last, 100) * speed;
-        last = timestamp;
+        advanceClock(clock, timestamp, MAX_CATCH_UP_MS, speed);
         let ended = false;
-        while (acc >= FRAME_MS) {
-          acc -= FRAME_MS;
+        while (clock.acc >= FRAME_MS) {
+          clock.acc -= FRAME_MS;
           if (!advance()) {
             ended = true;
             break;
@@ -177,10 +179,12 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
         }
         refreshPressed();
         const frame = state.frame;
-        setPlayback((p) => (p.frame === frame && !ended ? p : { ...p, frame, playing: ended ? false : p.playing }));
+        // React 상태(시간·슬라이더·HUD)는 약 10Hz로만 — 캔버스는 매 화면 프레임 그린다 (FE-06)
+        setPlayback((p) =>
+          !ended && Math.abs(frame - p.frame) < PLAYBACK_UI_STEP ? p : { ...p, frame, playing: ended ? false : p.playing },
+        );
       } else {
-        last = 0;
-        acc = 0;
+        resetClock(clock);
       }
       drawRef.current?.();
       rafId = requestAnimationFrame(loop);
@@ -197,7 +201,8 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
       setPlayback((p) => ({ ...p, playing: true }));
       return;
     }
-    setPlayback((p) => ({ ...p, playing: !p.playing }));
+    // 멈출 때는 화면 시간·슬라이더를 판의 실제 프레임에 맞춘다(재생 중에는 몇 프레임마다만 갱신한다)
+    setPlayback((p) => (p.playing ? { ...p, playing: false, frame: stateRef.current?.frame ?? current.frame } : { ...p, playing: true }));
   }, [seek, totalFrames]);
 
   // 키보드: Space 재생/정지, ←/→ 5초 이동

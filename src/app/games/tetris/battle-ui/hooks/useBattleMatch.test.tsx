@@ -7,7 +7,7 @@ import { ACTION, BOARD_ROWS, BOARD_WIDTH } from '../../engine';
 import { type BattleReplayInput, simulateBattleReplay } from '../../battle-engine';
 import type { MatchSync } from '../contexts/BattleSocketContext';
 import { encodeBoard } from '../lib/boardCodec';
-import { useBattleMatch } from './useBattleMatch';
+import { RESULT_WAIT_MS, useBattleMatch } from './useBattleMatch';
 
 type Listener = (...args: unknown[]) => void;
 
@@ -71,6 +71,7 @@ describe('useBattleMatch', () => {
   const setup = (
     status: RoomState['status'] = 'WAITING',
     submitReplay?: (matchId: string, replay: BattleReplayInput) => Promise<'saved' | 'invalid' | 'expired' | 'failed'>,
+    recoverSeat?: () => void,
   ) => {
     const onAttack = vi.fn();
     const hook = renderHook(
@@ -87,6 +88,7 @@ describe('useBattleMatch', () => {
               if (sync === s) sync = null;
             };
           },
+          recoverSeat,
           onAttack,
           submitReplay,
         }),
@@ -304,6 +306,26 @@ describe('useBattleMatch', () => {
     expect(locks.every((l) => l.matchId === 'm1')).toBe(true);
   });
 
+  it('재입장 대기가 아닌데 lock이 NOT_IN_ROOM이면(서버가 이 소켓을 뗐다) 복귀를 한 번 부탁하고, 복귀 뒤 같은 lock을 다시 보낸다', () => {
+    const recoverSeat = vi.fn();
+    const { result } = setup('WAITING', undefined, recoverSeat);
+    startMatch(result);
+    socket.ack = (event) => (event === 'lock' ? { ok: false, code: 'NOT_IN_ROOM', message: 'x' } : { ok: true, data: {} });
+    act(() => {
+      result.current.play.instant(ACTION.HARD_DROP);
+      vi.advanceTimersByTime(50);
+    });
+    const sent = socket.emitted.filter((e) => e.event === 'lock');
+    expect(sent).toHaveLength(1);
+    expect(recoverSeat).toHaveBeenCalledTimes(1);
+    socket.ack = () => ({ ok: true, data: { targetId: 'p2' } });
+    act(() => sync?.onRejoin(undefined));
+    const resent = socket.emitted.filter((e) => e.event === 'lock');
+    expect(resent).toHaveLength(2);
+    expect(resent[1].payload).toEqual(sent[0].payload);
+    expect(recoverSeat).toHaveBeenCalledTimes(1);
+  });
+
   it('응답이 없던(타임아웃) lock은 잠시 뒤 같은 내용으로 다시 보내고, 거절 응답은 다시 보내지 않는다', () => {
     const { result } = setup();
     startMatch(result);
@@ -386,12 +408,138 @@ describe('useBattleMatch', () => {
     ]);
   });
 
+  it('roomState(RESULT)가 matchEnded보다 먼저 와도 결과를 받아 끝낸다 — "결과를 받지 못했어요"로 끝내지 않는다 (FE-17)', () => {
+    const { result, rerender } = setup();
+    startMatch(result);
+    rerender({ r: room('RESULT') });
+    expect(result.current.phase.kind).toBe('playing');
+    const results = [{ playerId: 'p1', name: '나', place: 1, kos: 1, sent: 2, received: 0, pieces: 5, maxCombo: 1 }];
+    act(() => socket.fire('matchEnded', { matchId: 'm1', results }));
+    expect(result.current.phase).toEqual({ kind: 'ended', matchId: 'm1', results });
+    act(() => {
+      vi.advanceTimersByTime(RESULT_WAIT_MS);
+    });
+    expect(result.current.phase).toEqual({ kind: 'ended', matchId: 'm1', results });
+  });
+
+  it('결과 대기 중 재대결로 다음 매치가 시작되면 대기 타이머가 새 매치를 끝내지 않는다', () => {
+    const { result, rerender } = setup();
+    startMatch(result);
+    rerender({ r: room('RESULT') });
+    rerender({ r: room('WAITING') });
+    act(() => socket.fire('matchStarting', { matchId: 'm2', seed: 9, startInMs: 3000, startAt: '', players: PLAYERS }));
+    act(() => {
+      vi.advanceTimersByTime(RESULT_WAIT_MS);
+    });
+    expect(result.current.phase).toMatchObject({ kind: 'countdown', matchId: 'm2' });
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(result.current.phase).toEqual({ kind: 'playing', matchId: 'm2' });
+  });
+
+  it('화면을 떠난 뒤 늦게 온 lock 응답은 다시 보내거나 복귀를 부탁하지 않는다', () => {
+    const recoverSeat = vi.fn();
+    const { result, unmount } = setup('WAITING', undefined, recoverSeat);
+    startMatch(result);
+    const callbacks: ((err: Error | null, response: unknown) => void)[] = [];
+    socket.emit = (event: string, payload: Record<string, unknown>, callback?: (err: Error | null, response: unknown) => void) => {
+      socket.emitted.push({ event, payload });
+      if (callback) callbacks.push(callback);
+    };
+    act(() => {
+      result.current.play.instant(ACTION.HARD_DROP);
+      vi.advanceTimersByTime(50);
+    });
+    const sent = socket.emitted.filter((e) => e.event === 'lock').length;
+    unmount();
+    act(() => {
+      for (const cb of callbacks) cb(new Error('operation has timed out'), undefined);
+      vi.advanceTimersByTime(5000);
+    });
+    expect(socket.emitted.filter((e) => e.event === 'lock')).toHaveLength(sent);
+    act(() => {
+      for (const cb of callbacks) cb(null, { ok: false, code: 'NOT_IN_ROOM', message: 'x' });
+    });
+    expect(recoverSeat).not.toHaveBeenCalled();
+  });
+
+  it('카운트다운 중 경기가 끝나면(RESULT) 시작하지 않는다 (FE-18)', () => {
+    const { result, rerender } = setup();
+    act(() => socket.fire('matchStarting', { matchId: 'm1', seed: 7, startInMs: 3000, startAt: '', players: PLAYERS }));
+    act(() => {
+      vi.advanceTimersByTime(2500);
+    });
+    // 시작 0.5초 전에 끝났다 — 결과를 기다리는 사이 시작 시각이 와도 판을 시작하지 않는다
+    rerender({ r: room('RESULT') });
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(result.current.play.status).not.toBe('playing');
+    expect(result.current.phase.kind).toBe('countdown');
+    act(() => {
+      vi.advanceTimersByTime(RESULT_WAIT_MS);
+    });
+    expect(result.current.phase.kind).toBe('ended');
+  });
+
+  it('lock이 SERVICE_UNAVAILABLE면 보낸 그대로 다시, 순서·속도 위반(INVALID_PAYLOAD)은 버린다 (FE-03)', () => {
+    const { result } = setup();
+    startMatch(result);
+    let calls = 0;
+    socket.ack = (event) => {
+      if (event !== 'lock') return { ok: true, data: {} };
+      calls += 1;
+      return calls === 1 ? { ok: false, code: 'SERVICE_UNAVAILABLE', message: 'x' } : { ok: true, data: { targetId: 'p2' } };
+    };
+    act(() => {
+      result.current.play.instant(ACTION.HARD_DROP);
+      vi.advanceTimersByTime(50);
+    });
+    act(() => {
+      vi.advanceTimersByTime(1500);
+    });
+    const locks = socket.emitted.filter((e) => e.event === 'lock');
+    expect(locks).toHaveLength(2);
+    expect(locks[1].payload).toEqual(locks[0].payload);
+    expect(result.current.targetId).toBe('p2');
+  });
+
+  it('재입장 응답에서 끊긴 사이 탈락한 상대(alive=false)는 순위를 몰라도 탈락으로, 그 상대가 대상이면 비운다 (FE-04)', () => {
+    const { result } = setup();
+    startMatch(result);
+    socket.ack = (event) => (event === 'lock' ? { ok: true, data: { targetId: 'p2' } } : { ok: true, data: {} });
+    act(() => {
+      result.current.play.instant(ACTION.HARD_DROP);
+      vi.advanceTimersByTime(50);
+    });
+    expect(result.current.targetId).toBe('p2');
+    act(() =>
+      sync?.onRejoin({
+        match: { matchId: 'm1', seed: 7, status: 'PLAYING', alive: true },
+        missedGarbage: [],
+        opponents: [
+          { playerId: 'p2', board: '', pending: 0, alive: false },
+          { playerId: 'p3', board: '', pending: 0, alive: true },
+        ],
+      }),
+    );
+    const p2 = result.current.opponents.find((o) => o.playerId === 'p2');
+    expect(p2).toMatchObject({ out: true, place: null });
+    expect(result.current.opponents.find((o) => o.playerId === 'p3')?.out).toBeUndefined();
+    expect(result.current.targetId).toBeNull();
+  });
+
   it('matchEnded를 놓쳐도 방이 RESULT가 되거나 복귀 응답이 ENDED면 판을 멈추고 결과 없는 종료로', () => {
     const first = setup();
     startMatch(first.result);
     first.rerender({ r: room('RESULT') });
-    expect(first.result.current.phase).toEqual({ kind: 'ended', matchId: 'm1', results: [] });
+    // 판은 바로 멈추고, 결과는 matchEnded를 잠깐 기다린다
     expect(first.result.current.play.status).toBe('over');
+    act(() => {
+      vi.advanceTimersByTime(RESULT_WAIT_MS);
+    });
+    expect(first.result.current.phase).toEqual({ kind: 'ended', matchId: 'm1', results: [] });
     first.unmount();
 
     socket = new FakeSocket();
