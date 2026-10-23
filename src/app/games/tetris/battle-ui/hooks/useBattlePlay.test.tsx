@@ -140,4 +140,26 @@ describe('useBattlePlay', () => {
     expect(replay?.frames).toBe(frame);
     expect(replay && simulateBattleReplay(replay).ok).toBe(true);
   });
+
+  it('판 조작 키는 keyup도 기본 동작을 막는다 — 포커스가 남은 헤더 버튼을 Space가 누르지 않게 (FE-36)', () => {
+    const { result } = setup();
+    act(() => result.current.start(1, 10, 2));
+    const button = document.createElement('button');
+    document.body.appendChild(button);
+    const keyup = new KeyboardEvent('keyup', { code: 'Space', bubbles: true, cancelable: true });
+    act(() => {
+      button.dispatchEvent(keyup);
+    });
+    expect(keyup.defaultPrevented).toBe(true);
+    // 입력창(채팅)에서는 막지 않는다
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    const typing = new KeyboardEvent('keyup', { code: 'Space', bubbles: true, cancelable: true });
+    act(() => {
+      input.dispatchEvent(typing);
+    });
+    expect(typing.defaultPrevented).toBe(false);
+    button.remove();
+    input.remove();
+  });
 });
