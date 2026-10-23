@@ -769,6 +769,7 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
             replaySaved={finished.campaign.replaySaved}
             progressSaved={finished.campaign.progressSaved}
             nextHref={nextMeta ? stagePath(nextMeta.id) : null}
+            replayHref={campaign ? `/games/defense/replays/local/${campaign.meta.id}` : null}
             exitHref={exitHref}
             onRetry={onRetry}
           />

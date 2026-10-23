@@ -8,7 +8,7 @@ import { ENEMY_NAMES } from "../lib/labels";
 
 /**
  * 캠페인 결과 (defense DESIGN §F7) — 별·남은 목숨·시간 · 다시·다음
- * 패배면 실패 원인 요약(가장 많이 샌 적·웨이브, §F0-3). 다시보기 재생은 F3 — 여기서는 저장됐는지만 알린다
+ * 패배면 실패 원인 요약(가장 많이 샌 적·웨이브, §F0-3). 이 판이 스테이지 최고로 저장되면 다시보기 링크(로컬 재생기)
  */
 type Props = {
   result: PlayResult;
@@ -17,6 +17,8 @@ type Props = {
   /** 진행 저장 실패(사파리 비공개 모드 등) — 다음 스테이지가 열리지 않을 수 있음을 알린다 */
   progressSaved: boolean;
   nextHref: string | null;
+  /** 이 기기에 저장된 다시보기 재생 경로 (저장됐을 때만) */
+  replayHref?: string | null;
   exitHref: string;
   onRetry: () => void;
 };
@@ -26,7 +28,7 @@ function formatTicks(ticks: number): string {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 }
 
-export function ResultPanel({ result, stars, replaySaved, progressSaved, nextHref, exitHref, onRetry }: Props) {
+export function ResultPanel({ result, stars, replaySaved, progressSaved, nextHref, replayHref = null, exitHref, onRetry }: Props) {
   const nextRef = useRef<HTMLAnchorElement>(null);
   const retryRef = useRef<HTMLButtonElement>(null);
   // 대화상자가 뜨면 첫 동작(다음, 없으면 다시)으로 포커스 — 키보드·스크린리더가 결과를 바로 만난다
@@ -72,7 +74,19 @@ export function ResultPanel({ result, stars, replaySaved, progressSaved, nextHre
             {result.worstWave > 0 && <>웨이브 {result.worstWave}에서 가장 많이 샜어요</>}
           </p>
         )}
-        {replaySaved && <p className="mt-2 text-xs text-slate-400">이 판을 다시보기로 저장했어요</p>}
+        {replaySaved && (
+          <p className="mt-2 text-xs text-slate-400">
+            이 판을 다시보기로 저장했어요
+            {replayHref && (
+              <>
+                {" · "}
+                <Link replace href={replayHref} data-testid="defense-local-replay" className="inline-flex min-h-11 items-center font-semibold text-sky-300 underline">
+                  다시보기
+                </Link>
+              </>
+            )}
+          </p>
+        )}
         {!progressSaved && (
           <p className="mt-2 text-xs text-amber-300" role="alert">
             기기에 진행을 저장하지 못했어요(비공개 모드·저장 공간). 다음 스테이지가 열리지 않을 수 있어요.
