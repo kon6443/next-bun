@@ -125,6 +125,7 @@ export function MatchScreen({
       onExit={requestExit}
       // 내 판이 끝나 관전 중일 때만 상대 판을 크게 볼 수 있다 (FE-28)
       canEnlarge={spectating}
+      reserveControls={phase.kind === "countdown"}
       footer={
         spectating ? (
           <ChatPanel

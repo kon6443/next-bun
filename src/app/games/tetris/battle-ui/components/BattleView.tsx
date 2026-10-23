@@ -31,6 +31,11 @@ type BattleViewProps = {
   canEnlarge?: boolean;
   /** 판 아래 줄 — 관전 중 채팅 (터치 버튼은 경기 중에만 보이므로 자리가 겹치지 않는다) */
   footer?: React.ReactNode;
+  /**
+   * 카운트다운 — 터치 버튼 자리를 미리 잡는다. 시작 순간 버튼이 생기며 판이 줄어들지(캔버스 재할당) 않게 (games-polish FE-11)
+   * 시작 전 누름은 useBattlePlay가 무시한다
+   */
+  reserveControls?: boolean;
 };
 
 /** 상대 수·화면 폭 → 미니보드 칸 크기 (DESIGN §7: 2인전은 크게, 3~4인전은 작게) */
@@ -85,6 +90,7 @@ export function BattleView({
   overlay,
   canEnlarge = false,
   footer,
+  reserveControls = false,
 }: BattleViewProps) {
   const [isCoarse, setIsCoarse] = useState(false);
   const [emoteOpen, setEmoteOpen] = useState(false);
@@ -172,7 +178,7 @@ export function BattleView({
         )}
       </div>
 
-      {isCoarse && play.status === "playing" && (
+      {isCoarse && (play.status === "playing" || reserveControls) && (
         <TouchControls onHoldStart={play.press} onHoldEnd={play.release} onInstant={play.instant} />
       )}
       {footer}
