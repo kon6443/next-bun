@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { TeamsPageLayout, ButtonLink, Button, SectionLabel, EmptyState, TeamListSkeleton } from "@/app/teams/components";
 import { cardStyles } from "@/styles/teams";
 import { getGameRankings } from "@/services/gameService";
@@ -25,10 +25,16 @@ type RankingsViewProps<G extends GameType> = {
   board?: string;
   /** 기간 탭 — 보드 자체가 기간인 경우(주간 도전)는 숨기고 전체 기간으로 부른다 */
   showPeriods?: boolean;
+  /** 제목 아래 게임별 영역(보드 탭 등) */
+  header?: ReactNode;
+  /** 리플레이를 볼 수 없으면 그 이유 (RankingTable) */
+  replayUnavailable?: string | null;
+  /** 빈 목록의 "게임 시작" 링크 — 없으면 game.playPath */
+  playHref?: string;
 };
 
 /** 게임 랭킹 화면 — 기간 탭 + 상위 50개 (게임별 page는 클라이언트 래퍼에서 game 사양을 넘긴다) */
-export function RankingsView<G extends GameType>({ game, highlightId, board, showPeriods = true }: RankingsViewProps<G>) {
+export function RankingsView<G extends GameType>({ game, highlightId, board, showPeriods = true, header, replayUnavailable = null, playHref }: RankingsViewProps<G>) {
   const [selectedPeriod, setPeriod] = useState<RankingPeriod>("daily");
   const period: RankingPeriod = showPeriods ? selectedPeriod : "all";
   const [list, setList] = useState<RankingList<ScoreDetailByGame[G]> | null>(null);
@@ -68,6 +74,7 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
           </ButtonLink>
         </div>
         <h1 className="mt-4 text-2xl font-bold text-white">{game.name} 랭킹</h1>
+        {header}
         {/* 기간 선택 — 탭 패턴(화살표 이동·패널 연결) 대신 토글 버튼 그룹 */}
         {showPeriods && (
           <div role="group" aria-label="랭킹 기간" className="mt-4 grid grid-cols-3 gap-1 rounded-full border border-white/10 bg-slate-950/40 p-1">
@@ -106,13 +113,13 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
             message="아직 기록이 없어요."
             description="첫 번째 기록의 주인공이 되어 보세요!"
             action={
-              <ButtonLink href={game.playPath} size="md" className="mt-6">
+              <ButtonLink href={playHref ?? game.playPath} size="md" className="mt-6">
                 게임 시작
               </ButtonLink>
             }
           />
         ) : (
-          <RankingTable game={game} items={list.items} myScoreIds={myScoreIds} highlightId={highlightId} />
+          <RankingTable game={game} items={list.items} myScoreIds={myScoreIds} highlightId={highlightId} replayUnavailable={replayUnavailable} />
         )}
       </section>
     </TeamsPageLayout>

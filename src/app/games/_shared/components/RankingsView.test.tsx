@@ -38,4 +38,14 @@ describe('RankingsView — 게임 사양을 따른다', () => {
     expect(getGameRankings).toHaveBeenCalledTimes(1);
     expect(getGameRankings).toHaveBeenCalledWith('defense', 'all', 50, 'weekly-2026-w43');
   });
+
+  it('리플레이를 볼 수 없으면 행의 ▶는 이유를 단 비활성 버튼, 머리 영역·빈 목록 시작 링크는 넘긴 대로', async () => {
+    await act(async () => {
+      render(<RankingsView game={TEST_GAME} highlightId={null} board="weekly-2026-w43" header={<p>보드 탭</p>} replayUnavailable="주가 끝나면 공개돼요" />);
+    });
+    expect(screen.getByText('보드 탭')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /리플레이 보기/ })).toBeNull();
+    const button = screen.getByRole('button', { name: /리플레이 — 주가 끝나면 공개돼요/ }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+  });
 });

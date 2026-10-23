@@ -23,6 +23,17 @@ export type GameSession = {
   mode?: GameMode | null;
 };
 
+/** 랭킹 보드 (GET /games/:gameType/boards — D-024) */
+export type GameBoard = {
+  boardKey: string;
+  mode: GameMode | null;
+  /** 지금 등록받는 보드 (지난 시즌·지난 주는 false) */
+  current: boolean;
+  /** 기간 있는 보드(주간)의 시작·끝 — ISO 8601 (UTC), 없으면 null */
+  startsAt: string | null;
+  endsAt: string | null;
+};
+
 /** 테트리스 기록 상세 (DESIGN §1 DETAIL) */
 export type TetrisScoreDetail = {
   lines: number;
@@ -92,6 +103,8 @@ export type RankingItem<D = TetrisScoreDetail> = {
   durationMs: number;
   /** ISO 8601 (UTC) */
   createdAt: string;
+  /** 기록이 속한 랭킹 보드 (테트리스 'default' · 디펜스 endless-s{N}·weekly-YYYY-wNN) — 보드 일반화 전 응답에는 없다 */
+  boardKey?: string;
 };
 
 /** 기록 1건 요약 (GET /games/:gameType/scores/:scoreId) — 랭킹 항목과 같은 형태, rank는 전체 기간 순위 */
@@ -119,7 +132,6 @@ export type ParamsReplayData = RankingItem<GenericScoreDetail> & {
   seed: number;
   frames: number;
   inputs: number[];
-  boardKey?: string;
   params?: Record<string, number>;
 };
 
