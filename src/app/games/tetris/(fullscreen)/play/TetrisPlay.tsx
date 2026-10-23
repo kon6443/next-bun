@@ -23,13 +23,29 @@ import { type TetrisSettings, DEFAULT_SETTINGS, loadLastName, loadSettings, reco
 
 type SessionState =
   | { status: "loading" }
-  /** receivedAt: 이 기기 시계로 받은 시각 — 만료 판정은 이 기기에서 흐른 시간으로만 한다(기기 시계가 틀려도 안전) */
-  | { status: "ready"; session: GameSession; receivedAt: number }
+  /**
+   * receivedAt: 이 기기 시계로 받은 시각 — 만료 판정은 이 기기에서 흐른 시간으로 한다
+   * ttlMs: 받은 순간 남은 시간(응답 expiresAt 기준, sessionTtlMs)
+   */
+  | { status: "ready"; session: GameSession; receivedAt: number; ttlMs: number }
   /** 발급 실패 — 로컬 시드로 플레이만 한다 */
   | { status: "failed"; seed: number; error: string };
 
-/** 세션 TTL(백엔드 2시간) − 판 최대 길이(60분) − 여유 1분: 받은 지 이만큼 지났으면 시작 전에 새로 받는다 */
-const SESSION_REFRESH_AFTER_MS = (120 - 61) * 60 * 1000;
+/** 세션 TTL 상한(백엔드 2시간) — 응답 expiresAt이 이보다 멀어 보이면(기기 시계가 늦다) 이 값으로 */
+const SESSION_TTL_FALLBACK_MS = 120 * 60 * 1000;
+/** 판 최대 길이(60분) + 여유 1분 — 남은 시간이 이보다 짧으면 시작 전에 새로 받는다 */
+const SESSION_PLAY_MARGIN_MS = 61 * 60 * 1000;
+/** 세션 응답이 이만큼 늦으면 "등록 없이 시작"을 보인다 — 발급 상한(10초)까지 시작을 막지 않게 (games-polish FE-12) */
+export const SLOW_SESSION_MS = 3000;
+
+/**
+ * 받은 순간 세션의 남은 시간 — 하드코딩 TTL 대신 응답 expiresAt으로(서버 TTL이 바뀌어도 따라간다, Q-T1)
+ * 서버·기기 시계 차이로 길게 잡히지 않게 상한(2시간)을 두고, 읽을 수 없으면 상한
+ */
+export function sessionTtlMs(expiresAt: string, now: number): number {
+  const left = Date.parse(expiresAt) - now;
+  return Number.isFinite(left) ? Math.min(Math.max(0, left), SESSION_TTL_FALLBACK_MS) : SESSION_TTL_FALLBACK_MS;
+}
 
 function randomSeed(): number {
   return crypto.getRandomValues(new Uint32Array(1))[0];
@@ -98,7 +114,8 @@ export default function TetrisPlay() {
         });
         return;
       }
-      setSessionState({ status: "ready", session: data, receivedAt: Date.now() });
+      const receivedAt = Date.now();
+      setSessionState({ status: "ready", session: data, receivedAt, ttlMs: sessionTtlMs(data.expiresAt, receivedAt) });
     } catch (err) {
       if (!isLatest()) return;
       setSessionState({ status: "failed", seed: randomSeed(), error: sessionErrorMessage(err) });
@@ -130,7 +147,7 @@ export default function TetrisPlay() {
   const startGame = () => {
     if (sessionState.status === "loading") return;
     // 준비 화면에 오래 두어 판 도중(최대 60분) 세션이 만료될 수 있으면 새로 받은 뒤 이어서 시작한다
-    if (sessionState.status === "ready" && Date.now() - sessionState.receivedAt > SESSION_REFRESH_AFTER_MS) {
+    if (sessionState.status === "ready" && Date.now() - sessionState.receivedAt > sessionState.ttlMs - SESSION_PLAY_MARGIN_MS) {
       startAfterSessionRef.current = true;
       requestSession();
       return;
@@ -144,6 +161,23 @@ export default function TetrisPlay() {
     // 재발급에 실패하면 자동으로 시작하지 않는다 — 준비 화면에서 "등록 불가" 안내를 보고 시작하게
     if (sessionState.status === "ready") beginGame(sessionState.session.seed);
   }, [beginGame, sessionState]);
+
+  // 세션 응답이 늦으면 기다리지 않고 등록 없이 시작할 수 있게 한다 — 늦게 온 응답은 버린다(이 판은 로컬 seed)
+  const [sessionSlow, setSessionSlow] = useState(false);
+  useEffect(() => {
+    setSessionSlow(false);
+    if (sessionState.status !== "loading") return;
+    const timer = setTimeout(() => setSessionSlow(true), SLOW_SESSION_MS);
+    return () => clearTimeout(timer);
+  }, [sessionState.status]);
+
+  const startWithoutSession = () => {
+    beginSessionRequest(); // 진행 중인 발급 응답을 낡은 것으로 — 늦게 와도 이 판을 바꾸지 않는다
+    startAfterSessionRef.current = false;
+    const seed = randomSeed();
+    setSessionState({ status: "failed", seed, error: "서버 응답이 늦어 이번 판은 랭킹 등록 없이 플레이해요." });
+    beginGame(seed);
+  };
 
   const restart = () => {
     play.reset();
@@ -238,6 +272,11 @@ export default function TetrisPlay() {
               >
                 시작
               </Button>
+              {sessionState.status === "loading" && sessionSlow && (
+                <Button type="button" variant="secondary" size="md" fullWidth className="mt-2 min-h-11" onClick={startWithoutSession}>
+                  등록 없이 시작
+                </Button>
+              )}
               <EffectsToggle className="mt-3" />
               {!isCoarse && <ControlGuide />}
             </div>
