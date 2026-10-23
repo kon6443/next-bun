@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmModal } from "@/app/components/ConfirmModal";
 import { SOUND, Sfx } from "../audio/sfx";
@@ -268,6 +269,8 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
   const selectionRef = useRef<{ x: number; y: number; range: number } | null>(null);
   /** 웨이브 경계가 지나면 다음 프레임 전에 이어하기를 저장한다 */
   const saveDueRef = useRef(false);
+  /** 이어하기 저장 실패를 이미 알렸나 — 웨이브마다 되풀이하지 않게 판당 한 번 */
+  const resumeSaveWarnedRef = useRef(false);
 
   const [selected, setSelected] = useState<number | null>(null);
   const [armed, setArmed] = useState<string | null>(null);
@@ -375,7 +378,12 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
     saveDueRef.current = false;
     const state = stateRef.current;
     if (state.over || state.wavesStarted === 0) return;
-    saveResume({ engineVersion: ENGINE_VERSION, mode, boardKey, seed, tick: state.tick, inputs: recorderRef.current.inputs.slice(), savedAt: Date.now(), ...resumeFields });
+    const saved = saveResume({ engineVersion: ENGINE_VERSION, mode, boardKey, seed, tick: state.tick, inputs: recorderRef.current.inputs.slice(), savedAt: Date.now(), ...resumeFields });
+    // 저장소 차단·용량 초과면 떠났다 돌아와도 이어할 수 없다 — 모르고 떠나지 않게 한 번 알린다 (games-polish FE-46)
+    if (!saved && !resumeSaveWarnedRef.current) {
+      resumeSaveWarnedRef.current = true;
+      toast("이어하기를 저장하지 못했어요. 이 화면을 떠나면 판을 이어갈 수 없어요.", { id: "defense-resume-save" });
+    }
     const progress = loadProgress();
     const next = markEnemiesMet(progress, metRef.current);
     if (next !== progress) saveProgress(next);

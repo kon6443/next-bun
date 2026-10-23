@@ -88,6 +88,8 @@ export function ScoreSubmitPanel<G extends GameType>({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [canRetry, setCanRetry] = useState(false);
   const [isFinalError, setIsFinalError] = useState(false);
+  /** 배포 뒤 옛 화면으로 낸 기록이라 거절됐다 — 새로고침 버튼 (ENGINE_VERSION) */
+  const [needsReload, setNeedsReload] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submittingRef = useRef(false);
   const [registered, setRegistered] = useState<SubmitScoreResponse<ScoreDetailByGame[G]> | null>(null);
@@ -98,6 +100,22 @@ export function ScoreSubmitPanel<G extends GameType>({
   useEffect(() => {
     titleRef.current?.focus();
   }, []);
+
+  // 게임 오버 순간 기록을 보관한다 — 이름 입력·등록 전에 새로고침·탭 닫기·뒤로가기를 해도 시작 화면에서 다시 등록할 수 있게 (games-polish FE-05)
+  // 등록 성공·다시 내도 소용없는 거절이면 지우고, "다시 하기"·"나가기"를 직접 누르면 지운다(보관은 실수로 떠난 경우를 위한 것)
+  // 이름은 아직 모른다 — 기본 이름(규칙을 통과하면)으로 두고, 비어 있으면 다시 등록할 때 이름부터 묻는다
+  const presavedRef = useRef(false);
+  useEffect(() => {
+    if (!sessionId || presavedRef.current) return;
+    presavedRef.current = true;
+    const playerName = validatePlayerName(defaultName) === null ? normalizePlayerName(defaultName) : "";
+    storage.savePendingSubmission({ sessionId, playerName, replay, score, savedAt: Date.now() });
+  }, [sessionId, defaultName, replay, score, storage]);
+
+  /** 등록하지 않고 직접 떠난다 — 선보관을 지운다. 제출이 일시 실패해 보관한 기록(다시 등록하기)은 남긴다 */
+  const discardPresaved = () => {
+    if (sessionId && !registered && !canRetry) storage.removePendingSubmission(sessionId);
+  };
 
   // 등록 전 예상 순위 (상위 100개 기준) — 등록 후에는 서버가 준 순위를 쓴다
   // 패널(=게임 오버)당 정확히 기간별 1회: StrictMode·Fast Refresh가 effect를 다시 돌려도 ref 가드로 재요청하지 않는다
@@ -143,18 +161,19 @@ export function ScoreSubmitPanel<G extends GameType>({
       storage.saveLastName(playerName);
       storage.removePendingSubmission(sessionId);
     } catch (err) {
-      const { kind, message: text } = classifySubmitError(err, canRetry);
+      const { kind, message: text, reload } = classifySubmitError(err, canRetry);
       if (kind === "name") {
         setNameError(text);
       } else if (kind === "final") {
         setSubmitError(text);
         setIsFinalError(true);
+        setNeedsReload(reload === true);
         storage.removePendingSubmission(sessionId);
       } else {
-        // 네트워크·429·5xx — 결과를 보관하고 다시 시도할 수 있게
-        setSubmitError(text);
+        // 네트워크·429·5xx — 결과를 보관하고 다시 시도할 수 있게. 보관하지 못했으면(저장소 차단·용량) 떠나면 사라진다고 알린다 (FE-46)
+        const kept = storage.savePendingSubmission({ sessionId, playerName, replay, score, savedAt: Date.now() });
+        setSubmitError(kept ? text : `${text} 이 기기에 보관하지 못해 이 화면을 떠나면 기록이 사라져요.`);
         setCanRetry(true);
-        storage.savePendingSubmission({ sessionId, playerName, replay, score, savedAt: Date.now() });
       }
     } finally {
       submittingRef.current = false;
@@ -231,17 +250,31 @@ export function ScoreSubmitPanel<G extends GameType>({
           </Button>
         </form>
       ) : (
-        <p role="status" className="mt-5 rounded-xl border border-white/10 bg-slate-950/40 p-3 text-sm text-slate-300">
-          {submitError ?? sessionError ?? "이번 판은 랭킹에 등록할 수 없어요."}
-        </p>
+        <div role="status" className="mt-5 rounded-xl border border-white/10 bg-slate-950/40 p-3 text-sm text-slate-300">
+          <p>{submitError ?? sessionError ?? "이번 판은 랭킹에 등록할 수 없어요."}</p>
+          {needsReload && (
+            <Button type="button" variant="secondary" size="md" fullWidth className="mt-3 min-h-11" onClick={() => window.location.reload()}>
+              새로고침
+            </Button>
+          )}
+        </div>
       )}
 
       <div className="mt-3 flex gap-2">
-        <Button type="button" size="md" className="min-h-11 flex-1" onClick={onRestart}>
+        <Button
+          type="button"
+          size="md"
+          className="min-h-11 flex-1"
+          onClick={() => {
+            discardPresaved();
+            onRestart();
+          }}
+        >
           다시 하기
         </Button>
         <Link
           href={game.homePath}
+          onClick={discardPresaved}
           className="flex min-h-11 flex-1 items-center justify-center rounded-full border border-white/20 text-sm font-semibold text-slate-200 hover:border-white/40"
         >
           나가기
