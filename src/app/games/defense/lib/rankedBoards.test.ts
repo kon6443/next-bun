@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BOARD_PARAM, boardTabs, selectBoard } from './rankedBoards';
+import { BOARD_PARAM, DEFENSE_SESSION_TTL_MS, boardTabs, selectBoard, weeklyReplayState } from './rankedBoards';
 
 const BOARDS = [
   { boardKey: 'endless-s1', mode: 'endless', current: true },
@@ -28,6 +28,25 @@ describe('랭킹 보드 탭 (/boards → 탭)', () => {
     // 주간 보드가 없을 때(서버 설정) 별칭 weekly는 첫 탭으로
     expect(selectBoard(boardTabs(null), 'weekly')).toBe('endless-s1');
   });
+  it('주간 리플레이 공개 — 주 끝 + 세션 TTL(4시간)부터(D-032), 경계 고정', () => {
+    const endsAt = '2026-10-25T15:00:00.000Z';
+    const end = Date.parse(endsAt);
+    expect(DEFENSE_SESSION_TTL_MS).toBe(4 * 60 * 60 * 1000);
+    expect(weeklyReplayState('weekly-2026-w43', endsAt, end - 1)).toBe('running');
+    expect(weeklyReplayState('weekly-2026-w43', endsAt, end)).toBe('soon');
+    expect(weeklyReplayState('weekly-2026-w43', endsAt, end + DEFENSE_SESSION_TTL_MS - 1)).toBe('soon');
+    expect(weeklyReplayState('weekly-2026-w43', endsAt, end + DEFENSE_SESSION_TTL_MS)).toBe('open');
+  });
+
+  it('endsAt을 모르면 보드 키로 — 이번 주 running, 주 경계 직후 4시간은 막 끝난 주 soon', () => {
+    // 2026-10-26(월) 01:00 KST = 2026-10-25T16:00Z — 주 경계(15:00Z) 1시간 뒤
+    const now = Date.parse('2026-10-25T16:00:00Z');
+    expect(weeklyReplayState('weekly-2026-w44', null, now)).toBe('running');
+    expect(weeklyReplayState('weekly-2026-w43', null, now)).toBe('soon');
+    expect(weeklyReplayState('weekly-2026-w43', null, now + DEFENSE_SESSION_TTL_MS)).toBe('open');
+    expect(weeklyReplayState('weekly-2026-w40', undefined, now)).toBe('open');
+  });
+
   it('쿼리 형식 검사', () => {
     expect(['endless', 'weekly', 'endless-s2', 'weekly-2026-w43'].every((v) => BOARD_PARAM.test(v))).toBe(true);
     expect(['', 'default', 'weekly-2026-43', 'endless-s', '../x'].some((v) => BOARD_PARAM.test(v))).toBe(false);

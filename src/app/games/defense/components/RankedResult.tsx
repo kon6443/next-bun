@@ -82,9 +82,9 @@ export function RankedResult({ title, result, score, wave, kills, boardKey, week
           replay={{ engineVersion: ENGINE_VERSION, frames: result.endTick, inputs: result.inputs }}
           board={boardKey}
           periods={weekly ? WEEKLY_PERIODS : undefined}
-          // 진행 중인 주간 보드는 서버가 리플레이를 주가 끝날 때까지 막는다(D-027)
+          // 주간 보드는 서버가 리플레이를 주 종료 4시간(세션 TTL) 뒤까지 막는다(D-027·D-032) — 등록 직후는 늘 그 창 안
           showReplay={REPLAY_PLAYER_READY && !weekly}
-          // 신기록 순간 공유(§F11 — 등록 직후 결과 화면). 진행 중인 주간 기록은 링크가 주가 끝날 때까지 404라 공유하지 않는다
+          // 신기록 순간 공유(§F11 — 등록 직후 결과 화면). 주간 기록은 링크가 주 종료 4시간 뒤까지 404라 공유하지 않는다
           registeredActions={weekly ? undefined : (registered, playerName) => <DefenseShareButton wide subject={{ scoreId: registered.scoreId, playerName, score: registered.score, detail: registered.detail, boardKey }} />}
           sessionId={sessionId}
           sessionError={sessionError}

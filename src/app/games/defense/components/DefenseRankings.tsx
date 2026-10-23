@@ -6,7 +6,7 @@ import { RankingsView } from "@/app/games/_shared/components/RankingsView";
 import { getGameBoards } from "@/services/gameService";
 import type { GameBoard } from "@/types/game";
 import { DEFENSE_GAME, REPLAY_PLAYER_READY } from "../lib/defenseGame";
-import { boardTabs, selectBoard, weeklyBoardKeyAt } from "../lib/rankedBoards";
+import { boardTabs, selectBoard, weeklyReplayState } from "../lib/rankedBoards";
 
 /**
  * 디펜스 랭킹 (defense DESIGN §F1 랭킹·§B6·D-024·D-027) — /boards로 탭: 무한(시즌 — 일간·주간·전체) · 주간(이번 주·지난 주 — 기간 탭 없음)
@@ -29,9 +29,11 @@ export function DefenseRankings({ boardParam, highlightId }: Props) {
   const board = selectBoard(tabs, boardParam);
   const selected = tabs.find((t) => t.boardKey === board) ?? null;
   const weekly = board.startsWith("weekly-");
-  // 목록에 없으면(목록 실패·탭 밖 키) 이번 주 키와 비교 — 진행 중인 주를 "끝난 주"로 보지 않게
-  const runningWeekly = weekly && (selected ? selected.current : board === weeklyBoardKeyAt(Date.now()));
-  const replayUnavailable = runningWeekly ? "주가 끝나면 공개돼요" : REPLAY_PLAYER_READY ? null : "리플레이는 준비 중이에요";
+  // 주간 리플레이는 주 끝 + 4시간(세션 TTL) 뒤 공개(D-032) — /boards endsAt, 목록에 없으면 보드 키로 판정
+  const replayState = weekly ? weeklyReplayState(board, selected?.endsAt, Date.now()) : "open";
+  const runningWeekly = replayState === "running";
+  const replayUnavailable =
+    replayState === "running" ? "주가 끝나고 4시간 뒤 공개돼요" : replayState === "soon" ? "곧 공개돼요(주 종료 4시간 뒤)" : REPLAY_PLAYER_READY ? null : "리플레이는 준비 중이에요";
 
   const header = (
     <>
@@ -51,7 +53,8 @@ export function DefenseRankings({ boardParam, highlightId }: Props) {
         ))}
       </nav>
       {boardsError && <p className="mt-2 text-xs text-slate-500">보드 목록을 불러오지 못해 무한 모드 랭킹만 보여요.</p>}
-      {runningWeekly && <p className="mt-2 text-xs text-slate-500">진행 중인 주간 도전 — 리플레이는 주가 끝나면 공개돼요.</p>}
+      {runningWeekly && <p className="mt-2 text-xs text-slate-500">진행 중인 주간 도전 — 리플레이는 주가 끝나고 4시간 뒤 공개돼요.</p>}
+      {replayState === "soon" && <p className="mt-2 text-xs text-slate-500">막 끝난 주 — 리플레이는 주 종료 4시간 뒤 공개돼요.</p>}
     </>
   );
 

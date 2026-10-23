@@ -110,7 +110,7 @@ describe('리플레이 화면 — 로컬·서버', () => {
 
     loadReplay.mockRejectedValue(new ApiError('GAME_SCORE_NOT_FOUND', '기록을 찾을 수 없습니다.', 404));
     const third = render(<ServerReplay scoreId={47} />);
-    expect((await screen.findByTestId('defense-replay-error')).textContent).toContain('주가 끝나면 공개');
+    expect((await screen.findByTestId('defense-replay-error')).textContent).toContain('주가 끝나고 4시간 뒤에 공개');
     third.unmount();
 
     loadReplay.mockResolvedValue({ ...data, engineVersion: ENGINE_VERSION + 1 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { DEFENSE_SESSION_TTL_MS } from "../lib/rankedBoards";
 
 /**
  * 세션 시계 (defense DESIGN §B3·§F9b·§F10 useSessionClock) — 받은 뒤 이 기기에서 흐른 시간으로만 판정(기기 시계가 틀려도 안전)
@@ -9,8 +10,8 @@ import { useEffect, useState } from "react";
  */
 export type SessionClock = "none" | "ok" | "warn" | "expired";
 
-/** 디펜스 세션 TTL(벽시계) — 백엔드 §B3 4시간 */
-export const SESSION_TTL_MS = 4 * 60 * 60 * 1000;
+/** 디펜스 세션 TTL(벽시계) — 서버와 같은 값 한 곳(lib/rankedBoards) */
+export const SESSION_TTL_MS = DEFENSE_SESSION_TTL_MS;
 export const SESSION_WARN_BEFORE_MS = 30 * 60 * 1000;
 /** 제출 왕복·검증 여유 — 이보다 가까우면 등록하지 않는다 */
 export const SESSION_EXPIRE_MARGIN_MS = 60 * 1000;

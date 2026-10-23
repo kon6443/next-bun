@@ -85,7 +85,7 @@ function Loading({ progress }: { progress: number }) {
   );
 }
 
-/** 서버 기록 — 진행 중인 주간 보드는 404(주가 끝나면 공개, D-027) */
+/** 서버 기록 — 주간 보드는 주가 끝나고 4시간(세션 TTL) 뒤까지 404(D-027·D-032) */
 export function ServerReplay({ scoreId, actions }: { scoreId: number; actions?: (data: ParamsReplayData) => ReactNode }) {
   const [data, setData] = useState<ParamsReplayData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +95,7 @@ export function ServerReplay({ scoreId, actions }: { scoreId: number; actions?: 
       .then((replay) => !cancelled && setData(replay))
       .catch((err) => {
         if (cancelled) return;
-        setError(err instanceof ApiError && err.status === 404 ? "기록을 찾을 수 없어요. 진행 중인 주간 도전의 기록은 주가 끝나면 공개돼요." : extractErrorMessage(err, "리플레이를 불러오지 못했어요."));
+        setError(err instanceof ApiError && err.status === 404 ? "기록을 찾을 수 없어요. 주간 도전 기록은 주가 끝나고 4시간 뒤에 공개돼요." : extractErrorMessage(err, "리플레이를 불러오지 못했어요."));
       });
     return () => {
       cancelled = true;

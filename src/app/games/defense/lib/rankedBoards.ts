@@ -5,6 +5,12 @@
 
 export type RankedMode = 'endless' | 'weekly';
 
+/**
+ * 디펜스 세션 TTL(벽시계) — 서버 DEFENSE_SESSION_TTL_SECONDS(4시간, §B3)와 같아야 한다
+ * 세션 만료 판정(hooks/useSessionClock)·주간 리플레이 공개 시점(D-032)이 같이 쓴다
+ */
+export const DEFENSE_SESSION_TTL_MS = 4 * 60 * 60 * 1000;
+
 /** 현재 무한 시즌 보드 — 서버 resolveSessionBoard의 시즌과 같아야 로컬 판이 같은 맵·규칙이 된다 */
 export const ENDLESS_BOARD_KEY = 'endless-s1';
 
@@ -63,21 +69,21 @@ export function boardShortTitle(boardKey: string): string {
 /** 랭킹 화면 ?board= — 보드 키 또는 모드 별칭(endless·weekly = 그 모드의 현재 보드) */
 export const BOARD_PARAM = /^(endless|weekly|endless-s\d{1,3}|weekly-\d{4}-w\d{2})$/;
 
-export type BoardTab = { boardKey: string; mode: RankedMode; label: string; current: boolean };
+export type BoardTab = { boardKey: string; mode: RankedMode; label: string; current: boolean; endsAt: string | null };
 
 /**
  * /boards 목록 → 랭킹 탭 (D-024) — 무한(현재 시즌 → 지난 시즌) · 주간(이번 주 → 지난 주)
  * 목록을 못 받으면 현재 무한 시즌 하나
  */
-export function boardTabs(boards: readonly { boardKey: string; mode: string | null; current: boolean }[] | null): BoardTab[] {
+export function boardTabs(boards: readonly { boardKey: string; mode: string | null; current: boolean; endsAt?: string | null }[] | null): BoardTab[] {
   const tabs: BoardTab[] = [];
   for (const board of boards ?? []) {
     const mode = modeOfBoardKey(board.boardKey);
     if (!mode || board.mode !== mode) continue;
     const label = mode === 'endless' ? (board.current ? `무한 ${boardShortTitle(board.boardKey)}` : `지난 시즌 ${boardShortTitle(board.boardKey)}`) : board.current ? `이번 주 ${boardShortTitle(board.boardKey)}` : `지난 주 ${boardShortTitle(board.boardKey)}`;
-    tabs.push({ boardKey: board.boardKey, mode, label, current: board.current });
+    tabs.push({ boardKey: board.boardKey, mode, label, current: board.current, endsAt: board.endsAt ?? null });
   }
-  if (!tabs.some((t) => t.mode === 'endless')) tabs.unshift({ boardKey: ENDLESS_BOARD_KEY, mode: 'endless', label: `무한 ${boardShortTitle(ENDLESS_BOARD_KEY)}`, current: true });
+  if (!tabs.some((t) => t.mode === 'endless')) tabs.unshift({ boardKey: ENDLESS_BOARD_KEY, mode: 'endless', label: `무한 ${boardShortTitle(ENDLESS_BOARD_KEY)}`, current: true, endsAt: null });
   // 무한 먼저, 같은 모드에서는 현재 → 지난(목록 순서 유지)
   return [...tabs.filter((t) => t.mode === 'endless' && t.current), ...tabs.filter((t) => t.mode === 'endless' && !t.current), ...tabs.filter((t) => t.mode === 'weekly' && t.current), ...tabs.filter((t) => t.mode === 'weekly' && !t.current)];
 }
@@ -90,4 +96,22 @@ export function selectBoard(tabs: readonly BoardTab[], param: string | null): st
   }
   if (param && BOARD_PARAM.test(param)) return param;
   return tabs[0].boardKey;
+}
+
+/** 주간 보드 리플레이 공개 상태 — running: 진행 중 · soon: 끝났지만 공개 전 · open: 공개 */
+export type WeeklyReplayState = 'running' | 'soon' | 'open';
+
+/**
+ * 주간 보드 리플레이는 주가 끝나고 세션 TTL(4시간)이 더 지나야 공개된다(D-032 — 주 마지막에 받은 세션으로 1위 입력을
+ * 복제해 끝난 주 랭킹을 바꾸지 못하게. 그 전엔 서버 404). endsAt(/boards)을 모르면 보드 키로: 이번 주 = running,
+ * 지금보다 TTL만큼 앞선 시각의 주 = soon(주 경계 직후 4시간), 그 밖 = open
+ */
+export function weeklyReplayState(boardKey: string, endsAt: string | null | undefined, now: number): WeeklyReplayState {
+  const end = endsAt ? Date.parse(endsAt) : Number.NaN;
+  if (Number.isFinite(end)) {
+    if (now < end) return 'running';
+    return now < end + DEFENSE_SESSION_TTL_MS ? 'soon' : 'open';
+  }
+  if (boardKey === weeklyBoardKeyAt(now)) return 'running';
+  return boardKey === weeklyBoardKeyAt(now - DEFENSE_SESSION_TTL_MS) ? 'soon' : 'open';
 }

@@ -32,14 +32,23 @@ describe('디펜스 랭킹·허브 카드', () => {
     getGameRankings.mockReset().mockResolvedValue({ code: 'SUCCESS', message: '', data: { boardKey: 'x', items: [item], periodStart: null } });
   });
 
-  it('?board=weekly → 이번 주 보드, 기간 탭 없음, 리플레이는 주가 끝나면 공개', async () => {
+  it('?board=weekly → 이번 주 보드, 기간 탭 없음, 리플레이는 주 종료 4시간 뒤 공개', async () => {
     await act(async () => {
       render(<DefenseRankings boardParam="weekly" highlightId={null} />);
     });
     expect(getGameRankings).toHaveBeenCalledWith('defense', 'all', 50, 'weekly-2026-w43');
     expect(screen.getByTestId('defense-board-tab-weekly-2026-w43').getAttribute('aria-current')).toBe('page');
     expect(screen.queryByRole('group', { name: '랭킹 기간' })).toBeNull();
-    expect(screen.getByRole('button', { name: /주가 끝나면 공개돼요/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /주가 끝나고 4시간 뒤 공개돼요/ })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /리플레이 보기/ })).toBeNull();
+  });
+
+  it('막 끝난 주(종료 4시간 안)는 ▶ 비활성 "곧 공개돼요" — D-032', async () => {
+    getGameBoards.mockResolvedValue({ ...BOARDS, data: { items: [BOARDS.data.items[0], { ...BOARDS.data.items[2], endsAt: new Date(Date.now() - 60 * 60 * 1000).toISOString() }] } });
+    await act(async () => {
+      render(<DefenseRankings boardParam="weekly-2026-w42" highlightId={null} />);
+    });
+    expect(screen.getByRole('button', { name: /곧 공개돼요\(주 종료 4시간 뒤\)/ })).toBeTruthy();
     expect(screen.queryByRole('link', { name: /리플레이 보기/ })).toBeNull();
   });
 
@@ -78,7 +87,7 @@ describe('디펜스 랭킹·허브 카드', () => {
     await act(async () => {
       render(<DefenseRankings boardParam={weeklyBoardKeyAt(Date.now())} highlightId={null} />);
     });
-    expect(screen.getByRole('button', { name: /주가 끝나면 공개돼요/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /주가 끝나고 4시간 뒤 공개돼요/ })).toBeTruthy();
   });
 
   it('허브 카드 — 스테이지 4 전에는 잠김(랭킹은 열림), 깬 뒤에는 시작·이번 주 W43·내 최고 웨이브', async () => {

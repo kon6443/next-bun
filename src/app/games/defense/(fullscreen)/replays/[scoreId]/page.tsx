@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return buildReplayMetadata(DEFENSE_SHARE, scoreId, summary);
 }
 
-/** 랭킹 기록 리플레이 — 진행 중인 주간 보드 기록은 서버가 주가 끝날 때까지 404(D-027) */
+/** 랭킹 기록 리플레이 — 주간 보드 기록은 서버가 주 종료 4시간(세션 TTL) 뒤까지 404(D-027·D-032) */
 export default async function DefenseReplayPage({ params }: PageProps) {
   const id = parseScoreId((await params).scoreId);
   if (id === null) notFound();
