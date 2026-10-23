@@ -22,6 +22,7 @@ export function BattleMatchRow({ item, now }: { item: BattleMatchListItem; now: 
                 <span className="text-amber-300">{item.winnerName}</span> 우승
               </>
             )}
+            {item.disputed && " · 일부 기록 검증 실패"}
           </span>
         </span>
         <time dateTime={item.endedAt} className="shrink-0 text-xs text-slate-500">

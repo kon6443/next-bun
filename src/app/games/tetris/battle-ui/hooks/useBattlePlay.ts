@@ -12,10 +12,11 @@ import {
   receiveGarbage,
   stepBattle,
 } from "../../battle-engine";
-import { KEY_BINDINGS } from "../../lib/controls";
+import { KEY_BINDINGS, isTypingTarget } from "../../lib/controls";
 import { type EffectTracker, createEffectTracker, drainCues, noteGarbageRise, observeAfter, observeBefore, resetEffects } from "../../lib/effects";
 import { getSoundPlayer } from "../../lib/sound/soundPlayer";
 import type { GarbageGauge } from "../../lib/renderer";
+import { advanceClock, createClock, resetClock } from "../../lib/fixedStep";
 
 export type BattlePlayStatus = "ready" | "playing" | "over";
 
@@ -25,6 +26,8 @@ const FRAME_MS = 1000 / FRAMES_PER_SECOND;
  * 너무 길면(브라우저가 오래 재운 경우) 한 프레임에 수천 틱을 돌지 않게 자른다
  */
 const MAX_CATCH_UP_MS = 10_000;
+/** 한 화면 프레임에 이만큼 넘게 따라잡으면(백그라운드 복귀) 그동안의 효과음은 내지 않는다 — 수십 개가 한꺼번에 울리지 않게 */
+const QUIET_CATCH_UP_TICKS = 6;
 
 type BattlePlayOptions = {
   /** 블록이 고정될 때마다 — 서버 lock 보고·공격 표시 */
@@ -35,13 +38,6 @@ type BattlePlayOptions = {
   onOver?: (bs: BattleState, replay: BattleReplayInput) => void;
 };
 
-/** 입력창이나 열린 대화상자(기권 확인 등) 안의 키는 게임으로 보내지 않는다 */
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return (
-    target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable || target.closest('[role="dialog"]') !== null
-  );
-}
 
 /**
  * 대전 플레이 — 대전 래퍼(stepBattle)를 60Hz 논리 프레임으로 진행하고 입력을 기록한다
@@ -139,8 +135,10 @@ export function useBattlePlay(options: BattlePlayOptions = {}) {
 
   useEffect(() => {
     let rafId = 0;
-    let last = 0;
-    let acc = 0;
+    const clock = createClock();
+
+    /** 이번 화면 프레임이 백그라운드 복귀 따라잡기다 — 효과음을 내지 않는다(판·기록·보고는 그대로) */
+    let quiet = false;
 
     const tick = (bs: BattleState, recorder: InputRecorder) => {
       const incoming = incomingRef.current;
@@ -161,7 +159,8 @@ export function useBattlePlay(options: BattlePlayOptions = {}) {
         observeAfter(effects, game, actions, applied);
         // 가비지가 판에 들어왔다 — 아래에서 밀려 올라오는 연출 + 경고음 신호
         if (lock && lock.garbageApplied > 0) noteGarbageRise(effects, game.frame - 1, lock.garbageApplied);
-        getSoundPlayer().playCues(drainCues(effects));
+        const cues = drainCues(effects);
+        if (!quiet) getSoundPlayer().playCues(cues);
       }
       for (let i = 0; i < applied; i++) recordInput(recorder, frame, actions[i]);
 
@@ -182,16 +181,14 @@ export function useBattlePlay(options: BattlePlayOptions = {}) {
       const bs = battleRef.current;
       const recorder = recorderRef.current;
       if (statusRef.current === "playing" && bs && recorder) {
-        if (last === 0) last = timestamp;
-        acc += Math.min(timestamp - last, MAX_CATCH_UP_MS);
-        last = timestamp;
-        while (acc >= FRAME_MS && statusRef.current === "playing") {
+        advanceClock(clock, timestamp, MAX_CATCH_UP_MS);
+        quiet = clock.acc >= FRAME_MS * QUIET_CATCH_UP_TICKS;
+        while (clock.acc >= FRAME_MS && statusRef.current === "playing") {
           tick(bs, recorder);
-          acc -= FRAME_MS;
+          clock.acc -= FRAME_MS;
         }
       } else {
-        last = 0;
-        acc = 0;
+        resetClock(clock);
       }
       afterTickRef.current?.();
       rafId = requestAnimationFrame(loop);
@@ -208,13 +205,13 @@ export function useBattlePlay(options: BattlePlayOptions = {}) {
     };
     const onKeyDown = (e: KeyboardEvent) => {
       const binding = KEY_BINDINGS[e.code];
-      if (!binding || isTypingTarget(e.target) || statusRef.current !== "playing") return;
+      if (!binding || isTypingTarget(e.target, { includeDialogs: true }) || statusRef.current !== "playing") return;
       // 대전은 멈출 수 없다 — 일시정지 키는 무시
       if (binding.kind === "pause") return;
       e.preventDefault();
-      if (e.repeat) return;
+      // 키 반복은 엔진의 DAS/ARR이 맡는다 — 단 누른 채 창으로 돌아온 키(blur로 뗐다)는 반복 신호로 다시 누른다(press가 중복을 거른다)
       if (binding.kind === "hold") press(binding.press, binding.release);
-      else instant(binding.action);
+      else if (!e.repeat) instant(binding.action);
     };
     const onKeyUp = (e: KeyboardEvent) => {
       const binding = KEY_BINDINGS[e.code];

@@ -27,8 +27,8 @@ export type MatchLoad =
   | { status: "error"; message: string }
   | { status: "ready"; match: BattleMatch };
 
-/** 판 하나의 기록 상태 — missing = 미제출(MISSING)·리플레이 없음, unsupported = 다른 대전 엔진 버전 */
-export type TrackStatus = "loading" | "ready" | "missing" | "unsupported" | "error";
+/** 판 하나의 기록 상태 — missing = 미제출(MISSING)·리플레이 없음, invalid = 검증 실패(INVALID — 받지 않는다), unsupported = 다른 대전 엔진 버전 */
+export type TrackStatus = "loading" | "ready" | "missing" | "invalid" | "unsupported" | "error";
 
 /** 판 하나 — 캔버스가 그릴 때 읽는 ref와 재생 상태 */
 export type ReplayTrack = {
@@ -45,7 +45,7 @@ export type ReplayTrack = {
 function createTrack(player: BattleMatchPlayer): ReplayTrack {
   return {
     player,
-    status: player.verdict === "VERIFIED" ? "loading" : "missing",
+    status: player.verdict === "VERIFIED" ? "loading" : player.verdict === "INVALID" ? "invalid" : "missing",
     runner: null,
     snapshots: new Map(),
     buffer: [],

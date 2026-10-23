@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { ACTION } from '../../engine';
 import { type BattleLock, type BattleReplayInput, type BattleState, simulateBattleReplay } from '../../battle-engine';
+import { getSoundPlayer } from '../../lib/sound/soundPlayer';
 import { useBattlePlay } from './useBattlePlay';
 
 describe('useBattlePlay', () => {
@@ -40,6 +41,53 @@ describe('useBattlePlay', () => {
     const verified = simulateBattleReplay(replay);
     expect(verified).toMatchObject({ ok: true, pieces: bs.game.pieces, garbageReceived: bs.garbageReceived, topOutFrame: bs.game.endFrame });
     expect(result.current.status).toBe('over');
+  });
+
+  it('백그라운드에서 돌아와 한꺼번에 따라잡는 동안의 효과음은 내지 않고, 평소 프레임은 낸다 (FE-05)', () => {
+    // 화면 프레임 시각을 직접 준다 — 숨겨진 탭은 프레임이 오지 않다가 한 번에 긴 간격으로 온다
+    vi.useRealTimers();
+    let frame: FrameRequestCallback = () => {};
+    vi.stubGlobal('requestAnimationFrame', (fn: FrameRequestCallback) => {
+      frame = fn;
+      return 1;
+    });
+    vi.stubGlobal('cancelAnimationFrame', () => {});
+    const playCues = vi.spyOn(getSoundPlayer(), 'playCues');
+    try {
+      const { result } = setup();
+      act(() => result.current.start(7, 10, 2));
+      let t = 1000;
+      const step = (ms: number) => act(() => frame((t += ms)));
+      step(0);
+      step(17);
+      const from = playCues.mock.calls.length;
+      act(() => result.current.instant(ACTION.HARD_DROP));
+      step(3000);
+      expect(result.current.gameRef.current?.frame ?? 0).toBeGreaterThan(150);
+      expect(playCues.mock.calls.slice(from).some(([cues]) => cues.length > 0)).toBe(false);
+      act(() => result.current.instant(ACTION.HARD_DROP));
+      step(17);
+      expect(playCues.mock.calls.slice(from).some(([cues]) => cues.length > 0)).toBe(true);
+    } finally {
+      playCues.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('누른 채 창을 벗어났다 돌아오면(blur로 뗐다) 계속 오는 반복 keydown으로 다시 눌린다 (FE-09)', () => {
+    const { result } = setup();
+    act(() => result.current.start(1, 10, 2));
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft' }));
+      vi.advanceTimersByTime(50);
+      window.dispatchEvent(new Event('blur'));
+    });
+    const x = result.current.gameRef.current?.x ?? 0;
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft', repeat: true }));
+      vi.advanceTimersByTime(500);
+    });
+    expect(result.current.gameRef.current?.x).toBeLessThan(x);
   });
 
   it('창을 벗어나도 멈추지 않는다(대전) — 누르던 키만 뗀다', () => {

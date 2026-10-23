@@ -100,6 +100,26 @@ describe('useTetrisPlay', () => {
     });
     expect(result.current.status).toBe('ready');
     expect(result.current.stateRef.current?.frame).toBe(frame);
+    // 이전 판은 지운다 — 준비 화면 뒤로 끝난 판이 얼어붙어 보이지 않게 (FE-20)
+    expect(frame).toBeUndefined();
+  });
+
+  it('키를 누른 채 일시정지했다 재개하면, 계속 오는 반복 keydown으로 다시 눌린다 (FE-09)', () => {
+    const { result } = setup();
+    act(() => result.current.start(1, 10, 2));
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft' }));
+      vi.advanceTimersByTime(50);
+    });
+    act(() => result.current.pause());
+    act(() => result.current.resume());
+    const x = result.current.stateRef.current?.x;
+    act(() => {
+      // 키는 계속 눌려 있다 — OS가 반복 keydown을 보낸다
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft', repeat: true }));
+      vi.advanceTimersByTime(500);
+    });
+    expect(result.current.stateRef.current?.x).toBeLessThan(x ?? 0);
   });
 
   it('두 번째 판도 HUD 시간이 갱신된다', () => {

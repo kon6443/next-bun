@@ -11,7 +11,6 @@ import { type ConnectionStatus, useBattleSocket } from "../contexts/BattleSocket
 import { useAttackTrails } from "../hooks/useAttackTrails";
 import { useBattleMatch } from "../hooks/useBattleMatch";
 import { submitReplayWithRetry } from "../lib/replaySubmit";
-import { loadRoomSession } from "../lib/roomSession";
 import { MatchScreen } from "./MatchScreen";
 import { WaitingRoom } from "./WaitingRoom";
 
@@ -27,21 +26,21 @@ type RoomStageProps = {
  * 방 안 — 매치 이벤트는 대기실에 있을 때부터 받아야 하므로 여기서 연동하고, 단계에 따라 대기실·대전 화면을 고른다
  */
 export function RoomStage({ room, connection, onReconnect, onExit, onCopyInvite }: RoomStageProps) {
-  const { socket, myPlayerId, registerMatchSync } = useBattleSocket();
+  const { socket, myPlayerId, registerMatchSync, recoverSeat, playerTokenFor } = useBattleSocket();
   const { data: authSession } = useSession();
   const accessToken = authSession?.user?.accessToken ?? undefined;
   const reduced = useReducedEffects();
   const { rootRef, fire } = useAttackTrails(reduced);
   // DAS·ARR은 싱글과 같은 개인 설정을 쓴다 (리플레이에 함께 기록)
   const [settings] = useState(() => loadSettings());
-  // 경기 후 리플레이 제출 — 인증은 방 입장 때 받은 playerToken, 로그인이면 USER_ID도 남는다
+  // 경기 후 리플레이 제출 — 인증은 이 탭이 방에 들어갈 때 받은 playerToken(저장소 값은 다른 탭이 바꿀 수 있다), 로그인이면 USER_ID도 남는다
   const submitReplay = useCallback(
     async (matchId: string, replay: BattleReplayInput) => {
-      const playerToken = loadRoomSession(room.code)?.playerToken;
+      const playerToken = playerTokenFor(room.code);
       if (!playerToken) return "failed" as const;
       return submitReplayWithRetry(submitBattleReplay, matchId, playerToken, replay, accessToken);
     },
-    [room.code, accessToken],
+    [room.code, accessToken, playerTokenFor],
   );
   const match = useBattleMatch({
     socket,
@@ -50,6 +49,7 @@ export function RoomStage({ room, connection, onReconnect, onExit, onCopyInvite 
     das: settings.das,
     arr: settings.arr,
     registerMatchSync,
+    recoverSeat,
     onAttack: fire,
     submitReplay,
   });
@@ -69,6 +69,8 @@ export function RoomStage({ room, connection, onReconnect, onExit, onCopyInvite 
       myKos={match.myKos}
       replaySubmit={match.replaySubmit}
       trailsRootRef={rootRef}
+      roomPlayers={room.players}
+      roomStatus={room.status}
       onExit={onExit}
     />
   );

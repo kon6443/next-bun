@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ConfirmModal } from "@/app/components/ConfirmModal";
 import { Button } from "@/app/teams/components";
-import type { MatchResultEntry } from "@/types/tetrisBattleSocket";
+import { type MatchResultEntry, type RoomPlayer, type RoomStatus, TetrisBattleErrorCodes } from "@/types/tetrisBattleSocket";
 import { useBattleSocket } from "../contexts/BattleSocketContext";
 import type { MatchPhase, OpponentState, ReplaySubmitState } from "../hooks/useBattleMatch";
 import type { ReplaySubmitStatus } from "../lib/replaySubmit";
@@ -14,6 +14,8 @@ import { useReducedEffects } from "../../hooks/useReducedEffects";
 import fx from "./battleFx.module.css";
 import { getSoundPlayer } from "../../lib/sound/soundPlayer";
 import { MatchRecordLinks } from "./MatchRecordLinks";
+import { ChatPanel } from "./ChatPanel";
+import { ChatTicker } from "./ChatTicker";
 
 type MatchScreenProps = {
   phase: MatchPhase;
@@ -25,6 +27,9 @@ type MatchScreenProps = {
   myKos: number;
   replaySubmit: ReplaySubmitState | null;
   trailsRootRef: React.RefObject<HTMLDivElement | null>;
+  /** 지금 방 참가자 — 상대 접속 표시·결과 화면 내보내기 대상 */
+  roomPlayers: RoomPlayer[];
+  roomStatus: RoomStatus;
   onExit: () => void;
 };
 
@@ -41,17 +46,31 @@ export function MatchScreen({
   myKos,
   replaySubmit,
   trailsRootRef,
+  roomPlayers,
+  roomStatus,
   onExit,
 }: MatchScreenProps) {
   const reduced = useReducedEffects();
-  const { emotes, sendEmote, rematch } = useBattleSocket();
+  const { emotes, sendEmote, rematch, kickPlayer, chat, sendChat } = useBattleSocket();
+  // 경기 중 채팅(D-016) — 탈락·관전 중에는 입력까지, 살아 있는 동안은 판을 가리지 않는 자막만
+  const spectating = phase.kind === "out" || phase.kind === "unavailable";
+  const inPlay = phase.kind === "countdown" || phase.kind === "playing";
+
+  // 결과 화면에서 방장이 내보낼 수 있는 사람 — 지금 방에 있는 다른 참가자 (D-011, 경기 중에는 안 된다)
+  const kickable = isHost && roomStatus !== "PLAYING" ? new Set(roomPlayers.filter((p) => p.playerId !== myPlayerId).map((p) => p.playerId)) : null;
   const [confirmExit, setConfirmExit] = useState(false);
   // 경기 중 나가기는 기권(되돌릴 수 없음) — 확인을 받는다
   const inGame = phase.kind === "countdown" || phase.kind === "playing";
   const requestExit = () => (inGame ? setConfirmExit(true) : onExit());
   // 대상은 lock 응답(targetId)으로 정해진다 — 그 전이라도 살아 있는 상대가 한 명뿐이면 그 사람이 대상이다
-  const alive = opponents.filter((o) => o.place === null);
+  const alive = opponents.filter((o) => o.place === null && !o.out);
   const target = targetId ?? (alive.length === 1 ? alive[0].playerId : null);
+  // 미니보드 props — 채팅·이모트 등 다른 변경에는 같은 객체를 넘겨 memo된 판이 다시 그려지지 않게 (FE-19)
+  // 방에 없으면(나갔거나 정리됨) 오프라인으로 보인다
+  const opponentViews = useMemo(() => {
+    const online = new Map(roomPlayers.map((p) => [p.playerId, p.connected]));
+    return opponents.map((o) => ({ ...o, isTarget: o.playerId === target, online: online.get(o.playerId) ?? false }));
+  }, [opponents, target, roomPlayers]);
 
   const overlay =
     phase.kind === "countdown" ? (
@@ -75,6 +94,8 @@ export function MatchScreen({
         isHost={isHost}
         submitStatus={replaySubmit && replaySubmit.matchId === phase.matchId ? replaySubmit.status : null}
         onRematch={rematch}
+        kickable={kickable}
+        onKick={kickPlayer}
         onExit={onExit}
       />
     ) : phase.kind === "unavailable" ? (
@@ -91,13 +112,34 @@ export function MatchScreen({
     <BattleView
       play={play}
       meId={myPlayerId}
-      opponents={opponents.map((o) => ({ ...o, isTarget: o.playerId === target }))}
+      opponents={opponentViews}
       emotes={emotes}
       trailsRootRef={trailsRootRef}
       onEmote={(id) => void sendEmote(id)}
       onExit={requestExit}
+      // 내 판이 끝나 관전 중일 때만 상대 판을 크게 볼 수 있다 (FE-28)
+      canEnlarge={spectating}
+      footer={
+        spectating ? (
+          <ChatPanel
+            compact
+            messages={chat}
+            myPlayerId={myPlayerId}
+            enabled
+            onSend={async (text) => {
+              const result = await sendChat(text);
+              if (result.ok) return null;
+              // 탈락 직후 내 topOut이 서버에 닿기 전이면 아직 살아 있는 것으로 거절된다 — 잠깐 뒤 다시
+              return result.code === TetrisBattleErrorCodes.MATCH_ALREADY_STARTED
+                ? "탈락이 아직 반영되지 않았어요. 잠시 후 다시 보내 주세요."
+                : battleErrorMessage(result.code);
+            }}
+          />
+        ) : null
+      }
       overlay={
         <>
+          {inPlay && <ChatTicker messages={chat} />}
           {myKos > 0 && (
             <span className="pointer-events-none absolute right-2 top-2 rounded-full bg-amber-500/20 px-2 py-1 text-xs font-bold text-amber-200">
               KO {myKos}
@@ -151,7 +193,7 @@ function Countdown({ startsAt }: { startsAt: number }) {
 const SUBMIT_LABELS: Record<ReplaySubmitStatus, { text: string; tone: string }> = {
   submitting: { text: "기록 저장 중…", tone: "text-slate-500" },
   saved: { text: "기록 저장됨", tone: "text-emerald-300/80" },
-  invalid: { text: "기록 검증 실패", tone: "text-amber-300/80" },
+  invalid: { text: "기록 검증 실패 · 내 기록은 다시보기에서 빠져요", tone: "text-amber-300/80" },
   expired: { text: "기록 저장 시간이 지났어요", tone: "text-slate-500" },
   failed: { text: "기록을 저장하지 못했어요", tone: "text-slate-500" },
 };
@@ -164,13 +206,27 @@ type MatchResultsProps = {
   /** 이 기기에서 이 경기 기록을 제출했을 때만 */
   submitStatus: ReplaySubmitStatus | null;
   onRematch: () => Promise<{ ok: true } | { ok: false; code: string }>;
+  /** 방장이 내보낼 수 있는 참가자 — 방장이 아니거나 경기 중이면 null */
+  kickable: Set<string> | null;
+  onKick: (playerId: string) => Promise<{ ok: true } | { ok: false; code: string }>;
   onExit: () => void;
 };
 
 /** 결과 — 순위·KO·보낸/받은 줄·블록·최대 콤보, 방장은 재대결 */
-function MatchResults({ matchId, results, myPlayerId, isHost, submitStatus, onRematch, onExit }: MatchResultsProps) {
+function MatchResults({ matchId, results, myPlayerId, isHost, submitStatus, onRematch, kickable, onKick, onExit }: MatchResultsProps) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [kickTarget, setKickTarget] = useState<{ playerId: string; name: string } | null>(null);
+  const [kicking, setKicking] = useState(false);
+
+  const confirmKick = async () => {
+    if (!kickTarget) return;
+    setKicking(true);
+    const result = await onKick(kickTarget.playerId);
+    setKicking(false);
+    setKickTarget(null);
+    setError(result.ok ? null : battleErrorMessage(result.code));
+  };
   const mine = results.find((r) => r.playerId === myPlayerId);
 
   const rematch = async () => {
@@ -214,6 +270,24 @@ function MatchResults({ matchId, results, myPlayerId, isHost, submitStatus, onRe
           </tbody>
         </table>
         )}
+        {kickable && kickable.size > 0 && (
+          // 표에 열을 더하면 좁은 화면에서 넘친다 — 표 아래 줄로 (방장만)
+          <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="참가자 내보내기">
+            {results
+              .filter((r) => kickable.has(r.playerId))
+              .map((r) => (
+                <button
+                  key={r.playerId}
+                  type="button"
+                  onClick={() => setKickTarget({ playerId: r.playerId, name: r.name })}
+                  className="flex min-h-11 min-w-0 max-w-full items-center rounded-full border border-rose-400/40 px-3 text-xs font-semibold text-rose-200 hover:bg-rose-500/10"
+                >
+                  <span className="truncate">{r.name}</span>
+                  <span className="shrink-0">&nbsp;내보내기</span>
+                </button>
+              ))}
+          </div>
+        )}
         {isHost ? (
           <Button type="button" size="md" fullWidth className="mt-5 min-h-11" onClick={rematch} disabled={pending}>
             재대결
@@ -229,14 +303,24 @@ function MatchResults({ matchId, results, myPlayerId, isHost, submitStatus, onRe
             {SUBMIT_LABELS[submitStatus].text}
           </p>
         )}
-        {/* 내 기록이 저장됐을 때만 — 경기 전체가 저장(공개)될 때까지 기다린 뒤 연다 */}
-        {submitStatus === "saved" && matchId && <MatchRecordLinks matchId={matchId} />}
+        {/* 내 기록을 냈을 때만(검증 실패여도 경기는 공개된다 — D-008) — 경기 전체가 저장(공개)될 때까지 기다린 뒤 연다 */}
+        {(submitStatus === "saved" || submitStatus === "invalid") && matchId && <MatchRecordLinks matchId={matchId} />}
         {error && (
           <p role="alert" className="mt-2 text-center text-sm text-rose-300">
             {error}
           </p>
         )}
       </section>
+      <ConfirmModal
+        isOpen={kickTarget !== null}
+        onClose={() => setKickTarget(null)}
+        onConfirm={confirmKick}
+        title="플레이어를 내보낼까요?"
+        message={`${kickTarget?.name ?? ""}님을 방에서 내보내요. 다시 들어오면 새로 입장해요.`}
+        confirmLabel="내보내기"
+        isLoading={kicking}
+        variant="danger"
+      />
     </div>
   );
 }
