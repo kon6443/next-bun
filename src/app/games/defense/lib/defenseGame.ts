@@ -8,8 +8,8 @@ import { createGameStorage, readStorageJson, writeStorage } from '@/app/games/_s
  * 엔진을 import하지 않는다(허브·랭킹 번들)
  */
 
-/** 서버 기록 재생기(F3) — 준비되기 전에는 등록 패널·랭킹에서 다시보기를 비활성 */
-export const REPLAY_PLAYER_READY = false;
+/** 서버 기록 재생기(F3) — 등록 패널·랭킹의 다시보기를 켠다(진행 중인 주간 보드는 따로 막는다 — D-027) */
+export const REPLAY_PLAYER_READY = true;
 
 export const defenseStorage = createGameStorage('defense', { pendingKind: 'local', pendingLimit: 3 });
 
