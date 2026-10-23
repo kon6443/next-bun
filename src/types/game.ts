@@ -103,6 +103,8 @@ export type RankingItem<D = TetrisScoreDetail> = {
   durationMs: number;
   /** ISO 8601 (UTC) */
   createdAt: string;
+  /** 기록이 속한 랭킹 보드 (테트리스 'default' · 디펜스 endless-s{N}·weekly-YYYY-wNN) — 보드 일반화 전 응답에는 없다 */
+  boardKey?: string;
 };
 
 /** 기록 1건 요약 (GET /games/:gameType/scores/:scoreId) — 랭킹 항목과 같은 형태, rank는 전체 기간 순위 */
@@ -130,7 +132,6 @@ export type ParamsReplayData = RankingItem<GenericScoreDetail> & {
   seed: number;
   frames: number;
   inputs: number[];
-  boardKey?: string;
   params?: Record<string, number>;
 };
 

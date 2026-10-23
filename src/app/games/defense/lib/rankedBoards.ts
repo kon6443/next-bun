@@ -41,6 +41,16 @@ export function boardTitle(boardKey: string): string {
   return boardKey;
 }
 
+/** 순위 앞 보드 표기 — '무한 시즌 1' · 'W43 주간' (공유 카드·메타: "무한 시즌 1 · 1위"), 모르는 키면 null */
+export function boardRankLabel(boardKey: string | undefined, korean = true): string | null {
+  if (!boardKey) return null;
+  const weekly = WEEKLY_KEY.exec(boardKey);
+  if (weekly) return korean ? `W${Number(weekly[2])} 주간` : `WEEKLY W${Number(weekly[2])}`;
+  const endless = ENDLESS_KEY.exec(boardKey);
+  if (endless) return korean ? `무한 시즌 ${endless[1]}` : `ENDLESS S${endless[1]}`;
+  return null;
+}
+
 /** 짧은 표기 — 'W43' · '시즌 1' (탭·카드) */
 export function boardShortTitle(boardKey: string): string {
   const weekly = WEEKLY_KEY.exec(boardKey);

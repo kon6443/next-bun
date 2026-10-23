@@ -3,12 +3,21 @@ import { formatDurationMs } from '@/app/games/_shared/lib/format';
 import { type ReplayCard, isAscii } from '@/app/games/_shared/lib/replayCard';
 import type { ReplayShareSpec } from '@/app/games/_shared/lib/shareSpec';
 import { formatDefenseScore, splitDefenseScore } from './defenseGame';
+import { boardRankLabel } from './rankedBoards';
 
 /**
  * 디펜스 리플레이 공유 사양 (defense DESIGN §F11·D-019) — 공유 메뉴·카카오 카드·링크 미리보기·OG 이미지 문구
  * 점수 표기는 "웨이브 n · 진척 p%"(사용자 결정 — 결과·랭킹과 같다). 엔진을 import하지 않는다(서버 메타·OG 번들)
  * 카드 글자는 한글·ASCII만(이모지·특수 기호는 외부 글리프 조회 위험 — §F11)
+ * 순위는 그 기록 보드 안 전체 기간 순위(백엔드 요약 rank) — 보드가 있으면 "무한 시즌 1 · 1위"·"W43 주간 · 1위", 없으면 "전체 1위"
  */
+
+/** "무한 시즌 1 · 3위" · 보드를 모르면 "전체 3위" */
+function rankText(boardKey: string | undefined, rank: number, korean: boolean): string {
+  const board = boardRankLabel(boardKey, korean);
+  if (korean) return board ? `${board} · ${rank}위` : `전체 ${rank}위`;
+  return board ? `${board} · #${rank}` : `#${rank}`;
+}
 
 /** "처치 812 · 남은 목숨 3" (detail 키: 백엔드 defense-verify) */
 export function defenseShareStatLine(detail: GenericScoreDetail): string {
@@ -35,7 +44,7 @@ export function buildDefenseCard(summary: ScoreSummary<GenericScoreDetail> | nul
   // 한글 카드와 같이 처치가 없으면 뺀다
   const asciiStats = [Number.isFinite(summary.detail.kills) ? `${summary.detail.kills} KILLS` : null, time].filter(Boolean).join(' · ');
   return {
-    eyebrow: korean ? `타워 디펜스 리플레이 · 전체 ${summary.rank}위` : `TOWER DEFENSE REPLAY · #${summary.rank}`,
+    eyebrow: korean ? `타워 디펜스 리플레이 · ${rankText(summary.boardKey, summary.rank, true)}` : `TOWER DEFENSE REPLAY · ${rankText(summary.boardKey, summary.rank, false)}`,
     name: korean || isAscii(summary.playerName) ? summary.playerName : null,
     score: korean ? `웨이브 ${wave}` : `WAVE ${wave}`,
     scoreUnit: korean ? `진척 ${percent}%` : `${percent}%`,
@@ -47,9 +56,13 @@ export function buildDefenseCard(summary: ScoreSummary<GenericScoreDetail> | nul
 export const DEFENSE_SHARE: ReplayShareSpec<GenericScoreDetail> = {
   replayPath: (scoreId) => `/games/defense/replays/${scoreId}`,
   imagePath: (scoreId) => `/games/defense/replays/${scoreId}/og`,
-  headline: ({ playerName, score }) => `${playerName}님의 타워 디펜스 ${formatDefenseScore(score)}`,
+  headline: ({ playerName, score, boardKey }) => {
+    const board = boardRankLabel(boardKey);
+    return `${playerName}님의 타워 디펜스${board ? `(${board})` : ''} ${formatDefenseScore(score)}`;
+  },
   statLine: defenseShareStatLine,
-  metaDescription: (summary) => `${formatDefenseScore(summary.score)} · ${defenseShareStatLine(summary.detail)} · ${formatDurationMs(summary.durationMs)} · 전체 ${summary.rank}위 — 플레이를 그대로 다시 보세요.`,
+  metaDescription: (summary) =>
+    `${formatDefenseScore(summary.score)} · ${defenseShareStatLine(summary.detail)} · ${formatDurationMs(summary.durationMs)} · ${rankText(summary.boardKey, summary.rank, true)} — 플레이를 그대로 다시 보세요.`,
   card: buildDefenseCard,
   fallback: {
     title: '타워 디펜스 리플레이',

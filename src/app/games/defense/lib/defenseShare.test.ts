@@ -27,4 +27,22 @@ describe('디펜스 공유 사양 — 점수는 "웨이브 n · 진척 p%"', () 
     expect(ascii.score).toBe('WAVE 24');
     expect(buildDefenseCard(null, false).eyebrow).toBe('TOWER DEFENSE');
   });
+
+  it('보드가 있으면 순위 앞에 보드 — "무한 시즌 1 · 3위"·"W43 주간 · 3위"(제목·메타·카드 모두)', () => {
+    const endless = { ...summary, boardKey: 'endless-s1' };
+    const weekly = { ...summary, boardKey: 'weekly-2026-w43' };
+    expect(buildDefenseCard(endless, true).eyebrow).toBe('타워 디펜스 리플레이 · 무한 시즌 1 · 3위');
+    expect(buildDefenseCard(weekly, true).eyebrow).toBe('타워 디펜스 리플레이 · W43 주간 · 3위');
+    expect(buildDefenseCard(weekly, false).eyebrow).toBe('TOWER DEFENSE REPLAY · WEEKLY W43 · #3');
+    expect(buildDefenseCard(endless, false).eyebrow).toBe('TOWER DEFENSE REPLAY · ENDLESS S1 · #3');
+    // 보드가 있어도 ASCII 카드에 한글 없음
+    for (const card of [buildDefenseCard(endless, false), buildDefenseCard(weekly, false)]) {
+      for (const text of [card.eyebrow, card.score ?? '', card.scoreUnit, card.stats]) expect(/[가-힣ㄱ-ㅎ]/.test(text)).toBe(false);
+    }
+    expect(DEFENSE_SHARE.metaDescription(endless)).toContain('· 31:20 · 무한 시즌 1 · 3위 —');
+    expect(DEFENSE_SHARE.headline(weekly)).toBe('수비왕님의 타워 디펜스(W43 주간) 웨이브 24 · 진척 52%');
+    expect(buildShareContent(DEFENSE_SHARE, endless).title).toBe('수비왕님의 타워 디펜스(무한 시즌 1) 웨이브 24 · 진척 52%');
+    // 모르는 보드 키는 보드 없이
+    expect(buildDefenseCard({ ...summary, boardKey: 'default' }, true).eyebrow).toBe('타워 디펜스 리플레이 · 전체 3위');
+  });
 });
