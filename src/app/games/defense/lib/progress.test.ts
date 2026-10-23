@@ -39,4 +39,11 @@ describe('캠페인 진행 저장 (lib/progress)', () => {
     localStorage.setItem('defense:progress', JSON.stringify({ v: 99, stars: {} }));
     expect(loadProgress()).toEqual(emptyProgress());
   });
+
+  it('선택 필드는 형식이 틀리면 그 필드만 버린다(손상된 저장본이 도감·결과 화면을 깨뜨리지 않게)', () => {
+    localStorage.setItem('defense:progress', JSON.stringify({ v: 1, stars: { s1: { normal: 2 } }, tutorialDone: 'yes', briefingsSeen: 's2', metEnemies: [0, 'x', 1.5, 2] }));
+    expect(loadProgress()).toEqual({ v: 1, stars: { s1: { normal: 2 } }, metEnemies: [0, 2] });
+    localStorage.setItem('defense:progress', JSON.stringify({ v: 1, stars: [] }));
+    expect(loadProgress()).toEqual(emptyProgress());
+  });
 });

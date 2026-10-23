@@ -3,6 +3,11 @@ import { act, renderHook } from '@testing-library/react';
 import { StrictMode, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { OP, TOWER_ID, findStage, getStateHash, simulateReplay } from '../engine';
+import { GameDriver } from '../engine-dev/driver';
+import { greedyBot } from '../engine-dev/sim/bots';
+import { runGame } from '../engine-dev/sim/runner';
+import { restoreGame } from '../lib/restoreGame';
+import { resolveBoard } from '../engine';
 import { type PlayResult, useDefensePlay } from './useDefensePlay';
 
 const stage = findStage('s1')!;
@@ -120,5 +125,40 @@ describe('useDefensePlay (게임 루프)', () => {
     const tick = result.current.stateRef.current.tick;
     expect(tick).toBeGreaterThanOrEqual(28);
     expect(tick).toBeLessThanOrEqual(30);
+  });
+
+  it('증강 대기 — 틱이 멈추고(배속·자동 일시정지·일시정지 키 무시), 카드를 고르면 밀린 틱을 몰아 돌리지 않고 이어 간다', () => {
+    // 무한 판을 첫 증강 대기 3틱 전까지 — 이어하기로 연 뒤 재생하면 대기에 들어간다
+    const full = GameDriver.fromBoard('endless', 'endless-s1', 2);
+    runGame(full, greedyBot(), (d) => d.state.augmentPending);
+    const pendingTick = full.state.tick;
+    const near = GameDriver.fromBoard('endless', 'endless-s1', 2);
+    runGame(near, greedyBot(), (d) => d.state.tick >= pendingTick - 3);
+    const endless = resolveBoard('endless', 'endless-s1', 2)!;
+    const restore = restoreGame(endless, 2, near.recorder.inputs, near.state.tick)!;
+    const { result } = renderHook(() => useDefensePlay({ stage: endless, seed: 2, restore }));
+    expect(result.current.hud.status).toBe('paused');
+    act(() => result.current.togglePause());
+    frames(30);
+    expect(result.current.hud.status).toBe('augment');
+    expect(result.current.hud.augmentPending).toBe(true);
+    expect(result.current.stateRef.current.tick).toBe(pendingTick);
+    // 대기 중: 시간이 흘러도·창을 떠나도·일시정지를 눌러도 그대로
+    act(() => {
+      window.dispatchEvent(new Event('blur'));
+    });
+    act(() => result.current.togglePause());
+    frames(60);
+    expect(result.current.hud.status).toBe('augment');
+    expect(result.current.stateRef.current.tick).toBe(pendingTick);
+    expect(result.current.hud.canCall).toBe(false);
+    act(() => {
+      expect(result.current.dispatch(OP.PICK_AUGMENT, 0)).toBe(true);
+    });
+    expect(result.current.hud.status).toBe('playing');
+    frames(3);
+    // 대기 동안 쌓인 시간을 한꺼번에 돌리지 않는다(3프레임 ≈ 1~2틱)
+    expect(result.current.stateRef.current.tick - pendingTick).toBeLessThanOrEqual(2);
+    expect(result.current.stateRef.current.augments).toHaveLength(1);
   });
 });

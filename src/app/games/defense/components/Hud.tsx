@@ -18,9 +18,11 @@ type Props = {
   onCycleSpeed: () => void;
   /** 웨이브 총수를 보일지 — 무한·주간은 끝이 정해지지 않아 n만(§F2) */
   showTotalWaves?: boolean;
+  /** 나가기 버튼의 접근성 이름 — 캠페인은 스테이지 화면, 무한·주간은 디펜스 처음 */
+  exitLabel?: string;
 };
 
-export function Hud({ hud, exitHref, onRequestExit, soundOn, onToggleSound, onTogglePause, onCycleSpeed, showTotalWaves = true }: Props) {
+export function Hud({ hud, exitHref, onRequestExit, soundOn, onToggleSound, onTogglePause, onCycleSpeed, showTotalWaves = true, exitLabel = "스테이지 화면으로 나가기" }: Props) {
   const paused = hud.status === "paused";
   // 320px까지 한 줄 — 글자는 폭 따라 12~14px, 줄바꿈 금지(넘치면 숫자 칸을 자른다), 버튼은 44px 높이·40px 폭
   return (
@@ -34,7 +36,7 @@ export function Hud({ hud, exitHref, onRequestExit, soundOn, onToggleSound, onTo
           e.preventDefault();
           onRequestExit();
         }}
-        aria-label="스테이지 화면으로 나가기"
+        aria-label={exitLabel}
         className="flex min-h-11 min-w-10 items-center justify-center rounded-full border border-white/15 text-slate-300"
       >
         ←

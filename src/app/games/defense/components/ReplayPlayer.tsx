@@ -303,7 +303,8 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
             className="mt-2 h-11 w-full accent-sky-400"
           />
         </div>
-        <div className="flex items-center gap-2">
+        {/* 좁은 화면(320px)에서는 배속 묶음이 다음 줄로 */}
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={togglePlay}

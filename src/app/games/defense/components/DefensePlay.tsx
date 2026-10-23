@@ -670,6 +670,7 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
         onTogglePause={togglePause}
         onCycleSpeed={cycleSpeed}
         showTotalWaves={mode === "campaign"}
+        exitLabel={campaign ? undefined : "디펜스 처음으로 나가기"}
       />
       {mode !== "campaign" && <RankedStrip rules={stateRef.current.rules} bannedTower={stateRef.current.bannedTower} augments={stateRef.current.augments} />}
       <div className="relative min-h-0 flex-1" ref={canvas.containerRef} data-testid="defense-board" data-status={hud.status}>

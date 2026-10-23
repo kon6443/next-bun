@@ -58,6 +58,8 @@ export default function RankedPlay({ mode, fixedSeed }: Props) {
   const [checked, setChecked] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
   const [resumeOffer, setResumeOffer] = useState<ResumeSlot | null>(null);
+  /** 이어하기를 못 불러왔을 때 시작 화면 안내(캠페인과 같은 문구) */
+  const [resumeFailed, setResumeFailed] = useState(false);
   const [otherSlot, setOtherSlot] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const [run, setRun] = useState<Run | null>(null);
@@ -117,6 +119,7 @@ export default function RankedPlay({ mode, fixedSeed }: Props) {
     if (!restored) {
       clearResume();
       setOtherSlot(false);
+      setResumeFailed(true);
       return;
     }
     const session = slot.sessionId && slot.sessionReceivedAt !== undefined ? { sessionId: slot.sessionId, receivedAt: slot.sessionReceivedAt } : null;
@@ -133,8 +136,8 @@ export default function RankedPlay({ mode, fixedSeed }: Props) {
       const expired = run.session !== null && sessionClockAt(run.session.receivedAt, Date.now()) === "expired";
       const sessionId = run.session && !overLimit && !expired ? run.session.sessionId : null;
       const sessionError = overLimit ? "판이 너무 길어 랭킹에 등록할 수 없어요." : expired ? EXPIRED_MESSAGE : run.sessionError;
-      // 최고 기록은 세션이 있는 판만 — 로컬 판(seed가 다른 주간·고정 seed)이 공식 보드 기록과 섞이지 않게
-      setOver({ result, score, wave, kills: state.kills, isNewBest: run.session ? recordBest(run.boardKey, score) : false, sessionId, sessionError });
+      // 최고 기록은 등록할 수 있는 판만(세션이 있고 만료·상한 초과가 아닌 판) — 로컬·만료·너무 긴 판이 공식 보드 기록과 섞이지 않게
+      setOver({ result, score, wave, kills: state.kills, isNewBest: sessionId ? recordBest(run.boardKey, score) : false, sessionId, sessionError });
     };
     const candidate = [loginName, defenseStorage.loadLastName()].find((name) => name && validatePlayerName(name) === null);
     return (
@@ -212,6 +215,11 @@ export default function RankedPlay({ mode, fixedSeed }: Props) {
       <p className="max-w-xs text-sm text-slate-300">
         {mode === "endless" ? "웨이브가 끝없이 와요. 5웨이브마다 증강 카드를 하나 골라요." : "이번 주 맵과 규칙은 모두에게 같아요. 5웨이브마다 증강 카드를 하나 골라요."}
       </p>
+      {resumeFailed && (
+        <p role="status" className="text-sm text-amber-200" data-testid="defense-resume-failed">
+          이어하기를 불러오지 못해 새로 시작해요
+        </p>
+      )}
       {resumeOffer ? (
         <>
           <p className="text-sm text-slate-200">하던 판이 있어요 — {boardTitle(resumeOffer.boardKey)}</p>

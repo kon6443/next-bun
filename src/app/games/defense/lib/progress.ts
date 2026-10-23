@@ -26,11 +26,17 @@ export function emptyProgress(): Progress {
   return { v: VERSION, stars: {} };
 }
 
-/** 저장본이 없거나 형식이 다르면 빈 진행 */
+/**
+ * 저장본이 없거나 형식이 다르면 빈 진행. 선택 필드는 필드별로 — 형식이 틀린 필드만 버린다(손상된 저장본이 도감·결과 화면을 깨뜨리지 않게)
+ */
 export function loadProgress(): Progress {
   const raw = readStorageJson<Progress>('local', KEY);
-  if (!raw || raw.v !== VERSION || typeof raw.stars !== 'object' || raw.stars === null) return emptyProgress();
-  return raw;
+  if (!raw || raw.v !== VERSION || typeof raw.stars !== 'object' || raw.stars === null || Array.isArray(raw.stars)) return emptyProgress();
+  const progress: Progress = { v: VERSION, stars: raw.stars };
+  if (raw.tutorialDone === true) progress.tutorialDone = true;
+  if (Array.isArray(raw.briefingsSeen)) progress.briefingsSeen = raw.briefingsSeen.filter((id): id is string => typeof id === 'string');
+  if (Array.isArray(raw.metEnemies)) progress.metEnemies = raw.metEnemies.filter((kind): kind is number => Number.isInteger(kind));
+  return progress;
 }
 
 export function saveProgress(progress: Progress): boolean {

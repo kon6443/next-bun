@@ -56,7 +56,7 @@ export function StageScreen({ stage }: { stage: StageMeta }) {
                   <span className="block font-semibold">{DIFFICULTY_NAMES[difficulty]}</span>
                   <span className="block text-xs opacity-80">{open || !loaded ? DIFFICULTY_NOTE[difficulty] : "보통을 깨면 열려요"}</span>
                 </span>
-                <span aria-label={`별 ${stars}개`} className="text-sm tracking-wider">
+                <span role="img" aria-label={`별 ${stars}개`} className="text-sm tracking-wider">
                   <span className="text-amber-300">{"★".repeat(stars)}</span>
                   <span className="opacity-40">{"★".repeat(3 - stars)}</span>
                 </span>

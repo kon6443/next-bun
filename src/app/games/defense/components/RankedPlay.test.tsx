@@ -218,6 +218,27 @@ describe('RankedPlay — 무한·주간 입구', () => {
     const result = await screen.findByTestId('defense-ranked-result', {}, { timeout: 3000 });
     expect(result.textContent).toContain('세션 시간이 지나');
     expect(screen.queryByRole('button', { name: '랭킹 등록' })).toBeNull();
+    // 등록할 수 없는 판은 최고 기록도 남기지 않는다
+    expect(localStorage.getItem('defense:best')).toBeNull();
+    expect(screen.queryByText('개인 최고 기록!')).toBeNull();
+  });
+
+  it('다른 모드 저장본은 이어하기로 제시하지 않고(바뀐다고 안내), 깨진 같은 모드 저장본은 안내 후 새로 시작', async () => {
+    saveResume({ engineVersion: ENGINE_VERSION, mode: 'weekly', boardKey: 'weekly-2026-w43', seed: 1, tick: 10, inputs: [0, OP.CALL_WAVE], savedAt: 1 });
+    const { unmount } = render(<RankedPlay mode="endless" fixedSeed={3} />);
+    expect(await screen.findByTestId('defense-ranked-play')).toBeTruthy();
+    expect(screen.queryByTestId('defense-resume-continue')).toBeNull();
+    fireEvent.click(screen.getByTestId('defense-ranked-play'));
+    expect((await screen.findByTestId('defense-notice')).textContent).toContain('다른 판의 이어하기 저장');
+    // 무한·주간 나가기 버튼은 디펜스 처음으로
+    expect(screen.getByTestId('defense-exit').getAttribute('aria-label')).toBe('디펜스 처음으로 나가기');
+    unmount();
+    // 같은 모드인데 다시 돌릴 수 없는 저장본(틱이 로그보다 짧다)
+    saveResume({ engineVersion: ENGINE_VERSION, mode: 'endless', boardKey: 'endless-s1', seed: 1, tick: 0, inputs: [5, OP.CALL_WAVE], savedAt: 1 });
+    render(<RankedPlay mode="endless" fixedSeed={3} />);
+    fireEvent.click(await screen.findByTestId('defense-resume-continue'));
+    expect(screen.getByTestId('defense-resume-failed').textContent).toContain('이어하기를 불러오지 못해');
+    expect(loadResume()).toBeNull();
   });
 
   it('로컬 주간 판 안내에는 맵·규칙이 공식 판과 다르다고', async () => {

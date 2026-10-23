@@ -32,7 +32,7 @@ export function CampaignMap() {
               <span className="block font-semibold text-white">스테이지 {stage.number}</span>
               <span className="block truncate text-xs text-slate-400">{unlocked ? stage.intro : "앞 스테이지를 깨면 열려요"}</span>
             </span>
-            <span className="text-sm tracking-wider" aria-label={`별 ${stars}개`}>
+            <span className="text-sm tracking-wider" role="img" aria-label={`별 ${stars}개`}>
               <span className="text-amber-300">{"★".repeat(stars)}</span>
               <span className="text-slate-600">{"★".repeat(3 - stars)}</span>
             </span>

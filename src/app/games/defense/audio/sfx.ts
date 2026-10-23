@@ -142,10 +142,14 @@ export class Sfx {
     return true;
   }
 
+  /** 닫힌 컨텍스트의 음은 onended가 오지 않는다 — 카운터·전환 대기를 비워 같은 인스턴스를 다시 켜도(개발 StrictMode) 상한에 걸리지 않게 */
   dispose(): void {
     void this.ctx?.close();
     this.ctx = null;
     this.master = null;
+    this.voices = 0;
+    this.perKind.fill(0);
+    this.switching = false;
   }
 
   private init(): void {

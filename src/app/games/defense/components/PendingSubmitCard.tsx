@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
 import type { PendingSubmission } from "@/app/games/_shared/lib/storage";
 import { classifySubmitError } from "@/app/games/_shared/lib/submitError";
@@ -21,6 +21,8 @@ export function PendingSubmitCard() {
   const [message, setMessage] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
   const pending = list[0] ?? null;
+  /** 같은 렌더 안 연타도 막게 ref로 — 세션은 1회용이라 두 번째 제출은 실패하고 성공 문구를 덮는다 */
+  const retryingRef = useRef(false);
 
   useEffect(() => setList(defenseStorage.loadPendingSubmissions()), []);
 
@@ -31,7 +33,7 @@ export function PendingSubmitCard() {
   };
 
   const retry = async () => {
-    if (!pending || retrying) return;
+    if (!pending || retryingRef.current) return;
     let playerName = pending.playerName;
     if (needsNewName) {
       const error = validatePlayerName(name);
@@ -41,6 +43,7 @@ export function PendingSubmitCard() {
       }
       playerName = normalizePlayerName(name);
     }
+    retryingRef.current = true;
     setRetrying(true);
     setMessage(null);
     try {
@@ -59,6 +62,7 @@ export function PendingSubmitCard() {
       }
       setMessage(text);
     } finally {
+      retryingRef.current = false;
       setRetrying(false);
     }
   };

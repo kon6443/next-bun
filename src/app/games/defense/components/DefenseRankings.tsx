@@ -10,7 +10,7 @@ import { boardTabs, selectBoard, weeklyReplayState } from "../lib/rankedBoards";
 
 /**
  * 디펜스 랭킹 (defense DESIGN §F1 랭킹·§B6·D-024·D-027) — /boards로 탭: 무한(시즌 — 일간·주간·전체) · 주간(이번 주·지난 주 — 기간 탭 없음)
- * 랭킹 보기는 해금과 무관하게 누구나. 진행 중인 주간 보드는 리플레이를 주가 끝난 뒤 공개(서버 404)
+ * 랭킹 보기는 해금과 무관하게 누구나. 주간 보드 리플레이는 주 종료 4시간(세션 TTL) 뒤 공개(그 전 서버 404 — D-027·D-032)
  */
 type Props = { boardParam: string | null; highlightId: number | null };
 
@@ -30,7 +30,8 @@ export function DefenseRankings({ boardParam, highlightId }: Props) {
   const selected = tabs.find((t) => t.boardKey === board) ?? null;
   const weekly = board.startsWith("weekly-");
   // 주간 리플레이는 주 끝 + 4시간(세션 TTL) 뒤 공개(D-032) — /boards endsAt, 목록에 없으면 보드 키로 판정
-  const replayState = weekly ? weeklyReplayState(board, selected?.endsAt, Date.now()) : "open";
+  // 서버가 지금 등록받는 주(current)라고 하면 기기 시계와 상관없이 진행 중 — 시계가 빠른 기기에서 일찍 열리지 않게
+  const replayState = !weekly ? "open" : selected?.current ? "running" : weeklyReplayState(board, selected?.endsAt, Date.now());
   const runningWeekly = replayState === "running";
   const replayUnavailable =
     replayState === "running" ? "주가 끝나고 4시간 뒤 공개돼요" : replayState === "soon" ? "곧 공개돼요(주 종료 4시간 뒤)" : REPLAY_PLAYER_READY ? null : "리플레이는 준비 중이에요";

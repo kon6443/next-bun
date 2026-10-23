@@ -43,6 +43,14 @@ describe('디펜스 랭킹·허브 카드', () => {
     expect(screen.queryByRole('link', { name: /리플레이 보기/ })).toBeNull();
   });
 
+  it('서버가 등록받는 주(current)는 기기 시계가 빨라도 진행 중으로 — ▶ 비활성', async () => {
+    getGameBoards.mockResolvedValue({ ...BOARDS, data: { items: [BOARDS.data.items[0], { ...BOARDS.data.items[1], endsAt: '2000-01-01T00:00:00Z' }] } });
+    await act(async () => {
+      render(<DefenseRankings boardParam="weekly" highlightId={null} />);
+    });
+    expect(screen.getByRole('button', { name: /주가 끝나고 4시간 뒤 공개돼요/ })).toBeTruthy();
+  });
+
   it('막 끝난 주(종료 4시간 안)는 ▶ 비활성 "곧 공개돼요" — D-032', async () => {
     getGameBoards.mockResolvedValue({ ...BOARDS, data: { items: [BOARDS.data.items[0], { ...BOARDS.data.items[2], endsAt: new Date(Date.now() - 60 * 60 * 1000).toISOString() }] } });
     await act(async () => {

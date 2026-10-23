@@ -24,9 +24,13 @@ export type LocalReplay = {
 
 const keyOf = (stageId: string) => `defense:replay:${stageId}`;
 
+/** 손상된 저장본(정수가 아님·모르는 난이도)은 없는 것으로 — 재생기에 NaN이 넘어가지 않게 */
 export function loadLocalReplay(stageId: string): LocalReplay | null {
   const raw = readStorageJson<LocalReplay>('local', keyOf(stageId));
-  return raw && raw.v === VERSION && Array.isArray(raw.inputs) ? raw : null;
+  if (!raw || raw.v !== VERSION || typeof raw.boardKey !== 'string' || !Array.isArray(raw.inputs) || !raw.inputs.every(Number.isInteger)) return null;
+  if (!DIFFICULTIES.includes(raw.difficulty)) return null;
+  const ints = [raw.engineVersion, raw.seed, raw.ticks, raw.stars, raw.livesLeft];
+  return ints.every(Number.isInteger) && raw.seed >= 0 && raw.ticks > 0 ? raw : null;
 }
 
 /** 더 좋은 판 — 새 엔진 버전 → 별 → 난이도 → 남은 목숨 → 짧은 판 순 (구버전 기록은 재생 엔진이 생길 때까지 새 기록에 자리를 내준다) */

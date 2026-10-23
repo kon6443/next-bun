@@ -55,4 +55,20 @@ describe('도감·허브 보조 동작', () => {
     expect(defenseStorage.loadPendingSubmissions()).toEqual([]);
     expect(screen.getByTestId('defense-pending').textContent).toContain('4위');
   });
+
+  // 동작 고정용 — 클릭 사이에 다시 그려지면 예전 state 가드도 막는다(ref 가드는 같은 렌더 안 연타 방어)
+  it('허브 — 다시 등록하기를 연타해도 한 번만 낸다(세션 1회용 — 두 번째 실패가 성공 문구를 덮지 않게)', async () => {
+    defenseStorage.savePendingSubmission({ sessionId: 'sess2', playerName: '수비왕', replay: { engineVersion: ENGINE_VERSION, frames: 100, inputs: [0, 0] }, score: 1_000_000, savedAt: 1 });
+    let resolve: (value: unknown) => void = () => {};
+    submitGameScore.mockReset().mockReturnValue(new Promise((r) => (resolve = r)));
+    render(<HubActions />);
+    const button = await screen.findByTestId('defense-pending-retry');
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(submitGameScore).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      resolve({ code: 'SUCCESS', message: '', data: { scoreId: 8, score: 1_000_000, detail: {}, ranks: { daily: 1, weekly: 1, all: 1 } } });
+    });
+    expect(screen.getByTestId('defense-pending').textContent).toContain('등록했어요');
+  });
 });

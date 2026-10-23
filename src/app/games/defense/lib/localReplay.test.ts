@@ -40,4 +40,11 @@ describe('캠페인 로컬 다시보기 저장 (lib/localReplay)', () => {
     localStorage.setItem('defense:replay:s1', JSON.stringify({ ...base, v: 99 }));
     expect(loadLocalReplay('s1')).toBeNull();
   });
+
+  it('손상된 저장본(정수 아님·모르는 난이도·명령 로그 오염)은 없는 것으로', () => {
+    for (const patch of [{ seed: 'x' }, { ticks: 0 }, { difficulty: 'nightmare' }, { inputs: [0, 'a'] }, { engineVersion: 1.5 }, { boardKey: 3 }]) {
+      localStorage.setItem('defense:replay:s1', JSON.stringify({ ...base, ...patch }));
+      expect(loadLocalReplay('s1')).toBeNull();
+    }
+  });
 });

@@ -52,7 +52,7 @@ export function ResultPanel({ result, stars, replaySaved, progressSaved, nextHre
           {result.victory ? "승리!" : "패배"}
         </h2>
         {result.victory && (
-          <p className="mt-2 text-3xl tracking-widest" aria-label={`별 ${stars}개`}>
+          <p className="mt-2 text-3xl tracking-widest" role="img" aria-label={`별 ${stars}개`}>
             <span className="text-amber-300">{"★".repeat(stars)}</span>
             <span className="text-slate-600">{"★".repeat(3 - stars)}</span>
           </p>
