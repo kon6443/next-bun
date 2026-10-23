@@ -51,6 +51,13 @@ export function bestStars(progress: Progress, stageId: string): number {
   return Math.max(0, ...Object.values(record).map((n) => n ?? 0));
 }
 
+/** 무한·주간을 여는 스테이지 (§L7 — 공중까지 배운 뒤). 랭킹 보기는 해금과 무관 */
+export const RANKED_UNLOCK_STAGE = 's4';
+
+export function isRankedUnlocked(progress: Progress): boolean {
+  return bestStars(progress, RANKED_UNLOCK_STAGE) > 0;
+}
+
 export function isStageUnlocked(progress: Progress, stageId: string): boolean {
   const index = CAMPAIGN.findIndex((s) => s.id === stageId);
   if (index < 0) return false;
