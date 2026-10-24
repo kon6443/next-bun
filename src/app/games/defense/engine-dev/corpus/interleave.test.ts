@@ -51,6 +51,7 @@ describe('판 간 격리 — 판 여러 개를 틱 단위로 번갈아 돌려도
     const campaign = cases.filter((c) => c.input.mode === 'campaign' && c.input.ticks < 162000).slice(0, 4);
     const group = [...withAugments, ...campaign];
     expect(withAugments.length).toBeGreaterThanOrEqual(3);
+    expect(campaign.length).toBeGreaterThan(0);
     const runners = group.map((c) => ({ c, run: stepper(c.input), done: false }));
     // 모든 판이 끝날 때까지 한 틱씩 차례로
     for (let alive = runners.length; alive > 0; ) {
@@ -61,6 +62,11 @@ describe('판 간 격리 — 판 여러 개를 틱 단위로 번갈아 돌려도
         else r.done = true;
       }
     }
+    // 효과 개수는 같고 내용이 다른 두 판이 섞여야 메모가 "배열 동일성"을 빼먹은 퇴행(길이만 비교)을 잡는다
+    const sameLengthDifferent = runners.some((a, i) =>
+      runners.some((b, j) => j > i && a.run.state.effects.length > 0 && a.run.state.effects.length === b.run.state.effects.length && JSON.stringify(a.run.state.effects) !== JSON.stringify(b.run.state.effects)),
+    );
+    expect(sameLengthDifferent).toBe(true);
     for (const r of runners) {
       expect({ id: r.c.id, hash: getStateHash(r.run.state) }).toEqual({ id: r.c.id, hash: r.c.expected.result.stateHash });
       expect(r.run.checkpoints).toEqual(r.c.expected.checkpoints);
