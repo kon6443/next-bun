@@ -1,167 +1,171 @@
 {
-  "measuredAt": "2026-10-24T07:52:54.573Z",
+  "measuredAt": "2026-10-24T08:15:11.251Z",
   "env": {
     "node": "v22.21.1",
     "platform": "darwin-arm64",
     "cpu": "Apple M2 Pro",
     "gcExposed": true,
     "execArgv": [
-      "--expose-gc"
+      "--expose-gc",
+      "--min-semi-space-size=16",
+      "--max-semi-space-size=16"
     ],
-    "semiSpaceMB": 8,
+    "allocEstimateSemiSpaceMB": 16,
+    "semiSpaceMBAtStart": 16,
     "loadAvg": [
-      5.82,
-      6.6,
-      6.05
-    ]
+      7.55,
+      9.55,
+      7.96
+    ],
+    "semiSpaceMBAtEnd": 16
   },
   "replay": {
-    "corpus-c825-endless-longest": {
-      "ticks": 100014,
-      "commands": 279,
-      "medianMs": 280.83,
-      "minMs": 267.51,
-      "maxMs": 318.77,
+    "corpus-c2093-endless-longest": {
+      "ticks": 93048,
+      "commands": 293,
+      "medianMs": 223.23,
+      "minMs": 222.51,
+      "maxMs": 227.53,
       "runs": [
-        318.77,
-        301.23,
-        280.83,
-        279.8,
-        267.51
+        223.17,
+        224.68,
+        223.23,
+        227.53,
+        222.51
       ],
-      "scavengesPerRun": 22.8,
+      "scavengesPerRun": 10.6,
       "majorGcPerRun": 0,
-      "estAllocMBPerRun": 182.4,
-      "retainedMB": 7.73
+      "estAllocMBPerRun": 169.6,
+      "retainedMB": 0.01
     },
-    "corpus-c197-weekly-longest": {
-      "ticks": 87394,
-      "commands": 262,
-      "medianMs": 275.23,
-      "minMs": 270.53,
-      "maxMs": 278.86,
+    "corpus-c3636-weekly-longest": {
+      "ticks": 82250,
+      "commands": 239,
+      "medianMs": 238.7,
+      "minMs": 236.98,
+      "maxMs": 239.96,
       "runs": [
-        270.53,
-        275.23,
-        270.9,
-        276.84,
-        278.86
+        239.96,
+        239.48,
+        238.65,
+        238.7,
+        236.98
       ],
-      "scavengesPerRun": 8.2,
-      "majorGcPerRun": 0.4,
-      "estAllocMBPerRun": 131.2,
-      "retainedMB": 12.76
+      "scavengesPerRun": 10.2,
+      "majorGcPerRun": 0,
+      "estAllocMBPerRun": 163.2,
+      "retainedMB": 0.01
     },
     "corpus-c680-campaign-s8-hard-longest": {
       "ticks": 14275,
       "commands": 223,
-      "medianMs": 16.5,
-      "minMs": 16.02,
-      "maxMs": 18.19,
+      "medianMs": 15.48,
+      "minMs": 15.39,
+      "maxMs": 16.79,
       "runs": [
-        16.02,
-        16.5,
-        16.12,
-        18.19,
-        16.92
+        16.79,
+        15.6,
+        15.39,
+        15.41,
+        15.48
       ],
       "scavengesPerRun": 1.6,
       "majorGcPerRun": 0,
       "estAllocMBPerRun": 25.6,
-      "retainedMB": 8.31
+      "retainedMB": 0
     },
     "golden:endless-greedy": {
       "ticks": 60145,
       "commands": 281,
-      "medianMs": 98.16,
-      "minMs": 96.69,
-      "maxMs": 101.23,
+      "medianMs": 92.72,
+      "minMs": 92,
+      "maxMs": 93.77,
       "runs": [
-        96.69,
-        97.94,
-        98.16,
-        98.95,
-        101.23
+        93.19,
+        92,
+        92.67,
+        92.72,
+        93.77
       ],
       "scavengesPerRun": 5.4,
       "majorGcPerRun": 0,
       "estAllocMBPerRun": 86.4,
-      "retainedMB": 5.9
+      "retainedMB": 0
     }
   },
   "restore": {
-    "scenario": "corpus-c825-endless-longest",
-    "tick": 100013,
+    "scenario": "corpus-c2093-endless-longest",
+    "tick": 93047,
     "sync": {
-      "medianMs": 269.52,
-      "minMs": 266.27,
-      "maxMs": 274.29,
+      "medianMs": 227.15,
+      "minMs": 226.36,
+      "maxMs": 228.04,
       "runs": [
-        274.27,
-        274.29,
-        266.27,
-        269.52,
-        266.33
+        228.04,
+        227.45,
+        227.15,
+        226.36,
+        226.8
       ],
-      "scavengesPerRun": 11.6,
+      "scavengesPerRun": 11,
       "majorGcPerRun": 0,
-      "estAllocMBPerRun": 185.6,
-      "retainedMB": 9.35
+      "estAllocMBPerRun": 176,
+      "retainedMB": 0
     },
     "chunked": {
       "total": {
-        "medianMs": 298.33,
-        "minMs": 294.41,
-        "maxMs": 302.04,
+        "medianMs": 253.39,
+        "minMs": 252.12,
+        "maxMs": 254.03,
         "runs": [
-          294.41,
-          294.56,
-          298.33,
-          302.04,
-          302.04
+          252.12,
+          252.4,
+          254.03,
+          253.39,
+          253.99
         ]
       },
       "worstChunk": {
-        "medianMs": 29.88,
-        "minMs": 29.45,
-        "maxMs": 31.44,
+        "medianMs": 19.61,
+        "minMs": 18.73,
+        "maxMs": 20.46,
         "runs": [
-          29.45,
-          29.85,
-          30.36,
-          29.88,
-          31.44
+          19.46,
+          19.61,
+          18.73,
+          20.46,
+          19.76
         ]
       },
-      "chunks": 25
+      "chunks": 23
     }
   },
   "prepareReplay": {
-    "scenario": "corpus-c825-endless-longest",
+    "scenario": "corpus-c2093-endless-longest",
     "total": {
-      "medianMs": 305.44,
-      "minMs": 302.8,
-      "maxMs": 313.18,
+      "medianMs": 265.43,
+      "minMs": 260.28,
+      "maxMs": 267.73,
       "runs": [
-        313.18,
-        307.6,
-        303.37,
-        302.8,
-        305.44
+        265.43,
+        265.93,
+        260.28,
+        267.73,
+        261.96
       ]
     },
     "worstChunk": {
-      "medianMs": 30.12,
-      "minMs": 29.86,
-      "maxMs": 30.29,
+      "medianMs": 20.41,
+      "minMs": 20.15,
+      "maxMs": 20.8,
       "runs": [
-        30.12,
-        30.28,
-        29.86,
-        30.08,
-        30.29
+        20.41,
+        20.37,
+        20.15,
+        20.48,
+        20.8
       ]
     },
-    "chunks": 26
+    "chunks": 24
   }
 }

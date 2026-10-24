@@ -14,7 +14,7 @@ import { CAMPAIGN_SCRIPTS } from '../sim/scripts';
 import { CHECKPOINT_TICKS, type PortableExpected, computeExpected } from './portableRunner';
 
 /** 코퍼스 형식이 바뀌면 올린다(픽스처 재생성 신호) */
-export const CORPUS_VERSION = 1;
+export const CORPUS_VERSION = 2;
 
 export type CorpusBot = 'greedy' | 'greedy-early' | 'greedy-noise' | 'greedy-augrand' | 'novice' | 'scripted' | 'idle';
 
@@ -24,6 +24,7 @@ export type CorpusCase = { id: number; mode: 'campaign' | 'endless' | 'weekly'; 
 export type CorpusExpected = {
   id: number;
   ticks: number;
+  /** 입력 로그 길이(숫자 개수 — 명령 수가 아님) */
   commands: number;
   result: PortableExpected['result'];
   checkpointCount: number;
@@ -31,6 +32,8 @@ export type CorpusExpected = {
 };
 
 const DIFFICULTIES = ['', '-easy', '-hard'] as const;
+/** 시험 스테이지 — E2 아레나는 타워 6종·분기·궁극·적 11종·증강이 다 나온다 */
+const TEST_STAGES = ['e1', 'e2', 'e2-rules'] as const;
 const BOTS: readonly CorpusBot[] = ['greedy', 'greedy-early', 'greedy-noise', 'greedy-augrand', 'novice', 'scripted'];
 
 /** 32비트 정수 섞기(결정적) — 번호마다 고르게 퍼진 값 */
@@ -42,17 +45,20 @@ function mix(n: number): number {
 }
 
 /**
- * 판 번호 → 판. 구성(번호 기준 고정): 캠페인 60%(8스테이지 × 보통·쉬움·어려움) · 무한 20% · 주간 20%(여러 주차 키)
+ * 판 번호 → 판. 구성(번호 기준 고정): 캠페인 60%(8스테이지 × 보통·쉬움·어려움, 그중 10%는 시험 스테이지 e1·e2·e2-rules) · 무한 20% · 주간 20%
+ * seed는 0 ~ SEED_MAX(2³²−1) 전 범위 — 부호 없는 32비트 처리(>>> 0)가 바뀌면 큰 seed 판이 갈라지게
+ * 주간 판의 내용(맵·규칙)은 seed만으로 정해진다(pickWeekly) — 주차 키는 해시의 stageId 라벨
  * 봇: 기준(greedy)·조기 호출·가치 교란·증강 무작위·초보(무작위 배치, 누수 많은 판)·각본(캠페인만 — 다른 모드는 greedy로)
  *   · 2%는 idle(아무것도 안 함 — 캠페인은 웨이브를 부르지 않아 판 상한 MAX_TICKS까지 간다)
  */
 export function corpusCase(id: number): CorpusCase {
   const h = mix(id);
-  const seed = mix(id * 7 + 1) % 2147483647;
+  const seed = mix(id * 7 + 1);
   const botSeed = (mix(id * 13 + 5) % 100000) + 1;
   const kind = h % 10;
   let bot: CorpusBot = (h >>> 20) % 50 === 0 ? 'idle' : BOTS[(h >>> 8) % BOTS.length];
   if (kind < 6) {
+    if ((h >>> 16) % 10 === 0) return { id, mode: 'campaign', boardKey: TEST_STAGES[(h >>> 20) % TEST_STAGES.length], seed, bot: bot === 'scripted' ? 'greedy' : bot, botSeed };
     const stage = (h >>> 4) % 8;
     const difficulty = DIFFICULTIES[(h >>> 12) % 3];
     return { id, mode: 'campaign', boardKey: `s${stage + 1}${difficulty}`, seed, bot, botSeed };

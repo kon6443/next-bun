@@ -3,15 +3,18 @@
  * 실행(레포 루트):
  *   node_modules/.pnpm/esbuild@0.27.2/node_modules/esbuild/bin/esbuild src/app/games/defense/engine-dev/baseline/bench.ts \
  *     --bundle --platform=node --format=cjs --outfile=$TMPDIR/defense-bench.cjs \
- *   && node --expose-gc $TMPDIR/defense-bench.cjs > src/app/games/defense/engine-dev/baseline/BASELINE.json
+ *   && node --expose-gc --min-semi-space-size=16 --max-semi-space-size=16 $TMPDIR/defense-bench.cjs > src/app/games/defense/engine-dev/baseline/BASELINE.json
+ * 비교는 같은 Node·같은 플래그·낮은 부하(env.loadAvg)끼리만 한다 — 리팩토링 전후를 같은 명령으로 잰다
  * 판은 코퍼스(corpus.expected.json)에서 고른다 — 무한·주간 최장 판, 캠페인 최종 스테이지(s8-hard) 최장 판, 골든 최장 판(백엔드 기준선과 같은 판)
- * 각 측정: 워밍업 1회 + 5회 — 중앙값·최소·최대(ms)
- * GC: 5회 측정 동안 PerformanceObserver 'gc' 항목을 종류별로(minor = 스캐빈지, major = 마크·컴팩트) 센다
- * 할당(추정): 판 1회당 스캐빈지 수 × 새 공간 반쪽(semi-space) 용량 — 스캐빈지는 반쪽이 찰 때마다 돈다. 엔진의 핫패스 할당 압력 지표
- * 남은 힙: gc() 뒤 1회 실행의 heapUsed 증가(살아남는 것 — 리플레이 결과·스냅샷 등)
+ * 각 측정: 워밍업 3회(JIT tier-up) + 5회 — 중앙값·최소·최대(ms)
+ * GC: 5회 측정 동안 PerformanceObserver 'gc' 항목을 종류별로 센다(perf_hooks.constants — MINOR 1 스캐빈지 · MAJOR 4 마크·컴팩트, 증분·약한 콜백은 따로)
+ * 할당(추정): 판 1회당 스캐빈지 수 × 새 공간 반쪽(semi-space) 용량 — semi-space를 플래그로 고정해 시나리오·전후 비교가 같은 배율이 되게 한다.
+ *   major GC가 거둔 젊은 세대 할당은 세지 않는다(하한 추정). 엔진 핫패스 할당 압력 지표
+ * 남은 힙: 결과를 붙잡은 채 gc() 전후의 heapUsed 차 — 실행이 남기는 것(결과 객체·캐시)
+ * 청크 최장 구간: 쉬는 틈(setTimeout 0, 약 1ms)이 다음 묶음에 섞여 약 3% 크게 나온다 — 전후 비교에는 같은 편향
  */
 
-import { PerformanceObserver, performance } from 'node:perf_hooks';
+import { PerformanceObserver, constants, performance } from 'node:perf_hooks';
 import { getHeapSpaceStatistics } from 'node:v8';
 import * as engine from '../../engine';
 import { type ReplayInput, resolveBoard, simulateReplay } from '../../engine';
@@ -34,10 +37,9 @@ let gcMinor = 0;
 let gcMajor = 0;
 new PerformanceObserver((list) => {
   for (const entry of list.getEntries()) {
-    // detail.kind: 1 minor(스캐빈지) · 2 major · 4 incremental · 8 weak callbacks
     const kind = (entry as unknown as { detail?: { kind?: number } }).detail?.kind ?? 0;
-    if (kind === 1) gcMinor++;
-    else gcMajor++;
+    if (kind === constants.NODE_PERFORMANCE_GC_MINOR) gcMinor++;
+    else if (kind === constants.NODE_PERFORMANCE_GC_MAJOR) gcMajor++;
   }
 }).observe({ entryTypes: ['gc'] });
 
@@ -48,13 +50,19 @@ function semiSpaceMB(): number {
 }
 
 const gc = (globalThis as { gc?: () => void }).gc;
+/**
+ * 할당 추정 배율 — --max-semi-space-size(MB)로 고정한 값. V8이 실제로 잡는 크기는 늦게 커져 측정값(semiSpaceMB)은 배율로 못 쓴다
+ * 플래그가 없으면 측정값(비교 불가 — env에 시작·끝 값을 남긴다)
+ */
+const SEMI_SPACE_FLAG = /^--max-semi-space-size=(\d+)$/;
+const SEMI_SPACE_MB_AT_START = Number(process.execArgv.map((arg) => SEMI_SPACE_FLAG.exec(arg)?.[1]).find(Boolean) ?? semiSpaceMB());
 
 /** 동기 측정 — 워밍업 1 + 5회, 그리고 gc 뒤 1회의 힙 증가·GC 횟수 */
 /** PerformanceObserver는 비동기로 전달한다 — 센 값을 읽기 전에 한 바퀴 돌린다 */
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 20));
 
 async function measureSync(fn: () => unknown): Promise<Stats & { scavengesPerRun: number; majorGcPerRun: number; estAllocMBPerRun: number; retainedMB: number | null }> {
-  fn();
+  for (let i = 0; i < 3; i++) fn();
   await flush();
   const minorBefore = gcMinor;
   const majorBefore = gcMajor;
@@ -71,10 +79,13 @@ async function measureSync(fn: () => unknown): Promise<Stats & { scavengesPerRun
   if (gc) {
     gc();
     const before = process.memoryUsage().heapUsed;
-    fn();
+    let held: unknown = fn();
+    gc();
     retainedMB = round((process.memoryUsage().heapUsed - before) / 2 ** 20);
+    held = null;
+    void held;
   }
-  return { ...stats(runs), scavengesPerRun, majorGcPerRun, estAllocMBPerRun: round(scavengesPerRun * semiSpaceMB()), retainedMB };
+  return { ...stats(runs), scavengesPerRun, majorGcPerRun, estAllocMBPerRun: round(scavengesPerRun * SEMI_SPACE_MB_AT_START), retainedMB };
 }
 
 /** 비동기(청크) 측정 — 전체 시간과, 쉬는 틈(setTimeout 0) 사이 한 묶음의 최장 시간(메인 스레드가 멈추는 최장 구간) */
@@ -115,7 +126,10 @@ function longest(pred: (mode: string, boardKey: string) => boolean): { id: numbe
     if (!best || e.ticks > best.ticks) best = e;
   }
   if (!best) throw new Error('판 없음');
-  return { id: best.id, input: playCorpusCase(corpusCase(best.id)) };
+  const input = playCorpusCase(corpusCase(best.id));
+  // 봇·픽스처가 바뀌면 다른 판을 재게 된다 — 픽스처와 같은 판인지 확인
+  if (input.ticks !== best.ticks) throw new Error(`코퍼스 #${best.id}: 다시 만든 판 ${input.ticks}틱 ≠ 픽스처 ${best.ticks}틱`);
+  return { id: best.id, input };
 }
 
 async function main() {
@@ -138,7 +152,8 @@ async function main() {
       cpu: (await import('node:os')).cpus()[0]?.model,
       gcExposed: Boolean(gc),
       execArgv: process.execArgv,
-      semiSpaceMB: round(semiSpaceMB()),
+      allocEstimateSemiSpaceMB: SEMI_SPACE_MB_AT_START,
+      semiSpaceMBAtStart: round(semiSpaceMB()),
       loadAvg: (await import('node:os')).loadavg().map(round),
     },
     replay: {} as Record<string, unknown>,
@@ -166,6 +181,7 @@ async function main() {
     ...(await measureChunks((onProgress) => prepareReplay(engine, worstInput, onProgress))),
   };
 
+  (out.env as Record<string, unknown>).semiSpaceMBAtEnd = round(semiSpaceMB());
   process.stdout.write(`${JSON.stringify(out, null, 2)}\n`);
 }
 

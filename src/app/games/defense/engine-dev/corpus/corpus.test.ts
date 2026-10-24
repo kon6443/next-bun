@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ENGINE_VERSION } from '../../engine';
 import { withPool } from '../sim/pool';
 import corpusFixture from './corpus.expected.json';
 import portableFixture from './portable.json';
@@ -12,12 +13,14 @@ import { CORPUS_SIZE, defaultSampleIds } from './selection';
  * - 코퍼스(corpus.expected.json): 봇이 다시 플레이 → 결과·중간 해시 요약. 기본은 (모드·봇) 구성마다 1판,
  *   전체 4,000판은 DEFENSE_CORPUS=full pnpm exec vitest run src/app/games/defense/engine-dev/corpus/corpus.test.ts (워커 병렬)
  */
-const corpus = corpusFixture as { version: number; checkpointTicks: number; count: number; cases: CorpusExpected[] };
-const portable = portableFixture as { version: number; checkpointTicks: number; cases: PortableCase[] };
+const corpus = corpusFixture as { version: number; engineVersion: number; checkpointTicks: number; count: number; cases: CorpusExpected[] };
+const portable = portableFixture as { version: number; engineVersion: number; checkpointTicks: number; cases: PortableCase[] };
 
 describe('디펜스 차등 테스트 — 이식용 표본(입력 로그 재생)', () => {
   it('형식·버전', () => {
     expect(portable.version).toBe(CORPUS_VERSION);
+    // 엔진 동작을 의도적으로 바꾸면(ENGINE_VERSION을 올리면) 여기서 멈춘다 — 그때만 픽스처를 다시 만든다
+    expect(portable.engineVersion).toBe(ENGINE_VERSION);
     expect(portable.checkpointTicks).toBe(CHECKPOINT_TICKS);
     expect(portable.cases.length).toBeGreaterThanOrEqual(50);
   });
@@ -36,8 +39,11 @@ describe('디펜스 차등 테스트 — 이식용 표본(입력 로그 재생)'
 describe('디펜스 차등 테스트 — 코퍼스(봇 재플레이)', () => {
   it('형식·버전', () => {
     expect(corpus.version).toBe(CORPUS_VERSION);
+    expect(corpus.engineVersion).toBe(ENGINE_VERSION);
     expect(corpus.count).toBe(CORPUS_SIZE);
     expect(corpus.cases).toHaveLength(CORPUS_SIZE);
+    // diffCorpus는 cases[id]로 찾는다
+    expect(corpus.cases.every((c, i) => c.id === i)).toBe(true);
   });
 
   const full = process.env.DEFENSE_CORPUS === 'full';

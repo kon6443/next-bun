@@ -18,8 +18,11 @@ export type PortableExpected = {
 
 export type PortableCase = { id: string; input: ReplayInput; expected: PortableExpected };
 
-/** 입력 로그를 다시 돌리며 CHECKPOINT_TICKS마다 해시 — 로그가 깨졌으면 null(simulateReplay가 실패 이유를 준다) */
-export function replayCheckpoints(input: ReplayInput, every = CHECKPOINT_TICKS): string[] | null {
+/**
+ * 입력 로그를 다시 돌리며 CHECKPOINT_TICKS마다 해시 — 로그가 깨졌으면 null(simulateReplay가 실패 이유를 준다)
+ * 끝난 상태의 해시·틱도 돌려준다 — simulateReplay 결과와 같아야 이 루프가 엔진 루프의 거울임이 확인된다(computeExpected)
+ */
+export function replayCheckpoints(input: ReplayInput, every = CHECKPOINT_TICKS): { checkpoints: string[]; finalHash: string; endTick: number } | null {
   const stage = resolveBoard(input.mode, input.boardKey, input.seed);
   if (!stage) return null;
   const state = createGame(stage, input.seed);
@@ -42,25 +45,32 @@ export function replayCheckpoints(input: ReplayInput, every = CHECKPOINT_TICKS):
   let commandTick = 0;
   let i = 0;
   while (i < inputs.length) {
-    commandTick += inputs[i];
+    const delta = inputs[i];
     const op = inputs[i + 1];
     const count = OP_ARG_COUNTS[op];
-    if (count === undefined) return null;
+    // 형식이 깨진 로그(음수·소수 delta, 모르는 명령, 잘린 끝) — 단독으로 불려도 엔진과 다른 판을 만들지 않게
+    if (!Number.isInteger(delta) || delta < 0 || count === undefined || i + 2 + count > inputs.length) return null;
+    commandTick += delta;
     advanceTo(Math.min(commandTick, ticks));
     if (state.over || state.tick < commandTick) return null;
     if (!applyCommand(state, op, count > 0 ? inputs[i + 2] : 0, count > 1 ? inputs[i + 3] : 0)) return null;
     i += 2 + count;
   }
   advanceTo(ticks);
-  return hashes;
+  return { checkpoints: hashes, finalHash: getStateHash(state), endTick: state.endTick };
 }
 
 /** 이 엔진으로 한 판을 돌려 기대값 형식으로 — 픽스처를 만들 때와 검사할 때 같은 함수 */
 export function computeExpected(input: ReplayInput, every = CHECKPOINT_TICKS): PortableExpected | { error: string } {
   const result = simulateReplay(input);
   if (!result.ok) return { error: `simulateReplay ${result.reason}` };
-  const checkpoints = replayCheckpoints(input, every);
-  if (!checkpoints) return { error: 'checkpoint replay failed' };
+  const replayed = replayCheckpoints(input, every);
+  if (!replayed) return { error: 'checkpoint replay failed' };
+  // 거울 루프 자기 확인 — 엔진 루프와 같은 판을 돌렸다면 끝 상태가 같다
+  if (replayed.finalHash !== result.stateHash || replayed.endTick !== result.endTick) {
+    return { error: `checkpoint replay diverged from simulateReplay: ${replayed.finalHash}@${replayed.endTick} ≠ ${result.stateHash}@${result.endTick}` };
+  }
+  const checkpoints = replayed.checkpoints;
   const { score, wave, progress, kills, livesLeft, goldEarned, wavesStarted, augments, endTick, stateHash } = result;
   return { result: { score, wave, progress, kills, livesLeft, goldEarned, wavesStarted, augments, endTick, stateHash }, checkpoints };
 }
