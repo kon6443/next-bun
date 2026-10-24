@@ -1,6 +1,7 @@
 "use client";
 
 import { ScoreSubmitPanel } from "@/app/games/_shared/components/ScoreSubmitPanel";
+import { useDialog } from "@/app/hooks/useDialog";
 import type { RankingPeriod } from "@/types/game";
 import { ENGINE_VERSION, TICKS_PER_SECOND } from "../engine";
 import type { PlayResult } from "../hooks/useDefensePlay";
@@ -39,6 +40,8 @@ function formatTicks(ticks: number): string {
 }
 
 export function RankedResult({ title, result, score, wave, kills, boardKey, weekly, isNewBest, sessionId, sessionError, accessToken, defaultName, onRetry }: Props) {
+  // aria-modal에 맞게 Tab을 안에 가둔다 — 닫을 수 없는 결과라 Esc는 무시. 첫 포커스는 등록 패널 제목 그대로 (games-polish FE-42)
+  const dialogRef = useDialog(true, () => {}, { closeOnEscape: false });
   let worstEnemy = -1;
   result.leakedLivesByEnemy.forEach((lives, kind) => {
     if ((lives ?? 0) > (result.leakedLivesByEnemy[worstEnemy] ?? 0)) worstEnemy = kind;
@@ -72,7 +75,7 @@ export function RankedResult({ title, result, score, wave, kills, boardKey, week
   );
   return (
     <div className="absolute inset-0 z-20 flex overflow-y-auto bg-slate-950/85 p-4" data-testid="defense-ranked-result" data-wave={wave}>
-      <div className="m-auto w-full max-w-sm" role="dialog" aria-modal="true" aria-label={`${title} 결과`}>
+      <div ref={dialogRef} tabIndex={-1} className="m-auto w-full max-w-sm" role="dialog" aria-modal="true" aria-label={`${title} 결과`}>
         <ScoreSubmitPanel
           game={DEFENSE_GAME}
           score={score}

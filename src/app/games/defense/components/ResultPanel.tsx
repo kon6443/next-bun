@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef } from "react";
+import { useDialog } from "@/app/hooks/useDialog";
 import { TICKS_PER_SECOND } from "../engine";
 import type { PlayResult } from "../hooks/useDefensePlay";
 import { ENEMY_NAMES } from "../lib/labels";
@@ -29,6 +30,8 @@ function formatTicks(ticks: number): string {
 }
 
 export function ResultPanel({ result, stars, replaySaved, progressSaved, nextHref, replayHref = null, exitHref, onRetry }: Props) {
+  // 결과는 닫을 수 없다(다시·다음·나가기로만) — Esc는 무시하고 Tab만 안에 가둔다 (games-polish FE-42)
+  const dialogRef = useDialog<HTMLElement>(true, () => {}, { closeOnEscape: false });
   const nextRef = useRef<HTMLAnchorElement>(null);
   const retryRef = useRef<HTMLButtonElement>(null);
   // 대화상자가 뜨면 첫 동작(다음, 없으면 다시)으로 포커스 — 키보드·스크린리더가 결과를 바로 만난다
@@ -38,15 +41,18 @@ export function ResultPanel({ result, stars, replaySaved, progressSaved, nextHre
     if ((lives ?? 0) > (result.leakedLivesByEnemy[worstEnemy] ?? 0)) worstEnemy = kind;
   });
   return (
-    <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/80 p-4">
+    // 작은·가로 화면에서 잘리지 않게 스크롤 — 가운데 정렬은 m-auto(넘치면 위부터 보인다)
+    <div className="absolute inset-0 z-20 flex overflow-y-auto bg-slate-950/80 p-4">
       <section
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="defense-result-title"
         data-testid="defense-result"
         data-victory={result.victory ? "true" : "false"}
         data-stars={stars}
-        className="w-full max-w-sm rounded-2xl border border-white/15 bg-slate-900 p-5 text-center shadow-2xl shadow-black/60"
+        className="m-auto w-full max-w-sm rounded-2xl border border-white/15 bg-slate-900 p-5 text-center shadow-2xl shadow-black/60"
       >
         <h2 id="defense-result-title" className="text-2xl font-bold text-white">
           {result.victory ? "승리!" : "패배"}

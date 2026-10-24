@@ -118,6 +118,20 @@ describe('리플레이 화면 — 로컬·서버', () => {
     expect((await screen.findByTestId('defense-replay-error')).textContent).toContain('지금 버전의 게임으로 재생할 수 없어요');
   }, 30_000);
 
+  it('캠페인 결과는 대화상자 — 첫 동작에 포커스, Tab은 안에서 돈다, Esc로 닫히지 않는다 (games-polish FE-42)', () => {
+    const result = { victory: false, livesLeft: 0, endTick: 900, leakedLivesByEnemy: [], worstWave: 0, inputs: [] };
+    const onRetry = vi.fn();
+    render(<ResultPanel result={result} stars={0} replaySaved={false} progressSaved nextHref={null} exitHref="/x" onRetry={onRetry} />);
+    const dialog = screen.getByRole('dialog');
+    const focusable = dialog.querySelectorAll<HTMLElement>('a[href],button:not([disabled])');
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    focusable[focusable.length - 1].focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(document.activeElement).toBe(focusable[0]);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+
   it('캠페인 결과 — 다시보기로 저장되면 로컬 재생기 링크', () => {
     const result = { victory: true, livesLeft: 18, endTick: 900, leakedLivesByEnemy: [], worstWave: 0, inputs: [] };
     render(<ResultPanel result={result} stars={3} replaySaved progressSaved nextHref={null} replayHref="/games/defense/replays/local/s1" exitHref="/x" onRetry={() => {}} />);
