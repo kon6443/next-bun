@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { recipeFor } from './recipes';
-import { MAX_SFX_VOICES, __resetSoundPlayerForTests, createSoundPlayer, getSoundPlayer, orderCuesByPriority, type SoundPlayer } from './soundPlayer';
+import { MAX_SFX_VOICES, __resetSoundPlayerForTests, createSoundPlayer, getSoundPlayer, orderCuesByPriority, replayCues, type SoundPlayer } from './soundPlayer';
 import { __resetSoundSettingsForTests, saveSoundSettings } from './soundSettings';
 
 /** 호출 수만 세는 가짜 AudioContext — 테스트가 currentTime을 직접 옮긴다 */
@@ -285,5 +285,23 @@ describe('soundPlayer', () => {
     await flushResume();
     expect(fake.resume.mock.calls.length).toBe(calls + 1);
     expect(fake.state).toBe('running');
+  });
+});
+
+describe('replayCues (games-polish P7)', () => {
+  const cues = [
+    { kind: 'move' },
+    { kind: 'lock' },
+    { kind: 'clear', value: 1 },
+    { kind: 'clear', value: 4 },
+    { kind: 'tspin', value: 2 },
+    { kind: 'b2b' },
+    { kind: 'combo', value: 3 },
+    { kind: 'perfectClear' },
+    { kind: 'gameOver' },
+  ] as const;
+  it('4배속 미만은 그대로, 4배속부터는 큰 사건만(4줄·T-스핀·B2B·퍼펙트·승패)', () => {
+    expect(replayCues(cues, 2)).toBe(cues);
+    expect(replayCues(cues, 4).map((c) => c.kind + ('value' in c ? c.value : ''))).toEqual(['clear4', 'tspin2', 'b2b', 'perfectClear', 'gameOver']);
   });
 });

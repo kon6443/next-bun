@@ -14,7 +14,9 @@ import { buildShareContent } from "@/app/games/_shared/lib/shareSpec";
 import { ACTION_LABELS } from "../../../lib/controls";
 import { formatFrames, formatScore } from "@/app/games/_shared/lib/format";
 import { cloneGameState } from "../../../lib/gameSnapshot";
-import { type EffectTracker, createEffectTracker, observeAfter, observeBefore } from "../../../lib/effects";
+import { type EffectTracker, createEffectTracker, drainCues, observeAfter, observeBefore } from "../../../lib/effects";
+import { getSoundPlayer, replayCues } from "../../../lib/sound/soundPlayer";
+import { SoundToggle } from "../../../components/SoundToggle";
 import { loadReplay } from "@/app/games/_shared/lib/replayLoader";
 import { TETRIS_SHARE } from "../../../lib/share";
 import { collectActions } from "../../../lib/replayTimeline";
@@ -164,6 +166,8 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
       while (stateRef.current.frame < clamped && advance()) {
         // 목표 프레임까지
       }
+      // 건너뛴 구간의 소리는 버린다 — 다음 재생 프레임에 한꺼번에 나지 않게
+      if (effectsRef.current) drainCues(effectsRef.current);
       refreshPressed();
       drawRef.current?.();
       setPlayback((p) => ({ ...p, frame: stateRef.current?.frame ?? 0 }));
@@ -189,6 +193,8 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
             break;
           }
         }
+        // 효과음 — 같은 관찰에서 나온 신호(플레이와 같은 소리). 빠른 배속은 큰 사건만
+        if (effectsRef.current) getSoundPlayer().playCues(replayCues(drainCues(effectsRef.current), speed));
         refreshPressed();
         const frame = state.frame;
         // React 상태(시간·슬라이더·HUD)는 약 10Hz로만 — 캔버스는 매 화면 프레임 그린다 (FE-06)
@@ -204,6 +210,16 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
     rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
   }, [advance, data, refreshPressed]);
+
+  // 소리 플레이어를 화면에 들어올 때 만들어 둔다 — 첫 조작(오디오 시작 조건)을 놓치지 않게. 배경음악은 재생 중에만, 나가면 끈다
+  useEffect(() => {
+    const player = getSoundPlayer();
+    return () => player.setMusicPlaying(false);
+  }, []);
+  const ready = load.status === "ready";
+  useEffect(() => {
+    getSoundPlayer().setMusicPlaying(ready && playback.playing);
+  }, [ready, playback.playing]);
 
   /** 끌기 전에 재생 중이었으면 놓을 때 이어서 (FE-17) */
   const resumeAfterDragRef = useRef(false);
@@ -304,6 +320,7 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
             전체 {loaded.rank}위 · {formatFullDateTime(new Date(loaded.createdAt))}
           </p>
         </div>
+        <SoundToggle className="shrink-0" />
         <button
           type="button"
           onClick={() => setShareOpen(true)}
