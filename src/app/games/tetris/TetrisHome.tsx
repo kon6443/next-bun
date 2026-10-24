@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { TeamsPageLayout, ButtonLink, Button, SectionLabel, EmptyState, LoadingSpinnerSimple } from "@/app/teams/components";
 import { cardStyles } from "@/styles/teams";
@@ -35,7 +35,8 @@ import {
 
 const PREVIEW_LIMIT = 5;
 
-export default function TetrisHome() {
+/** about: 서버가 그린 소개·특징(검색엔진이 읽을 글) — 화면 맨 아래 */
+export default function TetrisHome({ about }: { about?: ReactNode }) {
   const { data: session, status: authStatus } = useSession();
   const accessToken = session?.user?.accessToken ?? undefined;
   const [needsNewName, setNeedsNewName] = useState(false);
@@ -285,6 +286,10 @@ export default function TetrisHome() {
           <SoundSettingsEntry />
         </div>
       </section>
+
+      {about}
+      {/* 하단 내비(떠 있는 카드형)에 마지막 항목이 가리지 않게 — 디펜스 허브와 같은 여백 */}
+      <div aria-hidden="true" className="h-8" />
     </TeamsPageLayout>
   );
 }

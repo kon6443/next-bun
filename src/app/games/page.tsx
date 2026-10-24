@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { TeamsPageLayout, SectionLabel } from "@/app/teams/components";
 import type { ReactNode } from "react";
 import { cardStyles } from "@/styles/teams";
+import { serializeJsonLd } from "@/app/utils/jsonLd";
+import { gameListJsonLd, gamePageMetadata } from "./_shared/lib/seo";
 import { BattleEntryLink } from "./tetris/battle-ui/components/BattleEntryLink";
 
 type GameCard = {
@@ -14,6 +17,12 @@ type GameCard = {
   /** 새 모드 입구 — 테트리스는 대전 링크(열린 방 수 배지, 홈 대전 섹션으로) */
   feature?: ReactNode;
 };
+
+export const metadata: Metadata = gamePageMetadata({
+  title: "무료 브라우저 미니게임 — 테트리스·타워 디펜스·낚시",
+  description: "설치 없이 브라우저에서 바로 하는 무료 미니게임 모음 — 온라인 테트리스 랭킹·대전, 타워 디펜스, 멀티플레이어 낚시.",
+  path: "/games",
+});
 
 const GAMES: GameCard[] = [
   {
@@ -46,6 +55,10 @@ const GAMES: GameCard[] = [
 export default function GamesPage() {
   return (
     <TeamsPageLayout>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(gameListJsonLd(GAMES.map((game) => ({ name: game.title, path: game.playHref })))) }}
+      />
       <section className={`${cardStyles.section} p-5`}>
         <SectionLabel spacing="wide">Games</SectionLabel>
         <h1 className="mt-4 text-3xl font-bold text-white">게임</h1>

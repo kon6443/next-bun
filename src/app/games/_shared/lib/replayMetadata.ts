@@ -39,7 +39,8 @@ export function buildReplayMetadata<D>(
     };
   }
 
-  const title = `${spec.headline(summary)} | 리플레이`;
+  // "{게임별 제목} 리플레이"(테트리스: "{이름}님의 테트리스 {점수}점 리플레이") — 무엇을 다시 보는지 한 줄로
+  const title = `${spec.headline(summary)} 리플레이`;
   const description = spec.metaDescription(summary);
   return {
     ...base,

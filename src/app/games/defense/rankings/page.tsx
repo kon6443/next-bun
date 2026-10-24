@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import { parseHighlightId } from "@/app/games/_shared/lib/rankingParams";
+import { gamePageMetadata } from "@/app/games/_shared/lib/seo";
 import { DefenseRankings } from "../components/DefenseRankings";
 import { BOARD_PARAM } from "../lib/rankedBoards";
 
-export const metadata: Metadata = {
-  title: "타워 디펜스 랭킹",
-  description: "타워 디펜스 무한 모드·주간 도전 랭킹",
-  alternates: { canonical: "/games/defense/rankings" },
-};
+export const metadata: Metadata = gamePageMetadata({
+  title: "타워 디펜스 랭킹 — 무한 모드·주간 도전 순위",
+  description: "브라우저 타워 디펜스 무한 모드 시즌 랭킹과 주간 도전 순위. 상위 기록 리플레이로 공략을 확인하세요.",
+  path: "/games/defense/rankings",
+});
 
 type RankingsPageProps = {
   searchParams: Promise<{ highlight?: string | string[]; board?: string | string[] }>;
