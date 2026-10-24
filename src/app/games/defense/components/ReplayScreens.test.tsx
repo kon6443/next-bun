@@ -145,4 +145,39 @@ describe('리플레이 화면 — 로컬·서버', () => {
     expect(Number(ring.dataset.slot)).toBe(target!.slot);
     await act(async () => {});
   });
+
+  it('재생 중 웨이브 표시는 바뀐 순간 갱신된다 — 1초 단위 시간 표시를 기다리지 않는다 (games-polish FE-41)', { timeout: 30_000 }, async () => {
+    saveLocalWin();
+    // 같은 seed·봇으로 다시 돌려 웨이브 수가 초 중간에 바뀌는 틱을 찾는다
+    const changes: { tick: number; waves: number }[] = [];
+    let last = 0;
+    const probe = GameDriver.fromBoard('campaign', 's1', 3);
+    runGame(probe, greedyBot(), (d) => {
+      if (d.state.wavesStarted !== last) {
+        last = d.state.wavesStarted;
+        changes.push({ tick: d.state.tick, waves: last });
+      }
+      return false;
+    });
+    const change = changes.find((c) => c.tick > TICKS_PER_SECOND && c.tick % TICKS_PER_SECOND >= 5 && c.tick % TICKS_PER_SECOND <= TICKS_PER_SECOND - 10)!;
+    expect(change).toBeDefined();
+    // 재생 루프(rAF)가 처음부터 가짜 시계로 돌게 렌더 전에 — 준비(setTimeout)는 진짜 시계
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance'] });
+    render(<LocalReplayView stageId="s1" />);
+    await screen.findByTestId('defense-replay', {}, { timeout: 5000 });
+    const second = Math.floor(change.tick / TICKS_PER_SECOND) * TICKS_PER_SECOND;
+    fireEvent.change(screen.getByTestId('defense-replay-seek'), { target: { value: String(second) } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(32); // 다음 프레임에 탐색
+    });
+    expect(Number(screen.getByTestId('defense-replay-wave').textContent)).toBe(change.waves - 1);
+    // 바뀐 틱 + 3틱까지 — 다음 초 경계 전
+    const ms = ((change.tick - second + 3) * 1000) / TICKS_PER_SECOND;
+    await act(async () => {
+      for (let t = 0; t < ms; t += 16) await vi.advanceTimersByTimeAsync(16);
+    });
+    expect(screen.getByTestId('defense-replay-time').textContent!.startsWith(fmt(second))).toBe(true);
+    expect(Number(screen.getByTestId('defense-replay-wave').textContent)).toBe(change.waves);
+    vi.useRealTimers();
+  });
 });
