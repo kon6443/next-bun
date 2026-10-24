@@ -73,12 +73,11 @@ export default function TetrisHome() {
       .catch((err) => setPreviewError(extractErrorMessage(err, "랭킹을 불러오지 못했습니다.")));
   }, []);
 
+  // 저장은 핸들러에서 한 번 — 상태 업데이터는 순수해야 한다(StrictMode가 두 번 부른다, games-polish FE-52)
   const updateSettings = (patch: Partial<TetrisSettings>) => {
-    setSettings((prev) => {
-      const next = { ...prev, ...patch };
-      saveSettings(next);
-      return next;
-    });
+    const next = { ...settings, ...patch };
+    setSettings(next);
+    saveSettings(next);
   };
 
   const retryPending = async () => {
