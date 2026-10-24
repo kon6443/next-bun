@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createGameSession, getGameBoards, getGameRankings, getGameReplay, getGameScore, RANKING_TIMEOUT_MS, SESSION_TIMEOUT_MS, submitGameScore } from './gameService';
+import { createGameSession, getGameBoards, getHallOfFame, getGameRankings, getGameReplay, getGameScore, getPopularReplays, RANKING_TIMEOUT_MS, recordReplayView, reportReplayWatch, SESSION_TIMEOUT_MS, submitGameScore } from './gameService';
 import { ApiError } from '@/types/api';
 
 // 서비스 → FetchService → fetch 경로 전체를 실제로 타고, 네트워크만 stub 한다 (백엔드 API 준비 전 mock)
@@ -280,5 +280,68 @@ describe('gameService', () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 404 }));
     await expect(getGameReplay('tetris', 7)).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
     expect(fetchMock.mock.calls[3][0]).toMatch(/\/api\/v1\/games\/tetris\/scores\/7\/replay$/);
+  });
+
+  describe('조회수·시청 시간·인기 리플레이 (replay-views)', () => {
+    const ok = (data: unknown) => json({ code: 'SUCCESS', message: 'ok', data });
+
+    it('조회 기록: 본문·Content-Type·Authorization 없는 POST', async () => {
+      fetchMock.mockResolvedValue(ok({ scoreId: 7, viewCount: 3, counted: true }));
+      const { data } = await recordReplayView('tetris', 7);
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toMatch(/\/api\/v1\/games\/tetris\/scores\/7\/views$/);
+      expect(init.method).toBe('POST');
+      expect(init.body).toBeUndefined();
+      expect(init.headers['Content-Type']).toBeUndefined();
+      expect(init.headers.Authorization).toBeUndefined();
+      expect(data.viewCount).toBe(3);
+    });
+
+    it('조회 기록: 404는 백엔드 code 그대로 던진다(호출부가 조용히 무시)', async () => {
+      fetchMock.mockResolvedValue(json({ code: 'GAME_SCORE_NOT_FOUND', message: 'x' }, 404));
+      await expect(recordReplayView('defense', 1)).rejects.toMatchObject({ code: 'GAME_SCORE_NOT_FOUND', status: 404 });
+    });
+
+    it('시청 보고: ms는 쿼리로만, 본문·Content-Type 없이(preflight 없는 단순 요청), keepalive 전달', async () => {
+      fetchMock.mockResolvedValue(ok({ scoreId: 7, watchMs: 4000, countedMs: 4000 }));
+      await reportReplayWatch('defense', 7, 4000, { keepalive: true });
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toMatch(/\/api\/v1\/games\/defense\/scores\/7\/watch\?ms=4000$/);
+      expect(init.method).toBe('POST');
+      expect(init.keepalive).toBe(true);
+      expect(init.body).toBeUndefined();
+      expect(init.headers['Content-Type']).toBeUndefined();
+      expect(init.headers.Authorization).toBeUndefined();
+    });
+
+    it('인기 리플레이: period·sort·limit, 보드는 있을 때만', async () => {
+      fetchMock.mockImplementation(() => Promise.resolve(ok({ boardKey: 'default', period: 'daily', sort: 'views', periodStart: null, items: [] })));
+      await getPopularReplays('tetris', { period: 'daily', sort: 'views', limit: 5 });
+      expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/v1\/games\/tetris\/popular-replays\?period=daily&sort=views&limit=5$/);
+      await getPopularReplays('defense', { period: 'all', sort: 'watch', limit: 50, board: 'endless-s1' });
+      expect(fetchMock.mock.calls[1][0]).toMatch(/\/api\/v1\/games\/defense\/popular-replays\?period=all&sort=watch&limit=50&board=endless-s1$/);
+      expect(fetchMock.mock.calls[1][1].signal).toBeDefined();
+    });
+  });
+
+  it('세션: 오늘의 테트리스는 board daily, 도전장은 challengeScoreId만 본문에 (games-growth B1·B2)', async () => {
+    fetchMock.mockImplementation(() => Promise.resolve(json({ code: 'SUCCESS', message: 'ok', data: { sessionId: 's', seed: 1, engineVersion: 1, expiresAt: 'x' } }, 201)));
+    await createGameSession('tetris', undefined, 'daily');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ board: 'daily' });
+    await createGameSession('tetris', undefined, { challengeScoreId: 41 });
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ challengeScoreId: 41 });
+  });
+
+  it('세션: 도전장 거절은 백엔드 code 그대로 — 원본 없음 404·지난 버전 409', async () => {
+    fetchMock.mockResolvedValueOnce(json({ code: 'GAME_SCORE_NOT_FOUND', message: 'x' }, 404)).mockResolvedValueOnce(json({ code: 'GAME_CHALLENGE_EXPIRED', message: 'y' }, 409));
+    await expect(createGameSession('tetris', undefined, { challengeScoreId: 9 })).rejects.toMatchObject({ code: 'GAME_SCORE_NOT_FOUND', status: 404 });
+    await expect(createGameSession('tetris', undefined, { challengeScoreId: 9 })).rejects.toMatchObject({ code: 'GAME_CHALLENGE_EXPIRED', status: 409 });
+  });
+
+  it('명예의 전당: GET /games/:g/hall-of-fame, 응답 대기 상한 (games-growth B5)', async () => {
+    fetchMock.mockResolvedValue(json({ code: 'SUCCESS', message: 'ok', data: { periods: [] } }));
+    await getHallOfFame('tetris');
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/v1\/games\/tetris\/hall-of-fame$/);
+    expect(fetchMock.mock.calls[0][1].signal).toBeDefined();
   });
 });

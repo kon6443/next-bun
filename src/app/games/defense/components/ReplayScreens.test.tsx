@@ -14,6 +14,16 @@ import { ResultPanel } from './ResultPanel';
 
 const loadReplay = vi.hoisted(() => vi.fn());
 vi.mock('@/app/games/_shared/lib/replayLoader', () => ({ loadReplay }));
+// 조회 기록·시청 보고는 훅 테스트(useReplayStats)가 맡는다 — 여기서는 화면이 넘기는 값만
+const stats = vi.hoisted(() => ({ recorded: null as number | null, addWatched: vi.fn(), viewCalls: [] as unknown[][] }));
+vi.mock('@/app/games/_shared/hooks/useReplayStats', async (importActual) => ({
+  ...(await importActual<typeof import('@/app/games/_shared/hooks/useReplayStats')>()),
+  useRecordedViewCount: (...args: unknown[]) => {
+    stats.viewCalls.push(args);
+    return stats.recorded;
+  },
+  useReplayWatchReport: () => stats.addWatched,
+}));
 const linkAttrs = (rest: Record<string, unknown>) => Object.fromEntries(Object.entries(rest).filter(([key]) => key !== 'replace' && key !== 'scroll'));
 vi.mock('next/link', () => ({ default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...linkAttrs(rest)}>{children}</a> }));
 
@@ -43,11 +53,16 @@ describe('리플레이 화면 — 로컬·서버', () => {
   beforeEach(() => {
     localStorage.clear();
     loadReplay.mockReset();
+    stats.recorded = null;
+    stats.addWatched.mockReset();
+    stats.viewCalls = [];
     vi.stubGlobal('ResizeObserver', FakeResizeObserver);
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 360, height: 600, top: 0, left: 0, right: 360, bottom: 600, x: 0, y: 0, toJSON: () => ({}) });
   });
   afterEach(() => {
+    // 가짜 타이머를 쓰는 테스트가 중간에 실패해도 다음 테스트로 새지 않게
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -103,11 +118,19 @@ describe('리플레이 화면 — 로컬·서버', () => {
     const player = await screen.findByTestId('defense-replay', {}, { timeout: 8000 });
     expect(player.getAttribute('aria-label')).toBe('무한 모드 시즌 1 리플레이');
     expect(screen.getByText('수비왕 · 웨이브 7 · 진척 25% · 2위')).toBeTruthy();
+    // 조회수 — 좁은 화면에서 기록 줄만 말줄임되고 조회수는 따로 남는다, 응답에 없으면 0 (replay-views)
+    expect(screen.getByText('· 조회 0')).toBeTruthy();
     unmount();
 
+    // 재생 준비가 끝난 뒤에만 조회로 센다 (replay-views)
+    expect(stats.viewCalls.at(-1)).toEqual(['defense', 46, true]);
+
+    stats.viewCalls = [];
     loadReplay.mockResolvedValue({ ...data, frames: data.frames + 1 });
     const second = render(<ServerReplay scoreId={46} />);
     expect((await screen.findByTestId('defense-replay-error', {}, { timeout: 8000 })).textContent).toContain('손상된 기록');
+    // 손상된 기록은 조회로 세지 않는다
+    expect(stats.viewCalls.every(([, , playable]) => playable === false)).toBe(true);
     second.unmount();
 
     loadReplay.mockRejectedValue(new ApiError('GAME_SCORE_NOT_FOUND', '기록을 찾을 수 없습니다.', 404));
@@ -239,6 +262,52 @@ describe('리플레이 화면 — 로컬·서버', () => {
     });
     expect(screen.getByTestId('defense-replay-time').textContent!.startsWith(fmt(second))).toBe(true);
     expect(Number(screen.getByTestId('defense-replay-wave').textContent)).toBe(change.waves);
+    vi.useRealTimers();
+  });
+
+  it('서버 기록 시청 시간 — 재생 중에만 실제 경과 ms를 넘긴다, 로컬 다시보기는 넘기지 않는다 (replay-views)', { timeout: 30_000 }, async () => {
+    saveLocalWin();
+    // 서버 기록은 무한 판 — 타워 없이 카운트다운마다 호출해 금방 진다
+    const driver = GameDriver.fromBoard('endless', 'endless-s1', 5);
+    driver.must(OP.CALL_WAVE);
+    while (!driver.state.over) {
+      if (driver.state.countdown > 0) driver.command(OP.CALL_WAVE);
+      step(driver.state);
+    }
+    const input = driver.toReplayInput();
+    stats.recorded = 1234;
+    loadReplay.mockResolvedValue({ rank: 1, scoreId: 50, playerName: '수비왕', boardKey: 'endless-s1', score: 1, detail: { wave: 1 }, durationMs: 1, createdAt: 'x', viewCount: 3, engineVersion: ENGINE_VERSION, seed: input.seed, frames: input.ticks, inputs: input.inputs, params: {} });
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance'] });
+    const { unmount } = render(<ServerReplay scoreId={50} />);
+    await screen.findByTestId('defense-replay', {}, { timeout: 5000 });
+    // 조회 기록 응답(1,234)과 재생 응답(3) 중 큰 값
+    expect(screen.getByText('· 조회 1,234')).toBeTruthy();
+    // 4배속이어도 시청 시간은 벽시계 — 배속을 곱한 값을 넘기지 않는다 (Opus 리뷰 S2)
+    fireEvent.click(screen.getByTestId('defense-replay-speed-4'));
+    await act(async () => {
+      for (let t = 0; t < 160; t += 16) await vi.advanceTimersByTimeAsync(16);
+    });
+    const watched = stats.addWatched.mock.calls.reduce((sum, [ms]) => sum + (ms as number), 0);
+    expect(watched).toBeGreaterThan(100);
+    expect(watched).toBeLessThanOrEqual(160);
+
+    fireEvent.click(screen.getByTestId('defense-replay-play'));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(32);
+    });
+    stats.addWatched.mockClear();
+    await act(async () => {
+      for (let t = 0; t < 160; t += 16) await vi.advanceTimersByTimeAsync(16);
+    });
+    expect(stats.addWatched).not.toHaveBeenCalled();
+    unmount();
+
+    render(<LocalReplayView stageId="s1" />);
+    await screen.findByTestId('defense-replay', {}, { timeout: 5000 });
+    await act(async () => {
+      for (let t = 0; t < 160; t += 16) await vi.advanceTimersByTimeAsync(16);
+    });
+    expect(stats.addWatched).not.toHaveBeenCalled();
     vi.useRealTimers();
   });
 });

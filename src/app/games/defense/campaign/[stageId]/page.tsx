@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TeamsPageLayout } from "@/app/teams/components";
+import { gamePageMetadata } from "@/app/games/_shared/lib/seo";
 import { StageScreen } from "../../components/StageScreen";
 import { CAMPAIGN, stageMeta } from "../../lib/campaign";
 
@@ -14,7 +15,12 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: StagePageProps): Promise<Metadata> {
   const { stageId } = await params;
   const stage = stageMeta(stageId);
-  return { title: stage ? `타워 디펜스 스테이지 ${stage.number}` : "타워 디펜스" };
+  if (!stage) return { title: "타워 디펜스" };
+  return gamePageMetadata({
+    title: `타워 디펜스 캠페인 스테이지 ${stage.number}`,
+    description: `브라우저 타워 디펜스 캠페인 스테이지 ${stage.number} — ${stage.intro}. 웨이브 ${stage.waves} · 시작 골드 ${stage.startGold}.`,
+    path: `/games/defense/campaign/${stage.id}`,
+  });
 }
 
 /** 스테이지 화면 (defense DESIGN §F1) — 난이도 선택 → 플레이 */

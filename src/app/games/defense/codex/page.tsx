@@ -3,7 +3,12 @@ import Link from "next/link";
 import { TeamsPageLayout } from "@/app/teams/components";
 import { Codex } from "../components/Codex";
 
-export const metadata: Metadata = { title: "타워 디펜스 도감" };
+/** 도감 내용은 이 기기의 진행도로 클라이언트에서 그린다 — 서버 HTML이 비어 색인하지 않는다 */
+export const metadata: Metadata = {
+  title: "타워 디펜스 도감",
+  description: "타워 디펜스에서 만난 적과 열린 타워를 모아 보는 도감.",
+  robots: { index: false, follow: true },
+};
 
 /** 도감 (defense DESIGN §F5) — 만난 적·열린 타워·브리핑 카드 */
 export default function DefenseCodexPage() {
