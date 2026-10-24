@@ -1,5 +1,7 @@
 "use client";
 
+import { vibrate } from "@/app/games/_shared/lib/vibrate";
+import { useInputQueue } from "./useInputQueue";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FRAMES_PER_SECOND,
@@ -16,7 +18,7 @@ import { KEY_BINDINGS, isTypingTarget } from "../lib/controls";
 import { type EffectTracker, createEffectTracker, drainCues, observeAfter, observeBefore, resetEffects } from "../lib/effects";
 import { getSoundPlayer } from "../lib/sound/soundPlayer";
 import type { ReplayPayload } from "@/types/game";
-import { advanceClock, createClock, resetClock } from "../lib/fixedStep";
+import { advanceClock, createClock, resetClock } from "@/app/games/_shared/lib/fixedStep";
 
 export type PlayStatus = "ready" | "playing" | "paused" | "over";
 
@@ -29,14 +31,6 @@ const HUD_TIME_STEP = 15;
 
 const EMPTY_HUD: Hud = { score: 0, lines: 0, level: 1, frame: 0 };
 
-function vibrate(pattern: number | number[]): void {
-  try {
-    navigator.vibrate?.(pattern);
-  } catch {
-    // 진동을 지원하지 않으면 무시
-  }
-}
-
 
 /**
  * 실시간 플레이 — 화면 주사율과 무관하게 60Hz 논리 프레임으로 엔진을 진행하고, 넘긴 입력을 그대로 기록한다
@@ -45,10 +39,9 @@ function vibrate(pattern: number | number[]): void {
 export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state: GameState, replay: ReplayPayload) => void }) {
   const stateRef = useRef<GameState | null>(null);
   const recorderRef = useRef<InputRecorder | null>(null);
-  const queueRef = useRef<number[]>([]);
-  /** 누르고 있는 동작: 누름 코드 → 뗌 코드 */
-  const heldRef = useRef<Map<number, number>>(new Map());
   const statusRef = useRef<PlayStatus>("ready");
+  // 일시정지 중 뗀 것도 큐에 남겨 재개 첫 프레임에 적용한다
+  const { queueRef, heldRef, press, release, instant, releaseAll } = useInputQueue(statusRef, { keepReleaseWhenStopped: true });
   const lastLockRef = useRef<LockEvent | null>(null);
   /** HUD 시간을 마지막으로 갱신한 프레임 — 판마다 처음부터 */
   const hudFrameRef = useRef(-HUD_TIME_STEP);
@@ -88,7 +81,7 @@ export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state:
       setHud(EMPTY_HUD);
       setStatus("playing");
     },
-    [setStatus],
+    [setStatus, heldRef, queueRef],
   );
 
   /** 판을 버리고 준비 상태로 — 이전 판이 다시 진행되거나 입력을 받지 않게 */
@@ -99,32 +92,9 @@ export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state:
     heldRef.current.clear();
     if (effectsRef.current) resetEffects(effectsRef.current);
     setStatus("ready");
-  }, [setStatus]);
+  }, [setStatus, heldRef, queueRef]);
 
   // ==================== 입력 ====================
-
-  const press = useCallback((pressCode: number, releaseCode: number) => {
-    if (statusRef.current !== "playing" || heldRef.current.has(pressCode)) return;
-    heldRef.current.set(pressCode, releaseCode);
-    queueRef.current.push(pressCode);
-  }, []);
-
-  const release = useCallback((pressCode: number) => {
-    const releaseCode = heldRef.current.get(pressCode);
-    if (releaseCode === undefined) return;
-    heldRef.current.delete(pressCode);
-    // 일시정지 중 뗀 것도 큐에 남겨 재개 첫 프레임에 적용한다
-    queueRef.current.push(releaseCode);
-  }, []);
-
-  const instant = useCallback((action: number) => {
-    if (statusRef.current !== "playing") return;
-    queueRef.current.push(action);
-  }, []);
-
-  const releaseAll = useCallback(() => {
-    for (const pressCode of Array.from(heldRef.current.keys())) release(pressCode);
-  }, [release]);
 
   const pause = useCallback(() => {
     if (statusRef.current !== "playing") return;
@@ -193,7 +163,7 @@ export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state:
     };
     rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
-  }, [setStatus]);
+  }, [setStatus, heldRef, queueRef]);
 
   // ==================== 키보드·자동 일시정지 ====================
 

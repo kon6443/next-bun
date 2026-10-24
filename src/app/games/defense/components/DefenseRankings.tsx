@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { RankingsView } from "@/app/games/_shared/components/RankingsView";
 import { getGameBoards } from "@/services/gameService";
 import type { GameBoard } from "@/types/game";
-import { DEFENSE_GAME, REPLAY_PLAYER_READY } from "../lib/defenseGame";
+import { DEFENSE_GAME } from "../lib/defenseGame";
 import { boardTabs, selectBoard, weeklyReplayState } from "../lib/rankedBoards";
 
 /**
@@ -34,7 +34,7 @@ export function DefenseRankings({ boardParam, highlightId }: Props) {
   const replayState = !weekly ? "open" : selected?.current ? "running" : weeklyReplayState(board, selected?.endsAt, Date.now());
   const runningWeekly = replayState === "running";
   const replayUnavailable =
-    replayState === "running" ? "주가 끝나고 4시간 뒤 공개돼요" : replayState === "soon" ? "곧 공개돼요(주 종료 4시간 뒤)" : REPLAY_PLAYER_READY ? null : "리플레이는 준비 중이에요";
+    replayState === "running" ? "주가 끝나고 4시간 뒤 공개돼요" : replayState === "soon" ? "곧 공개돼요(주 종료 4시간 뒤)" : null;
 
   const header = (
     <>

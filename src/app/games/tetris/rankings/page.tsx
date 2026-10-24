@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { parseHighlightId } from "@/app/games/_shared/lib/rankingParams";
 import RankingsView from "./RankingsView";
 
 export const metadata: Metadata = {
@@ -13,6 +14,6 @@ type RankingsPageProps = {
 
 export default async function RankingsPage({ searchParams }: RankingsPageProps) {
   const { highlight } = await searchParams;
-  const highlightId = typeof highlight === "string" && /^[1-9]\d*$/.test(highlight) ? Number(highlight) : null;
+  const highlightId = parseHighlightId(highlight);
   return <RankingsView highlightId={highlightId} />;
 }

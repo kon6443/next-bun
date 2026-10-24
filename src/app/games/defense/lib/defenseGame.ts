@@ -8,9 +8,6 @@ import { createGameStorage, readStorageJson, writeStorage } from '@/app/games/_s
  * 엔진을 import하지 않는다(허브·랭킹 번들)
  */
 
-/** 서버 기록 재생기(F3) — 등록 패널·랭킹의 다시보기를 켠다(진행 중인 주간 보드는 따로 막는다 — D-027) */
-export const REPLAY_PLAYER_READY = true;
-
 export const defenseStorage = createGameStorage('defense', { pendingKind: 'local', pendingLimit: 3 });
 
 /** 점수 = 클리어 웨이브 × 10⁶ + 진척‰ × 10³ — 엔진 scoreOf(engine/game.ts)와 같아야 한다(허브·랭킹은 엔진을 불러오지 않는다) */
@@ -18,6 +15,15 @@ export const SCORE_PER_WAVE = 1_000_000;
 const SCORE_PER_PERMILLE = 1_000;
 
 /** 점수 → 클리어 웨이브·진척(‰) */
+/** 가장 많이 샌 적 종류(목숨 기준, 같으면 앞 종류) — 하나도 안 샜으면 -1 */
+export function worstLeakedEnemy(leakedLivesByEnemy: readonly (number | undefined)[]): number {
+  let worst = -1;
+  leakedLivesByEnemy.forEach((lives, kind) => {
+    if ((lives ?? 0) > (leakedLivesByEnemy[worst] ?? 0)) worst = kind;
+  });
+  return worst;
+}
+
 export function splitDefenseScore(score: number): { wave: number; progress: number } {
   const safe = Math.max(0, Math.floor(score));
   return { wave: Math.floor(safe / SCORE_PER_WAVE), progress: Math.floor((safe % SCORE_PER_WAVE) / SCORE_PER_PERMILLE) };
@@ -64,10 +70,6 @@ export function loadBests(): Record<string, number> {
   const boards: Record<string, number> = {};
   for (const [key, value] of Object.entries(raw.boards)) if (Number.isFinite(value)) boards[key] = value;
   return boards;
-}
-
-export function loadBest(boardKey: string): number {
-  return loadBests()[boardKey] ?? 0;
 }
 
 /** 그 보드 최고 점수를 갱신 — 새 최고면 true(저장 실패해도 판정은 한다) */

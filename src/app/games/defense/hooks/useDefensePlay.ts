@@ -1,5 +1,6 @@
 "use client";
 
+import { advanceClock, createClock } from "@/app/games/_shared/lib/fixedStep";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   OP,
@@ -15,6 +16,7 @@ import {
   step,
 } from "../engine";
 import { LeakTracker } from "../lib/leakTracker";
+import { useLazyRef } from "@/app/games/_shared/hooks/useLazyRef";
 import { toRenderView } from "../lib/toRenderView";
 import { type RenderView, createRenderView } from "../renderer/renderView";
 
@@ -34,7 +36,6 @@ export type Speed = (typeof SPEEDS)[number];
 export type HudSnapshot = {
   status: PlayStatus;
   speed: Speed;
-  tick: number;
   lives: number;
   gold: number;
   wavesStarted: number;
@@ -98,7 +99,6 @@ function snapshotOf(state: GameState, stage: Stage, status: PlayStatus, speed: S
   return {
     status,
     speed,
-    tick: state.tick,
     lives: state.lives,
     gold: state.gold,
     wavesStarted: state.wavesStarted,
@@ -115,7 +115,7 @@ function snapshotOf(state: GameState, stage: Stage, status: PlayStatus, speed: S
 
 /**
  * 지난 스냅샷과 화면에 보이는 값이 같은지 — 객체를 만들지 않고 상태와 바로 비교한다(매 프레임 불린다, §F10 프레임당 할당 0)
- * tick·countdown은 매 틱 바뀐다 — 카운트다운은 보이는 단위(초)가 바뀔 때만
+ * countdown은 매 틱 바뀐다 — 카운트다운은 보이는 단위(초)가 바뀔 때만
  */
 function sameHud(a: HudSnapshot, state: GameState, status: PlayStatus, speed: Speed, version: number): boolean {
   return (
@@ -136,12 +136,8 @@ function sameHud(a: HudSnapshot, state: GameState, status: PlayStatus, speed: Sp
 }
 
 export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, onTickEvents, onFrame, onOver }: Options) {
-  const stateRef = useRef<GameState>(null as unknown as GameState);
-  const recorderRef = useRef<CommandRecorder>(null as unknown as CommandRecorder);
-  if (stateRef.current === null) {
-    stateRef.current = restore ? restore.state : createGame(stage, seed);
-    recorderRef.current = restore ? restore.recorder : createCommandRecorder();
-  }
+  const stateRef = useLazyRef<GameState>(() => (restore ? restore.state : createGame(stage, seed)));
+  const recorderRef = useLazyRef<CommandRecorder>(() => (restore ? restore.recorder : createCommandRecorder()));
   // 이어한 판은 일시정지로 연다 — 증강 대기 중에 저장한 판이면 카드 선택부터
   const initialStatus: PlayStatus = stateRef.current.augmentPending ? "augment" : stateRef.current.wavesStarted > 0 ? "paused" : "ready";
   const viewsRef = useRef<{ prev: RenderView; curr: RenderView } | null>(null);
@@ -155,8 +151,7 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
   const callbacksRef = useRef({ onTickEvents, onFrame, onOver });
   callbacksRef.current = { onTickEvents, onFrame, onOver };
   /** 누수 집계(실패 원인) — 이어한 판은 다시 돌리며 모은 것에서 이어 간다 */
-  const leaksRef = useRef<LeakTracker | null>(null);
-  if (leaksRef.current === null) leaksRef.current = restore ? restore.leaks : new LeakTracker();
+  const leaksRef = useLazyRef<LeakTracker>(() => (restore ? restore.leaks : new LeakTracker()));
 
   const [hud, setHud] = useState<HudSnapshot>(() => snapshotOf(stateRef.current, stage, initialStatus, initialSpeed, 0));
   const hudRef = useRef(hud);
@@ -166,7 +161,7 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
     const next = snapshotOf(stateRef.current, stage, statusRef.current, speedRef.current, versionRef.current);
     hudRef.current = next;
     setHud(next);
-  }, [stage]);
+  }, [stage, stateRef]);
 
   const setStatus = useCallback(
     (status: PlayStatus) => {
@@ -179,7 +174,7 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
   const finish = useCallback(() => {
     const state = stateRef.current;
     statusRef.current = "over";
-    const leaks = leaksRef.current!;
+    const leaks = leaksRef.current;
     callbacksRef.current.onOver?.({
       victory: state.victory,
       livesLeft: state.lives,
@@ -189,7 +184,7 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
       inputs: recorderRef.current.inputs.slice(),
     }, state);
     publish();
-  }, [publish]);
+  }, [publish, leaksRef, recorderRef, stateRef]);
 
   /** 명령 — 수락하면 기록하고 true. 끝난 판·무효 명령은 false(엔진이 상태를 바꾸지 않는다) */
   const dispatch = useCallback(
@@ -205,7 +200,7 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
       publish();
       return true;
     },
-    [publish],
+    [publish, recorderRef, stateRef],
   );
 
   const togglePause = useCallback(() => {
@@ -214,7 +209,7 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
     if (status === "over" || status === "augment") return;
     if (status === "paused") setStatus(stateRef.current.wavesStarted > 0 ? "playing" : "ready");
     else setStatus("paused");
-  }, [setStatus]);
+  }, [setStatus, stateRef]);
 
   const cycleSpeed = useCallback(() => {
     const index = SPEEDS.indexOf(speedRef.current);
@@ -224,45 +219,45 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
 
   useEffect(() => {
     let rafId = 0;
-    let last = 0;
-    let acc = 0;
+    const clock = createClock();
     let overFrames = 0;
     const events: number[] = [];
     /** 프레임마다 같은 객체를 고쳐 넘긴다(할당 0) — 받는 쪽은 다음 프레임 전까지만 쓴다 */
     const frame: FrameInfo = { prev: viewsRef.current!.prev, curr: viewsRef.current!.curr, alpha: 1, now: 0, frameMs: 0, frozen: true, version: 0 };
     const loop = (now: number) => {
-      const frameMs = last === 0 ? 0 : now - last;
-      last = now;
+      // 연출(파티클 등)은 멈춘 동안에도 화면 프레임 간격이 필요하다 — 시계를 진행하기 전에 잰다
+      const frameMs = clock.last === 0 ? 0 : now - clock.last;
+      // 진행 중에만 쌓는다(배속 곱) — 멈춘 동안은 배속 0으로 시각만 따라간다
+      advanceClock(clock, now, MAX_CATCH_UP_MS, statusRef.current === "playing" ? speedRef.current : 0);
       const state = stateRef.current;
       const views = viewsRef.current!;
       if (statusRef.current === "playing") {
-        acc += Math.min(frameMs, MAX_CATCH_UP_MS) * speedRef.current;
         let ticks = 0;
-        while (acc >= TICK_MS && ticks < MAX_TICKS_PER_FRAME && !state.over && !state.augmentPending) {
+        while (clock.acc >= TICK_MS && ticks < MAX_TICKS_PER_FRAME && !state.over && !state.augmentPending) {
           events.length = 0;
           step(state, events);
           const swap = views.prev;
           views.prev = views.curr;
           views.curr = toRenderView(state, swap);
-          leaksRef.current!.onEvents(events, state);
+          leaksRef.current.onEvents(events, state);
           callbacksRef.current.onTickEvents?.(events, views.curr, views.prev);
-          acc -= TICK_MS;
+          clock.acc -= TICK_MS;
           ticks++;
         }
-        if (ticks === MAX_TICKS_PER_FRAME) acc = 0;
+        if (ticks === MAX_TICKS_PER_FRAME) clock.acc = 0;
         if (state.over) finish();
         else if (state.augmentPending) {
           // 카드를 고르는 동안 시간이 쌓이지 않게 — 고른 뒤 밀린 틱을 한꺼번에 돌리지 않는다
-          acc = 0;
+          clock.acc = 0;
           setStatus("augment");
         } else publish();
       } else if (statusRef.current === "ready" || statusRef.current === "augment") {
-        acc = 0;
+        clock.acc = 0;
       }
       // 일시정지 중에는 acc를 그대로 둔다 — 멈춘 위치(보간 비율)가 재개 순간 튀지 않게
       frame.prev = views.prev;
       frame.curr = views.curr;
-      frame.alpha = statusRef.current === "ready" || statusRef.current === "augment" ? 1 : acc / TICK_MS;
+      frame.alpha = statusRef.current === "ready" || statusRef.current === "augment" ? 1 : clock.acc / TICK_MS;
       frame.now = now;
       frame.frameMs = frameMs;
       frame.frozen = statusRef.current === "ready" || statusRef.current === "paused" || statusRef.current === "augment";
@@ -273,7 +268,7 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
     };
     const autoPause = () => {
       if (statusRef.current === "playing") setStatus("paused");
-      last = 0;
+      clock.last = 0;
     };
     const onVisibility = () => {
       if (document.hidden) autoPause();
@@ -286,7 +281,7 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("blur", autoPause);
     };
-  }, [finish, publish, setStatus]);
+  }, [finish, publish, setStatus, leaksRef, stateRef]);
 
   return { hud, dispatch, togglePause, cycleSpeed, stateRef, recorderRef };
 }

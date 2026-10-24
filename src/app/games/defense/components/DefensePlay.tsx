@@ -1,5 +1,6 @@
 "use client";
 
+import { vibrate } from "@/app/games/_shared/lib/vibrate";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -256,13 +257,6 @@ export function nearestSlotInDirection(slots: readonly { x: number; y: number }[
   return best;
 }
 
-function vibrate(ms: number): void {
-  try {
-    navigator.vibrate?.(ms);
-  } catch {
-    // 지원하지 않거나 막힌 기기 — 무시
-  }
-}
 
 /** OS 동작 줄이기 — 화면 흔들림을 끈다 */
 function prefersReducedMotion(): boolean {

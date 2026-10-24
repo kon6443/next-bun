@@ -1,5 +1,5 @@
 import { type Highlight, thinHighlights } from '@/app/games/_shared/lib/highlights';
-import { isPerfectClear } from '../battle-engine/battle';
+import { isPerfectClear } from './boardRules';
 import { FRAMES_PER_SECOND, type GameState, createGame, stepFrame } from '../engine';
 import { cloneGameState } from './gameSnapshot';
 import { buildTimeline, collectActions, type ReplayTimeline } from './replayTimeline';

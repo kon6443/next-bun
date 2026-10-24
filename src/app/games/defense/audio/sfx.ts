@@ -4,6 +4,7 @@
  * - 마스터 Gain + 컴프레서, 동시 12음 · 종류별 3음 · 같은 종류 최소 간격 50/100/150ms(1·2·3× — 배속이 빠를수록 솎는다)
  * - 일시정지·화면 숨김이면 suspend
  */
+import { createAudioContext, createNoiseBuffer, isAudioHalted } from '@/app/games/_shared/lib/webAudio';
 
 export const SOUND = {
   FIRE_ARCHER: 0,
@@ -53,8 +54,6 @@ const TONES: readonly (readonly Tone[])[] = [
   [{ type: 'sawtooth', from: 330, to: 110, ms: 800, gain: 0.12 }],
 ];
 
-type AudioContextCtor = new () => AudioContext;
-
 export class Sfx {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -67,7 +66,7 @@ export class Sfx {
   private readonly lastAt = new Array<number>(SOUND_COUNT).fill(-Infinity);
 
   /** AudioContext 생성자 — 테스트가 가짜를 넣는다 */
-  constructor(private readonly createContext: () => AudioContext | null = defaultContext) {}
+  constructor(private readonly createContext: () => AudioContext | null = createAudioContext) {}
 
   get created(): boolean {
     return this.ctx !== null;
@@ -169,10 +168,7 @@ export class Sfx {
     master.connect(compressor);
     this.master = master;
     // 노이즈 0.5초 — 폭발·명중이 같이 쓴다
-    const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate / 2), ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-    this.noise = buffer;
+    this.noise = createNoiseBuffer(ctx);
   }
 
   /** suspend·resume가 진행 중이면 끝난 뒤 원하는 상태와 다시 맞춘다(빠른 일시정지·재개 경쟁) */
@@ -183,7 +179,7 @@ export class Sfx {
     if (!ctx || this.switching) return;
     const want = this.enabled && !this.paused;
     // iOS는 전화·다른 앱 소리로 'interrupted'가 된다 — running이 아니면 다시 켤 대상
-    const change = want ? (ctx.state !== 'running' && ctx.state !== 'closed' ? ctx.resume() : null) : ctx.state === 'running' ? ctx.suspend() : null;
+    const change = want ? (isAudioHalted(ctx) ? ctx.resume() : null) : ctx.state === 'running' ? ctx.suspend() : null;
     if (!change) return;
     this.switching = true;
     const settle = () => {
@@ -207,13 +203,7 @@ export class Sfx {
     if (!this.enabled) return;
     if (!this.ctx) this.init();
     const ctx = this.ctx;
-    if (ctx && !this.paused && ctx.state !== 'running' && ctx.state !== 'closed') void ctx.resume();
+    if (ctx && !this.paused && isAudioHalted(ctx)) void ctx.resume();
     else this.sync();
   }
-}
-
-function defaultContext(): AudioContext | null {
-  if (typeof window === 'undefined') return null;
-  const Ctor = (window.AudioContext ?? (window as unknown as { webkitAudioContext?: AudioContextCtor }).webkitAudioContext) as AudioContextCtor | undefined;
-  return Ctor ? new Ctor() : null;
 }

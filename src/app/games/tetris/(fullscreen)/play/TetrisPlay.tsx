@@ -7,6 +7,7 @@ import { Button } from "@/app/teams/components";
 import { ConfirmModal } from "@/app/components/ConfirmModal";
 import { createGameSession } from "@/services/gameService";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
+import { useMediaQuery } from "@/app/games/_shared/hooks/useMediaQuery";
 import { sessionTtlMs } from "@/app/games/_shared/lib/sessionTtl";
 import { ApiError } from "@/types/api";
 import type { GameSession, ReplayPayload } from "@/types/game";
@@ -54,7 +55,7 @@ export default function TetrisPlay() {
   const accessToken = authSession?.user?.accessToken ?? undefined;
 
   const [settings, setSettings] = useState<TetrisSettings>(DEFAULT_SETTINGS);
-  const [isCoarse, setIsCoarse] = useState(false);
+  const isCoarse = useMediaQuery("(pointer: coarse)");
   const [sessionState, setSessionState] = useState<SessionState>({ status: "loading" });
   const [phase, setPhase] = useState<"ready" | "game">("ready");
   const [result, setResult] = useState<{
@@ -84,11 +85,6 @@ export default function TetrisPlay() {
 
   useEffect(() => {
     setSettings(loadSettings());
-    const media = window.matchMedia("(pointer: coarse)");
-    setIsCoarse(media.matches);
-    const onChange = (e: MediaQueryListEvent) => setIsCoarse(e.matches);
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
   }, []);
 
   // "처음부터"를 연달아 눌러도 늦게 온 이전 세션 응답이 최신 상태를 덮지 않게 (FE-21)

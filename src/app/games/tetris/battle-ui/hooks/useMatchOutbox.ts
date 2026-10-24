@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
+import { ACK_TIMEOUT_MS } from "../lib/ackTimeout";
 import {
   type LockAckData,
   type LockPayload,
@@ -11,7 +12,6 @@ import {
   type TopOutPayload,
 } from "@/types/tetrisBattleSocket";
 
-export const ACK_TIMEOUT_MS = 8000;
 /** 응답이 없던 보고를 다시 보내기까지 */
 const RETRY_MS = 1500;
 /** lock·topOut 거절 중 다시 보내면 나아질 수 있는 것 — 그 밖의 거절은 영구(순서·속도 위반 등)라 버린다 (B-a) */

@@ -6,7 +6,7 @@ import { Hud } from './Hud';
 
 vi.mock('next/link', () => ({ default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...rest}>{children}</a> }));
 
-const hud = { status: 'playing', speed: 3, tick: 0, lives: 20, gold: 9999, wavesStarted: 12, wavesCleared: 11, totalWaves: 12, countdown: 0, earlyBonus: 0, canCall: false } as HudSnapshot;
+const hud = { status: 'playing', speed: 3, lives: 20, gold: 9999, wavesStarted: 12, wavesCleared: 11, totalWaves: 12, countdown: 0, earlyBonus: 0, canCall: false } as HudSnapshot;
 
 describe('Hud — 좁은 폭(320px)에서도 한 줄', () => {
   // jsdom은 배치를 계산하지 않는다 — 실제 폭 판정은 브라우저 스크린샷(320·390px). 여기서는 줄이 꺾일 자리가 없다는 것만 고정한다

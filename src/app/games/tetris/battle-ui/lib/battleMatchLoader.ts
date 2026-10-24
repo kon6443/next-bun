@@ -1,4 +1,5 @@
 import { ApiError } from '@/types/api';
+import { sleep as defaultSleep } from '@/app/games/_shared/lib/sleep';
 import {
   type BattleLobbyStats,
   type BattleMatch,
@@ -57,7 +58,6 @@ export function isRetryableLoadError(err: unknown): boolean {
   return !(err instanceof ApiError) || err.status === 429 || err.status >= 500;
 }
 
-const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export function loadBattleReplay(
   matchId: string,

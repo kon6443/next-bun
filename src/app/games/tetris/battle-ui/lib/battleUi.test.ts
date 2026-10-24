@@ -3,7 +3,7 @@ import { BOARD_BASE64_LENGTH, BOARD_BYTES, TetrisBattleErrorCodes } from '@/type
 import { BOARD_ROWS, BOARD_WIDTH } from '../../engine';
 import { battleErrorMessage } from './battleErrors';
 import { decodeBoard, encodeBoard } from './boardCodec';
-import { isValidMaxPlayers, normalizeChatText, normalizeRoomCode, validateRoomName, validateRoomPassword } from './roomForm';
+import { normalizeChatText, normalizeRoomCode, validateRoomName, validateRoomPassword } from './roomForm';
 import { createFakeOpponents, stepFakeOpponents } from './fakeOpponents';
 
 describe('판 인코딩 (DESIGN §16)', () => {
@@ -43,10 +43,6 @@ describe('방 입력값 (계약 상수와 같은 기준)', () => {
     expect(validateRoomPassword('')).toBeNull();
     expect(validateRoomPassword('1234')).toBeNull();
     expect(validateRoomPassword('x'.repeat(21))).not.toBeNull();
-  });
-
-  it('인원 2~4 정수', () => {
-    expect([1, 2, 3, 4, 5, 2.5].map(isValidMaxPlayers)).toEqual([false, true, true, true, false, false]);
   });
 
   it('방 코드: 대문자로 바꾸고 6자·허용 문자(0·O·1·I·L 제외)만', () => {

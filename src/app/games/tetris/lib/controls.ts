@@ -53,13 +53,6 @@ export const ACTION_LABELS: Readonly<Record<number, string>> = {
   [ACTION.HOLD]: 'H',
 };
 
-/** 누름 상태가 있는 동작의 뗌 코드 */
-export const RELEASE_OF: Readonly<Record<number, number>> = {
-  [ACTION.LEFT_PRESS]: ACTION.LEFT_RELEASE,
-  [ACTION.RIGHT_PRESS]: ACTION.RIGHT_RELEASE,
-  [ACTION.SOFT_DROP_PRESS]: ACTION.SOFT_DROP_RELEASE,
-};
-
 /**
  * 게임으로 보내지 않을 키 — 입력창·편집 영역에서 친 키
  * includeDialogs면 열린 대화상자(대전 기권 확인 등) 안의 키도 (FE-23: 싱글·대전이 같은 함수를 쓴다)
