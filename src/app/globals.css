@@ -118,3 +118,25 @@ body {
   scroll-snap-align: start;
   scroll-snap-stop: always;
 }
+
+/*
+ * 전체화면 게임 표면 (_shared/components/GameSurface, games-polish P9) — 꾹 눌러도 글 선택·복사 메뉴(콜아웃)·확대경·탭 하이라이트가 뜨지 않게
+ * 입력칸(채팅·이름·코드)과 직접 골라 복사하게 둔 글(.select-all·.select-text)은 되돌린다
+ */
+[data-game-surface] {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+[data-game-surface] :is(img, canvas, a) {
+  -webkit-user-drag: none;
+}
+[data-game-surface] :is(input, textarea, select, [contenteditable="true"]) {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+[data-game-surface] :is(.select-all, .select-text) {
+  -webkit-touch-callout: default;
+}
