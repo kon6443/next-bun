@@ -15,7 +15,8 @@ import { extractErrorMessage } from "@/app/utils/errorUtils";
 import { ENGINE_VERSION, type GameState, MAX_FRAMES, MAX_INPUT_LENGTH } from "../../engine";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
 import { TetrisCanvas } from "../../components/TetrisCanvas";
-import { GamePad } from "../../components/GamePad";
+import { GamePad } from "@/app/games/_shared/components/GamePad";
+import { TETRIS_PAD_LAYOUT } from "../../lib/tetrisPadLayout";
 import { EffectsToggle } from "../../components/EffectsToggle";
 import { SoundButton } from "@/app/games/_shared/components/SoundButton";
 import { type GameResult, GameOverPanel } from "../../components/GameOverPanel";
@@ -317,7 +318,7 @@ export default function TetrisPlay() {
       </div>
 
       {showControls && (
-        <GamePad onHoldStart={play.press} onHoldEnd={play.release} onInstant={play.instant} active={play.status === "playing"} />
+        <GamePad layout={TETRIS_PAD_LAYOUT} onHoldStart={play.press} onHoldEnd={play.release} onInstant={play.instant} active={play.status === "playing"} />
       )}
       <ConfirmModal
         isOpen={confirmRestart}
