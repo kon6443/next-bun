@@ -9,6 +9,7 @@ import type { GameType, RankingPeriod, ReplayPayloadByGame, ScoreDetailByGame, S
 import { estimateRank, formatScore } from "../lib/format";
 import type { GameUiConfig } from "../lib/gameConfig";
 import { classifySubmitError } from "../lib/submitError";
+import { bragLabel } from "../lib/brag";
 import { PLAYER_NAME_MAX_LENGTH, normalizePlayerName, playerNameLength, validatePlayerName } from "../lib/playerName";
 
 type ScoreSubmitPanelProps<G extends GameType> = {
@@ -25,8 +26,8 @@ type ScoreSubmitPanelProps<G extends GameType> = {
   periods?: readonly { key: RankingPeriod; label: string }[];
   /** 등록 뒤 "내 플레이 다시보기" — 재생기가 아직 없는 게임은 false */
   showReplay?: boolean;
-  /** 등록 뒤 링크 아래 게임별 동작(공유 등) */
-  registeredActions?: (registered: SubmitScoreResponse<ScoreDetailByGame[G]>, playerName: string) => React.ReactNode;
+  /** 등록 뒤 링크 아래 게임별 동작(공유 등) — brag: 상위권·개인 최고면 자랑 문구(bragLabel), 아니면 null */
+  registeredActions?: (registered: SubmitScoreResponse<ScoreDetailByGame[G]>, playerName: string, brag: string | null) => React.ReactNode;
   /** 세션이 없으면(발급 실패) 등록할 수 없다 */
   sessionId: string | null;
   sessionError: string | null;
@@ -233,7 +234,11 @@ export function ScoreSubmitPanel<G extends GameType>({
             랭킹 보기
           </ButtonLink>
           {/* 등록한 이름 — 등록 뒤에는 입력이 사라지므로 마지막 입력값을 정리한 것 */}
-          {registeredActions?.(registered, registered.playerName ?? normalizePlayerName(name))}
+          {registeredActions?.(
+            registered,
+            registered.playerName ?? normalizePlayerName(name),
+            bragLabel({ ranks: registered.ranks, isNewBest, periods: periods.map(({ key }) => key) }),
+          )}
         </div>
       ) : sessionId && !isFinalError ? (
         <form onSubmit={handleSubmit} className="mt-5 text-left" noValidate>

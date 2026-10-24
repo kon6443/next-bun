@@ -2,8 +2,10 @@
 
 import type { ReplayPayload } from "@/types/game";
 import { ScoreSubmitPanel } from "@/app/games/_shared/components/ScoreSubmitPanel";
+import { ResultShareButton } from "@/app/games/_shared/components/ResultShareButton";
 import { formatFrames } from "@/app/games/_shared/lib/format";
 import { TETRIS_GAME } from "../lib/game";
+import { TETRIS_SHARE } from "../lib/share";
 
 export type GameResult = {
   score: number;
@@ -24,7 +26,7 @@ type GameOverPanelProps = {
   onRestart: () => void;
 };
 
-/** 테트리스 게임 오버 — 공용 등록 패널 + 줄·레벨·시간 */
+/** 테트리스 게임 오버 — 공용 등록 패널 + 줄·레벨·시간, 등록 뒤 기록 공유(상위권·개인 최고면 자랑 문구) */
 export function GameOverPanel({ result, ...rest }: GameOverPanelProps) {
   return (
     <ScoreSubmitPanel
@@ -47,6 +49,9 @@ export function GameOverPanel({ result, ...rest }: GameOverPanelProps) {
           </div>
         </dl>
       }
+      registeredActions={(registered, playerName, brag) => (
+        <ResultShareButton spec={TETRIS_SHARE} subject={{ scoreId: registered.scoreId, playerName, score: registered.score, detail: registered.detail }} brag={brag} />
+      )}
       {...rest}
     />
   );

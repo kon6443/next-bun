@@ -78,6 +78,10 @@ describe('GameOverPanel 예상 순위 요청', () => {
     expect(screen.getByRole('link', { name: '랭킹 보기' }).getAttribute('href')).toBe('/games/tetris/rankings?highlight=9');
     expect(screen.getByRole('link', { name: '나가기' }).getAttribute('href')).toBe('/games/tetris');
     expect(window.localStorage.getItem('tetris:myScoreIds')).toBe('[9]');
+    // 전체 3위 — 넓은 기간부터 본다, 결과 화면 공유 버튼을 강조하고 자랑 문구로 (games-growth B3)
+    const share = screen.getByTestId('result-share');
+    expect(share.textContent).toBe('전체 3위! 친구에게 자랑하기');
+    expect(share.dataset.brag).toBe('true');
     expect(window.localStorage.getItem('tetris:lastName')).toBe('테스터');
   });
 
@@ -88,5 +92,19 @@ describe('GameOverPanel 예상 순위 요청', () => {
     });
     expect(getGameRankings).toHaveBeenCalledTimes(3);
     expect(screen.getAllByText('—')).toHaveLength(3);
+  });
+
+  it('상위권도 개인 최고도 아니면 공유 버튼은 평소 문구 그대로 (games-growth B3)', async () => {
+    getGameRankings.mockResolvedValue(page([]));
+    submitGameScore.mockResolvedValue({ code: 'SUCCESS', message: 'ok', data: { scoreId: 10, score: 500, detail: {}, ranks: { daily: 11, weekly: 30, all: 300 } } });
+    await act(async () => {
+      render(<GameOverPanel {...props} />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    const share = screen.getByTestId('result-share');
+    expect(share.textContent).toBe('이 기록 공유하기');
+    expect(share.dataset.brag).toBeUndefined();
   });
 });

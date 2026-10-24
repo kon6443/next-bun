@@ -200,8 +200,29 @@ describe('ScoreSubmitPanel — 게임 사양·보드를 따른다', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
     });
-    expect(actions).toHaveBeenLastCalledWith(expect.objectContaining({ scoreId: 7 }), '서버 이름');
+    // 순위 계산이 실패(ranks null)하고 개인 최고도 아니면 자랑 문구 없음
+    expect(actions).toHaveBeenLastCalledWith(expect.objectContaining({ scoreId: 7 }), '서버 이름', null);
     expect(TEST_GAME.storage.loadLastName()).toBe('서버 이름');
   });
-});
 
+  it('등록 뒤 동작에 자랑 문구를 넘긴다 — 보이는 기간의 10위 안이면 순위, 아니면 개인 최고, 둘 다 아니면 null (games-growth B3)', async () => {
+    const actions = vi.fn(() => null);
+    submitGameScore.mockResolvedValue({ data: { scoreId: 8, score: 1, detail: {}, ranks: { daily: 3, weekly: 12, all: 40 }, playerName: '이름' } });
+    const { unmount } = await act(async () => render(<ScoreSubmitPanel {...props} registeredActions={actions} />));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    expect(actions).toHaveBeenLastCalledWith(expect.anything(), '이름', '오늘 3위! 친구에게 자랑하기');
+    unmount();
+
+    // 보드 자체가 기간인 화면(전체 하나만 보임)은 보이지 않는 오늘 순위로 자랑하지 않는다 — 개인 최고로
+    submitGameScore.mockResolvedValue({ data: { scoreId: 9, score: 1, detail: {}, ranks: { daily: 3, weekly: 12, all: 40 }, playerName: '이름' } });
+    await act(async () => {
+      render(<ScoreSubmitPanel {...props} isNewBest periods={[{ key: 'all', label: '이번 주 순위' }]} registeredActions={actions} />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    expect(actions).toHaveBeenLastCalledWith(expect.anything(), '이름', '개인 최고 갱신! 친구에게 자랑하기');
+  });
+});
