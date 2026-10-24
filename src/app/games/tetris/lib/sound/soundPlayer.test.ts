@@ -2,7 +2,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { recipeFor } from './recipes';
 import { MAX_SFX_VOICES, __resetSoundPlayerForTests, createSoundPlayer, getSoundPlayer, orderCuesByPriority, replayCues, type SoundPlayer } from './soundPlayer';
-import { __resetSoundSettingsForTests, saveSoundSettings } from './soundSettings';
+import { __resetSoundSettingsForTests, saveSoundSettings } from '@/app/games/_shared/lib/soundSettings';
+import { unlockSounds } from '@/app/games/_shared/lib/soundUnlock';
 
 /** 호출 수만 세는 가짜 AudioContext — 테스트가 currentTime을 직접 옮긴다 */
 function createFakeContext() {
@@ -48,7 +49,9 @@ const flushResume = async () => {
   await Promise.resolve();
   await Promise.resolve();
 };
-const sourceCount = (ctx: FakeContext) => ctx.createOscillator.mock.calls.length + ctx.createBufferSource.mock.calls.length;
+/** 울린 voice 소스 수 — 시작할 때의 무음 1샘플(primeAudioContext, 길이 1 버퍼)은 빼고 */
+const primeCount = (ctx: FakeContext) => ctx.createBuffer.mock.calls.filter(([, length]) => length === 1).length;
+const sourceCount = (ctx: FakeContext) => ctx.createOscillator.mock.calls.length + ctx.createBufferSource.mock.calls.length - primeCount(ctx);
 const voiceCount = (kind: Parameters<typeof recipeFor>[0]) => recipeFor(kind).voices.length;
 
 describe('soundPlayer', () => {
@@ -82,6 +85,25 @@ describe('soundPlayer', () => {
     player.setMusicPlaying(true);
     expect(createContext).not.toHaveBeenCalled();
     expect(player.isMusicRunning()).toBe(false);
+  });
+
+  it('공통 소리 모달의 켜는 클릭 핸들러 안에서(같은 호출 스택) context를 만들고 resume·무음 1샘플까지 시작한다 — Safari 제스처 조건 (P8)', () => {
+    player = makePlayer();
+    const button = document.createElement('button');
+    let duringHandler: { created: number; resumed: number; primed: number } | null = null;
+    button.addEventListener('click', () => {
+      // 모달이 하는 일: 저장 → unlockSounds() (설정 구독은 같은 호출 안에서 반영된다)
+      saveSoundSettings({ sfx: true });
+      unlockSounds();
+      duringHandler = { created: createContext.mock.calls.length, resumed: fake.resume.mock.calls.length, primed: primeCount(fake) };
+    });
+    button.click();
+    expect(duringHandler).toEqual({ created: 1, resumed: 1, primed: 1 });
+    // 해제하면 모달이 더는 깨우지 않는다
+    player.dispose();
+    createContext.mockClear();
+    unlockSounds();
+    expect(createContext).not.toHaveBeenCalled();
   });
 
   it('효과음을 켜도 사용자 조작 전에는 context를 만들지 않고, 조작 뒤에는 cue마다 소스를 만든다', () => {
@@ -163,14 +185,20 @@ describe('soundPlayer', () => {
     expect(fake.suspend).toHaveBeenCalled();
   });
 
-  it('볼륨을 바꾸면 마스터 gain에 바로 반영한다', () => {
+  it('효과음·배경음 음량과 켜기/끄기를 각 버스 gain에 바로 반영한다 — 울리던 소리도 줄어든다 (P8)', () => {
     saveSoundSettings({ sfx: true });
     player = makePlayer();
     player.unlock();
-    const master = fake.createGain.mock.results[0].value;
-    expect(master.gain.value).toBe(0.6);
-    saveSoundSettings({ volume: 0.25 });
-    expect(master.gain.setTargetAtTime).toHaveBeenLastCalledWith(0.25, expect.any(Number), expect.any(Number));
+    const [master, sfxBus, musicBus] = fake.createGain.mock.results.map((r) => r.value);
+    expect(master.gain.value).toBe(1);
+    expect(sfxBus.gain.value).toBeCloseTo(0.8 * 0.6);
+    expect(musicBus.gain.value).toBe(0);
+    saveSoundSettings({ sfxVolume: 0.25 });
+    expect(sfxBus.gain.setTargetAtTime).toHaveBeenLastCalledWith(0.8 * 0.25, expect.any(Number), expect.any(Number));
+    saveSoundSettings({ music: true, musicVolume: 0.5 });
+    expect(musicBus.gain.setTargetAtTime).toHaveBeenLastCalledWith(0.35 * 0.5, expect.any(Number), expect.any(Number));
+    saveSoundSettings({ sfx: false });
+    expect(sfxBus.gain.setTargetAtTime).toHaveBeenLastCalledWith(0, expect.any(Number), expect.any(Number));
   });
 
   it('music 설정이 꺼져 있으면 setMusicPlaying(true)여도 스케줄러가 돌지 않고, 켜면 돌고, 끄면 멈춘다', async () => {

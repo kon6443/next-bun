@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { StrictMode } from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ApiError } from '@/types/api';
 import type { BattleMatch, BattleReplayDetail } from '@/services/tetrisBattleService';
 import golden from '../../battle-engine/__fixtures__/golden-battle-replays.json';
@@ -265,5 +265,19 @@ describe('대전 경기 페이지 (DESIGN §18)', () => {
       expect(largest).toBeLessThanOrEqual(5);
       expect(sound.play).toHaveBeenCalledWith({ kind: 'ko' });
     });
+  });
+
+  it('소리 설정 모달 안의 ←/→는 뒤의 경기 재생을 옮기지 않는다 (P8)', async () => {
+    getBattleMatch.mockResolvedValue({ data: match });
+    getBattleReplay.mockResolvedValue({ data: replay });
+    render(<BattleMatchViewer matchId={MATCH_ID} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: '일시정지' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '일시정지' }));
+    const seek = screen.getByRole('slider', { name: '재생 위치' }) as HTMLInputElement;
+    const before = seek.value;
+    fireEvent.click(screen.getByRole('button', { name: /소리 설정/ }));
+    const dialog = screen.getByRole('dialog', { name: '소리 설정' });
+    fireEvent.keyDown(within(dialog).getByRole('slider', { name: '효과음 음량' }), { code: 'ArrowRight', key: 'ArrowRight' });
+    expect(seek.value).toBe(before);
   });
 });

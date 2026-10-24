@@ -26,6 +26,21 @@ export function createNoiseBuffer(ctx: AudioContext, seconds = 0.5): AudioBuffer
   return buffer;
 }
 
+/**
+ * 무음 1샘플을 재생한다 — 제스처 안에서 부른다. WebKit(iOS·옛 Safari)은 resume만으로는 출력 경로가 열리지 않는 경우가 있어
+ * 실제 소스를 한 번 시작해 두는 것이 알려진 해법이다. 실패해도 조용히 넘어간다
+ */
+export function primeAudioContext(ctx: AudioContext): void {
+  try {
+    const source = ctx.createBufferSource();
+    source.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+    source.connect(ctx.destination);
+    source.start(0);
+  } catch {
+    // 닫힌 컨텍스트·옛 구현
+  }
+}
+
 /** 다시 켜야 하는 상태 — iOS는 전화·다른 앱 소리로 'interrupted'가 된다. running·closed가 아니면 모두 멈춘 것으로 본다 */
 export function isAudioHalted(ctx: AudioContext): boolean {
   return ctx.state !== 'running' && ctx.state !== 'closed';

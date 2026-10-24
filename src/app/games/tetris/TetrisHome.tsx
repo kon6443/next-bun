@@ -13,7 +13,8 @@ import { RankingTable } from "@/app/games/_shared/components/RankingTable";
 import { TETRIS_GAME } from "./lib/game";
 import { BattleEntry } from "./battle-ui/components/BattleEntry";
 import { RecentBattles } from "./battle-ui/components/RecentBattles";
-import { SoundSettingsPanel } from "./components/SoundSettingsPanel";
+import { SoundButton } from "@/app/games/_shared/components/SoundButton";
+import { SoundSettingsEntry } from "@/app/games/_shared/components/SoundSettingsEntry";
 import { CONTROL_GUIDE } from "./lib/controls";
 import { formatScore, framesToMs } from "@/app/games/_shared/lib/format";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
@@ -129,9 +130,13 @@ export default function TetrisHome() {
       <section className={`${cardStyles.section} p-5`}>
         <div className="flex items-center justify-between">
           <SectionLabel spacing="wide">Tetris</SectionLabel>
-          <ButtonLink href="/games" variant="secondary" size="md">
-            ← 게임 목록
-          </ButtonLink>
+          <div className="flex items-center gap-2">
+            {/* 소리 설정은 첫 화면에서 — 설정 섹션까지 내려가지 않아도 되게 (P8) */}
+            <SoundButton />
+            <ButtonLink href="/games" variant="secondary" size="md">
+              ← 게임 목록
+            </ButtonLink>
+          </div>
         </div>
         <h1 className="mt-4 text-3xl font-bold text-white [text-shadow:0_0_14px_rgba(56,189,248,0.6)]">테트리스</h1>
         <p className="mt-2 text-sm text-slate-400">
@@ -140,13 +145,15 @@ export default function TetrisHome() {
         <p className="mt-4 text-sm text-slate-300">
           내 최고 점수 <strong className="ml-1 text-lg text-amber-300">{best > 0 ? formatScore(best) : "-"}</strong>
         </p>
-        <div className="mt-5 grid grid-cols-2 items-start gap-3">
-          <ButtonLink href="/games/tetris/play" size="md" fullWidth className="min-h-11">
-            게임 시작
-          </ButtonLink>
-          <BattleEntry />
-        </div>
+        <ButtonLink href="/games/tetris/play" size="md" fullWidth className="mt-5 min-h-11">
+          게임 시작
+        </ButtonLink>
       </section>
+
+      {/* 대전 입구는 여기 한 곳 — 첫 화면에 보이게 헤더 바로 아래 (games-polish P8) */}
+      <div className={`${cardStyles.section} p-4`}>
+        <BattleEntry />
+      </div>
 
       {(pending || pendingMessage) && (
         <section className={`${cardStyles.section} p-4`} role="status">
@@ -275,7 +282,7 @@ export default function TetrisHome() {
               className="h-5 w-5 accent-sky-400"
             />
           </label>
-          <SoundSettingsPanel />
+          <SoundSettingsEntry />
         </div>
       </section>
     </TeamsPageLayout>

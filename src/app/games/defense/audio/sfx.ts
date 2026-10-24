@@ -3,8 +3,10 @@
  * - 기본 꺼짐. 켤 때(사용자 제스처) 처음으로 AudioContext를 만든다 — 꺼진 동안 오디오 자원·자동 재생 경고 0
  * - 마스터 Gain + 컴프레서, 동시 12음 · 종류별 3음 · 같은 종류 최소 간격 50/100/150ms(1·2·3× — 배속이 빠를수록 솎는다)
  * - 일시정지·화면 숨김이면 suspend
+ * - 음량은 게임 공통 소리 설정의 효과음 음량(setVolume) — 마스터 gain에 곱한다
  */
-import { createAudioContext, createNoiseBuffer, isAudioHalted } from '@/app/games/_shared/lib/webAudio';
+import { DEFAULT_SOUND_SETTINGS } from '@/app/games/_shared/lib/soundSettings';
+import { createAudioContext, createNoiseBuffer, isAudioHalted, primeAudioContext } from '@/app/games/_shared/lib/webAudio';
 
 export const SOUND = {
   FIRE_ARCHER: 0,
@@ -28,6 +30,11 @@ export const SOUND = {
 const SOUND_COUNT = 17;
 
 const MAX_VOICES = 12;
+/**
+ * 마스터 gain = 음량 × 이 값 — 공통 설정의 기본 음량(0.6)에서 예전 고정 레벨(0.8)과 같은 크기가 나게 맞춘다(P8: 음량 설정이 생기며 기본이 작아지지 않게)
+ * 최대(1)면 약 1.33 — 뒤의 컴프레서가 겹침을 누른다
+ */
+const MASTER_LEVEL = 0.8 / DEFAULT_SOUND_SETTINGS.sfxVolume;
 const MAX_PER_KIND = 3;
 const MIN_INTERVAL_MS: readonly number[] = [50, 100, 150];
 
@@ -59,6 +66,7 @@ export class Sfx {
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
   private enabled = false;
+  private volume = DEFAULT_SOUND_SETTINGS.sfxVolume;
   private paused = false;
   private speedIndex = 0;
   private voices = 0;
@@ -77,6 +85,12 @@ export class Sfx {
     this.enabled = on;
     if (on && !this.ctx) this.init();
     this.sync();
+  }
+
+  /** 효과음 음량 0~1 — 울리던 소리에도 바로 반영 */
+  setVolume(volume: number): void {
+    this.volume = Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : 1;
+    if (this.master) this.master.gain.value = MASTER_LEVEL * this.volume;
   }
 
   setSpeed(speed: number): void {
@@ -164,11 +178,13 @@ export class Sfx {
     const compressor = ctx.createDynamicsCompressor();
     compressor.connect(ctx.destination);
     const master = ctx.createGain();
-    master.gain.value = 0.8;
+    master.gain.value = MASTER_LEVEL * this.volume;
     master.connect(compressor);
     this.master = master;
     // 노이즈 0.5초 — 폭발·명중이 같이 쓴다
     this.noise = createNoiseBuffer(ctx);
+    // 만드는 순간은 늘 제스처 안(setEnabled·unlock) — 무음 한 번으로 WebKit 출력 경로를 연다(_shared/lib/webAudio)
+    primeAudioContext(ctx);
   }
 
   /** suspend·resume가 진행 중이면 끝난 뒤 원하는 상태와 다시 맞춘다(빠른 일시정지·재개 경쟁) */

@@ -1,12 +1,13 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useState } from "react";
 import { useDialog } from "@/app/hooks/useDialog";
+import { SoundSettingsEntry } from "@/app/games/_shared/components/SoundSettingsEntry";
 import type { DefenseSettings } from "../lib/settings";
 
 /**
- * 설정 (defense DESIGN §F1 설정) — 효과음·진동·데미지 숫자·화면 흔들림·기본 배속. 바꾸는 즉시 저장(lib/settings)
- * 효과음은 플레이 HUD 음소거 토글과 같은 값
+ * 설정 (defense DESIGN §F1 설정) — 소리(공통 모달)·진동·데미지 숫자·화면 흔들림·기본 배속. 바꾸는 즉시 저장(lib/settings)
+ * 소리는 게임 공통 소리 설정 — 플레이 HUD 소리 버튼과 같은 모달
  */
 type Props = {
   open: boolean;
@@ -15,8 +16,7 @@ type Props = {
   onClose: () => void;
 };
 
-const TOGGLES: readonly { key: "sound" | "vibration" | "damageNumbers" | "shake"; label: string; note: string }[] = [
-  { key: "sound", label: "효과음", note: "기본은 꺼져 있어요" },
+const TOGGLES: readonly { key: "vibration" | "damageNumbers" | "shake"; label: string; note: string }[] = [
   { key: "vibration", label: "진동", note: "목숨을 잃을 때 (지원 기기만)" },
   { key: "damageNumbers", label: "데미지 숫자", note: "명중할 때 피해량 표시" },
   { key: "shake", label: "화면 흔들림", note: "보스 등장·누수 때" },
@@ -24,7 +24,9 @@ const TOGGLES: readonly { key: "sound" | "vibration" | "damageNumbers" | "shake"
 
 export function SettingsPanel({ open, settings, onChange, onClose }: Props) {
   const titleId = useId();
-  const dialogRef = useDialog<HTMLDivElement>(open, onClose);
+  const [soundOpen, setSoundOpen] = useState(false);
+  // 소리 모달이 위에 열려 있는 동안은 이 대화상자의 키 처리(Esc·Tab 가두기)를 쉰다 — 둘 다 document에서 받아 Esc가 둘 다 닫지 않게
+  const dialogRef = useDialog<HTMLDivElement>(open && !soundOpen, onClose);
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
@@ -40,7 +42,10 @@ export function SettingsPanel({ open, settings, onChange, onClose }: Props) {
         <h2 id={titleId} className="text-lg font-bold text-white">
           설정
         </h2>
-        <ul className="mt-3 grid gap-1">
+        <div className="mt-3">
+          <SoundSettingsEntry music={false} onOpenChange={setSoundOpen} testId="defense-settings-sound" />
+        </div>
+        <ul className="mt-1 grid gap-1">
           {TOGGLES.map((t) => (
             <li key={t.key}>
               <label className="flex min-h-12 items-center gap-3 rounded-xl px-2 hover:bg-white/5">

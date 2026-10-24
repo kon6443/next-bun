@@ -11,7 +11,7 @@ import { HighlightMarks, HighlightNav } from "@/app/games/_shared/components/Hig
 import type { HighlightKindSpec } from "@/app/games/_shared/lib/highlights";
 import { FRAMES_PER_SECOND } from "../../engine";
 import { TetrisCanvas } from "../../components/TetrisCanvas";
-import { SoundToggle } from "../../components/SoundToggle";
+import { SoundButton } from "@/app/games/_shared/components/SoundButton";
 import { useReducedEffects } from "../../hooks/useReducedEffects";
 import { getSoundPlayer } from "../../lib/sound/soundPlayer";
 import { useAttackTrails } from "../hooks/useAttackTrails";
@@ -148,6 +148,8 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
     if (!playable) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (shareOpenRef.current) return;
+      // 대화상자(소리 설정 등) 안의 키는 그 대화상자 몫 — 음량 막대의 ←/→가 뒤의 재생을 옮기지 않게 (P8)
+      if (e.target instanceof Element && e.target.closest('[role="dialog"]')) return;
       if (e.target instanceof HTMLInputElement && e.target.type !== "range") return;
       if (e.code === "Space") {
         if (e.target instanceof HTMLButtonElement) return;
@@ -216,7 +218,7 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
             {match.playerCount}인전 · {formatFullDateTime(new Date(match.startedAt))}
           </p>
         </div>
-        <SoundToggle className="shrink-0" />
+        <SoundButton className="shrink-0" />
         <button
           type="button"
           onClick={() => setShareOpen(true)}

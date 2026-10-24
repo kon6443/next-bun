@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SoundButton } from "@/app/games/_shared/components/SoundButton";
 import type { HudSnapshot } from "../hooks/useDefensePlay";
 
 /**
@@ -12,8 +13,8 @@ type Props = {
   exitHref: string;
   /** 판 중 나가기 확인 — 부르면 링크 이동을 막고 확인 대화상자를 띄운다(§F9b) */
   onRequestExit?: () => void;
-  soundOn: boolean;
-  onToggleSound: () => void;
+  /** 소리 설정 모달이 열리고 닫힐 때 — 플레이는 열릴 때 멈춘다 */
+  onSoundOpenChange?: (open: boolean) => void;
   onTogglePause: () => void;
   onCycleSpeed: () => void;
   /** 웨이브 총수를 보일지 — 무한·주간은 끝이 정해지지 않아 n만(§F2) */
@@ -22,7 +23,7 @@ type Props = {
   exitLabel?: string;
 };
 
-export function Hud({ hud, exitHref, onRequestExit, soundOn, onToggleSound, onTogglePause, onCycleSpeed, showTotalWaves = true, exitLabel = "스테이지 화면으로 나가기" }: Props) {
+export function Hud({ hud, exitHref, onRequestExit, onSoundOpenChange, onTogglePause, onCycleSpeed, showTotalWaves = true, exitLabel = "스테이지 화면으로 나가기" }: Props) {
   const paused = hud.status === "paused";
   // 320px까지 한 줄 — 글자는 폭 따라 12~14px, 줄바꿈 금지(넘치면 숫자 칸을 자른다), 버튼은 44px 높이·폭은 320px에서 40px → 390px 이상 44px(games-polish FE-43)
   return (
@@ -73,17 +74,7 @@ export function Hud({ hud, exitHref, onRequestExit, soundOn, onToggleSound, onTo
           </dd>
         </div>
       </dl>
-      <button
-        type="button"
-        data-testid="defense-sound"
-        data-value={soundOn ? "on" : "off"}
-        aria-pressed={soundOn}
-        aria-label="효과음"
-        onClick={onToggleSound}
-        className="min-h-11 min-w-[clamp(2.5rem,11.3vw,2.75rem)] rounded-full border border-white/15 text-base"
-      >
-        <span aria-hidden="true">{soundOn ? "🔊" : "🔇"}</span>
-      </button>
+      <SoundButton shape="round" music={false} testId="defense-sound" onOpenChange={onSoundOpenChange} />
       <button
         type="button"
         data-testid="defense-speed"

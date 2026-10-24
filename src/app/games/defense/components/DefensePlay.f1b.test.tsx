@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { ENGINE_VERSION, OP, TOWER_ID, applyCommand, createCommandRecorder, createGame, findStage, recordCommand, step } from '../engine';
 import { loadProgress } from '../lib/progress';
 import { loadResume, saveResume } from '../lib/resume';
-import { loadSettings } from '../lib/settings';
+import { __resetSoundSettingsForTests, getSoundSettings } from '@/app/games/_shared/lib/soundSettings';
 import DefensePlay, { nearestSlotInDirection } from './DefensePlay';
 
 const replace = vi.fn();
@@ -22,6 +22,7 @@ describe('DefensePlay F1b — 학습·효과음·이어하기·나가기', () =>
   let audioContexts = 0;
   beforeEach(() => {
     localStorage.clear();
+    __resetSoundSettingsForTests();
     replace.mockClear();
     audioContexts = 0;
     vi.stubGlobal('ResizeObserver', FakeResizeObserver);
@@ -88,17 +89,24 @@ describe('DefensePlay F1b — 학습·효과음·이어하기·나가기', () =>
     expect(screen.queryByTestId('defense-briefing')).toBeNull();
   });
 
-  it('효과음은 기본 꺼짐 — 꺼진 동안 AudioContext 0, 토글하면 켜짐 저장(같은 값을 설정이 쓴다)', async () => {
+  it('효과음은 기본 꺼짐 — 꺼진 동안 AudioContext 0, 소리 버튼은 공통 모달을 열고(판은 멈춤) 켜는 클릭 안에서 컨텍스트를 만든다 (P8)', async () => {
     render(<DefensePlay boardKey="s1" seed={1} fixedSeed />);
-    const toggle = await screen.findByTestId('defense-sound');
-    expect([toggle.dataset.value, toggle.getAttribute('aria-pressed')]).toEqual(['off', 'false']);
+    const button = await screen.findByTestId('defense-sound');
+    expect(button.dataset.value).toBe('off');
     fireEvent.click(screen.getByTestId('defense-slot-0'), { detail: 1 });
     fireEvent.keyDown(window, { key: ' ', code: 'Space' });
     expect(audioContexts).toBe(0);
-    fireEvent.click(toggle);
+    fireEvent.click(button);
+    const dialog = screen.getByRole('dialog', { name: '소리 설정' });
+    // 배경음이 없는 게임 — 효과음 줄만
+    expect(within(dialog).queryByRole('checkbox', { name: '배경음' })).toBeNull();
+    expect(audioContexts).toBe(0);
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: '효과음' }));
+    expect(getSoundSettings().sfx).toBe(true);
+    // 켜는 클릭(제스처) 안에서 만들기를 시도했다 — 이 테스트의 AudioContext는 만들자마자 던져서 같은 클릭의 다른 시도도 다시 만든다
+    expect(audioContexts).toBeGreaterThan(0);
+    fireEvent.click(within(dialog).getByRole('button', { name: '닫기' }));
     expect(screen.getByTestId('defense-sound').dataset.value).toBe('on');
-    expect(loadSettings().sound).toBe(true);
-    expect(audioContexts).toBe(1);
   });
 
   it('이어하기 — 같은 보드 저장본이면 고르게 하고, 이어하면 저장 틱의 판을 일시정지로 연다', async () => {

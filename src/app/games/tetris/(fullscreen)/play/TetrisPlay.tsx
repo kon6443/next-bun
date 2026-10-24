@@ -15,9 +15,10 @@ import { extractErrorMessage } from "@/app/utils/errorUtils";
 import { ENGINE_VERSION, type GameState, MAX_FRAMES, MAX_INPUT_LENGTH } from "../../engine";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
 import { TetrisCanvas } from "../../components/TetrisCanvas";
-import { TouchControls } from "../../components/TouchControls";
+import { GamePad } from "@/app/games/_shared/components/GamePad";
+import { TETRIS_PAD_LAYOUT } from "../../lib/tetrisPadLayout";
 import { EffectsToggle } from "../../components/EffectsToggle";
-import { SoundToggle } from "../../components/SoundToggle";
+import { SoundButton } from "@/app/games/_shared/components/SoundButton";
 import { type GameResult, GameOverPanel } from "../../components/GameOverPanel";
 import { useTetrisPlay } from "../../hooks/useTetrisPlay";
 import { CONTROL_GUIDE } from "../../lib/controls";
@@ -187,7 +188,8 @@ export default function TetrisPlay() {
   const showControls = phase === "game" && play.status !== "over" && isCoarse;
 
   return (
-    <div className="flex h-full flex-col pt-[env(safe-area-inset-top)]">
+    // relative — 가로 화면에서 패드가 판 위에 겹쳐 좌우로 갈라진다(GamePad)
+    <div className="relative flex h-full flex-col pt-[env(safe-area-inset-top)]">
       {/* 상단 — 나가기·점수판·일시정지 */}
       {/* 320px에서도 한 줄 — 휴대폰 폭(640px 미만)에서는 나가기를 화살표만, 여백·간격·라벨·숫자를 폭에 맞춰 줄인다(글자 꺾임·잘림 금지, 점수 9,999,999까지) */}
       <header className="flex items-center gap-1.5 px-2 py-2 min-[360px]:gap-2 min-[360px]:px-3 sm:gap-3">
@@ -219,7 +221,8 @@ export default function TetrisPlay() {
             <dd className="text-[clamp(11px,3.4vw,14px)] font-bold tracking-tight text-white">{formatFrames(play.hud.frame)}</dd>
           </div>
         </dl>
-        <SoundToggle className="shrink-0" />
+        {/* 소리 설정 모달을 여는 동안 판을 멈춘다 */}
+        <SoundButton className="shrink-0" onOpenChange={(open) => open && play.pause()} />
         <button
           type="button"
           onClick={(e) => {
@@ -315,7 +318,7 @@ export default function TetrisPlay() {
       </div>
 
       {showControls && (
-        <TouchControls onHoldStart={play.press} onHoldEnd={play.release} onInstant={play.instant} />
+        <GamePad layout={TETRIS_PAD_LAYOUT} onHoldStart={play.press} onHoldEnd={play.release} onInstant={play.instant} active={play.status === "playing"} />
       )}
       <ConfirmModal
         isOpen={confirmRestart}
