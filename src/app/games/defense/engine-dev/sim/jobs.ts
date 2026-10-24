@@ -4,6 +4,7 @@
  */
 
 import { WEEKLY_MAPS } from '../../engine';
+import { runCorpusCase } from '../corpus/corpus';
 import { type EndlessRun, createEndlessRun, endlessCollapse, endlessRunCritical, endlessRunFix, endlessWallFrom, endlessWallPrefix, generateCampaignStage } from './generate';
 import { cardPolicyRun, endlessSearchRun, endlessSeedRuns } from './report';
 import type { SearchState } from './search';
@@ -39,6 +40,8 @@ export const JOBS = {
   reportSearch: (seed: number) => endlessSearchRun(seed),
   reportCard: (card: number, force: boolean, seed: number) => cardPolicyRun(card, force, seed),
   weeklyCollapse: (mapIndex: number, combo: readonly number[], seed: number) => weeklyCollapse(WEEKLY_MAPS[mapIndex], combo, seed),
+  /** 차등 테스트 코퍼스 판 하나 (corpus/corpus.ts) */
+  corpusCase: (id: number) => runCorpusCase(id),
 };
 
 export type JobName = keyof typeof JOBS;
