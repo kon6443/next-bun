@@ -140,13 +140,15 @@ export default function TetrisHome() {
         <p className="mt-4 text-sm text-slate-300">
           내 최고 점수 <strong className="ml-1 text-lg text-amber-300">{best > 0 ? formatScore(best) : "-"}</strong>
         </p>
-        <div className="mt-5 grid grid-cols-2 items-start gap-3">
-          <ButtonLink href="/games/tetris/play" size="md" fullWidth className="min-h-11">
-            게임 시작
-          </ButtonLink>
-          <BattleEntry />
-        </div>
+        <ButtonLink href="/games/tetris/play" size="md" fullWidth className="mt-5 min-h-11">
+          게임 시작
+        </ButtonLink>
       </section>
+
+      {/* 대전 입구는 여기 한 곳 — 첫 화면에 보이게 헤더 바로 아래 (games-polish P8) */}
+      <div className={`${cardStyles.section} p-4`}>
+        <BattleEntry />
+      </div>
 
       {(pending || pendingMessage) && (
         <section className={`${cardStyles.section} p-4`} role="status">
