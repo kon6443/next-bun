@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import toast from "react-hot-toast";
 import { useDialog } from "@/app/hooks";
+import type { KakaoStatus } from "../hooks/useKakaoReady";
 import { sendKakaoFeed } from "../lib/kakao";
 import { canWebShare, copyText, webShare } from "../lib/share";
 import type { ShareContent } from "../lib/shareSpec";
@@ -10,8 +11,8 @@ import type { ShareContent } from "../lib/shareSpec";
 type ShareMenuProps = {
   /** 게임별 공유 사양으로 만든 내용 (buildShareContent) */
   content: ShareContent;
-  /** 카카오 SDK가 로드·초기화됐을 때만 카카오톡 버튼을 보인다 */
-  kakaoReady: boolean;
+  /** 카카오 SDK 상태(useKakaoReady) — ready면 카카오톡 버튼, loading이면 비활성 자리, failed면 안내, off면 없음 */
+  kakao: KakaoStatus;
   onClose: () => void;
 };
 
@@ -25,7 +26,7 @@ const itemStyles =
  * 리플레이 공유 메뉴 — 모바일은 아래에서 올라오는 시트, 넓은 화면은 가운데 대화상자
  * [카카오톡](SDK 준비 시) · [링크 복사] · [더보기](Web Share 지원 시)
  */
-export function ShareMenu({ content, kakaoReady, onClose }: ShareMenuProps) {
+export function ShareMenu({ content, kakao, onClose }: ShareMenuProps) {
   const titleId = useId();
   const dialogRef = useDialog<HTMLDivElement>(true, onClose);
   // Web Share 지원 여부는 열린 뒤(브라우저)에서만 판단한다
@@ -91,14 +92,16 @@ export function ShareMenu({ content, kakaoReady, onClose }: ShareMenuProps) {
           {url}
         </p>
         <div className="flex flex-col gap-2">
-          {kakaoReady && (
-            <button type="button" onClick={handleKakao} className={itemStyles}>
+          {/* 받는 중에도 자리를 잡아 둔다 — 늦게 생기며 시트가 밀리지 않게. 실패면 이유를 한 줄로 (FE-49) */}
+          {(kakao === "ready" || kakao === "loading") && (
+            <button type="button" onClick={handleKakao} disabled={kakao !== "ready"} aria-busy={kakao === "loading"} className={`${itemStyles} disabled:opacity-50`}>
               <span aria-hidden="true" className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FEE500] text-sm text-[#181600]">
                 K
               </span>
-              카카오톡
+              {kakao === "ready" ? "카카오톡" : "카카오톡 준비 중…"}
             </button>
           )}
+          {kakao === "failed" && <p className="text-xs text-slate-400">카카오톡 공유를 불러오지 못했어요. 링크 복사를 이용해 주세요.</p>}
           <button type="button" onClick={handleCopy} className={itemStyles}>
             <span aria-hidden="true" className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-700 text-sm">
               🔗

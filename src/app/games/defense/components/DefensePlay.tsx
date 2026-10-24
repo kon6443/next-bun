@@ -1,11 +1,15 @@
 "use client";
 
+import { vibrate } from "@/app/games/_shared/lib/vibrate";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmModal } from "@/app/components/ConfirmModal";
-import { SOUND, Sfx } from "../audio/sfx";
-import { AUGMENTS, ENGINE_VERSION, EVENT, EVENT_STRIDE, OP, findStage, type GameState, type Stage } from "../engine";
+import { SOUND } from "../audio/sfx";
+import { commandSound, useDefenseSfx } from "../hooks/useDefenseSfx";
+import { AUGMENTS, ENGINE_VERSION, EVENT, EVENT_STRIDE, OP, findStage, slotAvailable, type GameState, type Stage } from "../engine";
+import { useAutoQuality } from "../hooks/useAutoQuality";
 import { useDefenseCanvas } from "../hooks/useDefenseCanvas";
 import { type FrameInfo, type PlayResult, type Speed, useDefensePlay } from "../hooks/useDefensePlay";
 import { useDefenseSettings } from "../hooks/useDefenseSettings";
@@ -17,7 +21,9 @@ import { applyTickEvents, createTickNotice } from "../lib/fx";
 import { DIFFICULTY_NAMES, ENEMY_NAMES, TOWER_NAMES } from "../lib/labels";
 import { hasSeenBriefing, isDifficultyUnlocked, loadProgress, markBriefingSeen, markEnemiesMet, markTutorialDone, saveProgress } from "../lib/progress";
 import { type ResumeSlot, clearResume, loadResume, saveResume } from "../lib/resume";
-import { type RestoredGame, restoreGame } from "../lib/restoreGame";
+import type { RestoredGame } from "../lib/restoreGame";
+import { useChunkedRestore } from "../hooks/useChunkedRestore";
+import { RestoreProgress } from "./RestoreProgress";
 import { type RingOption, currentRange, ringOptions, tapRing } from "../lib/ringOptions";
 import { boardTitle, modeOfBoardKey } from "../lib/rankedBoards";
 import { toRenderMap } from "../lib/toRenderView";
@@ -72,6 +78,7 @@ export default function DefensePlay({ boardKey, seed, fixedSeed }: Props) {
   const [resumeOffer, setResumeOffer] = useState<ResumeSlot | null>(null);
   const [opening, setOpening] = useState<Opening | null>(null);
 
+  const restorer = useChunkedRestore();
   const introFor = useCallback((stageId: string): Intro => {
     const progress = loadProgress();
     if (stageId === "s1" && !progress.tutorialDone) return "tutorial";
@@ -99,9 +106,19 @@ export default function DefensePlay({ boardKey, seed, fixedSeed }: Props) {
     }
   }, [parsed, boardKey, introFor]);
 
-  if (!parsed || !stage || !campaign) return null;
+  // 빈 화면 대신 — 잘못된 보드(페이지가 보통 404로 거른다)는 안내, 해금 확인 중은 불러오는 중 (games-polish FE-45)
+  if (!parsed || !stage || !campaign) {
+    return (
+      <main className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+        <p className="text-slate-200">스테이지를 찾지 못했어요.</p>
+        <Link href="/games/defense" className="flex min-h-11 items-center rounded-full border border-white/20 px-5 text-sm font-semibold">
+          디펜스 처음으로
+        </Link>
+      </main>
+    );
+  }
   const exitHref = stagePath(parsed.stage.id);
-  if (access === "checking") return null;
+  if (access === "checking") return <main className="h-full" aria-busy="true" aria-label="불러오는 중" />;
   if (access === "locked") {
     return (
       <main className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
@@ -113,8 +130,10 @@ export default function DefensePlay({ boardKey, seed, fixedSeed }: Props) {
     );
   }
   if (resumeOffer && !opening) {
-    const choose = (resume: boolean) => {
-      const restored = resume ? restoreGame(stage, resumeOffer.seed, resumeOffer.inputs, resumeOffer.tick) : null;
+    const choose = async (resume: boolean) => {
+      if (restorer.progress !== null) return;
+      const restored = resume ? await restorer.restore(stage, resumeOffer.seed, resumeOffer.inputs, resumeOffer.tick) : null;
+      if (restored === "cancelled") return;
       if (!restored) clearResume();
       setAttempt((a) => ({ n: a.n, seed: restored ? resumeOffer.seed : a.seed }));
       setOpening({ restore: restored, intro: restored ? null : introFor(parsed.stage.id), notice: resume && !restored ? "이어하기를 불러오지 못해 새로 시작했어요" : null });
@@ -123,21 +142,29 @@ export default function DefensePlay({ boardKey, seed, fixedSeed }: Props) {
       <main className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center" data-testid="defense-resume">
         <h1 className="text-lg font-bold text-white">하던 판이 있어요</h1>
         <p className="text-sm text-slate-300">스테이지 {parsed.stage.number} {DIFFICULTY_NAMES[parsed.difficulty]} — 저장한 곳부터 이어서 할까요?</p>
+        {restorer.progress !== null && <RestoreProgress progress={restorer.progress} />}
         <button
           type="button"
           data-testid="defense-resume-continue"
-          onClick={() => choose(true)}
+          disabled={restorer.progress !== null}
+          onClick={() => void choose(true)}
           className="min-h-12 w-full max-w-xs rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 text-sm font-semibold text-white"
         >
           이어하기
         </button>
-        <button type="button" data-testid="defense-resume-new" onClick={() => choose(false)} className="min-h-12 w-full max-w-xs rounded-full border border-white/20 text-sm font-semibold text-slate-100">
+        <button
+          type="button"
+          data-testid="defense-resume-new"
+          disabled={restorer.progress !== null}
+          onClick={() => void choose(false)}
+          className="min-h-12 w-full max-w-xs rounded-full border border-white/20 text-sm font-semibold text-slate-100 disabled:opacity-50"
+        >
           새로 시작
         </button>
       </main>
     );
   }
-  if (!opening) return null;
+  if (!opening) return <main className="h-full" aria-busy="true" aria-label="불러오는 중" />;
   return (
     <PlaySession
       key={attempt.n}
@@ -175,7 +202,7 @@ export type SessionProps = {
   /** 판 위 안내 띠(세션 만료 예고 등) */
   banner?: ReactNode;
   /** 이어하기 저장에 함께 싣는 값(무한·주간 세션) */
-  resumeFields?: Pick<ResumeSlot, "sessionId" | "sessionReceivedAt">;
+  resumeFields?: Pick<ResumeSlot, "sessionId" | "sessionReceivedAt" | "sessionTtlMs">;
   /** 판 중 나가기 확인 문구 */
   exitMessage: string;
   boardKey: string;
@@ -231,13 +258,6 @@ export function nearestSlotInDirection(slots: readonly { x: number; y: number }[
   return best;
 }
 
-function vibrate(ms: number): void {
-  try {
-    navigator.vibrate?.(ms);
-  } catch {
-    // 지원하지 않거나 막힌 기기 — 무시
-  }
-}
 
 /** OS 동작 줄이기 — 화면 흔들림을 끈다 */
 function prefersReducedMotion(): boolean {
@@ -247,7 +267,9 @@ function prefersReducedMotion(): boolean {
 export function PlaySession({ stage, mode, title, campaign, onRankedOver, rankedResult, banner, resumeFields, exitMessage, boardKey, seed, restore, intro, notice, exitHref, onRetry }: SessionProps) {
   const router = useRouter();
   const renderMap = useMemo(() => toRenderMap(stage), [stage]);
-  const canvas = useDefenseCanvas(renderMap, DPR_CAP);
+  // 저사양 기기 — 그리기가 예산을 계속 넘으면 숫자·파티클·DPR을 단계적으로 낮춘다 (FE-09)
+  const { dprCap, numbersAllowedRef: qualityNumbersRef, record: recordDrawTime } = useAutoQuality(DPR_CAP);
+  const canvas = useDefenseCanvas(renderMap, dprCap);
   const { settings, update: updateSettings } = useDefenseSettings();
   // 시작 배속 — 판은 첫 렌더에 만들어진다(설정 훅은 마운트 뒤에 읽는다). 판 중 배속은 HUD 버튼
   const [initialSpeed] = useState<Speed>(() => loadSettings().defaultSpeed);
@@ -258,8 +280,8 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
     fx.current = { particles: new ParticlePool(PARTICLE_CAPACITY), numbers: new DamageNumberPool(NUMBER_CAPACITY), effects: new EffectPool(EFFECT_CAPACITY), scratch: createSceneScratch() };
   }
   const noticeRef = useRef(createTickNotice());
-  const sfxRef = useRef<Sfx | null>(null);
-  if (sfxRef.current === null) sfxRef.current = new Sfx();
+  // 효과음 — 켜기·제스처 대기·정리는 훅이 맡는다(다시보기와 공용)
+  const sfx = useDefenseSfx(settings.sound);
   const leakAtRef = useRef(-Infinity);
   const shakeUntilRef = useRef(-Infinity);
   /** 이번 판에서 만난 적 — 저장 시점에 도감 기록으로 */
@@ -268,6 +290,8 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
   const selectionRef = useRef<{ x: number; y: number; range: number } | null>(null);
   /** 웨이브 경계가 지나면 다음 프레임 전에 이어하기를 저장한다 */
   const saveDueRef = useRef(false);
+  /** 이어하기 저장 실패를 이미 알렸나 — 웨이브마다 되풀이하지 않게 판당 한 번 */
+  const resumeSaveWarnedRef = useRef(false);
 
   const [selected, setSelected] = useState<number | null>(null);
   const [armed, setArmed] = useState<string | null>(null);
@@ -283,9 +307,9 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
 
   const onTickEvents = useCallback((events: readonly number[], view: RenderView, prev: RenderView) => {
     const pools = fx.current!;
-    const notice = applyTickEvents(events, view, prev, pools, noticeRef.current, settingsRef.current.damageNumbers);
+    const notice = applyTickEvents(events, view, prev, pools, noticeRef.current, settingsRef.current.damageNumbers && qualityNumbersRef.current);
     const now = performance.now();
-    for (const sound of notice.sounds) sfxRef.current!.play(sound, now);
+    for (const sound of notice.sounds) sfx.play(sound, now);
     if (notice.leakedLives > 0) {
       leakAtRef.current = now;
       if (settingsRef.current.vibration) vibrate(30);
@@ -299,7 +323,7 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
       if (events[i] === EVENT.SPAWN && !metRef.current.includes(events[i + 2])) metRef.current.push(events[i + 2]);
       else if (events[i] === EVENT.WAVE_START || events[i] === EVENT.WAVE_CLEAR) saveDueRef.current = true;
     }
-  }, []);
+  }, [qualityNumbersRef, sfx]);
 
   const reducedMotionRef = useRef(false);
   useEffect(() => {
@@ -308,22 +332,47 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
   /** 마지막으로 그린 프레임 — 루프가 멈춘 뒤(판 끝) 화면 크기가 바뀌면 다시 그린다 */
   const lastFrameRef = useRef<FrameInfo | null>(null);
   const shakingRef = useRef(false);
+  /** 연출 시계(ms) — 판 시간이 흐를 때만 간다. 일시정지에 적이 흔들리거나 파티클이 사라지지 않게 (FE-40) */
+  const fxClockRef = useRef(0);
+  /** 마지막으로 그린 그림의 재료 — 멈춘 동안 같으면 다시 그리지 않는다 */
+  const drawnRef = useRef<{ curr: RenderView; version: number; selection: object | null; viewport: object; numbers: boolean } | null>(null);
   const onFrame = useCallback(
     (frame: FrameInfo) => {
       const ctx = canvas.fgContextRef.current;
       const viewport = canvas.viewportRef.current;
       const { particles, numbers, effects, scratch } = fx.current!;
       lastFrameRef.current = frame;
-      particles.update(frame.frameMs);
-      numbers.update(frame.frameMs);
-      effects.update(frame.frameMs);
+      const dt = frame.frozen ? 0 : frame.frameMs;
+      fxClockRef.current += dt;
+      particles.update(dt);
+      numbers.update(dt);
+      effects.update(dt);
       if (saveDueRef.current) persistRef.current();
       if (!ctx || !viewport) return;
-      const showNumbers = settingsRef.current.damageNumbers;
-      drawSceneLayer(ctx, { prev: frame.prev, curr: frame.curr, alpha: frame.alpha, particles, numbers, effects, showDamageNumbers: showNumbers, timeMs: frame.now }, viewport, scratch);
+      const showNumbers = settingsRef.current.damageNumbers && qualityNumbersRef.current;
+      // 멈춘 동안은 판·명령·선택·크기·설정이 그대로면 같은 그림이다 — 매 프레임 다시 그리지 않는다(누수 경고가 사라지는 중이면 그린다)
+      const drawn = drawnRef.current;
+      const leakFading = frame.now - leakAtRef.current < LEAK_PULSE_MS;
+      if (
+        frame.frozen &&
+        !leakFading &&
+        drawn &&
+        drawn.curr === frame.curr &&
+        drawn.version === frame.version &&
+        drawn.selection === selectionRef.current &&
+        drawn.viewport === viewport &&
+        drawn.numbers === showNumbers
+      ) {
+        return;
+      }
+      drawnRef.current = { curr: frame.curr, version: frame.version, selection: selectionRef.current, viewport, numbers: showNumbers };
+      const drawStart = performance.now();
+      drawSceneLayer(ctx, { prev: frame.prev, curr: frame.curr, alpha: frame.alpha, particles, numbers, effects, showDamageNumbers: showNumbers, timeMs: fxClockRef.current }, viewport, scratch);
       if (selectionRef.current) drawSelection(ctx, selectionRef.current, viewport);
       drawBossBar(ctx, viewport, frame.curr, ENEMY_NAMES);
       drawLeakPulse(ctx, viewport, 1 - (frame.now - leakAtRef.current) / LEAK_PULSE_MS);
+      // 같은 그림을 건너뛴 프레임은 재지 않는다 — 실제로 그린 시간만 품질 판정에
+      if (!frame.frozen) recordDrawTime(performance.now() - drawStart, frame.now, particles);
       // 화면 흔들림(설정) — 컨테이너만 옮긴다(캔버스 다시 그리기 없음). 끝나면 한 번 원위치
       const container = canvas.containerRef.current;
       const shaking = settingsRef.current.shake && !reducedMotionRef.current && frame.now < shakeUntilRef.current;
@@ -332,13 +381,16 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
         shakingRef.current = shaking;
       }
     },
-    [canvas.fgContextRef, canvas.viewportRef, canvas.containerRef],
+    [canvas.fgContextRef, canvas.viewportRef, canvas.containerRef, qualityNumbersRef, recordDrawTime],
   );
 
   // 크기가 바뀌면 캔버스 백버퍼가 지워진다 — 루프가 돌고 있으면 다음 프레임이 그리지만, 멈춘 뒤에는 여기서 한 번(경과 0)
   useEffect(() => {
     const frame = lastFrameRef.current;
-    if (canvas.viewport && frame) onFrame({ ...frame, frameMs: 0 });
+    if (canvas.viewport && frame) {
+      drawnRef.current = null; // 백버퍼가 지워졌다 — 같은 그림이어도 다시 그린다
+      onFrame({ ...frame, frameMs: 0 });
+    }
   }, [canvas.viewport, onFrame]);
 
   /** 무한·주간 결과 콜백 — 부모가 렌더마다 새 함수를 넘겨도 onOver가 바뀌지 않게 최신 값만 */
@@ -351,12 +403,12 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
       // 별·진행도·로컬 다시보기는 캠페인만 — 무한·주간 기록은 서버 등록(결과 화면)
       const outcome = campaign ? settleCampaign({ stageId: campaign.meta.id, difficulty: campaign.difficulty, boardKey, seed, engineVersion: ENGINE_VERSION, ...result }) : null;
       if (!campaign) onRankedOverRef.current?.(result, state);
-      sfxRef.current!.play(result.victory ? SOUND.VICTORY : SOUND.DEFEAT, performance.now());
+      sfx.play(result.victory ? SOUND.VICTORY : SOUND.DEFEAT, performance.now());
       setSelected(null);
       setArmed(null);
       setFinished({ result, campaign: outcome });
     },
-    [campaign, boardKey, seed],
+    [campaign, boardKey, seed, sfx],
   );
 
   const { hud, dispatch, togglePause, cycleSpeed, stateRef, recorderRef } = useDefensePlay({
@@ -375,7 +427,12 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
     saveDueRef.current = false;
     const state = stateRef.current;
     if (state.over || state.wavesStarted === 0) return;
-    saveResume({ engineVersion: ENGINE_VERSION, mode, boardKey, seed, tick: state.tick, inputs: recorderRef.current.inputs.slice(), savedAt: Date.now(), ...resumeFields });
+    const saved = saveResume({ engineVersion: ENGINE_VERSION, mode, boardKey, seed, tick: state.tick, inputs: recorderRef.current.inputs.slice(), savedAt: Date.now(), ...resumeFields });
+    // 저장소 차단·용량 초과면 떠났다 돌아와도 이어할 수 없다 — 모르고 떠나지 않게 한 번 알린다 (games-polish FE-46)
+    if (!saved && !resumeSaveWarnedRef.current) {
+      resumeSaveWarnedRef.current = true;
+      toast("이어하기를 저장하지 못했어요. 이 화면을 떠나면 판을 이어갈 수 없어요.", { id: "defense-resume-save" });
+    }
     const progress = loadProgress();
     const next = markEnemiesMet(progress, metRef.current);
     if (next !== progress) saveProgress(next);
@@ -395,47 +452,23 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
     };
   }, []);
 
-  // 효과음 — 꺼져 있으면 컨텍스트를 만들지 않는다. 켜져 있는데 아직 소리가 안 나면(저장값 켜짐·제스처 전 suspended·iOS 끊김)
-  // 사용자 활성화를 주는 이벤트(pointerup·touchend·click·keydown — 터치의 pointerdown은 활성화가 아니다)마다 다시 시도한다
-  // 음소거 토글을 누르는 제스처는 건너뛴다(끄려는 손짓에 컨텍스트를 만들지 않게)
-  useEffect(() => {
-    const sfx = sfxRef.current!;
-    if (!settings.sound) {
-      sfx.setEnabled(false);
-      return;
-    }
-    // 이미 만든 컨텍스트면 바로 켠다 — 처음 만드는 것은 아래 제스처에서만(제스처 밖에서 만들면 iOS가 소리를 내지 않는다)
-    if (sfx.created) sfx.setEnabled(true);
-    const unlock = (e: Event) => {
-      if (sfx.created && !sfx.waitingForGesture) return;
-      if (e.target instanceof Element && e.target.closest('[data-testid="defense-sound"]')) return;
-      sfx.setEnabled(true);
-      sfx.unlock();
-    };
-    const events = ["pointerup", "touchend", "click", "keydown"] as const;
-    for (const type of events) window.addEventListener(type, unlock);
-    return () => {
-      for (const type of events) window.removeEventListener(type, unlock);
-    };
-  }, [settings.sound]);
-  useEffect(() => sfxRef.current!.setSpeed(hud.speed), [hud.speed]);
+  useEffect(() => sfx.setSpeed(hud.speed), [sfx, hud.speed]);
   // 끝난 판은 멈추지 않는다 — 승패음(0.6~0.8초)이 끝까지 나게. 루프는 판이 끝나면 곧 멈춘다
-  useEffect(() => sfxRef.current!.setPaused(hud.status === "paused"), [hud.status]);
-  useEffect(() => () => sfxRef.current?.dispose(), []);
+  useEffect(() => sfx.setPaused(hud.status === "paused"), [sfx, hud.status]);
 
   const toggleSound = useCallback(() => {
     const on = !settingsRef.current.sound;
     // 이 클릭이 사용자 제스처 — 여기서 켜야 컨텍스트가 소리를 낸다
-    sfxRef.current!.setEnabled(on);
+    sfx.setEnabled(on);
     updateSettings({ sound: on });
-  }, [updateSettings]);
+  }, [sfx, updateSettings]);
   /** 설정 패널 — 효과음을 바꾸는 체크도 제스처 안이라 그 자리에서 켠다/끈다 */
   const changeSettings = useCallback(
     (patch: Parameters<typeof updateSettings>[0]) => {
-      if (patch.sound !== undefined) sfxRef.current!.setEnabled(patch.sound);
+      if (patch.sound !== undefined) sfx.setEnabled(patch.sound);
       updateSettings(patch);
     },
-    [updateSettings],
+    [sfx, updateSettings],
   );
 
   // 보스 등장 배너 — 잠깐 보이고 사라진다
@@ -480,6 +513,13 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
   const lastPointerRef = useRef("");
   const selectSlot = (slot: number, byKeyboard: boolean) => {
     if (hud.status === "over") return;
+    // 잠긴 자리(개척 전·좁은 땅)는 링이 없다 — 고르지 않고 닫는다(선택 고리만 남지 않게, games-polish FE-08)
+    const state = stateRef.current;
+    if (!state.towers.some((t) => t.slot === slot) && !slotAvailable(state, stage, slot)) {
+      setArmed(null);
+      setSelected(null);
+      return;
+    }
     setArmed(null);
     setKeyboardRing(byKeyboard);
     // 마우스로 누른 버튼에 포커스를 주는 브라우저가 있다 — 남은 포커스가 Enter를 엉뚱한 슬롯으로 보내지 않게 놓는다
@@ -497,13 +537,13 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
       const { op } = next.command;
       const ok = dispatch(op, next.command.a, next.command.b);
       if (ok) {
-        const sound = op === OP.BUILD ? SOUND.BUILD : op === OP.SELL ? SOUND.SELL : op === OP.UPGRADE || op === OP.BRANCH ? SOUND.UPGRADE : -1;
-        if (sound >= 0) sfxRef.current!.play(sound, performance.now());
+        const sound = commandSound(op, OP);
+        if (sound >= 0) sfx.play(sound, performance.now());
       }
       // 건설·판매 뒤에는 닫고, 업그레이드·타게팅은 같은 슬롯을 열어 둔다(연속 업그레이드)
       if (ok && (op === OP.BUILD || op === OP.SELL)) close();
     },
-    [armed, dispatch, close],
+    [armed, dispatch, close, sfx],
   );
 
   const callWave = useCallback(() => {
@@ -511,10 +551,10 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
     if (overlayOpenRef.current) return;
     // 직접 부른 웨이브는 엔진이 렌더 이벤트를 내지 않는다(명령 적용은 이벤트 버퍼 없이) — 시작음을 여기서
     if (dispatch(OP.CALL_WAVE)) {
-      sfxRef.current!.play(SOUND.WAVE_START, performance.now());
+      sfx.play(SOUND.WAVE_START, performance.now());
       persistRef.current();
     }
-  }, [dispatch]);
+  }, [dispatch, sfx]);
 
   // 튜토리얼 단계(§F5) — 판 상태로 정하고, 웨이브를 부르면 끝(저장)
   const step = tutorialOn ? tutorialStep({ ringOpen: selected !== null, towers: stateRef.current.towers.length, wavesStarted: hud.wavesStarted }) : null;
@@ -679,7 +719,9 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
         {viewport &&
           stage.map.slots.map((spot, i) => {
             const tower = stateRef.current.towers.find((t) => t.slot === i);
-            const label = tower ? `${TOWER_NAMES[tower.kind]} Lv${tower.level}` : "빈 자리";
+            // 잠긴 자리 — 개척 증강 전·좁은 땅 규칙. 판 중에 바뀌므로(증강) 렌더마다 판정, 배경 맵 대신 버튼에 표시 (FE-08)
+            const locked = !tower && !slotAvailable(stateRef.current, stage, i);
+            const label = tower ? `${TOWER_NAMES[tower.kind]} Lv${tower.level}` : locked ? "잠긴 자리" : "빈 자리";
             return (
               <button
                 key={i}
@@ -692,6 +734,8 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
                 data-level={tower ? tower.level : 0}
                 aria-label={`슬롯 ${i + 1} — ${label}`}
                 aria-pressed={selected === i}
+                aria-disabled={locked || undefined}
+                data-locked={locked || undefined}
                 disabled={hud.status === "over"}
                 onPointerDown={(e) => {
                   lastPointerRef.current = e.pointerType;
@@ -700,7 +744,13 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
                 onClick={(e) => selectSlot(i, e.detail === 0)}
                 className="absolute rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-300"
                 style={{ left: toScreenX(viewport, spot.x) - slotSize / 2, top: toScreenY(viewport, spot.y) - slotSize / 2, width: slotSize, height: slotSize }}
-              />
+              >
+                {locked && (
+                  <span aria-hidden="true" className="pointer-events-none flex h-full w-full items-center justify-center rounded-full bg-slate-950/65 text-xs">
+                    🔒
+                  </span>
+                )}
+              </button>
             );
           })}
         {viewport && selected !== null && options.length > 0 && (

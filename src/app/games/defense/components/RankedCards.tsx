@@ -6,7 +6,7 @@ import { getGameBoards } from "@/services/gameService";
 import type { GameBoard } from "@/types/game";
 import { formatDefenseScore, loadBests } from "../lib/defenseGame";
 import { isRankedUnlocked, loadProgress } from "../lib/progress";
-import { ENDLESS_BOARD_KEY, boardShortTitle } from "../lib/rankedBoards";
+import { boardShortTitle, currentEndlessBoardKey } from "../lib/rankedBoards";
 
 /**
  * 허브의 무한·주간 카드 (defense DESIGN §F1·§L7) — 스테이지 4를 깨면 열린다. 랭킹 보기는 누구나
@@ -34,7 +34,9 @@ export function RankedCards() {
   }, []);
 
   const weekly = boards?.find((b) => b.mode === "weekly" && b.current) ?? null;
-  const endlessBest = bests[ENDLESS_BOARD_KEY] ?? 0;
+  // 최고 기록은 세션의 보드 키(시즌)로 쌓인다 — 시즌이 바뀌면 새 시즌 것을 보인다 (FE-07)
+  const endlessKey = currentEndlessBoardKey(boards);
+  const endlessBest = bests[endlessKey] ?? 0;
   const weeklyBest = weekly ? (bests[weekly.boardKey] ?? 0) : 0;
   // 보드 목록을 못 받아도 주간을 막지 않는다 — 세션 발급에서 다시 판정(실패면 로컬 판)
   const weeklyOpen = boards === null && !boardsFailed ? null : weekly !== null || boardsFailed;
@@ -43,9 +45,9 @@ export function RankedCards() {
     <section className="grid gap-3 sm:grid-cols-2" aria-label="무한 모드·주간 도전" data-testid="defense-ranked-cards">
       <article className="rounded-2xl border border-slate-700/50 bg-slate-800/50 p-4">
         <h2 className="text-lg font-semibold text-white">무한 모드</h2>
-        <p className="mt-1 text-xs text-slate-400">{boardShortTitle(ENDLESS_BOARD_KEY)} · 5웨이브마다 증강</p>
+        <p className="mt-1 text-xs text-slate-400">{boardShortTitle(endlessKey)} · 5웨이브마다 증강</p>
         <p className="mt-2 text-sm text-slate-300">내 최고 {endlessBest > 0 ? formatDefenseScore(endlessBest) : "—"}</p>
-        <RankedActions unlocked={unlocked} playHref="/games/defense/play/endless" rankingsHref={`/games/defense/rankings?board=${ENDLESS_BOARD_KEY}`} testId="endless" open />
+        <RankedActions unlocked={unlocked} playHref="/games/defense/play/endless" rankingsHref={`/games/defense/rankings?board=${endlessKey}`} testId="endless" open />
       </article>
       <article className="rounded-2xl border border-slate-700/50 bg-slate-800/50 p-4">
         <h2 className="text-lg font-semibold text-white">주간 도전</h2>

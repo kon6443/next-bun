@@ -175,6 +175,18 @@ export function BattleRoom({ code, lockedHint }: { code: string; lockedHint: boo
             <Button type="button" size="md" fullWidth className="mt-4 min-h-11" onClick={resumeHere} disabled={status !== "connected"}>
               이 탭에서 계속하기
             </Button>
+          ) : join.status === "auto" && status === "failed" ? (
+            // 자동 입장은 연결된 뒤에만 시작한다 — 연결이 없으면 "입장하는 중" 스피너 대신 상태를 알린다 (games-polish FE-33)
+            <p className="mt-6 flex flex-wrap items-center justify-center gap-2 text-sm text-slate-400" role="status">
+              서버에 연결되지 않았어요.
+              <button type="button" onClick={reconnect} className="min-h-11 px-2 text-sm font-semibold text-sky-300 hover:text-sky-200">
+                다시 연결
+              </button>
+            </p>
+          ) : join.status === "auto" && status === "disconnected" ? (
+            <p className="mt-6 text-center text-sm text-slate-400" role="status">
+              서버에 다시 연결하는 중이에요…
+            </p>
           ) : join.status !== "form" ? (
             <div className="mt-6 flex flex-col items-center gap-2" role="status" aria-label="입장하는 중">
               <LoadingSpinnerSimple />

@@ -85,7 +85,7 @@ export function createSyntheticScene(initial: BenchCounts): BenchScene {
       curr.enemies.length = counts.enemies;
       for (let i = 0; i < counts.enemies; i++) {
         const [x, y] = pointAt((i * PATH.total) / Math.max(1, counts.enemies) + frame * SPEED);
-        const e = curr.enemies[i] ?? (curr.enemies[i] = { id: 0, kind: 0, x: 0, y: 0, hp: 0, maxHp: 0, effects: 0, air: false });
+        const e = curr.enemies[i] ?? (curr.enemies[i] = { id: 0, kind: 0, x: 0, y: 0, hp: 0, maxHp: 0, air: false });
         e.id = 1000 + i;
         e.kind = 0;
         e.x = x;
@@ -93,7 +93,6 @@ export function createSyntheticScene(initial: BenchCounts): BenchScene {
         e.maxHp = 100;
         e.hp = i % 3 === 0 ? 100 : 20 + ((i * 37 + frame) % 80);
         e.air = i % 5 === 0;
-        e.effects = 0;
       }
       curr.towers.length = towers.length;
       for (let i = 0; i < towers.length; i++) {

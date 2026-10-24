@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BOARD_COLS, BOARD_VISIBLE_ROWS } from "@/types/tetrisBattleSocket";
 import type { TetrisBattleEmoteId } from "@/types/tetrisBattleSocket";
 import { TetrisCanvas } from "../../components/TetrisCanvas";
@@ -12,6 +12,7 @@ import { EmoteBar } from "./EmoteBar";
 import { EmoteBubble } from "./EmoteBubble";
 import { MiniBoard, type MiniBoardProps } from "./MiniBoard";
 import { useBoardFocus } from "../hooks/useBoardFocus";
+import { useMediaQuery } from "@/app/games/_shared/hooks/useMediaQuery";
 
 export type OpponentView = Omit<MiniBoardProps, "cell">;
 
@@ -31,18 +32,16 @@ type BattleViewProps = {
   canEnlarge?: boolean;
   /** 판 아래 줄 — 관전 중 채팅 (터치 버튼은 경기 중에만 보이므로 자리가 겹치지 않는다) */
   footer?: React.ReactNode;
+  /**
+   * 카운트다운 — 터치 버튼 자리를 미리 잡는다. 시작 순간 버튼이 생기며 판이 줄어들지(캔버스 재할당) 않게 (games-polish FE-11)
+   * 시작 전 누름은 useBattlePlay가 무시한다
+   */
+  reserveControls?: boolean;
 };
 
 /** 상대 수·화면 폭 → 미니보드 칸 크기 (DESIGN §7: 2인전은 크게, 3~4인전은 작게) */
 function useMiniCell(opponentCount: number): number {
-  const [wide, setWide] = useState(false);
-  useEffect(() => {
-    const media = window.matchMedia("(min-width: 640px)");
-    setWide(media.matches);
-    const onChange = (e: MediaQueryListEvent) => setWide(e.matches);
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
-  }, []);
+  const wide = useMediaQuery("(min-width: 640px)");
   if (opponentCount <= 1) return wide ? 10 : 6;
   return wide ? 8 : 4;
 }
@@ -85,20 +84,41 @@ export function BattleView({
   overlay,
   canEnlarge = false,
   footer,
+  reserveControls = false,
 }: BattleViewProps) {
-  const [isCoarse, setIsCoarse] = useState(false);
+  const isCoarse = useMediaQuery("(pointer: coarse)");
   const [emoteOpen, setEmoteOpen] = useState(false);
+  const emoteToggleRef = useRef<HTMLButtonElement>(null);
+  const emotePanelRef = useRef<HTMLDivElement>(null);
+  /** 이모트 창 닫기 — 키보드로 닫았으면 토글로 포커스를 돌려준다 */
+  const closeEmotes = useCallback((returnFocus: boolean) => {
+    setEmoteOpen(false);
+    if (returnFocus) emoteToggleRef.current?.focus();
+  }, []);
+  // 열리면 첫 이모트로 포커스, Esc·바깥 누르기로 닫는다 — 판을 가린 채 남지 않게 (games-polish FE-31)
+  useEffect(() => {
+    if (!emoteOpen) return;
+    emotePanelRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      closeEmotes(true);
+    };
+    const onPointer = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (emotePanelRef.current?.contains(target) || emoteToggleRef.current?.contains(target)) return;
+      closeEmotes(false);
+    };
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+    };
+  }, [emoteOpen, closeEmotes]);
   const miniCell = useMiniCell(opponents.length);
   const focus = useBoardFocus(canEnlarge);
   const enlarged = opponents.find((o) => o.playerId === focus.focusedId) ?? null;
-
-  useEffect(() => {
-    const media = window.matchMedia("(pointer: coarse)");
-    setIsCoarse(media.matches);
-    const onChange = (e: MediaQueryListEvent) => setIsCoarse(e.matches);
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
-  }, []);
 
   return (
     <div ref={trailsRootRef} className="relative flex h-full flex-col pt-[env(safe-area-inset-top)]">
@@ -128,9 +148,11 @@ export function BattleView({
         </ul>
         <SoundToggle className="shrink-0" />
         <button
+          ref={emoteToggleRef}
           type="button"
           onClick={() => setEmoteOpen((v) => !v)}
           aria-expanded={emoteOpen}
+          aria-controls="battle-emote-panel"
           aria-label="이모트"
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-700/60 bg-slate-900/70 text-xl"
         >
@@ -138,11 +160,15 @@ export function BattleView({
         </button>
       </header>
       {emoteOpen && (
-        <div className="absolute right-2 top-[calc(env(safe-area-inset-top)+3.5rem)] z-20 rounded-2xl border border-white/10 bg-slate-950/95 p-2 shadow-[0_12px_30px_rgba(2,6,23,0.7)]">
+        <div
+          ref={emotePanelRef}
+          id="battle-emote-panel"
+          className="absolute right-2 top-[calc(env(safe-area-inset-top)+3.5rem)] z-20 rounded-2xl border border-white/10 bg-slate-950/95 p-2 shadow-[0_12px_30px_rgba(2,6,23,0.7)]"
+        >
           <EmoteBar
             compact
             onSend={(id) => {
-              setEmoteOpen(false);
+              closeEmotes(true);
               onEmote(id);
             }}
           />
@@ -172,7 +198,7 @@ export function BattleView({
         )}
       </div>
 
-      {isCoarse && play.status === "playing" && (
+      {isCoarse && (play.status === "playing" || reserveControls) && (
         <TouchControls onHoldStart={play.press} onHoldEnd={play.release} onInstant={play.instant} />
       )}
       {footer}

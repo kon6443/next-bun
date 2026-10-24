@@ -8,7 +8,8 @@ import { ApiError } from "@/types/api";
 import type { ParamsReplayData } from "@/types/game";
 import { canReplayVersion, loadReplayEngine } from "../engine-versions";
 import { CAMPAIGN, stagePath } from "../lib/campaign";
-import { formatDefenseScore } from "../lib/defenseGame";
+import { rankingsHref } from "@/app/games/_shared/components/ScoreSubmitPanel";
+import { DEFENSE_GAME, formatDefenseScore } from "../lib/defenseGame";
 import { DIFFICULTY_NAMES } from "../lib/labels";
 import { type LocalReplay, loadLocalReplay } from "../lib/localReplay";
 import { boardTitle, modeOfBoardKey } from "../lib/rankedBoards";
@@ -88,41 +89,57 @@ function Loading({ progress }: { progress: number }) {
 /** 서버 기록 — 주간 보드는 주가 끝나고 4시간(세션 TTL) 뒤까지 404(D-027·D-032) */
 export function ServerReplay({ scoreId, actions }: { scoreId: number; actions?: (data: ParamsReplayData) => ReactNode }) {
   const [data, setData] = useState<ParamsReplayData | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  /** retryable: 일시 실패(망·429·5xx) — "다시 시도"로 다시 받는다(실패는 캐시되지 않는다, games-polish FE-25) */
+  const [error, setError] = useState<{ message: string; retryable: boolean } | null>(null);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
+    setError(null);
     loadReplay("defense", scoreId)
       .then((replay) => !cancelled && setData(replay))
       .catch((err) => {
         if (cancelled) return;
-        setError(err instanceof ApiError && err.status === 404 ? "기록을 찾을 수 없어요. 주간 도전 기록은 주가 끝나고 4시간 뒤에 공개돼요." : extractErrorMessage(err, "리플레이를 불러오지 못했어요."));
+        const notFound = err instanceof ApiError && err.isNotFoundError();
+        setError({
+          message: notFound ? "기록을 찾을 수 없어요. 주간 도전 기록은 주가 끝나고 4시간 뒤에 공개돼요." : extractErrorMessage(err, "리플레이를 불러오지 못했어요."),
+          retryable: !notFound,
+        });
       });
     return () => {
       cancelled = true;
     };
-  }, [scoreId]);
+  }, [scoreId, attempt]);
   const mode = data?.boardKey ? modeOfBoardKey(data.boardKey) : null;
   // 헤더는 받은 기록이 바뀔 때만 새로 — 준비 effect가 렌더마다 다시 돌지 않게
   const header = useMemo<ReplayHeader | null>(() => (data && data.boardKey && mode ? { mode, boardKey: data.boardKey, seed: data.seed, ticks: data.frames, inputs: data.inputs } : null), [data, mode]);
   const prepared = usePreparedReplay(header, data && mode ? data.engineVersion : null);
-  const rankingsHref = data?.boardKey ? `/games/defense/rankings?board=${data.boardKey}&highlight=${scoreId}` : "/games/defense/rankings";
+  const exitHref = data?.boardKey ? rankingsHref(DEFENSE_GAME.rankingsPath, scoreId, data.boardKey) : DEFENSE_GAME.rankingsPath;
   if (error || (data && !mode)) {
     return (
-      <Status exitHref={rankingsHref} exitLabel="랭킹으로" testId="defense-replay-error">
-        <p className="text-sm text-slate-200">{error ?? "재생할 수 없는 기록이에요."}</p>
+      <Status exitHref={exitHref} exitLabel="랭킹으로" testId="defense-replay-error">
+        <p className="text-sm text-slate-200">{error?.message ?? "재생할 수 없는 기록이에요."}</p>
+        {error?.retryable && (
+          <button
+            type="button"
+            onClick={() => setAttempt((n) => n + 1)}
+            className="flex min-h-11 items-center rounded-full bg-sky-500/30 px-5 text-sm font-semibold text-white"
+          >
+            다시 시도
+          </button>
+        )}
       </Status>
     );
   }
   if (!data || prepared.status === "loading") {
     return (
-      <Status exitHref={rankingsHref} exitLabel="랭킹으로" testId="defense-replay-pending">
+      <Status exitHref={exitHref} exitLabel="랭킹으로" testId="defense-replay-pending">
         <Loading progress={prepared.status === "loading" ? prepared.progress : 0} />
       </Status>
     );
   }
   if (prepared.status === "error") {
     return (
-      <Status exitHref={rankingsHref} exitLabel="랭킹으로" testId="defense-replay-error">
+      <Status exitHref={exitHref} exitLabel="랭킹으로" testId="defense-replay-error">
         <p className="text-sm text-slate-200">{prepared.message}</p>
       </Status>
     );
@@ -133,7 +150,7 @@ export function ServerReplay({ scoreId, actions }: { scoreId: number; actions?: 
       replay={prepared.replay}
       title={boardTitle(data.boardKey!)}
       subtitle={`${data.playerName} · ${formatDefenseScore(data.score)} · ${data.rank}위`}
-      exitHref={rankingsHref}
+      exitHref={exitHref}
       exitLabel="랭킹으로"
       actions={actions?.(data)}
     />

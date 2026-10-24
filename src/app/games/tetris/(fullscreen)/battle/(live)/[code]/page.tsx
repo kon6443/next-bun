@@ -26,5 +26,6 @@ export default async function TetrisBattleRoomPage({ params, searchParams }: Bat
   }
   const normalized = normalizeRoomCode(decoded);
   if (!normalized) notFound();
-  return <BattleRoom code={normalized} lockedHint={locked === "1"} />;
+  // 방마다 새로 마운트 — 방에서 다른 방 링크로 바로 가도 앞 방의 입장 상태(자동 입장 시도·입력값)가 이어지지 않게 (games-polish FE-35)
+  return <BattleRoom key={normalized} code={normalized} lockedHint={locked === "1"} />;
 }

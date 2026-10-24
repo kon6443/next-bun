@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { DIFFICULTIES, type StageMeta, playPath } from "../lib/campaign";
 import { DIFFICULTY_NAMES, TOWER_NAMES } from "../lib/labels";
-import { type Progress, emptyProgress, isDifficultyUnlocked, isStageUnlocked, loadProgress } from "../lib/progress";
+import { useProgress } from "../hooks/useProgress";
+import { emptyProgress, isDifficultyUnlocked, isStageUnlocked } from "../lib/progress";
 
 /**
  * 스테이지 화면 (defense DESIGN §F1) — 난이도 선택(쉬움·보통·어려움, 어려움은 보통 클리어 후 §L5) · 이 판 정보
@@ -13,12 +13,10 @@ import { type Progress, emptyProgress, isDifficultyUnlocked, isStageUnlocked, lo
 const DIFFICULTY_NOTE = { easy: "적 체력 −20% · 타워 −15%", normal: "기준 난이도", hard: "적 체력 +20% · 타워 +8%" } as const;
 
 export function StageScreen({ stage }: { stage: StageMeta }) {
-  const [progress, setProgress] = useState<Progress>(emptyProgress);
-  const [loaded, setLoaded] = useState(false);
-  useEffect(() => {
-    setProgress(loadProgress());
-    setLoaded(true);
-  }, []);
+  // 읽기 전(null)에는 잠김을 단정하지 않는다 — 기존 loaded 분기 그대로 (useProgress, FE-44)
+  const stored = useProgress();
+  const loaded = stored !== null;
+  const progress = stored ?? emptyProgress();
 
   const unlocked = isStageUnlocked(progress, stage.id);
   return (

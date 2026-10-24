@@ -1,5 +1,6 @@
 "use client";
 
+import { ConfirmModal } from "@/app/components/ConfirmModal";
 import { useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
@@ -21,6 +22,10 @@ export function PendingSubmitCard() {
   const [message, setMessage] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
   const pending = list[0] ?? null;
+  // 게임 오버 순간 이름 없이 보관한 기록(기본 이름이 없었다)이면 이름부터 묻는다 (games-polish FE-05)
+  const askName = needsNewName || pending?.playerName === "";
+  /** 보관 기록 버리기 확인 — 게임 오버 순간 선보관(FE-05)이라 등록할 마음이 없는 기록도 남는다 (games-polish P5) */
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   /** 같은 렌더 안 연타도 막게 ref로 — 세션은 1회용이라 두 번째 제출은 실패하고 성공 문구를 덮는다 */
   const retryingRef = useRef(false);
 
@@ -35,7 +40,7 @@ export function PendingSubmitCard() {
   const retry = async () => {
     if (!pending || retryingRef.current) return;
     let playerName = pending.playerName;
-    if (needsNewName) {
+    if (askName) {
       const error = validatePlayerName(name);
       if (error) {
         setMessage(error);
@@ -49,7 +54,7 @@ export function PendingSubmitCard() {
     try {
       const { data } = await submitGameScore("defense", { sessionId: pending.sessionId, playerName, replay: pending.replay }, accessToken);
       defenseStorage.addMyScoreId(data.scoreId);
-      defenseStorage.saveLastName(playerName);
+      defenseStorage.saveLastName(data.playerName ?? playerName);
       drop(pending.sessionId);
       setMessage(data.ranks ? `등록했어요! ${data.ranks.all}위` : "등록했어요! 순위는 랭킹에서 확인해 주세요.");
     } catch (err) {
@@ -73,12 +78,12 @@ export function PendingSubmitCard() {
       {pending && (
         <>
           <p className="text-sm text-slate-200">
-            등록하지 못한 기록이 있어요{list.length > 1 ? ` (${list.length}건)` : ""} — <strong>{needsNewName ? name : pending.playerName}</strong> · {formatDefenseScore(pending.score)}
+            등록하지 못한 기록이 있어요{list.length > 1 ? ` (${list.length}건)` : ""} — <strong>{askName ? name : pending.playerName}</strong> · {formatDefenseScore(pending.score)}
           </p>
-          {needsNewName && (
+          {askName && (
             <div className="mt-3">
               <label htmlFor="defense-pending-name" className="mb-1 block text-xs text-slate-400">
-                다른 이름으로 등록 (1~12자)
+                {pending.playerName === "" ? "등록할 이름 (1~12자)" : "다른 이름으로 등록 (1~12자)"}
               </label>
               <input
                 id="defense-pending-name"
@@ -99,6 +104,29 @@ export function PendingSubmitCard() {
           >
             {retrying ? "등록 중..." : "다시 등록하기"}
           </button>
+          <button
+            type="button"
+            data-testid="defense-pending-discard"
+            onClick={() => setConfirmDiscard(true)}
+            disabled={retrying}
+            className="ml-2 mt-3 min-h-11 rounded-full border border-white/20 px-5 text-sm font-semibold text-slate-200 disabled:opacity-50"
+          >
+            버리기
+          </button>
+          <ConfirmModal
+            isOpen={confirmDiscard}
+            onClose={() => setConfirmDiscard(false)}
+            onConfirm={() => {
+              setConfirmDiscard(false);
+              drop(pending.sessionId);
+              setMessage(null);
+            }}
+            title="이 기록을 버릴까요?"
+            message="버리면 랭킹에 다시 등록할 수 없어요."
+            confirmLabel="버리기"
+            cancelLabel="취소"
+            variant="danger"
+          />
         </>
       )}
       <p role="status" className="mt-2 text-sm text-slate-300 empty:hidden">

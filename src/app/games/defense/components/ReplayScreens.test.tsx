@@ -7,6 +7,8 @@ import { GameDriver } from '../engine-dev/driver';
 import { greedyBot } from '../engine-dev/sim/bots';
 import { runGame } from '../engine-dev/sim/runner';
 import { LOCAL_REPLAY_VERSION } from '../lib/localReplay';
+import * as engine from '../engine';
+import { type PreparedReplay, prepareReplay } from '../lib/replayRunner';
 import { LocalReplayView, ServerReplay } from './ReplayScreens';
 import { ResultPanel } from './ResultPanel';
 
@@ -118,6 +120,65 @@ describe('리플레이 화면 — 로컬·서버', () => {
     expect((await screen.findByTestId('defense-replay-error')).textContent).toContain('지금 버전의 게임으로 재생할 수 없어요');
   }, 30_000);
 
+  it('재생 중에 막대를 끝으로 끌면 멈춘 상태가 된다 — "Ⅱ"인 채 서 있지 않고 ▶ 한 번이면 처음부터 (games-polish FE-38)', { timeout: 30_000 }, async () => {
+    const { input } = saveLocalWin();
+    render(<LocalReplayView stageId="s1" />);
+    await screen.findByTestId('defense-replay', {}, { timeout: 5000 });
+    const play = screen.getByTestId('defense-replay-play');
+    expect(play.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.change(screen.getByTestId('defense-replay-seek'), { target: { value: String(Math.ceil(input.ticks / TICKS_PER_SECOND) * TICKS_PER_SECOND) } });
+    await waitFor(() => expect(screen.getByTestId('defense-replay-time').textContent).toBe(`${fmt(input.ticks)} / ${fmt(input.ticks)}`));
+    expect(play.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(play);
+    expect(play.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByTestId('defense-replay-time').textContent!.startsWith('0:00')).toBe(true);
+  });
+
+  it('하이라이트 — 목숨을 잃은 순간이 막대 점·버튼으로, 다음을 누르면 그 순간 1.5초 앞으로 (games-polish P4)', async () => {
+    const driver = GameDriver.fromBoard('endless', 'endless-s1', 5);
+    driver.must(OP.CALL_WAVE);
+    while (!driver.state.over) {
+      if (driver.state.countdown > 0) driver.command(OP.CALL_WAVE);
+      step(driver.state);
+    }
+    const input = driver.toReplayInput();
+    const prepared = (await prepareReplay(engine, { mode: 'endless', boardKey: 'endless-s1', seed: input.seed, ticks: input.ticks, inputs: input.inputs })) as PreparedReplay;
+    const first = prepared.highlights[0];
+    expect(first.kind).toBe('leak');
+    loadReplay.mockResolvedValue({ rank: 2, scoreId: 48, playerName: '수비왕', boardKey: 'endless-s1', score: 1, detail: { wave: 7 }, durationMs: 1, createdAt: 'x', engineVersion: ENGINE_VERSION, seed: input.seed, frames: input.ticks, inputs: input.inputs, params: {} });
+    render(<ServerReplay scoreId={48} />);
+    await screen.findByTestId('defense-replay', {}, { timeout: 8000 });
+    expect(screen.getByTestId('highlight-marks').children).toHaveLength(prepared.highlights.length);
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`^다음 하이라이트 — 목숨 잃음 ${first.detail} ${fmt(first.at)}$`) }));
+    expect(screen.getByTestId('defense-replay-time').textContent!.startsWith(fmt(Math.max(0, first.at - 1.5 * TICKS_PER_SECOND)))).toBe(true);
+  }, 30_000);
+
+  it('서버 기록을 일시 실패로 못 받으면 "다시 시도"로 다시 받는다 — 없는 기록(404)은 버튼 없이 (games-polish FE-25)', async () => {
+    loadReplay.mockRejectedValueOnce(new ApiError('TOO_MANY_REQUESTS', '요청이 너무 잦습니다.', 429)).mockRejectedValueOnce(new ApiError('GAME_SCORE_NOT_FOUND', 'x', 404));
+    render(<ServerReplay scoreId={49} />);
+    const retry = await screen.findByRole('button', { name: '다시 시도' });
+    await act(async () => {
+      fireEvent.click(retry);
+    });
+    expect((await screen.findByTestId('defense-replay-error')).textContent).toContain('기록을 찾을 수 없어요');
+    expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
+    expect(loadReplay).toHaveBeenCalledTimes(2);
+  });
+
+  it('캠페인 결과는 대화상자 — 첫 동작에 포커스, Tab은 안에서 돈다, Esc로 닫히지 않는다 (games-polish FE-42)', () => {
+    const result = { victory: false, livesLeft: 0, endTick: 900, leakedLivesByEnemy: [], worstWave: 0, inputs: [] };
+    const onRetry = vi.fn();
+    render(<ResultPanel result={result} stars={0} replaySaved={false} progressSaved nextHref={null} exitHref="/x" onRetry={onRetry} />);
+    const dialog = screen.getByRole('dialog');
+    const focusable = dialog.querySelectorAll<HTMLElement>('a[href],button:not([disabled])');
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    focusable[focusable.length - 1].focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(document.activeElement).toBe(focusable[0]);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+
   it('캠페인 결과 — 다시보기로 저장되면 로컬 재생기 링크', () => {
     const result = { victory: true, livesLeft: 18, endTick: 900, leakedLivesByEnemy: [], worstWave: 0, inputs: [] };
     render(<ResultPanel result={result} stars={3} replaySaved progressSaved nextHref={null} replayHref="/games/defense/replays/local/s1" exitHref="/x" onRetry={() => {}} />);
@@ -144,5 +205,40 @@ describe('리플레이 화면 — 로컬·서버', () => {
     const ring = await screen.findByTestId('defense-replay-highlight', {}, { timeout: 3000 });
     expect(Number(ring.dataset.slot)).toBe(target!.slot);
     await act(async () => {});
+  });
+
+  it('재생 중 웨이브 표시는 바뀐 순간 갱신된다 — 1초 단위 시간 표시를 기다리지 않는다 (games-polish FE-41)', { timeout: 30_000 }, async () => {
+    saveLocalWin();
+    // 같은 seed·봇으로 다시 돌려 웨이브 수가 초 중간에 바뀌는 틱을 찾는다
+    const changes: { tick: number; waves: number }[] = [];
+    let last = 0;
+    const probe = GameDriver.fromBoard('campaign', 's1', 3);
+    runGame(probe, greedyBot(), (d) => {
+      if (d.state.wavesStarted !== last) {
+        last = d.state.wavesStarted;
+        changes.push({ tick: d.state.tick, waves: last });
+      }
+      return false;
+    });
+    const change = changes.find((c) => c.tick > TICKS_PER_SECOND && c.tick % TICKS_PER_SECOND >= 5 && c.tick % TICKS_PER_SECOND <= TICKS_PER_SECOND - 10)!;
+    expect(change).toBeDefined();
+    // 재생 루프(rAF)가 처음부터 가짜 시계로 돌게 렌더 전에 — 준비(setTimeout)는 진짜 시계
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance'] });
+    render(<LocalReplayView stageId="s1" />);
+    await screen.findByTestId('defense-replay', {}, { timeout: 5000 });
+    const second = Math.floor(change.tick / TICKS_PER_SECOND) * TICKS_PER_SECOND;
+    fireEvent.change(screen.getByTestId('defense-replay-seek'), { target: { value: String(second) } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(32); // 다음 프레임에 탐색
+    });
+    expect(Number(screen.getByTestId('defense-replay-wave').textContent)).toBe(change.waves - 1);
+    // 바뀐 틱 + 3틱까지 — 다음 초 경계 전
+    const ms = ((change.tick - second + 3) * 1000) / TICKS_PER_SECOND;
+    await act(async () => {
+      for (let t = 0; t < ms; t += 16) await vi.advanceTimersByTimeAsync(16);
+    });
+    expect(screen.getByTestId('defense-replay-time').textContent!.startsWith(fmt(second))).toBe(true);
+    expect(Number(screen.getByTestId('defense-replay-wave').textContent)).toBe(change.waves);
+    vi.useRealTimers();
   });
 });

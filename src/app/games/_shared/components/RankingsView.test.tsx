@@ -5,7 +5,11 @@ import { RankingsView } from './RankingsView';
 import { TEST_GAME } from './testGame';
 
 const getGameRankings = vi.fn();
-vi.mock('@/services/gameService', () => ({ getGameRankings: (...a: unknown[]) => getGameRankings(...a) }));
+const getGameScore = vi.fn();
+vi.mock('@/services/gameService', () => ({
+  getGameRankings: (...a: unknown[]) => getGameRankings(...a),
+  getGameScore: (...a: unknown[]) => getGameScore(...a),
+}));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/games/defense/rankings' }));
 vi.mock('next-auth/react', () => ({ useSession: () => ({ data: null, status: 'unauthenticated' }) }));
 
@@ -48,4 +52,22 @@ describe('RankingsView — 게임 사양을 따른다', () => {
     const button = screen.getByRole('button', { name: /리플레이 — 주가 끝나면 공개돼요/ }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
   });
+
+  it('가리킨 기록이 목록에 있으면 그 행으로 스크롤 — 없으면 전체 기간 순위를 받아 "상위 50위 밖"을 알린다 (games-polish FE-14)', async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    const { unmount } = await act(async () => render(<RankingsView game={TEST_GAME} highlightId={5} board="endless-s1" />));
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
+    expect(screen.queryByTestId('ranking-outside')).toBeNull();
+    expect(getGameScore).not.toHaveBeenCalled();
+    unmount();
+
+    getGameScore.mockResolvedValue({ data: { ...item, scoreId: 99, rank: 137 } });
+    await act(async () => {
+      render(<RankingsView game={TEST_GAME} highlightId={99} board="endless-s1" />);
+    });
+    expect(getGameScore).toHaveBeenCalledWith('defense', 99);
+    expect(screen.getByTestId('ranking-outside').textContent).toBe('가리킨 기록은 이 목록(상위 50위)에 없어요 · 전체 기간 137위');
+  });
 });
+

@@ -1,4 +1,4 @@
-import { ENEMIES, ENEMY_STATUS, PROJECTILE_STATUS, RANK, type GameState, type Stage, statusBits, ultimatePeriod } from '../engine';
+import { ENEMIES, ENEMY_STATUS, PROJECTILE_STATUS, RANK, type GameState, type Stage, ultimatePeriod } from '../engine';
 import type { RenderEnemy, RenderMap, RenderProjectile, RenderTower, RenderView } from '../renderer/renderView';
 
 /**
@@ -14,14 +14,13 @@ export function toRenderView(state: GameState, view: RenderView): RenderView {
   let n = 0;
   for (const enemy of state.enemies) {
     if (enemy.status !== ENEMY_STATUS.ALIVE) continue;
-    const item: RenderEnemy = view.enemies[n] ?? (view.enemies[n] = { id: 0, kind: 0, x: 0, y: 0, hp: 0, maxHp: 0, effects: 0, air: false });
+    const item: RenderEnemy = view.enemies[n] ?? (view.enemies[n] = { id: 0, kind: 0, x: 0, y: 0, hp: 0, maxHp: 0, air: false });
     item.id = enemy.id;
     item.kind = enemy.kind;
     item.x = enemy.x;
     item.y = enemy.y;
     item.hp = enemy.hp;
     item.maxHp = enemy.maxHp;
-    item.effects = statusBits(enemy);
     item.air = enemy.air;
     // 보스 페이즈 — 먼저 나온(생성 순번 작은) 보스 기준 1·2
     if (view.bossPhase === 0 && ENEMIES[enemy.kind].rank === RANK.BOSS) view.bossPhase = enemy.phase + 1;

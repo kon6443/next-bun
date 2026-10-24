@@ -4,6 +4,7 @@
  * - AudioContext는 사용자 첫 조작(pointerdown·keydown·touchstart) 뒤에만 만들거나 resume한다(iOS 자동재생 정책)
  * - 설정(soundSettings)을 구독해 볼륨·음악 시작/정지를 바로 반영한다
  */
+import { createAudioContext, createNoiseBuffer, isAudioHalted } from '@/app/games/_shared/lib/webAudio';
 import type { SoundCue, SoundCueKind } from '../effects';
 import { MUSIC_PATTERN_STEPS, MUSIC_STEP_SECONDS, musicStep, recipeFor, type Voice } from './recipes';
 import { getSoundSettings, subscribeSoundSettings, type SoundSettings } from './soundSettings';
@@ -47,6 +48,20 @@ export function orderCuesByPriority(cues: readonly SoundCue[]): readonly SoundCu
   return cues.length > 1 ? [...cues].sort((a, b) => priorityOf(a) - priorityOf(b)) : cues;
 }
 
+/** 큰 사건 — 퍼펙트·승패·KO·T-스핀·4줄·B2B·레벨업. 이동·고정음·한두 줄 삭제·콤보는 뺀다 */
+export function isBigCue(cue: SoundCue): boolean {
+  if (cue.kind === 'clear') return (cue.value ?? 0) >= 4;
+  return priorityOf(cue) <= 2;
+}
+
+/** 다시보기 배속이 이 이상이면 큰 사건만 울린다 — 4배속의 이동·고정음은 소음이 된다 */
+export const REPLAY_BIG_CUES_ONLY_SPEED = 4;
+
+/** 다시보기에서 울릴 신호 — 배속이 빠르면 큰 사건만 (games-polish P7) */
+export function replayCues(cues: readonly SoundCue[], speed: number): readonly SoundCue[] {
+  return speed >= REPLAY_BIG_CUES_ONLY_SPEED ? cues.filter(isBigCue) : cues;
+}
+
 export type SoundPlayer = {
   /** 한 틱에 쌓인 신호를 울린다 — 효과음이 꺼져 있거나 아직 조작 전이면 아무것도 하지 않는다 */
   playCues(cues: readonly SoundCue[]): void;
@@ -70,19 +85,6 @@ export type SoundPlayerOptions = {
   eventTarget?: EventTarget | null;
 };
 
-/** 옛 iOS Safari는 접두어가 붙은 생성자만 있다 */
-type GlobalWithAudio = { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext };
-
-function defaultCreateContext(): AudioContext | null {
-  try {
-    const w = globalThis as GlobalWithAudio;
-    const Ctor = w.AudioContext ?? w.webkitAudioContext;
-    return Ctor ? new Ctor() : null;
-  } catch {
-    return null;
-  }
-}
-
 function defaultNow(): number {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
 }
@@ -99,7 +101,7 @@ const NOOP_PLAYER: SoundPlayer = {
 export function createSoundPlayer(options: SoundPlayerOptions = {}): SoundPlayer {
   if (typeof window === 'undefined' && options.eventTarget === undefined) return NOOP_PLAYER;
 
-  const createContext = options.createContext ?? defaultCreateContext;
+  const createContext = options.createContext ?? createAudioContext;
   const now = options.now ?? defaultNow;
   const eventTarget = options.eventTarget === undefined ? window : options.eventTarget;
 
@@ -191,7 +193,7 @@ export function createSoundPlayer(options: SoundPlayerOptions = {}): SoundPlayer
       const context = ctx;
       context.onstatechange = () => {
         // iOS는 전화·다른 앱 오디오로 'interrupted'가 되기도 한다 — running·closed가 아니면 모두 멈춘 것으로 본다
-        const halted = context.state !== 'running' && context.state !== 'closed';
+        const halted = isAudioHalted(context);
         if (halted && unlocked && anyEnabled()) {
           unlocked = false;
           syncGestureListeners();
@@ -215,11 +217,7 @@ export function createSoundPlayer(options: SoundPlayerOptions = {}): SoundPlayer
   }
 
   function getNoiseBuffer(context: AudioContext): AudioBuffer {
-    if (noiseBuffer) return noiseBuffer;
-    const length = Math.floor(context.sampleRate * 0.5);
-    noiseBuffer = context.createBuffer(1, length, context.sampleRate);
-    const data = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+    if (!noiseBuffer) noiseBuffer = createNoiseBuffer(context);
     return noiseBuffer;
   }
 
@@ -286,6 +284,8 @@ export function createSoundPlayer(options: SoundPlayerOptions = {}): SoundPlayer
       const recipe = recipeFor(cue);
       const last = lastPlayedAt.get(cue.kind);
       if (last !== undefined && ms - last < recipe.throttleMs) continue;
+      // 자리가 없으면 그만 — 울리지 않은 소리로 쓰로틀 시각을 남기면 다음 같은 소리가 막힌다 (games-polish FE-18)
+      if (sfxVoiceEnds.length >= MAX_SFX_VOICES) return;
       lastPlayedAt.set(cue.kind, ms);
       for (const voice of recipe.voices) {
         if (sfxVoiceEnds.length >= MAX_SFX_VOICES) return; // 남은 신호는 덜 중요한 것들

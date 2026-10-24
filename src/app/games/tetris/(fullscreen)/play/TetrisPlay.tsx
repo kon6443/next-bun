@@ -4,8 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Button } from "@/app/teams/components";
+import { ConfirmModal } from "@/app/components/ConfirmModal";
 import { createGameSession } from "@/services/gameService";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
+import { useMediaQuery } from "@/app/games/_shared/hooks/useMediaQuery";
+import { sessionTtlMs } from "@/app/games/_shared/lib/sessionTtl";
 import { ApiError } from "@/types/api";
 import type { GameSession, ReplayPayload } from "@/types/game";
 import { extractErrorMessage } from "@/app/utils/errorUtils";
@@ -23,13 +26,20 @@ import { type TetrisSettings, DEFAULT_SETTINGS, loadLastName, loadSettings, reco
 
 type SessionState =
   | { status: "loading" }
-  /** receivedAt: 이 기기 시계로 받은 시각 — 만료 판정은 이 기기에서 흐른 시간으로만 한다(기기 시계가 틀려도 안전) */
-  | { status: "ready"; session: GameSession; receivedAt: number }
+  /**
+   * receivedAt: 이 기기 시계로 받은 시각 — 만료 판정은 이 기기에서 흐른 시간으로 한다
+   * ttlMs: 받은 순간 남은 시간(응답 ttlSeconds, 없으면 expiresAt 기준 — _shared/lib/sessionTtl)
+   */
+  | { status: "ready"; session: GameSession; receivedAt: number; ttlMs: number }
   /** 발급 실패 — 로컬 시드로 플레이만 한다 */
   | { status: "failed"; seed: number; error: string };
 
-/** 세션 TTL(백엔드 2시간) − 판 최대 길이(60분) − 여유 1분: 받은 지 이만큼 지났으면 시작 전에 새로 받는다 */
-const SESSION_REFRESH_AFTER_MS = (120 - 61) * 60 * 1000;
+/** 세션 TTL 상한(백엔드 2시간) — 응답 남은 시간이 이보다 길게 잡히면(기기 시계가 늦다 등) 이 값으로 (sessionTtlMs) */
+const SESSION_TTL_FALLBACK_MS = 120 * 60 * 1000;
+/** 판 최대 길이(60분) + 여유 1분 — 남은 시간이 이보다 짧으면 시작 전에 새로 받는다 */
+const SESSION_PLAY_MARGIN_MS = 61 * 60 * 1000;
+/** 세션 응답이 이만큼 늦으면 "등록 없이 시작"을 보인다 — 발급 상한(10초)까지 시작을 막지 않게 (games-polish FE-12) */
+export const SLOW_SESSION_MS = 3000;
 
 function randomSeed(): number {
   return crypto.getRandomValues(new Uint32Array(1))[0];
@@ -45,7 +55,7 @@ export default function TetrisPlay() {
   const accessToken = authSession?.user?.accessToken ?? undefined;
 
   const [settings, setSettings] = useState<TetrisSettings>(DEFAULT_SETTINGS);
-  const [isCoarse, setIsCoarse] = useState(false);
+  const isCoarse = useMediaQuery("(pointer: coarse)");
   const [sessionState, setSessionState] = useState<SessionState>({ status: "loading" });
   const [phase, setPhase] = useState<"ready" | "game">("ready");
   const [result, setResult] = useState<{
@@ -75,11 +85,6 @@ export default function TetrisPlay() {
 
   useEffect(() => {
     setSettings(loadSettings());
-    const media = window.matchMedia("(pointer: coarse)");
-    setIsCoarse(media.matches);
-    const onChange = (e: MediaQueryListEvent) => setIsCoarse(e.matches);
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
   }, []);
 
   // "처음부터"를 연달아 눌러도 늦게 온 이전 세션 응답이 최신 상태를 덮지 않게 (FE-21)
@@ -98,7 +103,8 @@ export default function TetrisPlay() {
         });
         return;
       }
-      setSessionState({ status: "ready", session: data, receivedAt: Date.now() });
+      const receivedAt = Date.now();
+      setSessionState({ status: "ready", session: data, receivedAt, ttlMs: sessionTtlMs(data, receivedAt, SESSION_TTL_FALLBACK_MS) });
     } catch (err) {
       if (!isLatest()) return;
       setSessionState({ status: "failed", seed: randomSeed(), error: sessionErrorMessage(err) });
@@ -130,7 +136,7 @@ export default function TetrisPlay() {
   const startGame = () => {
     if (sessionState.status === "loading") return;
     // 준비 화면에 오래 두어 판 도중(최대 60분) 세션이 만료될 수 있으면 새로 받은 뒤 이어서 시작한다
-    if (sessionState.status === "ready" && Date.now() - sessionState.receivedAt > SESSION_REFRESH_AFTER_MS) {
+    if (sessionState.status === "ready" && Date.now() - sessionState.receivedAt > sessionState.ttlMs - SESSION_PLAY_MARGIN_MS) {
       startAfterSessionRef.current = true;
       requestSession();
       return;
@@ -144,6 +150,26 @@ export default function TetrisPlay() {
     // 재발급에 실패하면 자동으로 시작하지 않는다 — 준비 화면에서 "등록 불가" 안내를 보고 시작하게
     if (sessionState.status === "ready") beginGame(sessionState.session.seed);
   }, [beginGame, sessionState]);
+
+  // 세션 응답이 늦으면 기다리지 않고 등록 없이 시작할 수 있게 한다 — 늦게 온 응답은 버린다(이 판은 로컬 seed)
+  const [sessionSlow, setSessionSlow] = useState(false);
+  useEffect(() => {
+    setSessionSlow(false);
+    if (sessionState.status !== "loading") return;
+    const timer = setTimeout(() => setSessionSlow(true), SLOW_SESSION_MS);
+    return () => clearTimeout(timer);
+  }, [sessionState.status]);
+
+  const startWithoutSession = () => {
+    beginSessionRequest(); // 진행 중인 발급 응답을 낡은 것으로 — 늦게 와도 이 판을 바꾸지 않는다
+    startAfterSessionRef.current = false;
+    const seed = randomSeed();
+    setSessionState({ status: "failed", seed, error: "서버 응답이 늦어 이번 판은 랭킹 등록 없이 플레이해요." });
+    beginGame(seed);
+  };
+
+  /** 일시정지의 "처음부터" — 진행 중인 판을 버리므로 한 번 묻는다 (games-polish FE-27) */
+  const [confirmRestart, setConfirmRestart] = useState(false);
 
   const restart = () => {
     play.reset();
@@ -238,6 +264,11 @@ export default function TetrisPlay() {
               >
                 시작
               </Button>
+              {sessionState.status === "loading" && sessionSlow && (
+                <Button type="button" variant="secondary" size="md" fullWidth className="mt-2 min-h-11" onClick={startWithoutSession}>
+                  등록 없이 시작
+                </Button>
+              )}
               <EffectsToggle className="mt-3" />
               {!isCoarse && <ControlGuide />}
             </div>
@@ -252,7 +283,7 @@ export default function TetrisPlay() {
                 <Button type="button" size="md" fullWidth className="min-h-11" onClick={play.resume} autoFocus>
                   계속하기
                 </Button>
-                <Button type="button" variant="secondary" size="md" fullWidth className="min-h-11" onClick={restart}>
+                <Button type="button" variant="secondary" size="md" fullWidth className="min-h-11" onClick={() => setConfirmRestart(true)}>
                   처음부터
                 </Button>
               </div>
@@ -286,6 +317,19 @@ export default function TetrisPlay() {
       {showControls && (
         <TouchControls onHoldStart={play.press} onHoldEnd={play.release} onInstant={play.instant} />
       )}
+      <ConfirmModal
+        isOpen={confirmRestart}
+        onClose={() => setConfirmRestart(false)}
+        onConfirm={() => {
+          setConfirmRestart(false);
+          restart();
+        }}
+        title="처음부터 다시 할까요?"
+        message="지금 판은 끝나고 기록이 남지 않아요."
+        confirmLabel="처음부터"
+        cancelLabel="계속하기"
+        variant="danger"
+      />
     </div>
   );
 }

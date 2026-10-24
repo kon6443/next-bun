@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { RankingsView } from "@/app/games/_shared/components/RankingsView";
 import { getGameBoards } from "@/services/gameService";
 import type { GameBoard } from "@/types/game";
-import { DEFENSE_GAME, REPLAY_PLAYER_READY } from "../lib/defenseGame";
+import { DEFENSE_GAME } from "../lib/defenseGame";
 import { boardTabs, selectBoard, weeklyReplayState } from "../lib/rankedBoards";
 
 /**
@@ -34,7 +34,7 @@ export function DefenseRankings({ boardParam, highlightId }: Props) {
   const replayState = !weekly ? "open" : selected?.current ? "running" : weeklyReplayState(board, selected?.endsAt, Date.now());
   const runningWeekly = replayState === "running";
   const replayUnavailable =
-    replayState === "running" ? "주가 끝나고 4시간 뒤 공개돼요" : replayState === "soon" ? "곧 공개돼요(주 종료 4시간 뒤)" : REPLAY_PLAYER_READY ? null : "리플레이는 준비 중이에요";
+    replayState === "running" ? "주가 끝나고 4시간 뒤 공개돼요" : replayState === "soon" ? "곧 공개돼요(주 종료 4시간 뒤)" : null;
 
   const header = (
     <>
@@ -59,7 +59,8 @@ export function DefenseRankings({ boardParam, highlightId }: Props) {
     </>
   );
 
-  if (!ready) return null;
+  // 목록을 받기 전에도 화면 틀·skeleton을 보인다 — 빈 화면이 아니라 불러오는 중으로 (games-polish FE-04)
+  if (!ready) return <RankingsView key="waiting" game={DEFENSE_GAME} highlightId={highlightId} showPeriods={false} waiting />;
   return (
     <RankingsView
       // 보드를 바꾸면 기간 탭·목록을 새로(이전 보드 응답이 섞이지 않게)

@@ -11,4 +11,10 @@ describe('sessionClockAt — 받은 뒤 흐른 시간으로 판정', () => {
     expect(sessionClockAt(t0, t0 + SESSION_TTL_MS - 60 * 1000 - 1)).toBe('warn');
     expect(sessionClockAt(t0, t0 + SESSION_TTL_MS - 60 * 1000)).toBe('expired');
   });
+
+  it('받은 순간 남은 시간(ttlMs)을 주면 그 기준 — 짧은 세션은 일찍 예고·만료', () => {
+    const ttl = 20 * 60 * 1000;
+    expect(sessionClockAt(t0, t0, ttl)).toBe('warn');
+    expect(sessionClockAt(t0, t0 + ttl - 60 * 1000, ttl)).toBe('expired');
+  });
 });

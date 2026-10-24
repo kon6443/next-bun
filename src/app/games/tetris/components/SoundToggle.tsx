@@ -28,7 +28,8 @@ export function SoundToggle({ className = "" }: { className?: string }) {
       type="button"
       onClick={toggle}
       aria-pressed={on}
-      aria-label={on ? "소리 끄기" : "소리 켜기"}
+      // 상태는 aria-pressed가 말한다 — 이름까지 동작형("소리 끄기")이면 "소리 끄기, 켜짐"처럼 모순되게 읽힌다 (games-polish FE-28)
+      aria-label="소리"
       className={`flex h-11 w-11 items-center justify-center rounded-xl border border-slate-700/60 bg-slate-900/70 text-slate-300 transition-colors ${
         on ? "border-cyan-400/60 text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.35)]" : ""
       } ${className}`}

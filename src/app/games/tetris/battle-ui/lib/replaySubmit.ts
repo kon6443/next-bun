@@ -1,4 +1,5 @@
 import { ApiError } from '@/types/api';
+import { sleep } from '@/app/games/_shared/lib/sleep';
 import type { BattleReplayInput } from '../../battle-engine';
 import type { submitBattleReplay } from '@/services/tetrisBattleService';
 
@@ -51,7 +52,7 @@ export async function submitReplayWithRetry(
   playerToken: string,
   replay: BattleReplayInput,
   accessToken?: string,
-  sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  wait: (ms: number) => Promise<void> = sleep,
 ): Promise<Exclude<ReplaySubmitStatus, 'submitting'>> {
   for (let attempt = 0; ; attempt++) {
     try {
@@ -63,7 +64,7 @@ export async function submitReplayWithRetry(
         if (err.code === BattleReplayErrorCodes.SUBMISSION_CLOSED) return 'expired';
       }
       if (!isRetryable(err) || attempt >= SUBMIT_RETRIES) return 'failed';
-      await sleep(RETRY_DELAY_MS * (attempt + 1));
+      await wait(RETRY_DELAY_MS * (attempt + 1));
     }
   }
 }

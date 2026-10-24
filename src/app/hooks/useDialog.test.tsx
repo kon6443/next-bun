@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { useEffect, useRef } from 'react';
 import { render, fireEvent, cleanup } from '@testing-library/react';
 import { useDialog } from './useDialog';
 
@@ -67,5 +68,24 @@ describe('useDialog', () => {
     expect(document.activeElement).toBe(document.body);
     fireEvent.keyDown(document, { key: 'Tab' });
     expect(document.activeElement).toBe(getByText('첫 버튼'));
+  });
+
+  it('안쪽 컴포넌트가 열리며 이미 자기 요소에 포커스를 줬으면 그대로 둔다 (자식 effect가 먼저 돈다)', () => {
+    function Inner() {
+      const ref = useRef<HTMLButtonElement>(null);
+      useEffect(() => ref.current?.focus(), []);
+      return <button ref={ref}>안쪽 제목</button>;
+    }
+    function WithInner() {
+      const ref = useDialog(true, () => {});
+      return (
+        <div ref={ref} role="dialog" tabIndex={-1}>
+          <button>첫 버튼</button>
+          <Inner />
+        </div>
+      );
+    }
+    const { getByText } = render(<WithInner />);
+    expect(document.activeElement).toBe(getByText('안쪽 제목'));
   });
 });

@@ -7,7 +7,7 @@ import { BOARD_BASE64_LENGTH, BOARD_BYTES, BOARD_CELL_MAX, BOARD_VISIBLE_ROW_OFF
  */
 
 /** 엔진 판(BOARD_ROWS × BOARD_WIDTH) → 보이는 200칸 */
-export function visibleCells(board: Uint8Array): Uint8Array {
+function visibleCells(board: Uint8Array): Uint8Array {
   return board.slice(BOARD_VISIBLE_ROW_OFFSET * BOARD_WIDTH, BOARD_VISIBLE_ROW_OFFSET * BOARD_WIDTH + BOARD_BYTES);
 }
 

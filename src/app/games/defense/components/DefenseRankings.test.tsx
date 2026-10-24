@@ -123,4 +123,28 @@ describe('디펜스 랭킹·허브 카드', () => {
     expect(screen.getByText('이번 주 도전을 열 수 없어요')).toBeTruthy();
     expect(screen.queryByTestId('defense-weekly-play')).toBeNull();
   });
+
+  it('허브 카드 — 무한 시즌이 오르면 /boards의 현재 시즌으로 최고 기록·랭킹 링크 (FE-07)', async () => {
+    localStorage.setItem('defense:progress', JSON.stringify({ v: 1, stars: { s4: { normal: 1 } } }));
+    localStorage.setItem('defense:best', JSON.stringify({ v: 1, boards: { 'endless-s1': 24_500_000, 'endless-s2': 12_000_000 } }));
+    getGameBoards.mockResolvedValue({
+      ...BOARDS,
+      data: { items: [{ ...BOARDS.data.items[0], boardKey: 'endless-s2' }, { ...BOARDS.data.items[0], current: false }, BOARDS.data.items[1]] },
+    });
+    await act(async () => {
+      render(<RankedCards />);
+    });
+    expect(screen.getByTestId('defense-endless-rankings').getAttribute('href')).toBe('/games/defense/rankings?board=endless-s2');
+    expect(screen.getByText(/시즌 2 · 5웨이브마다 증강/)).toBeTruthy();
+    expect(screen.getByText('내 최고 웨이브 12 · 진척 0%')).toBeTruthy();
+  });
+
+  it('보드 목록을 받기 전에는 빈 화면이 아니라 랭킹 화면 틀·불러오는 중 — 랭킹은 아직 부르지 않는다 (FE-04)', async () => {
+    getGameBoards.mockReturnValue(new Promise(() => {}));
+    render(<DefenseRankings boardParam="weekly" highlightId={null} />);
+    expect(screen.getByRole('heading', { name: '타워 디펜스 랭킹' })).toBeTruthy();
+    expect(document.querySelector('[aria-busy="true"]')).not.toBeNull();
+    await act(async () => {});
+    expect(getGameRankings).not.toHaveBeenCalled();
+  });
 });

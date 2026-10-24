@@ -8,13 +8,11 @@ import { type ConnectionStatus, useBattleSocket } from "../contexts/BattleSocket
 import { battleErrorMessage } from "../lib/battleErrors";
 import { ChatPanel } from "./ChatPanel";
 import { ConnectionBadge } from "./ConnectionBadge";
+import { BATTLE_CONTROL_GUIDE } from "../../lib/controls";
 import { EmoteBar } from "./EmoteBar";
 import { EmoteBubble } from "./EmoteBubble";
 import { PresenceDot } from "./PresenceDot";
 import { useOfflineCountdown } from "../hooks/useOfflineCountdown";
-
-/** 매치 시작을 연다 — 백엔드 매치(P2)가 없는 환경에서 막아야 하면 false */
-export const BATTLE_MATCH_AVAILABLE = true;
 
 type WaitingRoomProps = {
   room: RoomState;
@@ -59,8 +57,11 @@ export function WaitingRoom({ room, connection, onReconnect, onExit, onCopyInvit
   const start = async () => {
     setStarting(true);
     const result = await startMatch();
+    // 성공이면 잠근 채 둔다 — matchStarting은 ack보다 먼저 와 곧 대전 화면으로 바뀐다(Q-B1).
+    // 풀어 두면 그 틈에 다시 눌러 MATCH_ALREADY_STARTED 문구가 번쩍인다 (games-polish FE-34)
+    if (result.ok) return;
     setStarting(false);
-    setError(result.ok ? null : battleErrorMessage(result.code));
+    setError(battleErrorMessage(result.code));
   };
 
   const toggleReady = async () => {
@@ -166,16 +167,12 @@ export function WaitingRoom({ room, connection, onReconnect, onExit, onCopyInvit
                   fullWidth
                   className="min-h-11"
                   onClick={start}
-                  disabled={!BATTLE_MATCH_AVAILABLE || !everyoneReady || starting}
+                  disabled={!everyoneReady || starting}
                 >
                   게임 시작
                 </Button>
                 <p className="mt-2 text-center text-xs text-slate-500">
-                  {!BATTLE_MATCH_AVAILABLE
-                    ? "대전 시작은 곧 열려요. 지금은 방·채팅만 쓸 수 있어요."
-                    : everyoneReady
-                      ? "모두 준비됐어요."
-                      : "2명 이상 모이고 모두 준비(연결)되면 시작할 수 있어요."}
+                  {everyoneReady ? "모두 준비됐어요." : "2명 이상 모이고 모두 준비(연결)되면 시작할 수 있어요."}
                 </p>
               </div>
             ) : (
@@ -202,6 +199,18 @@ export function WaitingRoom({ room, connection, onReconnect, onExit, onCopyInvit
                 {error}
               </p>
             )}
+            {/* 키보드 조작 — 데스크톱 대전에서 볼 곳이 없었다. 터치 기기는 버튼이라 숨긴다 (games-polish FE-32) */}
+            <details className="mt-3 text-xs text-slate-400 [@media(pointer:coarse)]:hidden">
+              <summary className="flex min-h-11 cursor-pointer items-center">키보드 조작</summary>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5" aria-label="대전 키보드 조작">
+                {BATTLE_CONTROL_GUIDE.map(({ keys, label }) => (
+                  <div key={keys} className="contents">
+                    <dt className="font-mono font-semibold text-sky-300">{keys}</dt>
+                    <dd>{label}</dd>
+                  </div>
+                ))}
+              </dl>
+            </details>
           </section>
 
           <ChatPanel

@@ -2,8 +2,6 @@ import {
   CHAT_TEXT_MAX_LENGTH,
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
-  ROOM_MAX_PLAYERS,
-  ROOM_MIN_PLAYERS,
   ROOM_NAME_MAX_LENGTH,
   ROOM_PASSWORD_MAX_LENGTH,
   ROOM_PASSWORD_MIN_LENGTH,
@@ -38,10 +36,6 @@ export function validateRoomPassword(raw: string): string | null {
     return `비밀번호는 ${ROOM_PASSWORD_MIN_LENGTH}~${ROOM_PASSWORD_MAX_LENGTH}자로 입력해 주세요.`;
   }
   return null;
-}
-
-export function isValidMaxPlayers(value: number): boolean {
-  return Number.isInteger(value) && value >= ROOM_MIN_PLAYERS && value <= ROOM_MAX_PLAYERS;
 }
 
 /** 입력한 방 코드 → 대문자·공백 제거. 형식이 아니면 null */

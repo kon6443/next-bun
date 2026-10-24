@@ -7,7 +7,8 @@ import { CAMPAIGN, type Difficulty } from './campaign';
  * 영구 강화가 없어 조작해도 랭킹 영향 0 (D-005·D-006)
  */
 
-const KEY = 'defense:progress';
+export const PROGRESS_KEY = 'defense:progress';
+const KEY = PROGRESS_KEY;
 const VERSION = 1;
 
 /**

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { BRIEFINGS } from "../lib/briefings";
 import { CAMPAIGN } from "../lib/campaign";
 import { ENEMY_NAMES, ENEMY_TRAITS, TOWER_NAMES, TOWER_ROLES } from "../lib/labels";
-import { type Progress, emptyProgress, isStageUnlocked, loadProgress } from "../lib/progress";
+import { useProgress } from "../hooks/useProgress";
+import { isStageUnlocked } from "../lib/progress";
 import { BriefingCard } from "./BriefingCard";
 
 /**
@@ -12,8 +12,9 @@ import { BriefingCard } from "./BriefingCard";
  * 아직 모르는 것은 「???」 — 이름만 가리고 자리 수는 보여 준다(남은 것이 얼마나 되는지 알 수 있게)
  */
 export function Codex() {
-  const [progress, setProgress] = useState<Progress>(emptyProgress);
-  useEffect(() => setProgress(loadProgress()), []);
+  const progress = useProgress();
+  // 읽기 전에는 비워 둔다 — 모두 「???」로 깜빡이지 않게 (FE-44)
+  if (!progress) return <div className="grid gap-4" aria-busy="true" />;
 
   const unlockedStages = CAMPAIGN.filter((s) => isStageUnlocked(progress, s.id));
   const towers = new Set(unlockedStages.flatMap((s) => s.towers));

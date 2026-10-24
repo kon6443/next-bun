@@ -18,6 +18,8 @@ export type GameSession = {
   engineVersion: number;
   /** ISO 8601 (UTC) */
   expiresAt: string;
+  /** 세션 유효 시간(초, 엔진별) — 만료는 받은 시각 + 이 값으로 센다(기기 시계와 무관). 이 필드 배포 전 서버면 없다 */
+  ttlSeconds?: number;
   /** 이 세션이 등록될 랭킹 보드 (테트리스 'default') — 백엔드 보드 일반화 배포 전에는 오지 않는다 */
   boardKey?: string;
   mode?: GameMode | null;
@@ -91,6 +93,8 @@ export type SubmitScoreResponse<D = TetrisScoreDetail> = {
   detail: D;
   /** 기록은 저장됐지만 순위 계산만 실패하면 null — 등록은 성공이다 */
   ranks: Record<RankingPeriod, number> | null;
+  /** 서버가 저장한 이름(앞뒤 공백·연속 공백 정리값) — 공유 카드·결과·최근 이름은 이 값. 이 필드 배포 전 응답에는 없다(보낸 이름으로 폴백) */
+  playerName?: string;
 };
 
 export type RankingItem<D = TetrisScoreDetail> = {
