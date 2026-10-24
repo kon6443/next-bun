@@ -110,4 +110,12 @@ describe('WaitingRoom 접속 표시·내보내기 (D-010·D-011)', () => {
     expect(again).toBeEnabled();
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
+
+  it('대기실에 대전 키보드 조작 — 멈출 수 없으니 일시정지 키는 없다 (games-polish FE-32)', () => {
+    renderRoom(room([player('p1', '나'), player('p2', '친구')]));
+    const guide = screen.getByLabelText('대전 키보드 조작');
+    expect(guide.textContent).toContain('하드 드롭');
+    expect(guide.textContent).not.toContain('일시정지');
+  });
 });
+
