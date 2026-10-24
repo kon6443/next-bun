@@ -7,11 +7,13 @@ import { formatFullDateTime } from "@/app/utils/taskUtils";
 import { ShareMenu } from "@/app/games/_shared/components/ShareMenu";
 import { useKakaoReady } from "@/app/games/_shared/hooks/useKakaoReady";
 import { formatFrames } from "@/app/games/_shared/lib/format";
+import { HighlightMarks, HighlightNav } from "@/app/games/_shared/components/HighlightRail";
+import type { HighlightKindSpec } from "@/app/games/_shared/lib/highlights";
 import { FRAMES_PER_SECOND } from "../../engine";
 import { TetrisCanvas } from "../../components/TetrisCanvas";
 import { type ReplayTrack, useBattleMatchReplay } from "../hooks/useBattleMatchReplay";
 import { useBoardFocus } from "../hooks/useBoardFocus";
-import { isRunnerDone, lastReceivedGarbage } from "../lib/battleReplayRunner";
+import { type BattleHighlightKind, isRunnerDone, lastReceivedGarbage } from "../lib/battleReplayRunner";
 import { buildBattleShareContent } from "../lib/battleShare";
 import { advanceClock, createClock, resetClock } from "../../lib/fixedStep";
 
@@ -27,6 +29,13 @@ const GARBAGE_FLASH_FRAMES = 45;
  * 탐색·끝에 닿음은 바로 반영한다
  */
 const PLAYBACK_UI_STEP = 6;
+/** 하이라이트로 가면 그 순간 이만큼 앞부터 · "이전"이 방금 간 것을 다시 고르지 않게 (games-polish P4) */
+const HIGHLIGHT_LEAD_FRAMES = 1.5 * FRAMES_PER_SECOND;
+const HIGHLIGHT_SLACK_FRAMES = 2 * FRAMES_PER_SECOND;
+export const BATTLE_HIGHLIGHT_KINDS: Record<BattleHighlightKind, HighlightKindSpec> = {
+  attack: { label: "큰 공격", dot: "bg-rose-400" },
+  ko: { label: "KO", dot: "bg-amber-300" },
+};
 
 type Playback = { playing: boolean; speed: number; frame: number };
 
@@ -41,7 +50,7 @@ const KO_LABELS: Record<BattleKoReason, string> = {
  * 재생 방식(배속·탐색·처음부터·키보드)은 싱글 리플레이 재생기와 같다
  */
 export function BattleMatchViewer({ matchId }: { matchId: string }) {
-  const { load, tracks, totalFrames, settled, frameRef, seekAll, retry, retryTrack } = useBattleMatchReplay(matchId);
+  const { load, tracks, totalFrames, settled, frameRef, seekAll, retry, retryTrack, highlights } = useBattleMatchReplay(matchId);
   const [playback, setPlayback] = useState<Playback>({ playing: true, speed: 1, frame: 0 });
   const [shareOpen, setShareOpen] = useState(false);
   const shareOpenRef = useRef(false);
@@ -242,17 +251,33 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
       <footer className="space-y-2 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2">
         <div className="flex items-center gap-3 text-xs tabular-nums text-slate-400">
           <span>{formatFrames(playback.frame)}</span>
-          <input
-            type="range"
-            min={0}
-            max={totalFrames}
-            value={playback.frame}
-            onChange={(e) => seek(Number(e.target.value))}
-            aria-label="재생 위치"
-            className="h-11 min-w-0 flex-1 accent-sky-400"
-          />
+          <div className="relative min-w-0 flex-1">
+            <HighlightMarks marks={highlights} kinds={BATTLE_HIGHLIGHT_KINDS} max={totalFrames} />
+            <input
+              type="range"
+              min={0}
+              max={totalFrames}
+              value={playback.frame}
+              onChange={(e) => seek(Number(e.target.value))}
+              aria-label="재생 위치"
+              // 프레임 수가 아니라 시간으로 읽게 (games-polish FE-26)
+              aria-valuetext={`${formatFrames(playback.frame)} / ${formatFrames(totalFrames)}`}
+              data-testid="battle-replay-seek"
+              className="h-11 w-full accent-sky-400"
+            />
+          </div>
           <span>{formatFrames(totalFrames)}</span>
         </div>
+        <HighlightNav
+          marks={highlights}
+          kinds={BATTLE_HIGHLIGHT_KINDS}
+          position={playback.frame}
+          leadIn={HIGHLIGHT_LEAD_FRAMES}
+          slack={HIGHLIGHT_SLACK_FRAMES}
+          formatAt={formatFrames}
+          onSeek={seek}
+          disabled={!playable}
+        />
         <div className="flex items-center justify-center gap-2">
           <button
             type="button"
