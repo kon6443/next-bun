@@ -16,9 +16,12 @@ export class ParticlePool {
   readonly color: Uint8Array;
   /** 가득 찼을 때 덮어쓸 다음 자리 */
   protected cursor = 0;
+  /** 실제로 쓰는 칸 수(≤ capacity) — 그래픽 품질을 낮추면 줄인다(배열은 다시 만들지 않는다, games-polish FE-09) */
+  limit: number;
 
   constructor(capacity: number) {
     this.capacity = capacity;
+    this.limit = capacity;
     this.x = new Float32Array(capacity);
     this.y = new Float32Array(capacity);
     this.vx = new Float32Array(capacity);
@@ -31,10 +34,10 @@ export class ParticlePool {
   /** 넣은 자리 인덱스를 돌려준다 */
   spawn(x: number, y: number, vx: number, vy: number, lifeMs: number, color: number): number {
     let i: number;
-    if (this.count < this.capacity) i = this.count++;
+    if (this.count < this.limit) i = this.count++;
     else {
-      i = this.cursor;
-      this.cursor = (this.cursor + 1) % this.capacity;
+      i = this.cursor % this.limit;
+      this.cursor = (i + 1) % this.limit;
     }
     this.x[i] = x;
     this.y[i] = y;
@@ -44,6 +47,13 @@ export class ParticlePool {
     this.maxLife[i] = lifeMs;
     this.color[i] = color;
     return i;
+  }
+
+  /** 쓸 칸 수를 바꾼다(1 ~ capacity) — 줄이면 넘치는 것은 바로 지운다 */
+  setLimit(limit: number): void {
+    this.limit = Math.max(1, Math.min(this.capacity, Math.floor(limit)));
+    if (this.count > this.limit) this.count = this.limit;
+    this.cursor %= this.limit;
   }
 
   /** dt ms만큼 진행 — 다 된 것은 마지막 것과 자리를 바꿔 지운다(순서 무관) */

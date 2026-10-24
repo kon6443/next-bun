@@ -7,6 +7,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { ConfirmModal } from "@/app/components/ConfirmModal";
 import { SOUND, Sfx } from "../audio/sfx";
 import { AUGMENTS, ENGINE_VERSION, EVENT, EVENT_STRIDE, OP, findStage, slotAvailable, type GameState, type Stage } from "../engine";
+import { useAutoQuality } from "../hooks/useAutoQuality";
 import { useDefenseCanvas } from "../hooks/useDefenseCanvas";
 import { type FrameInfo, type PlayResult, type Speed, useDefensePlay } from "../hooks/useDefensePlay";
 import { useDefenseSettings } from "../hooks/useDefenseSettings";
@@ -261,7 +262,9 @@ function prefersReducedMotion(): boolean {
 export function PlaySession({ stage, mode, title, campaign, onRankedOver, rankedResult, banner, resumeFields, exitMessage, boardKey, seed, restore, intro, notice, exitHref, onRetry }: SessionProps) {
   const router = useRouter();
   const renderMap = useMemo(() => toRenderMap(stage), [stage]);
-  const canvas = useDefenseCanvas(renderMap, DPR_CAP);
+  // 저사양 기기 — 그리기가 예산을 계속 넘으면 숫자·파티클·DPR을 단계적으로 낮춘다 (FE-09)
+  const { dprCap, numbersAllowedRef: qualityNumbersRef, record: recordDrawTime } = useAutoQuality(DPR_CAP);
+  const canvas = useDefenseCanvas(renderMap, dprCap);
   const { settings, update: updateSettings } = useDefenseSettings();
   // 시작 배속 — 판은 첫 렌더에 만들어진다(설정 훅은 마운트 뒤에 읽는다). 판 중 배속은 HUD 버튼
   const [initialSpeed] = useState<Speed>(() => loadSettings().defaultSpeed);
@@ -299,7 +302,7 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
 
   const onTickEvents = useCallback((events: readonly number[], view: RenderView, prev: RenderView) => {
     const pools = fx.current!;
-    const notice = applyTickEvents(events, view, prev, pools, noticeRef.current, settingsRef.current.damageNumbers);
+    const notice = applyTickEvents(events, view, prev, pools, noticeRef.current, settingsRef.current.damageNumbers && qualityNumbersRef.current);
     const now = performance.now();
     for (const sound of notice.sounds) sfxRef.current!.play(sound, now);
     if (notice.leakedLives > 0) {
@@ -315,7 +318,7 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
       if (events[i] === EVENT.SPAWN && !metRef.current.includes(events[i + 2])) metRef.current.push(events[i + 2]);
       else if (events[i] === EVENT.WAVE_START || events[i] === EVENT.WAVE_CLEAR) saveDueRef.current = true;
     }
-  }, []);
+  }, [qualityNumbersRef]);
 
   const reducedMotionRef = useRef(false);
   useEffect(() => {
@@ -335,11 +338,13 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
       effects.update(frame.frameMs);
       if (saveDueRef.current) persistRef.current();
       if (!ctx || !viewport) return;
-      const showNumbers = settingsRef.current.damageNumbers;
+      const showNumbers = settingsRef.current.damageNumbers && qualityNumbersRef.current;
+      const drawStart = performance.now();
       drawSceneLayer(ctx, { prev: frame.prev, curr: frame.curr, alpha: frame.alpha, particles, numbers, effects, showDamageNumbers: showNumbers, timeMs: frame.now }, viewport, scratch);
       if (selectionRef.current) drawSelection(ctx, selectionRef.current, viewport);
       drawBossBar(ctx, viewport, frame.curr, ENEMY_NAMES);
       drawLeakPulse(ctx, viewport, 1 - (frame.now - leakAtRef.current) / LEAK_PULSE_MS);
+      recordDrawTime(performance.now() - drawStart, frame.now, particles);
       // 화면 흔들림(설정) — 컨테이너만 옮긴다(캔버스 다시 그리기 없음). 끝나면 한 번 원위치
       const container = canvas.containerRef.current;
       const shaking = settingsRef.current.shake && !reducedMotionRef.current && frame.now < shakeUntilRef.current;
@@ -348,7 +353,7 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
         shakingRef.current = shaking;
       }
     },
-    [canvas.fgContextRef, canvas.viewportRef, canvas.containerRef],
+    [canvas.fgContextRef, canvas.viewportRef, canvas.containerRef, qualityNumbersRef, recordDrawTime],
   );
 
   // 크기가 바뀌면 캔버스 백버퍼가 지워진다 — 루프가 돌고 있으면 다음 프레임이 그리지만, 멈춘 뒤에는 여기서 한 번(경과 0)
