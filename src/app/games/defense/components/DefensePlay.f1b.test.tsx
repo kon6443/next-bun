@@ -115,7 +115,8 @@ describe('DefensePlay F1b — 학습·효과음·이어하기·나가기', () =>
     fireEvent.click(await screen.findByTestId('defense-resume-continue'));
     const board = await screen.findByTestId('defense-board');
     expect(board.dataset.status).toBe('paused');
-    expect(screen.getByTestId('defense-slot-7').dataset.tower).toBe(String(TOWER_ID.CANNON));
+    // 슬롯 버튼은 판 크기를 잰 뒤에 생긴다 — 이어하기 복원이 비동기라(FE-06) 판보다 늦을 수 있다
+    expect((await screen.findByTestId('defense-slot-7')).dataset.tower).toBe(String(TOWER_ID.CANNON));
     expect(screen.getByTestId('defense-gold').dataset.value).toBe(String(state.gold));
     expect(screen.getByTestId('defense-wave').dataset.value).toBe(String(state.wavesStarted));
   });

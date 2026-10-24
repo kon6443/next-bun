@@ -31,10 +31,12 @@ type RankingsViewProps<G extends GameType> = {
   replayUnavailable?: string | null;
   /** 빈 목록의 "게임 시작" 링크 — 없으면 game.playPath */
   playHref?: string;
+  /** 어느 보드를 볼지 정하는 중(디펜스 /boards 응답 전) — 같은 화면 틀에 skeleton만, 랭킹은 아직 부르지 않는다 */
+  waiting?: boolean;
 };
 
 /** 게임 랭킹 화면 — 기간 탭 + 상위 50개 (게임별 page는 클라이언트 래퍼에서 game 사양을 넘긴다) */
-export function RankingsView<G extends GameType>({ game, highlightId, board, showPeriods = true, header, replayUnavailable = null, playHref }: RankingsViewProps<G>) {
+export function RankingsView<G extends GameType>({ game, highlightId, board, showPeriods = true, header, replayUnavailable = null, playHref, waiting = false }: RankingsViewProps<G>) {
   const [selectedPeriod, setPeriod] = useState<RankingPeriod>("daily");
   const period: RankingPeriod = showPeriods ? selectedPeriod : "all";
   const [list, setList] = useState<RankingList<ScoreDetailByGame[G]> | null>(null);
@@ -61,8 +63,9 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
   }, [game.gameType, board]);
 
   useEffect(() => {
+    if (waiting) return;
     load(period);
-  }, [load, period]);
+  }, [load, period, waiting]);
 
   return (
     <TeamsPageLayout>

@@ -147,6 +147,9 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
         accRef.current += Math.min(frameMs, MAX_CATCH_UP_MS) * speedRef.current;
         let n = 0;
         let shownSecond = Math.floor(cursor.state.tick / tps);
+        // 목숨·웨이브는 바뀐 순간 보인다 — 시간 표시처럼 1초 단위로 기다리지 않게 (games-polish FE-41)
+        const shownLives = cursor.state.lives;
+        const shownWaves = cursor.state.wavesStarted;
         while (accRef.current >= tickMs && n < MAX_TICKS_PER_FRAME && cursor.state.tick < totalTicks && !cursor.state.over) {
           advanceCursor(
             engine,
@@ -168,7 +171,7 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
           n++;
         }
         if (n === MAX_TICKS_PER_FRAME) accRef.current = 0;
-        if (Math.floor(cursor.state.tick / tps) !== shownSecond || cursor.state.over) {
+        if (Math.floor(cursor.state.tick / tps) !== shownSecond || cursor.state.over || cursor.state.lives !== shownLives || cursor.state.wavesStarted !== shownWaves) {
           shownSecond = Math.floor(cursor.state.tick / tps);
           setTick(cursor.state.tick);
         }

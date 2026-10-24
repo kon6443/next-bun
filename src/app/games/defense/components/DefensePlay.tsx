@@ -6,7 +6,8 @@ import toast from "react-hot-toast";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmModal } from "@/app/components/ConfirmModal";
 import { SOUND, Sfx } from "../audio/sfx";
-import { AUGMENTS, ENGINE_VERSION, EVENT, EVENT_STRIDE, OP, findStage, type GameState, type Stage } from "../engine";
+import { AUGMENTS, ENGINE_VERSION, EVENT, EVENT_STRIDE, OP, findStage, slotAvailable, type GameState, type Stage } from "../engine";
+import { useAutoQuality } from "../hooks/useAutoQuality";
 import { useDefenseCanvas } from "../hooks/useDefenseCanvas";
 import { type FrameInfo, type PlayResult, type Speed, useDefensePlay } from "../hooks/useDefensePlay";
 import { useDefenseSettings } from "../hooks/useDefenseSettings";
@@ -18,7 +19,9 @@ import { applyTickEvents, createTickNotice } from "../lib/fx";
 import { DIFFICULTY_NAMES, ENEMY_NAMES, TOWER_NAMES } from "../lib/labels";
 import { hasSeenBriefing, isDifficultyUnlocked, loadProgress, markBriefingSeen, markEnemiesMet, markTutorialDone, saveProgress } from "../lib/progress";
 import { type ResumeSlot, clearResume, loadResume, saveResume } from "../lib/resume";
-import { type RestoredGame, restoreGame } from "../lib/restoreGame";
+import type { RestoredGame } from "../lib/restoreGame";
+import { useChunkedRestore } from "../hooks/useChunkedRestore";
+import { RestoreProgress } from "./RestoreProgress";
 import { type RingOption, currentRange, ringOptions, tapRing } from "../lib/ringOptions";
 import { boardTitle, modeOfBoardKey } from "../lib/rankedBoards";
 import { toRenderMap } from "../lib/toRenderView";
@@ -73,6 +76,7 @@ export default function DefensePlay({ boardKey, seed, fixedSeed }: Props) {
   const [resumeOffer, setResumeOffer] = useState<ResumeSlot | null>(null);
   const [opening, setOpening] = useState<Opening | null>(null);
 
+  const restorer = useChunkedRestore();
   const introFor = useCallback((stageId: string): Intro => {
     const progress = loadProgress();
     if (stageId === "s1" && !progress.tutorialDone) return "tutorial";
@@ -100,9 +104,19 @@ export default function DefensePlay({ boardKey, seed, fixedSeed }: Props) {
     }
   }, [parsed, boardKey, introFor]);
 
-  if (!parsed || !stage || !campaign) return null;
+  // 빈 화면 대신 — 잘못된 보드(페이지가 보통 404로 거른다)는 안내, 해금 확인 중은 불러오는 중 (games-polish FE-45)
+  if (!parsed || !stage || !campaign) {
+    return (
+      <main className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+        <p className="text-slate-200">스테이지를 찾지 못했어요.</p>
+        <Link href="/games/defense" className="flex min-h-11 items-center rounded-full border border-white/20 px-5 text-sm font-semibold">
+          디펜스 처음으로
+        </Link>
+      </main>
+    );
+  }
   const exitHref = stagePath(parsed.stage.id);
-  if (access === "checking") return null;
+  if (access === "checking") return <main className="h-full" aria-busy="true" aria-label="불러오는 중" />;
   if (access === "locked") {
     return (
       <main className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
@@ -114,8 +128,10 @@ export default function DefensePlay({ boardKey, seed, fixedSeed }: Props) {
     );
   }
   if (resumeOffer && !opening) {
-    const choose = (resume: boolean) => {
-      const restored = resume ? restoreGame(stage, resumeOffer.seed, resumeOffer.inputs, resumeOffer.tick) : null;
+    const choose = async (resume: boolean) => {
+      if (restorer.progress !== null) return;
+      const restored = resume ? await restorer.restore(stage, resumeOffer.seed, resumeOffer.inputs, resumeOffer.tick) : null;
+      if (restored === "cancelled") return;
       if (!restored) clearResume();
       setAttempt((a) => ({ n: a.n, seed: restored ? resumeOffer.seed : a.seed }));
       setOpening({ restore: restored, intro: restored ? null : introFor(parsed.stage.id), notice: resume && !restored ? "이어하기를 불러오지 못해 새로 시작했어요" : null });
@@ -124,21 +140,29 @@ export default function DefensePlay({ boardKey, seed, fixedSeed }: Props) {
       <main className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center" data-testid="defense-resume">
         <h1 className="text-lg font-bold text-white">하던 판이 있어요</h1>
         <p className="text-sm text-slate-300">스테이지 {parsed.stage.number} {DIFFICULTY_NAMES[parsed.difficulty]} — 저장한 곳부터 이어서 할까요?</p>
+        {restorer.progress !== null && <RestoreProgress progress={restorer.progress} />}
         <button
           type="button"
           data-testid="defense-resume-continue"
-          onClick={() => choose(true)}
+          disabled={restorer.progress !== null}
+          onClick={() => void choose(true)}
           className="min-h-12 w-full max-w-xs rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 text-sm font-semibold text-white"
         >
           이어하기
         </button>
-        <button type="button" data-testid="defense-resume-new" onClick={() => choose(false)} className="min-h-12 w-full max-w-xs rounded-full border border-white/20 text-sm font-semibold text-slate-100">
+        <button
+          type="button"
+          data-testid="defense-resume-new"
+          disabled={restorer.progress !== null}
+          onClick={() => void choose(false)}
+          className="min-h-12 w-full max-w-xs rounded-full border border-white/20 text-sm font-semibold text-slate-100 disabled:opacity-50"
+        >
           새로 시작
         </button>
       </main>
     );
   }
-  if (!opening) return null;
+  if (!opening) return <main className="h-full" aria-busy="true" aria-label="불러오는 중" />;
   return (
     <PlaySession
       key={attempt.n}
@@ -176,7 +200,7 @@ export type SessionProps = {
   /** 판 위 안내 띠(세션 만료 예고 등) */
   banner?: ReactNode;
   /** 이어하기 저장에 함께 싣는 값(무한·주간 세션) */
-  resumeFields?: Pick<ResumeSlot, "sessionId" | "sessionReceivedAt">;
+  resumeFields?: Pick<ResumeSlot, "sessionId" | "sessionReceivedAt" | "sessionTtlMs">;
   /** 판 중 나가기 확인 문구 */
   exitMessage: string;
   boardKey: string;
@@ -248,7 +272,9 @@ function prefersReducedMotion(): boolean {
 export function PlaySession({ stage, mode, title, campaign, onRankedOver, rankedResult, banner, resumeFields, exitMessage, boardKey, seed, restore, intro, notice, exitHref, onRetry }: SessionProps) {
   const router = useRouter();
   const renderMap = useMemo(() => toRenderMap(stage), [stage]);
-  const canvas = useDefenseCanvas(renderMap, DPR_CAP);
+  // 저사양 기기 — 그리기가 예산을 계속 넘으면 숫자·파티클·DPR을 단계적으로 낮춘다 (FE-09)
+  const { dprCap, numbersAllowedRef: qualityNumbersRef, record: recordDrawTime } = useAutoQuality(DPR_CAP);
+  const canvas = useDefenseCanvas(renderMap, dprCap);
   const { settings, update: updateSettings } = useDefenseSettings();
   // 시작 배속 — 판은 첫 렌더에 만들어진다(설정 훅은 마운트 뒤에 읽는다). 판 중 배속은 HUD 버튼
   const [initialSpeed] = useState<Speed>(() => loadSettings().defaultSpeed);
@@ -286,7 +312,7 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
 
   const onTickEvents = useCallback((events: readonly number[], view: RenderView, prev: RenderView) => {
     const pools = fx.current!;
-    const notice = applyTickEvents(events, view, prev, pools, noticeRef.current, settingsRef.current.damageNumbers);
+    const notice = applyTickEvents(events, view, prev, pools, noticeRef.current, settingsRef.current.damageNumbers && qualityNumbersRef.current);
     const now = performance.now();
     for (const sound of notice.sounds) sfxRef.current!.play(sound, now);
     if (notice.leakedLives > 0) {
@@ -302,7 +328,7 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
       if (events[i] === EVENT.SPAWN && !metRef.current.includes(events[i + 2])) metRef.current.push(events[i + 2]);
       else if (events[i] === EVENT.WAVE_START || events[i] === EVENT.WAVE_CLEAR) saveDueRef.current = true;
     }
-  }, []);
+  }, [qualityNumbersRef]);
 
   const reducedMotionRef = useRef(false);
   useEffect(() => {
@@ -311,22 +337,47 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
   /** 마지막으로 그린 프레임 — 루프가 멈춘 뒤(판 끝) 화면 크기가 바뀌면 다시 그린다 */
   const lastFrameRef = useRef<FrameInfo | null>(null);
   const shakingRef = useRef(false);
+  /** 연출 시계(ms) — 판 시간이 흐를 때만 간다. 일시정지에 적이 흔들리거나 파티클이 사라지지 않게 (FE-40) */
+  const fxClockRef = useRef(0);
+  /** 마지막으로 그린 그림의 재료 — 멈춘 동안 같으면 다시 그리지 않는다 */
+  const drawnRef = useRef<{ curr: RenderView; version: number; selection: object | null; viewport: object; numbers: boolean } | null>(null);
   const onFrame = useCallback(
     (frame: FrameInfo) => {
       const ctx = canvas.fgContextRef.current;
       const viewport = canvas.viewportRef.current;
       const { particles, numbers, effects, scratch } = fx.current!;
       lastFrameRef.current = frame;
-      particles.update(frame.frameMs);
-      numbers.update(frame.frameMs);
-      effects.update(frame.frameMs);
+      const dt = frame.frozen ? 0 : frame.frameMs;
+      fxClockRef.current += dt;
+      particles.update(dt);
+      numbers.update(dt);
+      effects.update(dt);
       if (saveDueRef.current) persistRef.current();
       if (!ctx || !viewport) return;
-      const showNumbers = settingsRef.current.damageNumbers;
-      drawSceneLayer(ctx, { prev: frame.prev, curr: frame.curr, alpha: frame.alpha, particles, numbers, effects, showDamageNumbers: showNumbers, timeMs: frame.now }, viewport, scratch);
+      const showNumbers = settingsRef.current.damageNumbers && qualityNumbersRef.current;
+      // 멈춘 동안은 판·명령·선택·크기·설정이 그대로면 같은 그림이다 — 매 프레임 다시 그리지 않는다(누수 경고가 사라지는 중이면 그린다)
+      const drawn = drawnRef.current;
+      const leakFading = frame.now - leakAtRef.current < LEAK_PULSE_MS;
+      if (
+        frame.frozen &&
+        !leakFading &&
+        drawn &&
+        drawn.curr === frame.curr &&
+        drawn.version === frame.version &&
+        drawn.selection === selectionRef.current &&
+        drawn.viewport === viewport &&
+        drawn.numbers === showNumbers
+      ) {
+        return;
+      }
+      drawnRef.current = { curr: frame.curr, version: frame.version, selection: selectionRef.current, viewport, numbers: showNumbers };
+      const drawStart = performance.now();
+      drawSceneLayer(ctx, { prev: frame.prev, curr: frame.curr, alpha: frame.alpha, particles, numbers, effects, showDamageNumbers: showNumbers, timeMs: fxClockRef.current }, viewport, scratch);
       if (selectionRef.current) drawSelection(ctx, selectionRef.current, viewport);
       drawBossBar(ctx, viewport, frame.curr, ENEMY_NAMES);
       drawLeakPulse(ctx, viewport, 1 - (frame.now - leakAtRef.current) / LEAK_PULSE_MS);
+      // 같은 그림을 건너뛴 프레임은 재지 않는다 — 실제로 그린 시간만 품질 판정에
+      if (!frame.frozen) recordDrawTime(performance.now() - drawStart, frame.now, particles);
       // 화면 흔들림(설정) — 컨테이너만 옮긴다(캔버스 다시 그리기 없음). 끝나면 한 번 원위치
       const container = canvas.containerRef.current;
       const shaking = settingsRef.current.shake && !reducedMotionRef.current && frame.now < shakeUntilRef.current;
@@ -335,13 +386,16 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
         shakingRef.current = shaking;
       }
     },
-    [canvas.fgContextRef, canvas.viewportRef, canvas.containerRef],
+    [canvas.fgContextRef, canvas.viewportRef, canvas.containerRef, qualityNumbersRef, recordDrawTime],
   );
 
   // 크기가 바뀌면 캔버스 백버퍼가 지워진다 — 루프가 돌고 있으면 다음 프레임이 그리지만, 멈춘 뒤에는 여기서 한 번(경과 0)
   useEffect(() => {
     const frame = lastFrameRef.current;
-    if (canvas.viewport && frame) onFrame({ ...frame, frameMs: 0 });
+    if (canvas.viewport && frame) {
+      drawnRef.current = null; // 백버퍼가 지워졌다 — 같은 그림이어도 다시 그린다
+      onFrame({ ...frame, frameMs: 0 });
+    }
   }, [canvas.viewport, onFrame]);
 
   /** 무한·주간 결과 콜백 — 부모가 렌더마다 새 함수를 넘겨도 onOver가 바뀌지 않게 최신 값만 */
@@ -488,6 +542,13 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
   const lastPointerRef = useRef("");
   const selectSlot = (slot: number, byKeyboard: boolean) => {
     if (hud.status === "over") return;
+    // 잠긴 자리(개척 전·좁은 땅)는 링이 없다 — 고르지 않고 닫는다(선택 고리만 남지 않게, games-polish FE-08)
+    const state = stateRef.current;
+    if (!state.towers.some((t) => t.slot === slot) && !slotAvailable(state, stage, slot)) {
+      setArmed(null);
+      setSelected(null);
+      return;
+    }
     setArmed(null);
     setKeyboardRing(byKeyboard);
     // 마우스로 누른 버튼에 포커스를 주는 브라우저가 있다 — 남은 포커스가 Enter를 엉뚱한 슬롯으로 보내지 않게 놓는다
@@ -687,7 +748,9 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
         {viewport &&
           stage.map.slots.map((spot, i) => {
             const tower = stateRef.current.towers.find((t) => t.slot === i);
-            const label = tower ? `${TOWER_NAMES[tower.kind]} Lv${tower.level}` : "빈 자리";
+            // 잠긴 자리 — 개척 증강 전·좁은 땅 규칙. 판 중에 바뀌므로(증강) 렌더마다 판정, 배경 맵 대신 버튼에 표시 (FE-08)
+            const locked = !tower && !slotAvailable(stateRef.current, stage, i);
+            const label = tower ? `${TOWER_NAMES[tower.kind]} Lv${tower.level}` : locked ? "잠긴 자리" : "빈 자리";
             return (
               <button
                 key={i}
@@ -700,6 +763,8 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
                 data-level={tower ? tower.level : 0}
                 aria-label={`슬롯 ${i + 1} — ${label}`}
                 aria-pressed={selected === i}
+                aria-disabled={locked || undefined}
+                data-locked={locked || undefined}
                 disabled={hud.status === "over"}
                 onPointerDown={(e) => {
                   lastPointerRef.current = e.pointerType;
@@ -708,7 +773,13 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
                 onClick={(e) => selectSlot(i, e.detail === 0)}
                 className="absolute rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-300"
                 style={{ left: toScreenX(viewport, spot.x) - slotSize / 2, top: toScreenY(viewport, spot.y) - slotSize / 2, width: slotSize, height: slotSize }}
-              />
+              >
+                {locked && (
+                  <span aria-hidden="true" className="pointer-events-none flex h-full w-full items-center justify-center rounded-full bg-slate-950/65 text-xs">
+                    🔒
+                  </span>
+                )}
+              </button>
             );
           })}
         {viewport && selected !== null && options.length > 0 && (

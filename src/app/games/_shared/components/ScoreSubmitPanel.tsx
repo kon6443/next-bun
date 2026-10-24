@@ -32,6 +32,8 @@ type ScoreSubmitPanelProps<G extends GameType> = {
   accessToken?: string;
   defaultName: string;
   onRestart: () => void;
+  /** 다시 하기를 준비하는 중(다음 판 세션을 받는 중) — 버튼을 잠그고 "준비 중"으로 (games-polish FE-45) */
+  restarting?: boolean;
 };
 
 const PERIODS: readonly { key: RankingPeriod; label: string }[] = [
@@ -79,6 +81,7 @@ export function ScoreSubmitPanel<G extends GameType>({
   accessToken,
   defaultName,
   onRestart,
+  restarting = false,
 }: ScoreSubmitPanelProps<G>) {
   const { gameType, storage } = game;
   /** 게임마다 고정 id — 테트리스는 공용화 전과 같은 "tetris-player-name" */
@@ -265,12 +268,14 @@ export function ScoreSubmitPanel<G extends GameType>({
           type="button"
           size="md"
           className="min-h-11 flex-1"
+          disabled={restarting}
+          aria-busy={restarting}
           onClick={() => {
             discardPresaved();
             onRestart();
           }}
         >
-          다시 하기
+          {restarting ? "준비 중…" : "다시 하기"}
         </Button>
         <Link
           href={game.homePath}

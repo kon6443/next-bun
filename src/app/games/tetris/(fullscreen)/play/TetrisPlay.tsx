@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { Button } from "@/app/teams/components";
 import { createGameSession } from "@/services/gameService";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
+import { sessionTtlMs } from "@/app/games/_shared/lib/sessionTtl";
 import { ApiError } from "@/types/api";
 import type { GameSession, ReplayPayload } from "@/types/game";
 import { extractErrorMessage } from "@/app/utils/errorUtils";
@@ -25,27 +26,18 @@ type SessionState =
   | { status: "loading" }
   /**
    * receivedAt: 이 기기 시계로 받은 시각 — 만료 판정은 이 기기에서 흐른 시간으로 한다
-   * ttlMs: 받은 순간 남은 시간(응답 expiresAt 기준, sessionTtlMs)
+   * ttlMs: 받은 순간 남은 시간(응답 expiresAt 기준, _shared/lib/sessionTtl)
    */
   | { status: "ready"; session: GameSession; receivedAt: number; ttlMs: number }
   /** 발급 실패 — 로컬 시드로 플레이만 한다 */
   | { status: "failed"; seed: number; error: string };
 
-/** 세션 TTL 상한(백엔드 2시간) — 응답 expiresAt이 이보다 멀어 보이면(기기 시계가 늦다) 이 값으로 */
+/** 세션 TTL 상한(백엔드 2시간) — 응답 expiresAt이 이보다 멀어 보이면(기기 시계가 늦다) 이 값으로 (sessionTtlMs) */
 const SESSION_TTL_FALLBACK_MS = 120 * 60 * 1000;
 /** 판 최대 길이(60분) + 여유 1분 — 남은 시간이 이보다 짧으면 시작 전에 새로 받는다 */
 const SESSION_PLAY_MARGIN_MS = 61 * 60 * 1000;
 /** 세션 응답이 이만큼 늦으면 "등록 없이 시작"을 보인다 — 발급 상한(10초)까지 시작을 막지 않게 (games-polish FE-12) */
 export const SLOW_SESSION_MS = 3000;
-
-/**
- * 받은 순간 세션의 남은 시간 — 하드코딩 TTL 대신 응답 expiresAt으로(서버 TTL이 바뀌어도 따라간다, Q-T1)
- * 서버·기기 시계 차이로 길게 잡히지 않게 상한(2시간)을 두고, 읽을 수 없으면 상한
- */
-export function sessionTtlMs(expiresAt: string, now: number): number {
-  const left = Date.parse(expiresAt) - now;
-  return Number.isFinite(left) ? Math.min(Math.max(0, left), SESSION_TTL_FALLBACK_MS) : SESSION_TTL_FALLBACK_MS;
-}
 
 function randomSeed(): number {
   return crypto.getRandomValues(new Uint32Array(1))[0];
@@ -115,7 +107,7 @@ export default function TetrisPlay() {
         return;
       }
       const receivedAt = Date.now();
-      setSessionState({ status: "ready", session: data, receivedAt, ttlMs: sessionTtlMs(data.expiresAt, receivedAt) });
+      setSessionState({ status: "ready", session: data, receivedAt, ttlMs: sessionTtlMs(data.expiresAt, receivedAt, SESSION_TTL_FALLBACK_MS) });
     } catch (err) {
       if (!isLatest()) return;
       setSessionState({ status: "failed", seed: randomSeed(), error: sessionErrorMessage(err) });

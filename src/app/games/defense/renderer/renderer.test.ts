@@ -49,6 +49,17 @@ describe('ParticlePool — 고정 용량 SoA', () => {
     expect(pool.count).toBe(0);
   });
 
+  it('품질을 낮추면(setLimit) 그 칸 수 안에서만 돌려 쓰고 넘치는 것은 지운다 — 배열은 그대로 (FE-09)', () => {
+    const pool = new ParticlePool(4);
+    for (let i = 0; i < 4; i++) pool.spawn(i, 0, 0, 0, 1000, 0);
+    pool.setLimit(2);
+    expect(pool.count).toBe(2);
+    expect(pool.x.length).toBe(4);
+    const slots = [pool.spawn(9, 0, 0, 0, 1000, 0), pool.spawn(9, 0, 0, 0, 1000, 0), pool.spawn(9, 0, 0, 0, 1000, 0)];
+    expect(slots.every((i) => i < 2)).toBe(true);
+    expect(pool.count).toBe(2);
+  });
+
   it('이동: 속도(밀리타일/초) × 시간', () => {
     const pool = new ParticlePool(1);
     pool.spawn(0, 0, 1000, -500, 1000, 0);

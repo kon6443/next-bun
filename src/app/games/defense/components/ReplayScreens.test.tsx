@@ -118,6 +118,20 @@ describe('리플레이 화면 — 로컬·서버', () => {
     expect((await screen.findByTestId('defense-replay-error')).textContent).toContain('지금 버전의 게임으로 재생할 수 없어요');
   }, 30_000);
 
+  it('캠페인 결과는 대화상자 — 첫 동작에 포커스, Tab은 안에서 돈다, Esc로 닫히지 않는다 (games-polish FE-42)', () => {
+    const result = { victory: false, livesLeft: 0, endTick: 900, leakedLivesByEnemy: [], worstWave: 0, inputs: [] };
+    const onRetry = vi.fn();
+    render(<ResultPanel result={result} stars={0} replaySaved={false} progressSaved nextHref={null} exitHref="/x" onRetry={onRetry} />);
+    const dialog = screen.getByRole('dialog');
+    const focusable = dialog.querySelectorAll<HTMLElement>('a[href],button:not([disabled])');
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    focusable[focusable.length - 1].focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(document.activeElement).toBe(focusable[0]);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+
   it('캠페인 결과 — 다시보기로 저장되면 로컬 재생기 링크', () => {
     const result = { victory: true, livesLeft: 18, endTick: 900, leakedLivesByEnemy: [], worstWave: 0, inputs: [] };
     render(<ResultPanel result={result} stars={3} replaySaved progressSaved nextHref={null} replayHref="/games/defense/replays/local/s1" exitHref="/x" onRetry={() => {}} />);
@@ -144,5 +158,40 @@ describe('리플레이 화면 — 로컬·서버', () => {
     const ring = await screen.findByTestId('defense-replay-highlight', {}, { timeout: 3000 });
     expect(Number(ring.dataset.slot)).toBe(target!.slot);
     await act(async () => {});
+  });
+
+  it('재생 중 웨이브 표시는 바뀐 순간 갱신된다 — 1초 단위 시간 표시를 기다리지 않는다 (games-polish FE-41)', { timeout: 30_000 }, async () => {
+    saveLocalWin();
+    // 같은 seed·봇으로 다시 돌려 웨이브 수가 초 중간에 바뀌는 틱을 찾는다
+    const changes: { tick: number; waves: number }[] = [];
+    let last = 0;
+    const probe = GameDriver.fromBoard('campaign', 's1', 3);
+    runGame(probe, greedyBot(), (d) => {
+      if (d.state.wavesStarted !== last) {
+        last = d.state.wavesStarted;
+        changes.push({ tick: d.state.tick, waves: last });
+      }
+      return false;
+    });
+    const change = changes.find((c) => c.tick > TICKS_PER_SECOND && c.tick % TICKS_PER_SECOND >= 5 && c.tick % TICKS_PER_SECOND <= TICKS_PER_SECOND - 10)!;
+    expect(change).toBeDefined();
+    // 재생 루프(rAF)가 처음부터 가짜 시계로 돌게 렌더 전에 — 준비(setTimeout)는 진짜 시계
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance'] });
+    render(<LocalReplayView stageId="s1" />);
+    await screen.findByTestId('defense-replay', {}, { timeout: 5000 });
+    const second = Math.floor(change.tick / TICKS_PER_SECOND) * TICKS_PER_SECOND;
+    fireEvent.change(screen.getByTestId('defense-replay-seek'), { target: { value: String(second) } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(32); // 다음 프레임에 탐색
+    });
+    expect(Number(screen.getByTestId('defense-replay-wave').textContent)).toBe(change.waves - 1);
+    // 바뀐 틱 + 3틱까지 — 다음 초 경계 전
+    const ms = ((change.tick - second + 3) * 1000) / TICKS_PER_SECOND;
+    await act(async () => {
+      for (let t = 0; t < ms; t += 16) await vi.advanceTimersByTimeAsync(16);
+    });
+    expect(screen.getByTestId('defense-replay-time').textContent!.startsWith(fmt(second))).toBe(true);
+    expect(Number(screen.getByTestId('defense-replay-wave').textContent)).toBe(change.waves);
+    vi.useRealTimers();
   });
 });

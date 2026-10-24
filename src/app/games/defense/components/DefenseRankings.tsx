@@ -59,7 +59,8 @@ export function DefenseRankings({ boardParam, highlightId }: Props) {
     </>
   );
 
-  if (!ready) return null;
+  // 목록을 받기 전에도 화면 틀·skeleton을 보인다 — 빈 화면이 아니라 불러오는 중으로 (games-polish FE-04)
+  if (!ready) return <RankingsView key="waiting" game={DEFENSE_GAME} highlightId={highlightId} showPeriods={false} waiting />;
   return (
     <RankingsView
       // 보드를 바꾸면 기간 탭·목록을 새로(이전 보드 응답이 섞이지 않게)

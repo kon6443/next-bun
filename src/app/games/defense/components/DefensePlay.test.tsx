@@ -111,4 +111,56 @@ describe('DefensePlay (플레이 화면 조작)', () => {
     expect(await screen.findByText('아직 열리지 않은 스테이지·난이도예요.')).toBeTruthy();
     expect(screen.queryByTestId('defense-board')).toBeNull();
   });
+
+  it('멈춘 동안(대기·일시정지)은 같은 그림을 다시 그리지 않고, 명령(건설)·진행이 있으면 그린다 (games-polish FE-40)', async () => {
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance'] });
+    // 아무 메서드나 받아 호출 수만 센다 — 그라데이션·measureText 등은 자기 자신을 돌려준다
+    let calls = 0;
+    const store: Record<string | symbol, unknown> = {};
+    const ctx: unknown = new Proxy(store, {
+      get: (target, key) => {
+        if (key in target) return target[key];
+        const method = () => {
+          calls++;
+          return ctx;
+        };
+        target[key] = method;
+        return method;
+      },
+      set: (target, key, value) => {
+        target[key] = value;
+        return true;
+      },
+    });
+    vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(ctx as CanvasRenderingContext2D);
+    render(<DefensePlay boardKey="s1" seed={1} fixedSeed />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    const frames = async (ms: number) => {
+      const before = calls;
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(ms);
+      });
+      return calls - before;
+    };
+    expect(await frames(500)).toBe(0); // 대기 — 첫 그림 뒤로는 그대로
+    act(() => {
+      fireEvent.click(screen.getByTestId('defense-slot-7'));
+    });
+    expect(await frames(50)).toBeGreaterThan(0); // 선택 고리
+    expect(await frames(500)).toBe(0);
+    act(() => {
+      fireEvent.click(screen.getByTestId('defense-call-wave'));
+    });
+    const playing = await frames(500);
+    expect(playing).toBeGreaterThan(0); // 진행 중에는 매 프레임
+    vi.useRealTimers();
+  });
+
+  it('보드를 해석할 수 없으면 빈 화면이 아니라 안내와 돌아갈 링크 (FE-45)', () => {
+    render(<DefensePlay boardKey="zz" seed={1} fixedSeed />);
+    expect(screen.getByText('스테이지를 찾지 못했어요.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: '디펜스 처음으로' }).getAttribute('href')).toBe('/games/defense');
+  });
 });
