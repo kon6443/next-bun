@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { TeamsPageLayout, ButtonLink, Button, SectionLabel, EmptyState, LoadingSpinnerSimple } from "@/app/teams/components";
 import { cardStyles } from "@/styles/teams";
@@ -13,6 +13,9 @@ import { RankingTable } from "@/app/games/_shared/components/RankingTable";
 import { TETRIS_GAME } from "./lib/game";
 import { BattleEntry } from "./battle-ui/components/BattleEntry";
 import { RecentBattles } from "./battle-ui/components/RecentBattles";
+import { DailyCard } from "./components/DailyCard";
+import { tetrisRankLabel } from "./lib/replayCard";
+import { PopularReplaysPreview } from "@/app/games/_shared/components/PopularReplaysPreview";
 import { SoundButton } from "@/app/games/_shared/components/SoundButton";
 import { SoundSettingsEntry } from "@/app/games/_shared/components/SoundSettingsEntry";
 import { CONTROL_GUIDE } from "./lib/controls";
@@ -35,7 +38,8 @@ import {
 
 const PREVIEW_LIMIT = 5;
 
-export default function TetrisHome() {
+/** about: 서버가 그린 소개·특징(검색엔진이 읽을 글) — 화면 맨 아래 */
+export default function TetrisHome({ about }: { about?: ReactNode }) {
   const { data: session, status: authStatus } = useSession();
   const accessToken = session?.user?.accessToken ?? undefined;
   const [needsNewName, setNeedsNewName] = useState(false);
@@ -107,7 +111,8 @@ export default function TetrisHome() {
       saveLastName(data.playerName ?? playerName);
       dropPending(pending.sessionId);
       setMyScoreIds(new Set(loadMyScoreIds()));
-      setPendingMessage(data.ranks ? `등록했어요! 전체 ${data.ranks.all}위` : "등록했어요! 순위는 랭킹에서 확인해 주세요.");
+      // 데일리·도전장 판이면 그 보드 순위로 읽히게(결과 화면의 "오늘의 순위"·"도전장 순위"와 같은 값)
+      setPendingMessage(data.ranks ? `등록했어요! ${tetrisRankLabel(pending.board, data.ranks.all)}` : "등록했어요! 순위는 랭킹에서 확인해 주세요.");
     } catch (err) {
       // 보관된 기록은 앞서 한 번 실패한 제출의 재시도다
       const { kind, message } = classifySubmitError(err, true);
@@ -149,6 +154,9 @@ export default function TetrisHome() {
           게임 시작
         </ButtonLink>
       </section>
+
+      {/* 오늘의 테트리스 — 데일리 보드가 있을 때만 (games-growth B1) */}
+      <DailyCard />
 
       {/* 대전 입구는 여기 한 곳 — 첫 화면에 보이게 헤더 바로 아래 (games-polish P8) */}
       <div className={`${cardStyles.section} p-4`}>
@@ -236,6 +244,8 @@ export default function TetrisHome() {
         )}
       </section>
 
+      <PopularReplaysPreview game={TETRIS_GAME} myScoreIds={myScoreIds} />
+
       <RecentBattles />
 
       {/* 조작·설정 */}
@@ -285,6 +295,10 @@ export default function TetrisHome() {
           <SoundSettingsEntry />
         </div>
       </section>
+
+      {about}
+      {/* 하단 내비(떠 있는 카드형)에 마지막 항목이 가리지 않게 — 디펜스 허브와 같은 여백 */}
+      <div aria-hidden="true" className="h-8" />
     </TeamsPageLayout>
   );
 }

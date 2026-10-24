@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { RankingsView } from "@/app/games/_shared/components/RankingsView";
+import { HallOfFame } from "@/app/games/_shared/components/HallOfFame";
 import { getGameBoards } from "@/services/gameService";
 import type { GameBoard } from "@/types/game";
 import { DEFENSE_GAME } from "../lib/defenseGame";
-import { boardTabs, selectBoard, weeklyReplayState } from "../lib/rankedBoards";
+import { DEFENSE_SESSION_TTL_MS, boardTabs, selectBoard, weeklyReplayState } from "../lib/rankedBoards";
 
 /**
  * 디펜스 랭킹 (defense DESIGN §F1 랭킹·§B6·D-024·D-027) — /boards로 탭: 무한(시즌 — 일간·주간·전체) · 주간(이번 주·지난 주 — 기간 탭 없음)
@@ -72,6 +73,8 @@ export function DefenseRankings({ boardParam, highlightId }: Props) {
       header={header}
       replayUnavailable={replayUnavailable}
       playHref={weekly ? "/games/defense/play/weekly" : "/games/defense/play/endless"}
+      // 명예의 전당 — 지난 주간 보드 1~3위, 리플레이는 주 끝 + 4시간(세션 TTL) 뒤 공개 (games-growth B5)
+      footer={<HallOfFame game={DEFENSE_GAME} replayDelayMs={{ weekly: DEFENSE_SESSION_TTL_MS }} />}
     />
   );
 }

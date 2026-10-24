@@ -1,7 +1,7 @@
 import type { TetrisScoreDetail } from '@/types/game';
 import { formatScore } from '@/app/games/_shared/lib/format';
 import type { ReplayShareSpec } from '@/app/games/_shared/lib/shareSpec';
-import { buildReplayCard, tetrisDuration, tetrisStatLine } from './replayCard';
+import { buildReplayCard, tetrisDuration, tetrisRankLabel, tetrisStatLine } from './replayCard';
 
 /**
  * 테트리스 리플레이 공유 사양 (DESIGN §2·§3) — 공유 메뉴·카카오 카드·링크 미리보기·OG 이미지 문구
@@ -13,7 +13,7 @@ export const TETRIS_SHARE: ReplayShareSpec<TetrisScoreDetail> = {
   headline: ({ playerName, score }) => `${playerName}님의 테트리스 ${formatScore(score)}점`,
   statLine: tetrisStatLine,
   metaDescription: (summary) =>
-    `${tetrisStatLine(summary.detail)} · ${tetrisDuration(summary.durationMs)} · 전체 ${summary.rank}위 — 플레이를 그대로 다시 보세요.`,
+    `${tetrisStatLine(summary.detail)} · ${tetrisDuration(summary.durationMs)} · ${tetrisRankLabel(summary.boardKey, summary.rank)} — 플레이를 그대로 다시 보세요.`,
   card: buildReplayCard,
   fallback: {
     title: '테트리스 리플레이',

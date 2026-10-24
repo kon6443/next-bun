@@ -7,7 +7,8 @@ import { ENGINE_VERSION, TICKS_PER_SECOND } from "../engine";
 import type { PlayResult } from "../hooks/useDefensePlay";
 import { formatFrames } from "@/app/games/_shared/lib/format";
 import { DEFENSE_GAME, worstLeakedEnemy } from "../lib/defenseGame";
-import { DefenseShareButton } from "./DefenseShareButton";
+import { ResultShareButton } from "@/app/games/_shared/components/ResultShareButton";
+import { DEFENSE_SHARE } from "../lib/defenseShare";
 import { ENEMY_NAMES } from "../lib/labels";
 
 /**
@@ -83,7 +84,13 @@ export function RankedResult({ title, result, score, wave, kills, boardKey, week
           // 주간 보드는 서버가 리플레이를 주 종료 4시간(세션 TTL) 뒤까지 막는다(D-027·D-032) — 등록 직후는 늘 그 창 안
           showReplay={!weekly}
           // 신기록 순간 공유(§F11 — 등록 직후 결과 화면). 주간 기록은 링크가 주 종료 4시간 뒤까지 404라 공유하지 않는다
-          registeredActions={weekly ? undefined : (registered, playerName) => <DefenseShareButton wide subject={{ scoreId: registered.scoreId, playerName, score: registered.score, detail: registered.detail, boardKey }} />}
+          registeredActions={
+            weekly
+              ? undefined
+              : (registered, playerName, brag) => (
+                  <ResultShareButton spec={DEFENSE_SHARE} subject={{ scoreId: registered.scoreId, playerName, score: registered.score, detail: registered.detail, boardKey }} brag={brag} />
+                )
+          }
           sessionId={sessionId}
           sessionError={sessionError}
           accessToken={accessToken}

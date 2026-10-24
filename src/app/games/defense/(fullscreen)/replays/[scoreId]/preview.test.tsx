@@ -22,7 +22,7 @@ describe('디펜스 리플레이 링크 미리보기 (§F11)', () => {
     getGameScoreSummary.mockResolvedValue(summary);
     const meta = await generateMetadata(params('46'));
     expect(getGameScoreSummary).toHaveBeenCalledWith('defense', 46);
-    expect(meta.title).toBe('수비왕님의 타워 디펜스(무한 시즌 1) 웨이브 24 · 진척 52% | 리플레이');
+    expect(meta.title).toBe('수비왕님의 타워 디펜스(무한 시즌 1) 웨이브 24 · 진척 52% 리플레이');
     expect(meta.description).toContain('처치 812 · 남은 목숨 2 · 31:20 · 무한 시즌 1 · 3위');
     expect(meta.alternates).toEqual({ canonical: '/games/defense/replays/46' });
     expect(JSON.stringify(meta.openGraph)).toContain('/games/defense/replays/46/og');

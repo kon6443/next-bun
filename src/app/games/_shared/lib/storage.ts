@@ -59,6 +59,8 @@ export type PendingSubmission<G extends GameType = 'tetris'> = SubmitScoreReques
   /** 엔진이 계산한 점수 (표시용) */
   score: number;
   savedAt: number;
+  /** 등록할 보드 키 — 테트리스 홈이 다시 등록했을 때 데일리·도전장 순위를 그 보드 순위로 읽게(표시용, 제출 본문에는 싣지 않는다. 디펜스는 쓰지 않는다) */
+  board?: string;
 };
 
 export type GameStorageOptions = {

@@ -29,10 +29,14 @@ type Props = {
   title: string;
   /** 제목 아래 한 줄(기록자·점수 등) */
   subtitle?: ReactNode;
+  /** 제목 아래 줄 끝 지표(조회수) — 좁은 화면에서 subtitle만 말줄임하고 이것은 남긴다 */
+  subtitleStat?: string;
   exitHref: string;
   exitLabel: string;
   /** 머리줄 오른쪽 동작(공유 등) */
   actions?: ReactNode;
+  /** 재생이 진행된 벽시계 ms(배속 전) — 서버 기록의 시청 시간. 캠페인 로컬 재생은 없다 */
+  onWatched?: (ms: number) => void;
 };
 
 const SPEEDS = [0.5, 1, 2, 4] as const;
@@ -75,7 +79,7 @@ function commandLabel(replay: PreparedReplay, command: ReplayCommand): string {
   }
 }
 
-export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, actions }: Props) {
+export function ReplayPlayer({ replay, title, subtitle, subtitleStat, exitHref, exitLabel, actions, onWatched }: Props) {
   const { engine, totalTicks } = replay;
   const tps = engine.TICKS_PER_SECOND;
   const tickMs = 1000 / tps;
@@ -103,6 +107,8 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
   playingRef.current = playing;
   const speedRef = useRef<number>(speed);
   speedRef.current = speed;
+  const onWatchedRef = useRef(onWatched);
+  onWatchedRef.current = onWatched;
   // 효과음 — 게임 공통 소리 설정을 따른다(머리줄 소리 버튼 → 공통 모달). 탐색(seekCursor)은 틱 이벤트를 내지 않아 건너뛴 구간은 울리지 않는다
   const sfx = useDefenseSfx();
   // 같은 종류 최소 간격은 1~3배속 단계까지 — 0.5배속은 1, 4배속은 3단계
@@ -162,7 +168,9 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
       const pools = poolsRef.current!;
       const advancing = playingRef.current && cursor.state.tick < totalTicks && !cursor.state.over;
       // 탐색 뒤에 쌓는다(탐색이 쌓인 시간을 비운다) — 재생 중에만(배속 곱), 멈춘 동안은 배속 0으로 시각만 따라간다
-      advanceClock(clock, now, MAX_CATCH_UP_MS, advancing ? speedRef.current : 0);
+      const elapsed = advanceClock(clock, now, MAX_CATCH_UP_MS, advancing ? speedRef.current : 0);
+      // 멈춤·끝난 뒤는 시청 시간에 넣지 않는다(시각만 따라가는 프레임)
+      if (advancing) onWatchedRef.current?.(elapsed);
       if (advancing) {
         let n = 0;
         let shownSecond = Math.floor(cursor.state.tick / tps);
@@ -279,7 +287,12 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
         </Link>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-sm font-semibold text-white">{title}</h1>
-          {subtitle && <p className="truncate text-xs text-slate-400">{subtitle}</p>}
+          {subtitle && (
+            <p className="flex gap-1 text-xs text-slate-400">
+              <span className="truncate">{subtitle}</span>
+              {subtitleStat && <span className="shrink-0">· {subtitleStat}</span>}
+            </p>
+          )}
         </div>
         <dl className="flex shrink-0 items-center gap-2 text-xs tabular-nums text-slate-200" data-testid="defense-replay-hud">
           <div className="flex gap-0.5">

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { loadReplay } from "@/app/games/_shared/lib/replayLoader";
+import { formatViewCount } from "@/app/games/_shared/lib/format";
+import { displayedViewCount, useRecordedViewCount, useReplayWatchReport } from "@/app/games/_shared/hooks/useReplayStats";
 import { extractErrorMessage } from "@/app/utils/errorUtils";
 import { ApiError } from "@/types/api";
 import type { ParamsReplayData } from "@/types/game";
@@ -92,6 +94,7 @@ export function ServerReplay({ scoreId, actions }: { scoreId: number; actions?: 
   /** retryable: 일시 실패(망·429·5xx) — "다시 시도"로 다시 받는다(실패는 캐시되지 않는다, games-polish FE-25) */
   const [error, setError] = useState<{ message: string; retryable: boolean } | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const addWatched = useReplayWatchReport("defense", scoreId);
   useEffect(() => {
     let cancelled = false;
     setError(null);
@@ -113,6 +116,8 @@ export function ServerReplay({ scoreId, actions }: { scoreId: number; actions?: 
   // 헤더는 받은 기록이 바뀔 때만 새로 — 준비 effect가 렌더마다 다시 돌지 않게
   const header = useMemo<ReplayHeader | null>(() => (data && data.boardKey && mode ? { mode, boardKey: data.boardKey, seed: data.seed, ticks: data.frames, inputs: data.inputs } : null), [data, mode]);
   const prepared = usePreparedReplay(header, data && mode ? data.engineVersion : null);
+  // 재생 준비가 끝난 뒤에만 조회로 센다 — 손상·재생할 수 없는 버전은 세지 않는다
+  const recordedViewCount = useRecordedViewCount("defense", scoreId, prepared.status === "ready");
   const exitHref = data?.boardKey ? rankingsHref(DEFENSE_GAME.rankingsPath, scoreId, data.boardKey) : DEFENSE_GAME.rankingsPath;
   if (error || (data && !mode)) {
     return (
@@ -150,9 +155,11 @@ export function ServerReplay({ scoreId, actions }: { scoreId: number; actions?: 
       replay={prepared.replay}
       title={boardTitle(data.boardKey!)}
       subtitle={`${data.playerName} · ${formatDefenseScore(data.score)} · ${data.rank}위`}
+      subtitleStat={formatViewCount(displayedViewCount(recordedViewCount, data.viewCount))}
       exitHref={exitHref}
       exitLabel="랭킹으로"
       actions={actions?.(data)}
+      onWatched={addWatched}
     />
   );
 }

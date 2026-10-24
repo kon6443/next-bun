@@ -32,7 +32,7 @@ describe('리플레이 링크 미리보기 (DESIGN §3)', () => {
     getGameScoreSummary.mockResolvedValue(summary);
     const meta = await generateMetadata(params('12'));
     expect(getGameScoreSummary).toHaveBeenCalledWith('tetris', 12);
-    expect(meta.title).toBe('테트리스왕님의 테트리스 12,340점 | 리플레이');
+    expect(meta.title).toBe('테트리스왕님의 테트리스 12,340점 리플레이');
     expect(meta.description).toContain('40줄 · 레벨 5 · 1:23 · 전체 2위');
     expect(meta.openGraph).toMatchObject({ url: '/games/tetris/replays/12' });
     expect(meta.alternates).toEqual({ canonical: '/games/tetris/replays/12' });

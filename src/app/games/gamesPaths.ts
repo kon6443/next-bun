@@ -16,6 +16,11 @@ const FULLSCREEN_GAME_ROUTE = /^\/games\/[^/]+\/(play|replays)(\/|$)/;
 
 /** 전체화면 게임 화면 — 하단 내비를 숨긴다 (낚시 도감·소개, 게임 허브·랭킹은 보인다) */
 export function isFullscreenGamePath(path: string): boolean {
-  // 테트리스 대전(/games/tetris/battle 하위)은 play·replays 규칙 밖이라 따로
-  return path === '/fishing' || FULLSCREEN_GAME_ROUTE.test(path) || startsWithSegment(path, '/games/tetris/battle');
+  // 테트리스 대전(/games/tetris/battle 하위)·도전장(/games/tetris/challenge/{id} — 플레이 화면)은 play·replays 규칙 밖이라 따로
+  return (
+    path === '/fishing' ||
+    FULLSCREEN_GAME_ROUTE.test(path) ||
+    startsWithSegment(path, '/games/tetris/battle') ||
+    startsWithSegment(path, '/games/tetris/challenge')
+  );
 }

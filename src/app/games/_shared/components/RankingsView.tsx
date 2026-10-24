@@ -3,10 +3,11 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { TeamsPageLayout, ButtonLink, Button, SectionLabel, EmptyState, TeamListSkeleton } from "@/app/teams/components";
 import { cardStyles } from "@/styles/teams";
-import { getGameRankings, getGameScore } from "@/services/gameService";
-import type { GameType, RankingList, RankingPeriod, ScoreDetailByGame } from "@/types/game";
+import { getGameRankings, getGameScore, getPopularReplays } from "@/services/gameService";
+import type { GameType, PopularReplayList, PopularSort, RankingList, RankingPeriod, ScoreDetailByGame } from "@/types/game";
 import { extractErrorMessage } from "@/app/utils/errorUtils";
 import { formatFullDateTime } from "@/app/utils/taskUtils";
+import { formatViewCount, formatWatchTime } from "../lib/format";
 import type { GameUiConfig } from "../lib/gameConfig";
 import { RankingTable } from "./RankingTable";
 
@@ -15,7 +16,17 @@ const PERIODS: { key: RankingPeriod; label: string }[] = [
   { key: "weekly", label: "주간" },
   { key: "all", label: "전체" },
 ];
+/** 점수순 = 랭킹, 조회순·시청순 = 인기 리플레이(기간 조회수·시청 시간) */
+type SortKey = "score" | PopularSort;
+const SORTS: { key: SortKey; label: string }[] = [
+  { key: "score", label: "점수순" },
+  { key: "views", label: "조회순" },
+  { key: "watch", label: "시청순" },
+];
 const LIMIT = 50;
+
+/** 받은 목록과 그 정렬 — 정렬을 바꾼 직후 렌더에서 이전 목록에 새 정렬의 지표를 붙이지 않게 함께 둔다 */
+type Listing<D> = { sort: "score"; data: RankingList<D> } | { sort: PopularSort; data: PopularReplayList<D> };
 
 type RankingsViewProps<G extends GameType> = {
   game: GameUiConfig<G>;
@@ -33,13 +44,17 @@ type RankingsViewProps<G extends GameType> = {
   playHref?: string;
   /** 어느 보드를 볼지 정하는 중(디펜스 /boards 응답 전) — 같은 화면 틀에 skeleton만, 랭킹은 아직 부르지 않는다 */
   waiting?: boolean;
+  /** 목록 아래 게임별 영역(명예의 전당 등) */
+  footer?: ReactNode;
 };
 
-/** 게임 랭킹 화면 — 기간 탭 + 상위 50개 (게임별 page는 클라이언트 래퍼에서 game 사양을 넘긴다) */
-export function RankingsView<G extends GameType>({ game, highlightId, board, showPeriods = true, header, replayUnavailable = null, playHref, waiting = false }: RankingsViewProps<G>) {
+/** 게임 랭킹 화면 — 기간 탭 × 정렬(점수·조회·시청) + 상위 50개 (게임별 page는 클라이언트 래퍼에서 game 사양을 넘긴다) */
+export function RankingsView<G extends GameType>({ game, highlightId, board, showPeriods = true, header, replayUnavailable = null, playHref, waiting = false, footer }: RankingsViewProps<G>) {
   const [selectedPeriod, setPeriod] = useState<RankingPeriod>("daily");
   const period: RankingPeriod = showPeriods ? selectedPeriod : "all";
-  const [list, setList] = useState<RankingList<ScoreDetailByGame[G]> | null>(null);
+  const [sort, setSort] = useState<SortKey>("score");
+  const [listing, setListing] = useState<Listing<ScoreDetailByGame[G]> | null>(null);
+  const list = listing?.data ?? null;
   const [error, setError] = useState<string | null>(null);
   const [myScoreIds, setMyScoreIds] = useState<ReadonlySet<number>>(new Set());
   const requestIdRef = useRef(0);
@@ -49,14 +64,17 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
     setMyScoreIds(new Set(storage.loadMyScoreIds()));
   }, [storage]);
 
-  const load = useCallback(async (target: RankingPeriod) => {
+  const load = useCallback(async (target: RankingPeriod, targetSort: SortKey) => {
     // 탭을 빠르게 바꾸면 늦게 온 이전 탭 응답은 버린다
     const requestId = ++requestIdRef.current;
-    setList(null);
+    setListing(null);
     setError(null);
     try {
-      const { data } = await getGameRankings(game.gameType, target, LIMIT, board);
-      if (requestId === requestIdRef.current) setList(data);
+      const next: Listing<ScoreDetailByGame[G]> =
+        targetSort === "score"
+          ? { sort: "score", data: (await getGameRankings(game.gameType, target, LIMIT, board)).data }
+          : { sort: targetSort, data: (await getPopularReplays(game.gameType, { period: target, sort: targetSort, limit: LIMIT, board })).data };
+      if (requestId === requestIdRef.current) setListing(next);
     } catch (err) {
       if (requestId === requestIdRef.current) setError(extractErrorMessage(err, "랭킹을 불러오지 못했습니다."));
     }
@@ -67,7 +85,8 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
    * null = 아직 모름(목록에 있거나 받는 중), "unknown" = 받지 못함
    */
   const [outside, setOutside] = useState<{ rank: number } | "unknown" | null>(null);
-  const missing = highlightId !== null && list !== null && !list.items.some((item) => item.scoreId === highlightId);
+  // 인기 목록의 순서는 점수 순위가 아니다 — "상위 50위 밖" 안내는 점수순에서만
+  const missing = listing?.sort === "score" && highlightId !== null && !listing.data.items.some((item) => item.scoreId === highlightId);
   useEffect(() => {
     if (!missing || highlightId === null) {
       setOutside(null);
@@ -84,8 +103,8 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
 
   useEffect(() => {
     if (waiting) return;
-    load(period);
-  }, [load, period, waiting]);
+    load(period, sort);
+  }, [load, period, sort, waiting]);
 
   return (
     <TeamsPageLayout>
@@ -116,8 +135,29 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
             ))}
           </div>
         )}
+        {/* 리플레이를 아직 볼 수 없는 보드(진행 중인 주간 도전)는 본 기록도 없다 — 정렬을 숨긴다 */}
+        {!replayUnavailable && (
+          <div role="group" aria-label="랭킹 정렬" className="mt-2 grid grid-cols-3 gap-1 rounded-full border border-white/10 bg-slate-950/40 p-1">
+            {SORTS.map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={sort === key}
+                onClick={() => setSort(key)}
+                className={`min-h-11 rounded-full text-sm font-semibold transition ${
+                  sort === key ? "bg-sky-500/30 text-white" : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         {list?.periodStart && period !== "all" && (
-          <p className="mt-3 text-xs text-slate-500">{formatFullDateTime(new Date(list.periodStart))}부터의 기록</p>
+          <p className="mt-3 text-xs text-slate-500">
+            {formatFullDateTime(new Date(list.periodStart))}
+            {listing?.sort === "score" ? "부터의 기록" : listing?.sort === "views" ? "부터 본 횟수" : "부터 본 시간"}
+          </p>
         )}
       </section>
 
@@ -125,13 +165,18 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
         {error ? (
           <div className={`${cardStyles.errorDashedContainer} px-6 py-10 text-center`} role="alert">
             <p className="text-sm font-semibold text-red-300">{error}</p>
-            <Button variant="secondary" size="sm" className="mt-4 min-h-11" onClick={() => load(period)}>
+            <Button variant="secondary" size="sm" className="mt-4 min-h-11" onClick={() => load(period, sort)}>
               다시 시도
             </Button>
           </div>
-        ) : list === null ? (
+        ) : listing === null ? (
           <TeamListSkeleton cardCount={3} />
-        ) : list.items.length === 0 ? (
+        ) : listing.sort !== "score" && listing.data.items.length === 0 ? (
+          <EmptyState
+            message={showPeriods ? "이 기간에 본 리플레이가 아직 없어요." : "아직 본 리플레이가 없어요."}
+            description="점수순 목록에서 ▶를 눌러 다시보기를 볼 수 있어요."
+          />
+        ) : listing.data.items.length === 0 ? (
           <EmptyState
             message="아직 기록이 없어요."
             description="첫 번째 기록의 주인공이 되어 보세요!"
@@ -150,10 +195,23 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
                   : `가리킨 기록은 이 목록(상위 ${LIMIT}위)에 없어요.`}
               </p>
             )}
-            <RankingTable game={game} items={list.items} myScoreIds={myScoreIds} highlightId={highlightId} replayUnavailable={replayUnavailable} />
+            {listing.sort === "score" ? (
+              <RankingTable game={game} items={listing.data.items} myScoreIds={myScoreIds} highlightId={highlightId} replayUnavailable={replayUnavailable} />
+            ) : (
+              <RankingTable
+                game={game}
+                items={listing.data.items}
+                popular
+                stat={listing.sort === "views" ? (item) => formatViewCount(item.periodViewCount) : (item) => formatWatchTime(item.periodWatchMs)}
+                myScoreIds={myScoreIds}
+                highlightId={highlightId}
+                replayUnavailable={replayUnavailable}
+              />
+            )}
           </>
         )}
       </section>
+      {footer}
     </TeamsPageLayout>
   );
 }
