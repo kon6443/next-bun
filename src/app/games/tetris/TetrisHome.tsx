@@ -14,6 +14,7 @@ import { TETRIS_GAME } from "./lib/game";
 import { BattleEntry } from "./battle-ui/components/BattleEntry";
 import { RecentBattles } from "./battle-ui/components/RecentBattles";
 import { DailyCard } from "./components/DailyCard";
+import { tetrisRankLabel } from "./lib/replayCard";
 import { PopularReplaysPreview } from "@/app/games/_shared/components/PopularReplaysPreview";
 import { SoundButton } from "@/app/games/_shared/components/SoundButton";
 import { SoundSettingsEntry } from "@/app/games/_shared/components/SoundSettingsEntry";
@@ -109,7 +110,8 @@ export default function TetrisHome() {
       saveLastName(data.playerName ?? playerName);
       dropPending(pending.sessionId);
       setMyScoreIds(new Set(loadMyScoreIds()));
-      setPendingMessage(data.ranks ? `등록했어요! 전체 ${data.ranks.all}위` : "등록했어요! 순위는 랭킹에서 확인해 주세요.");
+      // 데일리·도전장 판이면 그 보드 순위로 읽히게(결과 화면의 "오늘의 순위"·"도전장 순위"와 같은 값)
+      setPendingMessage(data.ranks ? `등록했어요! ${tetrisRankLabel(pending.board, data.ranks.all)}` : "등록했어요! 순위는 랭킹에서 확인해 주세요.");
     } catch (err) {
       // 보관된 기록은 앞서 한 번 실패한 제출의 재시도다
       const { kind, message } = classifySubmitError(err, true);

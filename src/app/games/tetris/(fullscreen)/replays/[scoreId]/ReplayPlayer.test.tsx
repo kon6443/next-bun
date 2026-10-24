@@ -7,6 +7,8 @@ import { ENGINE_VERSION, FRAMES_PER_SECOND } from '../../../engine';
 import { formatFrames } from '@/app/games/_shared/lib/format';
 
 const loadReplay = vi.fn();
+const getGameScore = vi.fn();
+vi.mock('@/services/gameService', () => ({ getGameScore: (...a: unknown[]) => getGameScore(...a) }));
 vi.mock('@/app/games/_shared/lib/replayLoader', () => ({ loadReplay: (...a: unknown[]) => loadReplay(...a) }));
 // 판은 그리지 않는다 — 재생 컨트롤만 본다
 vi.mock('../../../components/TetrisCanvas', () => ({ TetrisCanvas: () => null }));
@@ -49,6 +51,7 @@ describe('싱글 리플레이 재생기 (games-polish P4)', () => {
     stats.recorded = null;
     stats.addWatched.mockReset();
     stats.viewCalls = [];
+    getGameScore.mockReset();
   });
 
   it('하이라이트 — 4줄 순간이 막대 점·버튼으로, 다음을 누르면 그 순간 1.5초 앞으로', async () => {
@@ -180,5 +183,44 @@ describe('싱글 리플레이 재생기 (games-polish P4)', () => {
     await ready();
     expect(screen.getByTestId('challenge-share').textContent).toBe('⚔️ 도전장 보내기');
     expect(screen.getByRole('link', { name: '직접 도전' }).getAttribute('href')).toBe('/games/tetris/challenge/1');
+  });
+
+  it('도전장 보드 기록이면 도전장은 원본(root) 기준 — 링크·문구가 실제 도전 상대와 같게 (games-growth B2)', async () => {
+    getGameScore.mockResolvedValue({ data: { scoreId: 7, playerName: '원본왕', score: 12340, rank: 1, detail: { lines: 40, level: 5 }, durationMs: 1, createdAt: 'x' } });
+    loadReplay.mockResolvedValue({ ...replayOf('back-to-back'), boardKey: 'challenge-7' });
+    render(<ReplayPlayer scoreId={1} />);
+    await screen.findByTestId('tetris-replay-seek', {}, { timeout: 5000 });
+    expect(getGameScore).toHaveBeenCalledWith('tetris', 7);
+    expect(await screen.findByRole('link', { name: '직접 도전' })).toHaveAttribute('href', '/games/tetris/challenge/7');
+    // 공유는 원본이 온 뒤에 원본 이름·링크로
+    fireEvent.click(await screen.findByTestId('challenge-share'));
+    expect(screen.getByRole('heading', { name: '도전장 공유' })).toBeTruthy();
+    expect(screen.getByText(/원본왕님의 12,340점에 도전!/)).toBeTruthy();
+    expect(screen.getByText(/\/games\/tetris\/challenge\/7$/)).toBeTruthy();
+  });
+
+  it('데일리·도전장 기록은 그 보드 순위로 쓰고 랭킹으로 돌아갈 때도 그 보드로 (games-growth B1·B2)', async () => {
+    getGameScore.mockReturnValue(new Promise(() => {}));
+    loadReplay.mockResolvedValue({ ...replayOf('back-to-back'), rank: 3, boardKey: 'daily-2026-10-24' });
+    const { unmount } = render(<ReplayPlayer scoreId={1} />);
+    await screen.findByTestId('tetris-replay-seek', {}, { timeout: 5000 });
+    expect(screen.getByText(/^10\/24 데일리 3위 · /)).toBeTruthy();
+    expect(screen.getByRole('link', { name: '← 랭킹' })).toHaveAttribute('href', '/games/tetris/rankings?highlight=1&board=daily-2026-10-24');
+    unmount();
+
+    // 원본 요약을 못 받아도(응답 없음) 직접 도전 링크는 원본으로 — 공유 버튼만 기다린다
+    loadReplay.mockResolvedValue({ ...replayOf('back-to-back'), rank: 2, boardKey: 'challenge-7' });
+    render(<ReplayPlayer scoreId={1} />);
+    await screen.findByTestId('tetris-replay-seek', {}, { timeout: 5000 });
+    expect(screen.getByText(/^도전장 2위 · /)).toBeTruthy();
+    expect(screen.getByRole('link', { name: '← 랭킹' })).toHaveAttribute('href', '/games/tetris/rankings?highlight=1&board=challenge-7');
+    expect(screen.getByRole('link', { name: '직접 도전' })).toHaveAttribute('href', '/games/tetris/challenge/7');
+    expect(screen.queryByTestId('challenge-share')).toBeNull();
+  });
+
+  it('기본 보드 기록은 지금처럼 "전체 N위"·기본 랭킹', async () => {
+    await ready();
+    expect(screen.getByText(/^전체 1위 · /)).toBeTruthy();
+    expect(screen.getByRole('link', { name: '← 랭킹' })).toHaveAttribute('href', '/games/tetris/rankings');
   });
 });

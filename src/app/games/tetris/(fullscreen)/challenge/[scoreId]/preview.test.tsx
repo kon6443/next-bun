@@ -51,4 +51,13 @@ describe('도전장 링크 미리보기 (games-growth B2)', () => {
     const fallback = await GET(new Request('http://x'), params('41'));
     expect(fallback.headers.get('content-type')).toBe('image/png');
   });
+
+  it('링크 id가 도전장 보드 기록이면 미리보기는 원본(root) 기준 — 받은 사람이 실제로 도전하는 상대', async () => {
+    getGameScoreSummary.mockImplementation((_g: string, id: number) =>
+      Promise.resolve(id === 50 ? { ...summary, scoreId: 50, playerName: '도전자', score: 500, boardKey: 'challenge-41' } : { ...summary, boardKey: 'default' }),
+    );
+    const meta = await generateMetadata(params('50'));
+    expect(getGameScoreSummary).toHaveBeenCalledWith('tetris', 41);
+    expect(meta.title).toBe('테트리스왕님의 12,340점에 도전!');
+  });
 });

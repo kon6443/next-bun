@@ -2,13 +2,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import TetrisRankingsView from './RankingsView';
+import RankingsPage from './page';
 
 const getGameBoards = vi.fn();
 const getGameRankings = vi.fn();
+const getGameScore = vi.fn();
 vi.mock('@/services/gameService', () => ({
   getGameBoards: (...a: unknown[]) => getGameBoards(...a),
   getGameRankings: (...a: unknown[]) => getGameRankings(...a),
-  getGameScore: vi.fn(),
+  getGameScore: (...a: unknown[]) => getGameScore(...a),
   getPopularReplays: vi.fn(),
   getHallOfFame: () => Promise.resolve({ data: { periods: [] } }),
 }));
@@ -26,6 +28,7 @@ describe('테트리스 랭킹 — 오늘의 테트리스 보드 탭 (games-growt
   beforeEach(() => {
     getGameBoards.mockReset().mockResolvedValue({ data: { items: boards } });
     getGameRankings.mockReset().mockResolvedValue({ data: { items: [item], periodStart: null } });
+    getGameScore.mockReset();
   });
 
   it('보드 지정 없이는 기본 랭킹(보드 없이·기간 탭), 데일리 보드가 있으면 탭을 보인다', async () => {
@@ -65,5 +68,46 @@ describe('테트리스 랭킹 — 오늘의 테트리스 보드 탭 (games-growt
       render(<TetrisRankingsView highlightId={null} boardParam={null} />);
     });
     expect(screen.queryByTestId('tetris-board-tabs')).toBeNull();
+  });
+
+  it('도전장 보드(challenge-{원본}) — 기간 탭 없이 그 보드로, 머리에 원본 기록과 직접 도전 (games-growth B2)', async () => {
+    getGameScore.mockResolvedValue({ data: { ...item, scoreId: 7, playerName: '원본왕', score: 12340 } });
+    await act(async () => {
+      render(<TetrisRankingsView highlightId={50} boardParam="challenge-7" />);
+    });
+    expect(getGameRankings).toHaveBeenCalledWith('tetris', 'all', 50, 'challenge-7');
+    expect(screen.queryByRole('group', { name: '랭킹 기간' })).toBeNull();
+    expect(getGameScore).toHaveBeenCalledWith('tetris', 7);
+    expect(screen.getByTestId('challenge-board').textContent).toContain('원본왕님의 12,340점에 도전한 기록이에요.');
+    expect(screen.getByRole('link', { name: '직접 도전' }).getAttribute('href')).toBe('/games/tetris/challenge/7');
+  });
+
+  it('page: ?board= 는 daily·daily-날짜·challenge-{id}만 넘긴다 — 도전장 결과의 "랭킹 보기"가 도전장 보드로 (games-growth B2)', async () => {
+    const boardOf = async (board: string) => ((await RankingsPage({ searchParams: Promise.resolve({ board }) })) as { props: { boardParam: string | null } }).props.boardParam;
+    expect(await boardOf('challenge-7')).toBe('challenge-7');
+    expect(await boardOf('daily')).toBe('daily');
+    expect(await boardOf('daily-2026-10-24')).toBe('daily-2026-10-24');
+    expect(await boardOf('challenge-0')).toBeNull();
+    expect(await boardOf('weekly-2026-w43')).toBeNull();
+  });
+
+  it('다른 도전장 보드로 바뀌면 새 원본이 오기 전까지 이전 원본을 보이지 않는다', async () => {
+    getGameScore.mockResolvedValueOnce({ data: { ...item, scoreId: 7, playerName: '원본왕', score: 12340 } }).mockReturnValueOnce(new Promise(() => {}));
+    const { rerender } = await act(async () => render(<TetrisRankingsView highlightId={null} boardParam="challenge-7" />));
+    expect(screen.getByTestId('challenge-board').textContent).toContain('원본왕님');
+    await act(async () => {
+      rerender(<TetrisRankingsView highlightId={null} boardParam="challenge-9" />);
+    });
+    expect(getGameScore).toHaveBeenLastCalledWith('tetris', 9);
+    expect(screen.getByTestId('challenge-board').textContent).toContain('같은 블록 순서로 겨룬 도전장 기록이에요.');
+  });
+
+  it('지난 데일리가 공개 전이면 안내에 그날 날짜', async () => {
+    const yesterday = { boardKey: 'daily-2026-10-23', mode: 'daily', current: false, startsAt: null, endsAt: new Date(Date.now() - 60_000).toISOString() };
+    getGameBoards.mockResolvedValue({ data: { items: [boards[0], yesterday] } });
+    await act(async () => {
+      render(<TetrisRankingsView highlightId={null} boardParam="daily-2026-10-23" />);
+    });
+    expect(screen.getByText('10/23 데일리 리플레이는 하루가 끝나고 2시간 뒤 공개돼요.')).toBeTruthy();
   });
 });

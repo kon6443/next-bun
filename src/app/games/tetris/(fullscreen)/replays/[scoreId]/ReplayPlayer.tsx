@@ -20,7 +20,13 @@ import { getSoundPlayer, replayCues } from "../../../lib/sound/soundPlayer";
 import { SoundButton } from "@/app/games/_shared/components/SoundButton";
 import { loadReplay } from "@/app/games/_shared/lib/replayLoader";
 import { TETRIS_SHARE } from "../../../lib/share";
-import { challengePath } from "../../../lib/challenge";
+import { challengePath, challengeRootId } from "../../../lib/challenge";
+import { isDailyBoardKey } from "../../../lib/daily";
+import { tetrisRankLabel } from "../../../lib/replayCard";
+import { rankingsHref } from "@/app/games/_shared/components/ScoreSubmitPanel";
+import { TETRIS_GAME } from "../../../lib/game";
+import { getGameScore } from "@/services/gameService";
+import type { ScoreSummary } from "@/types/game";
 import { ChallengeShareButton } from "../../../components/ChallengeShareButton";
 import { collectActions } from "../../../lib/replayTimeline";
 import { advanceClock, createClock, resetClock } from "@/app/games/_shared/lib/fixedStep";
@@ -72,6 +78,20 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
   // 재생 준비가 끝난 뒤에만 조회로 센다 — 없는 기록·지원하지 않는 버전은 세지 않는다
   const recordedViewCount = useRecordedViewCount("tetris", scoreId, load.status === "ready");
   const addWatched = useReplayWatchReport("tetris", scoreId);
+  // 도전장 보드 기록이면 도전장은 원본(root) 기준 — 서버가 root로 묶으므로 문구·링크도 원본으로 (B2)
+  const loadedData = load.status === "ready" ? load.data : null;
+  const challengeRoot = loadedData ? challengeRootId(loadedData.boardKey) : null;
+  const [challengeOriginal, setChallengeOriginal] = useState<ScoreSummary | null>(null);
+  useEffect(() => {
+    if (challengeRoot === null) return;
+    let cancelled = false;
+    getGameScore("tetris", challengeRoot)
+      .then(({ data }) => !cancelled && setChallengeOriginal(data))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [challengeRoot]);
 
   const stateRef = useRef<GameState | null>(null);
   const drawRef = useRef<(() => void) | null>(null);
@@ -310,12 +330,16 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
   const state = stateRef.current;
   const loaded = load.data;
   const highlights = load.prepared.highlights;
+  // 데일리·도전장 기록은 그 보드의 순위 — 랭킹으로 돌아갈 때도 그 보드로, 순위도 "전체"가 아니라 그 보드로 읽히게
+  const boardKey = loaded.boardKey && (isDailyBoardKey(loaded.boardKey) || challengeRootId(loaded.boardKey) !== null) ? loaded.boardKey : null;
+  const exitHref = boardKey ? rankingsHref(TETRIS_GAME.rankingsPath, loaded.scoreId, boardKey) : TETRIS_GAME.rankingsPath;
+  const rankLabel = tetrisRankLabel(boardKey ?? undefined, loaded.rank);
 
   return (
     <div className="flex h-full flex-col pt-[env(safe-area-inset-top)]" style={{ touchAction: "auto" }}>
       <header className="flex items-center gap-3 px-3 py-2">
         <Link
-          href="/games/tetris/rankings"
+          href={exitHref}
           className="flex min-h-11 items-center rounded-xl border border-slate-700/60 bg-slate-900/70 px-3 text-xs text-slate-400 hover:text-slate-200"
         >
           ← 랭킹
@@ -327,7 +351,7 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
           {/* 좁은 화면에서도 한 줄 — 순위·날짜만 말줄임, 조회수는 남긴다 */}
           <p className="flex justify-center gap-1 text-xs text-slate-500">
             <span className="truncate">
-              전체 {loaded.rank}위 · {formatFullDateTime(new Date(loaded.createdAt))}
+              {rankLabel} · {formatFullDateTime(new Date(loaded.createdAt))}
             </span>
             <span className="shrink-0">· {formatViewCount(displayedViewCount(recordedViewCount, loaded.viewCount))}</span>
           </p>
@@ -455,11 +479,11 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
             ))}
           </div>
         </div>
-        {/* 도전장 — 같은 블록 순서로 이 기록에 도전 (games-growth B2) */}
+        {/* 도전장 — 같은 블록 순서로 이 기록에 도전 (games-growth B2). 링크는 원본 id만 있으면 되고, 공유 문구(원본 이름·점수)만 원본 요약을 기다린다 */}
         <div className="flex items-center justify-center gap-2">
-          <ChallengeShareButton original={loaded} label="도전장 보내기" />
+          {(challengeRoot === null || challengeOriginal) && <ChallengeShareButton original={challengeOriginal ?? loaded} label="도전장 보내기" />}
           <Link
-            href={challengePath(loaded.scoreId)}
+            href={challengePath(challengeRoot ?? loaded.scoreId)}
             className="flex min-h-11 items-center rounded-full border border-white/20 px-4 text-sm font-semibold text-slate-100"
           >
             직접 도전

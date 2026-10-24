@@ -119,8 +119,8 @@ export function ScoreSubmitPanel<G extends GameType>({
     if (!sessionId || presavedRef.current) return;
     presavedRef.current = true;
     const playerName = validatePlayerName(defaultName) === null ? normalizePlayerName(defaultName) : "";
-    storage.savePendingSubmission({ sessionId, playerName, replay, score, savedAt: Date.now() });
-  }, [sessionId, defaultName, replay, score, storage]);
+    storage.savePendingSubmission({ sessionId, playerName, replay, score, savedAt: Date.now(), ...(board ? { board } : {}) });
+  }, [sessionId, defaultName, replay, score, storage, board]);
 
   /** 다시 하면 이 판 기록이 사라지는 경우 — 등록 가능한 판을 아직 등록하지 않았고, 다시 등록할 보관도 없다 (games-polish FE-27) */
   const [confirmRestart, setConfirmRestart] = useState(false);
@@ -190,7 +190,7 @@ export function ScoreSubmitPanel<G extends GameType>({
         storage.removePendingSubmission(sessionId);
       } else {
         // 네트워크·429·5xx — 결과를 보관하고 다시 시도할 수 있게. 보관하지 못했으면(저장소 차단·용량) 떠나면 사라진다고 알린다 (FE-46)
-        const kept = storage.savePendingSubmission({ sessionId, playerName, replay, score, savedAt: Date.now() });
+        const kept = storage.savePendingSubmission({ sessionId, playerName, replay, score, savedAt: Date.now(), ...(board ? { board } : {}) });
         setSubmitError(kept ? text : `${text} 이 기기에 보관하지 못해 이 화면을 떠나면 기록이 사라져요.`);
         setCanRetry(true);
       }

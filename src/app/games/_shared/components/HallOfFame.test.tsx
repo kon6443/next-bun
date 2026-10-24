@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
-import { HallOfFame, hallOfFamePeriodLabel } from './HallOfFame';
+import { HallOfFame, clearHallOfFameCache, hallOfFamePeriodLabel } from './HallOfFame';
 import { TrophyBadge, trophyLabel } from './TrophyBadge';
 import { TEST_GAME } from './testGame';
 
@@ -19,6 +19,7 @@ const daily = { kind: 'daily', boardKey: 'daily-2026-10-24', startsAt: '2026-10-
 describe('명예의 전당 (games-growth B5)', () => {
   beforeEach(() => {
     getHallOfFame.mockReset();
+    clearHallOfFameCache();
     vi.useFakeTimers({ toFake: ['Date'] });
   });
   afterEach(() => vi.useRealTimers());
@@ -72,5 +73,31 @@ describe('입상 배지 (games-growth B5)', () => {
       </>,
     );
     expect(container.innerHTML).toBe('');
+  });
+});
+
+describe('명예의 전당 요청 재사용', () => {
+  beforeEach(() => {
+    getHallOfFame.mockReset();
+    clearHallOfFameCache();
+  });
+
+  it('보드 탭을 바꿔 다시 마운트돼도 잠시 같은 응답을 쓴다 — 실패는 재사용하지 않는다', async () => {
+    getHallOfFame.mockResolvedValue({ data: { periods: [daily] } });
+    const first = await act(async () => render(<HallOfFame game={TEST_GAME} />));
+    first.unmount();
+    await act(async () => {
+      render(<HallOfFame game={TEST_GAME} />);
+    });
+    expect(getHallOfFame).toHaveBeenCalledTimes(1);
+
+    clearHallOfFameCache();
+    getHallOfFame.mockReset().mockRejectedValueOnce(new Error('503')).mockResolvedValueOnce({ data: { periods: [daily] } });
+    const failed = await act(async () => render(<HallOfFame game={TEST_GAME} />));
+    failed.unmount();
+    await act(async () => {
+      render(<HallOfFame game={TEST_GAME} />);
+    });
+    expect(getHallOfFame).toHaveBeenCalledTimes(2);
   });
 });

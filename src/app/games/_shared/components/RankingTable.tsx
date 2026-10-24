@@ -67,10 +67,11 @@ export function RankingTable<G extends GameType, I extends RankingItem<ScoreDeta
               {popular ? item.rank : (medal(item.rank) ?? item.rank)}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-white">
-                {item.playerName}
+              {/* 이름만 말줄임 — 배지·"나"는 긴 이름에도 남긴다 */}
+              <p className="flex min-w-0 items-center text-sm font-semibold text-white">
+                <span className="truncate">{item.playerName}</span>
                 <TrophyBadge trophies={item.trophies} />
-                {mine && <span className="ml-1.5 rounded-full bg-sky-500/30 px-1.5 py-0.5 text-[10px] text-sky-100">나</span>}
+                {mine && <span className="ml-1.5 shrink-0 rounded-full bg-sky-500/30 px-1.5 py-0.5 text-[10px] text-sky-100">나</span>}
               </p>
               {!compact && (
                 // 지표는 줄이 잘려도 보이게 — 요약·날짜만 말줄임

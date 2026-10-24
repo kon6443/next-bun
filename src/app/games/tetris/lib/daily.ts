@@ -57,9 +57,15 @@ export function loadDailyFirstRun(boardKey: string): DailyFirstRun | null {
   return saved && saved.boardKey === boardKey && Number.isFinite(saved.score) ? saved : null;
 }
 
-/** 판이 끝날 때 — 그 보드의 첫 판이면 저장하고 true, 이미 첫 판이 있으면 그대로 두고 false */
+/**
+ * 판이 끝날 때 — 그 보드의 첫 판이면 저장하고 true, 이미 첫 판이 있으면 그대로 두고 false
+ * 더 최근 날의 첫 판이 이미 있으면(자정 직전 세션으로 늦게 끝난 판·다른 탭) 덮지 않는다 — 키 날짜(YYYY-MM-DD)는 문자열 순서가 날짜 순서
+ */
 export function recordDailyRun(run: Omit<DailyFirstRun, 'scoreId' | 'rank'>): boolean {
   if (loadDailyFirstRun(run.boardKey)) return false;
+  const saved = readStorageJson<DailyFirstRun>('local', FIRST_RUN_KEY);
+  // 저장값이 데일리 키 형식이 아니면(손상·형식 변경) 비교하지 않고 덮는다 — 이상한 값 하나로 첫 판이 영영 막히지 않게
+  if (saved && typeof saved.boardKey === 'string' && isDailyBoardKey(saved.boardKey) && saved.boardKey > run.boardKey) return false;
   writeStorage('local', FIRST_RUN_KEY, JSON.stringify(run));
   return true;
 }

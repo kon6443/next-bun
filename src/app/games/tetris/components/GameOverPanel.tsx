@@ -70,7 +70,8 @@ export function GameOverPanel({ result, daily = null, challenge = null, ...rest 
         ) : challenge?.original ? (
           <ChallengeShareButton original={challenge.original} myScore={registered.score} label="도전장 다시 보내기" className="w-full" />
         ) : (
-          <ResultShareButton spec={TETRIS_SHARE} subject={{ scoreId: registered.scoreId, playerName, score: registered.score, detail: registered.detail }} brag={brag} />
+          // 도전장 판인데 원본을 못 받았으면 일반 공유 — 도전장 보드 순위를 "전체 N위"로 자랑하지 않게 자랑 문구는 뺀다
+          <ResultShareButton spec={TETRIS_SHARE} subject={{ scoreId: registered.scoreId, playerName, score: registered.score, detail: registered.detail }} brag={challenge ? null : brag} />
         )
       }
       {...rest}
@@ -88,7 +89,7 @@ function DailyRegistered({ daily, registered }: { daily: { boardKey: string; isF
     <>
       <p className="text-xs text-slate-400">
         {daily.isFirstRun ? `${dailyDateLabel(daily.boardKey)} 첫 판 기록으로 공유돼요.` : `다시 도전한 판이에요 — 공유는 ${dailyDateLabel(daily.boardKey)} 첫 판 기록으로 해요.`}
-        {" "}리플레이는 내일 새벽 2시에 공개돼요.
+        {" "}리플레이는 {dailyDateLabel(daily.boardKey)} 하루가 끝나고 2시간 뒤 공개돼요.
       </p>
       <DailyShareButton boardKey={daily.boardKey} />
     </>

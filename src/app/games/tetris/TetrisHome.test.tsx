@@ -4,9 +4,10 @@ import { StrictMode } from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 
 vi.mock('next-auth/react', () => ({ useSession: () => ({ data: null, status: 'unauthenticated' }) }));
+const submitGameScore = vi.hoisted(() => vi.fn());
 vi.mock('@/services/gameService', () => ({
   getGameRankings: () => new Promise(() => {}),
-  submitGameScore: vi.fn(),
+  submitGameScore,
 }));
 // 대전 입구는 이 테스트와 무관 — 조회 없이
 vi.mock('./battle-ui/components/BattleEntry', () => ({ BattleEntry: () => null }));
@@ -45,5 +46,19 @@ describe('TetrisHome 설정 (games-polish FE-52)', () => {
     expect(tetrisStorage.loadPendingSubmissions()).toEqual([]);
     expect(screen.queryByText(/등록하지 못한 기록이 있어요/)).toBeNull();
   });
-});
 
+  it('데일리 판을 다시 등록하면 그 보드 순위로 알린다 — "전체 N위"가 아니라 (games-growth B1)', async () => {
+    window.sessionStorage.clear();
+    tetrisStorage.savePendingSubmission({ sessionId: 's2', playerName: '테스터', replay: { frames: 1, inputs: [], das: 10, arr: 2, engineVersion: 1 } as never, score: 500, savedAt: 1, board: 'daily-2026-10-24' });
+    submitGameScore.mockResolvedValue({ data: { scoreId: 9, score: 500, detail: {}, ranks: { daily: 3, weekly: 3, all: 3 } } });
+    await act(async () => {
+      render(<TetrisHome />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '다시 등록하기' }));
+    });
+    // 제출 본문에는 보드를 싣지 않는다(DTO 밖 필드는 422)
+    expect(submitGameScore).toHaveBeenCalledWith('tetris', { sessionId: 's2', playerName: '테스터', replay: expect.anything() }, undefined);
+    expect(screen.getByText('등록했어요! 10/24 데일리 3위')).toBeTruthy();
+  });
+});

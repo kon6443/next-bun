@@ -160,4 +160,16 @@ describe('GameOverPanel 예상 순위 요청', () => {
     expect(screen.getByTestId('challenge-share').textContent).toBe('⚔️ 도전장 다시 보내기');
     expect(screen.queryByTestId('result-share')).toBeNull();
   });
+
+  it('도전장 판인데 원본을 못 받았으면 일반 공유 — 도전장 보드 순위를 "전체 N위"로 자랑하지 않는다', async () => {
+    getGameRankings.mockResolvedValue(page([]));
+    submitGameScore.mockResolvedValue({ code: 'SUCCESS', message: 'ok', data: { scoreId: 51, score: 500, detail: {}, ranks: { daily: 1, weekly: 1, all: 1 } } });
+    await act(async () => {
+      render(<GameOverPanel {...props} challenge={{ boardKey: 'challenge-7', original: null }} />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    expect(screen.getByTestId('result-share').textContent).toBe('이 기록 공유하기');
+  });
 });

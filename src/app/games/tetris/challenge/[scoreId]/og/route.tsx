@@ -1,9 +1,9 @@
-import { getGameScoreSummary } from "@/services/gameServerService";
 // route 파일은 HTTP 메서드·segment config만 export할 수 있다(next build의 route 타입 검사) — 렌더·상수는 lib에 둔다
 import { renderReplayCardImage } from "@/app/games/_shared/lib/ogCard";
 import { parseScoreId } from "@/app/games/_shared/lib/share";
 import { TETRIS_SHARE } from "../../../lib/share";
 import { buildChallengeCard } from "../../../lib/challenge";
+import { loadChallengeTarget } from "../../../lib/challengeTarget";
 
 /**
  * 도전장 미리보기 카드 1200×630 — GET /games/tetris/challenge/{scoreId}/og (games-growth B2)
@@ -18,6 +18,6 @@ const CHALLENGE_CARD_SPEC = { ...TETRIS_SHARE, card: buildChallengeCard, fallbac
 export async function GET(_request: Request, { params }: RouteContext) {
   const { scoreId } = await params;
   const id = parseScoreId(scoreId);
-  const summary = id === null ? null : await getGameScoreSummary("tetris", id);
+  const summary = id === null ? null : await loadChallengeTarget(id);
   return renderReplayCardImage(CHALLENGE_CARD_SPEC, summary);
 }

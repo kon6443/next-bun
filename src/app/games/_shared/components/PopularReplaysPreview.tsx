@@ -34,8 +34,10 @@ export function PopularReplaysPreview<G extends GameType>({ game, myScoreIds, li
 
   if (failed) return null;
   return (
-    <section className={`${cardStyles.section} p-4`} data-testid="popular-replays">
-      <h2 className="mb-3 text-base font-semibold text-white">오늘 많이 본 리플레이</h2>
+    <section className={`${cardStyles.section} p-4`} aria-labelledby="popular-replays-title" data-testid="popular-replays">
+      <h2 id="popular-replays-title" className="mb-3 text-base font-semibold text-white">
+        오늘 많이 본 리플레이
+      </h2>
       {items === null ? (
         <LoadingSpinnerSimple message="리플레이를 불러오는 중..." />
       ) : items.length === 0 ? (

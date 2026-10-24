@@ -22,7 +22,7 @@ export function TrophyBadge({ trophies }: { trophies: Trophies | null | undefine
   const label = trophyLabel(trophies);
   if (!label) return null;
   return (
-    <span role="img" aria-label={`명예의 전당 ${label}`} title={`명예의 전당 ${label}`} className="ml-1.5 inline-flex items-center gap-1 align-middle text-[10px] font-semibold text-amber-200" data-testid="trophy-badge">
+    <span role="img" aria-label={`명예의 전당 ${label}`} title={`명예의 전당 ${label}`} className="ml-1.5 inline-flex shrink-0 items-center gap-1 align-middle text-[10px] font-semibold text-amber-200" data-testid="trophy-badge">
       {MEDALS.filter(({ key }) => trophies[key] > 0).map(({ key, icon }) => (
         <span key={key} aria-hidden="true">
           {icon}

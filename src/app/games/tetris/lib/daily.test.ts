@@ -46,6 +46,18 @@ describe('오늘 첫 판 기록·공유 문구', () => {
     expect(loadDailyFirstRun(KEY)).toBeNull();
   });
 
+  it('더 최근 날의 첫 판이 있으면 지난 날 판(자정 직전 세션·다른 탭)이 덮지 않는다', () => {
+    recordDailyRun({ boardKey: 'daily-2026-10-25', score: 7, lines: 0, level: 1 });
+    expect(recordDailyRun({ boardKey: KEY, score: 100, lines: 4, level: 1 })).toBe(false);
+    expect(loadDailyFirstRun('daily-2026-10-25')?.score).toBe(7);
+  });
+
+  it('저장값이 데일리 키 형식이 아니면(손상) 비교하지 않고 새 첫 판으로 덮는다 — 첫 판이 영영 막히지 않게', () => {
+    window.localStorage.setItem('tetris:daily:first', JSON.stringify({ boardKey: 'zzz', score: 1, lines: 0, level: 1 }));
+    expect(recordDailyRun({ boardKey: KEY, score: 100, lines: 4, level: 1 })).toBe(true);
+    expect(loadDailyFirstRun(KEY)?.score).toBe(100);
+  });
+
   it('등록하면 순위를 붙인다 — 이미 다른 기록이 붙었으면 무시', () => {
     recordDailyRun({ boardKey: KEY, score: 100, lines: 4, level: 1 });
     attachDailyRank(KEY, 31, 3);

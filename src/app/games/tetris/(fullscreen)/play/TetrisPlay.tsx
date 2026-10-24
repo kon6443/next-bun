@@ -50,18 +50,21 @@ function randomSeed(): number {
   return crypto.getRandomValues(new Uint32Array(1))[0];
 }
 
-/** 도전장 세션이 거절된 이유 — 다시 받아도 같으므로 시작을 막는다. 그 밖(망·503)은 null */
+/** 도전장 세션이 거절된 이유 — 다시 받아도 같으므로 시작을 막는다(문구는 고정 — 서버 원문을 그대로 띄우지 않는다). 그 밖(망·503)은 null */
 function challengeBlockMessage(err: unknown): string | null {
   if (!(err instanceof ApiError)) return null;
   if (err.code === "GAME_CHALLENGE_EXPIRED") return "지난 버전 게임의 기록이라 이 도전장은 더 이상 할 수 없어요.";
   if (err.status === 404) return "도전할 기록을 찾을 수 없어요. 지워졌거나 아직 공개 전인 기록이에요.";
-  if (err.status === 409 || err.status === 422) return err.getDefaultMessage();
+  if (err.status === 409 || err.status === 422) return "이 기록에는 도전할 수 없어요.";
   return null;
 }
 
-function sessionErrorMessage(err: unknown): string {
+/** 세션을 못 받았을 때 — 이번 판은 로컬 seed로 등록 없이. 오늘의 테트리스·도전장이면 같은 블록 순서가 아님을 밝힌다 */
+function sessionErrorMessage(err: unknown, variant: "daily" | "challenge" | null): string {
   if (err instanceof ApiError && err.code === "GAME_SESSION_UNAVAILABLE") return err.getDefaultMessage();
   if (err instanceof ApiError && err.code === "GAME_DAILY_UNAVAILABLE") return "지금은 오늘의 테트리스를 열 수 없어요. 이번 판은 일반 판으로 등록 없이 플레이해요.";
+  if (variant === "daily") return "오늘의 테트리스를 준비하지 못했어요. 이번 판은 일반 판으로 등록 없이 플레이해요.";
+  if (variant === "challenge") return "도전장을 준비하지 못했어요. 이번 판은 일반 판으로 등록 없이 플레이해요.";
   return `${extractErrorMessage(err, "랭킹 등록을 준비하지 못했습니다.")} 이번 판은 등록 없이 플레이해요.`;
 }
 
@@ -143,7 +146,7 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
       if (!isLatest()) return;
       const blocked = challengeScoreId ? challengeBlockMessage(err) : null;
       if (blocked) setSessionState({ status: "blocked", error: blocked });
-      else setSessionState({ status: "failed", seed: randomSeed(), error: sessionErrorMessage(err) });
+      else setSessionState({ status: "failed", seed: randomSeed(), error: sessionErrorMessage(err, daily ? "daily" : challengeScoreId ? "challenge" : null) });
     }
   }, [accessToken, beginSessionRequest, daily, challengeScoreId]);
 
@@ -156,8 +159,10 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
     originalRequestedRef.current = rootId;
     getGameScore("tetris", rootId)
       .then(({ data }) => setOriginal(data))
-      // 원본 요약을 못 받아도 도전은 된다 — 비교만 빠진다
-      .catch(() => {});
+      // 원본 요약을 못 받아도 도전은 된다 — 비교만 빠진다. 다음 세션(다시 하기)에서 다시 묻게 표시를 지운다
+      .catch(() => {
+        if (originalRequestedRef.current === rootId) originalRequestedRef.current = null;
+      });
   }, [rootId]);
 
   // 로그인 상태가 정해진 뒤 첫 세션을 받는다 (로그인이면 기록에 USER_ID가 남는다)
@@ -234,6 +239,9 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
   }, [startEnabled]);
 
   const showControls = phase === "game" && play.status !== "over" && isCoarse;
+  // 세션을 못 받아 로컬 seed로 하는 판(failed)은 같은 블록 순서가 아니다 — 데일리·도전장 문구를 거둔다(거절된 도전장은 무엇을 못 하는지 보이게 남긴다)
+  const dailyLive = daily && sessionState.status !== "failed";
+  const challengeLive = !!challengeScoreId && sessionState.status !== "failed";
 
   return (
     // relative — 가로 화면에서 패드가 판 위에 겹쳐 좌우로 갈라진다(GamePad)
@@ -295,12 +303,12 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
         {phase === "ready" && (
           <Overlay>
             <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900/95 p-6 text-center">
-              <p className="text-xs font-semibold tracking-[0.4em] text-slate-400">{daily ? "DAILY" : challengeScoreId ? "CHALLENGE" : "TETRIS"}</p>
+              <p className="text-xs font-semibold tracking-[0.4em] text-slate-400">{dailyLive ? "DAILY" : challengeLive ? "CHALLENGE" : "TETRIS"}</p>
               <h1 className="mt-2 text-2xl font-bold text-white">
-                {daily ? "오늘의 테트리스" : challengeScoreId ? (original ? challengeHeadline(original) : "도전장") : "준비됐나요?"}
+                {dailyLive ? "오늘의 테트리스" : challengeLive ? (original ? challengeHeadline(original) : "도전장") : "준비됐나요?"}
               </h1>
-              {daily && <p className="mt-2 text-sm text-slate-300">오늘은 모두 같은 블록 순서예요. 첫 판 기록으로 결과를 공유해요.</p>}
-              {challengeScoreId && sessionState.status !== "blocked" && <p className="mt-2 text-sm text-slate-300">같은 블록 순서로 이 점수를 넘어 보세요.</p>}
+              {dailyLive && sessionState.status !== "blocked" && <p className="mt-2 text-sm text-slate-300">오늘은 모두 같은 블록 순서예요. 첫 판 기록으로 결과를 공유해요.</p>}
+              {challengeLive && sessionState.status !== "blocked" && <p className="mt-2 text-sm text-slate-300">같은 블록 순서로 이 점수를 넘어 보세요.</p>}
               <p className="mt-2 text-sm text-slate-400" role="status">
                 {sessionState.status === "loading"
                   ? "랭킹 등록을 준비하는 중..."

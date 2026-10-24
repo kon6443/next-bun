@@ -225,4 +225,11 @@ describe('ScoreSubmitPanel — 게임 사양·보드를 따른다', () => {
     });
     expect(actions).toHaveBeenLastCalledWith(expect.anything(), '이름', '개인 최고 갱신! 친구에게 자랑하기');
   });
+
+  it('등록 전 보관에 보드를 같이 남긴다 — 다시 등록할 때 그 보드 순위로 읽게 (games-growth B1·B2)', async () => {
+    await act(async () => {
+      render(<ScoreSubmitPanel {...props} board="challenge-7" />);
+    });
+    expect(TEST_GAME.storage.loadPendingSubmissions().at(-1)).toMatchObject({ board: 'challenge-7' });
+  });
 });

@@ -70,6 +70,9 @@ describe('오늘의 테트리스 플레이 (games-growth B1)', () => {
       render(<TetrisPlay daily />);
     });
     expect(screen.getByRole('status').textContent).toContain('지금은 오늘의 테트리스를 열 수 없어요');
+    // 같은 seed가 아닌 판 — 데일리 제목·"모두 같은 블록 순서" 문구를 거둔다
+    expect(screen.queryByText(/오늘은 모두 같은 블록 순서예요/)).toBeNull();
+    expect(screen.getByRole('heading', { name: '준비됐나요?' })).toBeTruthy();
     act(() => play.onGameOver!(over(500), replay));
     expect(window.localStorage.getItem('tetris:daily:first')).toBeNull();
   });
@@ -119,11 +122,23 @@ describe('테트리스 도전장 플레이 (games-growth B2)', () => {
     expect(screen.queryByRole('button', { name: '시작' })).toBeNull();
   });
 
-  it('망 오류(503 등)면 막지 않고 등록 없이 플레이할 수 있다', async () => {
-    createGameSession.mockRejectedValue(new ApiError('GAME_SESSION_UNAVAILABLE', 'x', 503));
+  it('망 오류면 막지 않고 등록 없이 플레이 — 원본 seed가 아니므로 도전장 제목·"같은 블록 순서" 문구를 거둔다', async () => {
+    createGameSession.mockRejectedValue(new Error('network'));
     await act(async () => {
       render(<TetrisPlay challengeScoreId={41} />);
     });
     expect(screen.getByRole('button', { name: '시작' })).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toContain('도전장을 준비하지 못했어요. 이번 판은 일반 판으로 등록 없이 플레이해요.');
+    expect(screen.queryByText('같은 블록 순서로 이 점수를 넘어 보세요.')).toBeNull();
+    expect(screen.getByRole('heading', { name: '준비됐나요?' })).toBeTruthy();
+  });
+
+  it('422(도전할 수 없는 기록)는 서버 원문 대신 고정 문구로 막는다', async () => {
+    createGameSession.mockRejectedValue(new ApiError('VALIDATION_ERROR', 'challengeScoreId must be ...', 422));
+    await act(async () => {
+      render(<TetrisPlay challengeScoreId={41} />);
+    });
+    expect(screen.getByRole('status').textContent).toBe('이 기록에는 도전할 수 없어요.');
+    expect(screen.queryByRole('button', { name: '시작' })).toBeNull();
   });
 });

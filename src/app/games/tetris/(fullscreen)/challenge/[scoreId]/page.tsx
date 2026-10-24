@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getGameScoreSummary } from "@/services/gameServerService";
 import { parseScoreId } from "@/app/games/_shared/lib/share";
 import TetrisPlay from "../../play/TetrisPlay";
 import { buildChallengeMetadata } from "../../../lib/challenge";
+import { loadChallengeTarget } from "../../../lib/challengeTarget";
 
 type ChallengePageProps = {
   params: Promise<{ scoreId: string }>;
@@ -13,7 +13,7 @@ type ChallengePageProps = {
 export async function generateMetadata({ params }: ChallengePageProps): Promise<Metadata> {
   const { scoreId } = await params;
   const id = parseScoreId(scoreId);
-  const summary = id === null ? null : await getGameScoreSummary("tetris", id);
+  const summary = id === null ? null : await loadChallengeTarget(id);
   return buildChallengeMetadata(scoreId, summary);
 }
 

@@ -13,7 +13,7 @@ const PERIOD_LABEL: Record<RankingPeriod, string> = { all: '전체', weekly: '�
 
 /**
  * @param ranks 등록 응답의 서버 순위 — 순위 계산이 실패하면 null
- * @param isNewBest 이 기기의 개인 최고를 갱신했나 (게임·보드별 로컬 기록)
+ * @param isNewBest 이 기기의 개인 최고를 갱신했나 (로컬 기록 — 테트리스는 게임 하나, 디펜스는 보드별)
  * @param periods 결과 화면에 보이는 기간 — 보이지 않는 기간의 순위로 자랑하지 않는다
  * @returns 공유 버튼 문구, 자랑할 것이 없으면 null
  */

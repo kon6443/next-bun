@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { cardStyles } from "@/styles/teams";
 import { getHallOfFame } from "@/services/gameService";
-import type { GameType, HallOfFamePeriod, ScoreDetailByGame } from "@/types/game";
+import type { ApiResponse } from "@/types/api";
+import type { GameType, HallOfFame as HallOfFameData, HallOfFamePeriod, ScoreDetailByGame } from "@/types/game";
 import { formatScore } from "../lib/format";
 import type { GameUiConfig } from "../lib/gameConfig";
 
@@ -18,6 +19,30 @@ type Props<G extends GameType> = {
 };
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+/**
+ * 받아 둔 명예의 전당 — 보드 탭을 바꾸면 랭킹 화면이 통째로 다시 마운트돼도(key) 같은 요청을 반복하지 않게
+ * 응답은 보드와 무관하고 서버도 최대 10분 늦으므로 잠시 재사용한다. 실패는 캐시하지 않는다
+ */
+const CACHE_MS = 60_000;
+const cache = new Map<GameType, { at: number; request: Promise<ApiResponse<HallOfFameData<unknown>>> }>();
+
+function loadHallOfFame<G extends GameType>(gameType: G): Promise<ApiResponse<HallOfFameData<ScoreDetailByGame[G]>>> {
+  const cached = cache.get(gameType);
+  if (cached && Date.now() - cached.at < CACHE_MS) return cached.request as Promise<ApiResponse<HallOfFameData<ScoreDetailByGame[G]>>>;
+  const request = getHallOfFame(gameType);
+  const entry = { at: Date.now(), request };
+  cache.set(gameType, entry);
+  request.catch(() => {
+    if (cache.get(gameType) === entry) cache.delete(gameType);
+  });
+  return request;
+}
+
+/** 테스트용 */
+export function clearHallOfFameCache(): void {
+  cache.clear();
+}
 const MEDALS = ["🥇", "🥈", "🥉"];
 
 /** ISO(UTC) → KST "10/24" */
@@ -41,7 +66,7 @@ export function HallOfFame<G extends GameType>({ game, replayDelayMs = {} }: Pro
   const [periods, setPeriods] = useState<HallOfFamePeriod<ScoreDetailByGame[G]>[] | null>(null);
   useEffect(() => {
     let cancelled = false;
-    getHallOfFame(game.gameType)
+    loadHallOfFame(game.gameType)
       .then(({ data }) => !cancelled && setPeriods(data.periods))
       .catch(() => !cancelled && setPeriods([]));
     return () => {
@@ -61,7 +86,8 @@ export function HallOfFame<G extends GameType>({ game, replayDelayMs = {} }: Pro
           const label = hallOfFamePeriodLabel(period);
           const replayOpen = now >= Date.parse(period.endsAt) + (replayDelayMs[period.kind] ?? 0);
           return (
-            <li key={period.boardKey} className="rounded-2xl border border-white/10 bg-slate-950/40 p-3">
+            // 보드 키는 기간마다 다르지 않을 수 있다(테트리스 주간 = 기본 보드) — 종류·시작 시각으로
+            <li key={`${period.kind}:${period.startsAt}`} className="rounded-2xl border border-white/10 bg-slate-950/40 p-3">
               <h3 className="text-xs font-semibold text-slate-400">{label}</h3>
               <ol className="mt-2 grid gap-1.5">
                 {period.podium.map((item) => (

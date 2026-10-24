@@ -32,7 +32,7 @@ export function ChallengeShareButton({ original, myScore = null, label, classNam
         ⚔️ {label}
       </button>
       {kakaoScript}
-      {open && <ShareMenu content={buildChallengeShareContent(original, myScore)} kakao={kakao} onClose={() => setOpen(false)} />}
+      {open && <ShareMenu content={buildChallengeShareContent(original, myScore)} kakao={kakao} subject="도전장" onClose={() => setOpen(false)} />}
     </>
   );
 }
