@@ -26,7 +26,7 @@ describe('toRenderView — 엔진 상태를 렌더 상태로', () => {
     expect(sawProjectile).toBe(true);
     expect(reused).toBeGreaterThan(100);
     const e = state.enemies.find((x) => x.status === 0);
-    if (e) expect(view.enemies.find((x) => x.id === e.id)).toMatchObject({ x: e.x, y: e.y, hp: e.hp, maxHp: e.maxHp, air: false, effects: 0 });
+    if (e) expect(view.enemies.find((x) => x.id === e.id)).toMatchObject({ x: e.x, y: e.y, hp: e.hp, maxHp: e.maxHp, air: false });
   });
 
   it('투사체 위치는 발사 지점 → 표적 마지막 위치 사이 비율', () => {

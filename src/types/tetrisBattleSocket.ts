@@ -36,8 +36,6 @@ export const TetrisBattleServerEvents = {
   ROOM_STATE: 'roomState',
   CHAT_MESSAGE: 'chatMessage',
   EMOTE_RECEIVED: 'emoteReceived',
-  /** ack 없이 보낸 요청이 실패했을 때만 */
-  ERROR: 'error',
   // P2
   MATCH_STARTING: 'matchStarting',
   GARBAGE: 'garbage',
@@ -260,11 +258,6 @@ export interface KickedPayload {
   code: string;
 }
 
-export interface TetrisBattleErrorPayload {
-  code: TetrisBattleErrorCode;
-  message: string;
-}
-
 /** P2 */
 export interface MatchStartingPayload {
   matchId: string;
@@ -363,7 +356,6 @@ export interface TetrisBattleServerToClientEvents {
   [TetrisBattleServerEvents.ROOM_STATE]: (payload: RoomState) => void;
   [TetrisBattleServerEvents.CHAT_MESSAGE]: (payload: ChatMessagePayload) => void;
   [TetrisBattleServerEvents.EMOTE_RECEIVED]: (payload: EmoteReceivedPayload) => void;
-  [TetrisBattleServerEvents.ERROR]: (payload: TetrisBattleErrorPayload) => void;
   [TetrisBattleServerEvents.MATCH_STARTING]: (payload: MatchStartingPayload) => void;
   [TetrisBattleServerEvents.GARBAGE]: (payload: GarbagePayload) => void;
   [TetrisBattleServerEvents.ATTACK]: (payload: AttackPayload) => void;

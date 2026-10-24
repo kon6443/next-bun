@@ -17,14 +17,14 @@ export type MatchPublished =
   | { status: "unavailable" };
 
 /**
- * 경기가 저장돼 공개될 때까지 GET으로 기다린다 (DESIGN §18 진입점) — enabled일 때만, 200이면 멈춘다
+ * 경기가 저장돼 공개될 때까지 GET으로 기다린다 (DESIGN §18 진입점) — 200이면 멈춘다
  * 마감 뒤 첫 GET이 저장을 일으키므로 다른 참가자가 늦게 내도 한도 안에 열린다
  */
-export function useMatchPublished(matchId: string | null, enabled: boolean): MatchPublished {
+export function useMatchPublished(matchId: string | null): MatchPublished {
   const [state, setState] = useState<MatchPublished>({ status: "idle" });
 
   useEffect(() => {
-    if (!matchId || !enabled) {
+    if (!matchId) {
       setState({ status: "idle" });
       return;
     }
@@ -55,7 +55,7 @@ export function useMatchPublished(matchId: string | null, enabled: boolean): Mat
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [matchId, enabled]);
+  }, [matchId]);
 
   return state;
 }

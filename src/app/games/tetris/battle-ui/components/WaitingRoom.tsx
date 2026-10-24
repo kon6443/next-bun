@@ -14,9 +14,6 @@ import { EmoteBubble } from "./EmoteBubble";
 import { PresenceDot } from "./PresenceDot";
 import { useOfflineCountdown } from "../hooks/useOfflineCountdown";
 
-/** 매치 시작을 연다 — 백엔드 매치(P2)가 없는 환경에서 막아야 하면 false */
-export const BATTLE_MATCH_AVAILABLE = true;
-
 type WaitingRoomProps = {
   room: RoomState;
   connection: ConnectionStatus;
@@ -170,16 +167,12 @@ export function WaitingRoom({ room, connection, onReconnect, onExit, onCopyInvit
                   fullWidth
                   className="min-h-11"
                   onClick={start}
-                  disabled={!BATTLE_MATCH_AVAILABLE || !everyoneReady || starting}
+                  disabled={!everyoneReady || starting}
                 >
                   게임 시작
                 </Button>
                 <p className="mt-2 text-center text-xs text-slate-500">
-                  {!BATTLE_MATCH_AVAILABLE
-                    ? "대전 시작은 곧 열려요. 지금은 방·채팅만 쓸 수 있어요."
-                    : everyoneReady
-                      ? "모두 준비됐어요."
-                      : "2명 이상 모이고 모두 준비(연결)되면 시작할 수 있어요."}
+                  {everyoneReady ? "모두 준비됐어요." : "2명 이상 모이고 모두 준비(연결)되면 시작할 수 있어요."}
                 </p>
               </div>
             ) : (

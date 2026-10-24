@@ -35,7 +35,6 @@ export type Speed = (typeof SPEEDS)[number];
 export type HudSnapshot = {
   status: PlayStatus;
   speed: Speed;
-  tick: number;
   lives: number;
   gold: number;
   wavesStarted: number;
@@ -99,7 +98,6 @@ function snapshotOf(state: GameState, stage: Stage, status: PlayStatus, speed: S
   return {
     status,
     speed,
-    tick: state.tick,
     lives: state.lives,
     gold: state.gold,
     wavesStarted: state.wavesStarted,
@@ -116,7 +114,7 @@ function snapshotOf(state: GameState, stage: Stage, status: PlayStatus, speed: S
 
 /**
  * 지난 스냅샷과 화면에 보이는 값이 같은지 — 객체를 만들지 않고 상태와 바로 비교한다(매 프레임 불린다, §F10 프레임당 할당 0)
- * tick·countdown은 매 틱 바뀐다 — 카운트다운은 보이는 단위(초)가 바뀔 때만
+ * countdown은 매 틱 바뀐다 — 카운트다운은 보이는 단위(초)가 바뀔 때만
  */
 function sameHud(a: HudSnapshot, state: GameState, status: PlayStatus, speed: Speed, version: number): boolean {
   return (

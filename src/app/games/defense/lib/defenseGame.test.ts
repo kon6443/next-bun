@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, it, expect } from 'vitest';
-import { defenseStatLine, worstLeakedEnemy, formatDefenseScore, loadBest, loadBests, recordBest, splitDefenseScore } from './defenseGame';
+import { defenseStatLine, worstLeakedEnemy, formatDefenseScore, loadBests, recordBest, splitDefenseScore } from './defenseGame';
 
 describe('defenseGame — 보드별 최고 점수·랭킹 요약', () => {
   beforeEach(() => localStorage.clear());
@@ -9,7 +9,8 @@ describe('defenseGame — 보드별 최고 점수·랭킹 요약', () => {
     expect(recordBest('endless-s1', 5_000_000)).toBe(true);
     expect(recordBest('endless-s1', 4_000_000)).toBe(false);
     expect(recordBest('weekly-2026-w43', 1_000_000)).toBe(true);
-    expect([loadBest('endless-s1'), loadBest('weekly-2026-w43'), loadBest('weekly-2026-w44')]).toEqual([5_000_000, 1_000_000, 0]);
+    const bests = loadBests();
+    expect([bests['endless-s1'], bests['weekly-2026-w43'], bests['weekly-2026-w44'] ?? 0]).toEqual([5_000_000, 1_000_000, 0]);
   });
 
   it('주간은 최근 8주만 남긴다(무한 시즌은 그대로)', () => {
