@@ -48,13 +48,24 @@ function stepper(input: ReplayInput) {
 describe('판 간 격리 — 판 여러 개를 틱 단위로 번갈아 돌려도 단독 실행과 같다', () => {
   it('증강 있는 무한·주간 판과 캠페인 판을 섞어 4판씩 번갈아', () => {
     const withAugments = cases.filter((c) => c.expected.result.augments.length > 0).slice(0, 4);
-    const campaign = cases.filter((c) => c.input.mode === 'campaign' && c.input.ticks < 162000).slice(0, 4);
+    // 증강 있는 캠페인 판이 양쪽 목록에 겹치지 않게 — 캠페인 몫은 증강 없는 판(효과가 판 시작 난이도 효과뿐)
+    const campaign = cases.filter((c) => c.input.mode === 'campaign' && c.input.ticks < 162000 && !withAugments.includes(c)).slice(0, 4);
     const group = [...withAugments, ...campaign];
     expect(withAugments.length).toBeGreaterThanOrEqual(3);
-    expect(campaign.length).toBeGreaterThan(0);
+    expect(campaign.length).toBeGreaterThanOrEqual(2);
     const runners = group.map((c) => ({ c, run: stepper(c.input), done: false }));
+    /** 이번 순회에 살아 있는 두 판의 효과가 개수는 같고 내용이 다르다 — 메모가 "배열 동일성"을 빼먹은 퇴행(길이만 비교)이 드러나는 조건 */
+    const sameLengthDifferentAlive = () =>
+      runners.some((a, i) =>
+        runners.some(
+          (b, j) =>
+            j > i && !a.done && !b.done && a.run.state.effects.length > 0 && a.run.state.effects.length === b.run.state.effects.length && JSON.stringify(a.run.state.effects) !== JSON.stringify(b.run.state.effects),
+        ),
+      );
+    let collided = false;
     // 모든 판이 끝날 때까지 한 틱씩 차례로
     for (let alive = runners.length; alive > 0; ) {
+      if (!collided) collided = sameLengthDifferentAlive();
       alive = 0;
       for (const r of runners) {
         if (r.done) continue;
@@ -62,11 +73,8 @@ describe('판 간 격리 — 판 여러 개를 틱 단위로 번갈아 돌려도
         else r.done = true;
       }
     }
-    // 효과 개수는 같고 내용이 다른 두 판이 섞여야 메모가 "배열 동일성"을 빼먹은 퇴행(길이만 비교)을 잡는다
-    const sameLengthDifferent = runners.some((a, i) =>
-      runners.some((b, j) => j > i && a.run.state.effects.length > 0 && a.run.state.effects.length === b.run.state.effects.length && JSON.stringify(a.run.state.effects) !== JSON.stringify(b.run.state.effects)),
-    );
-    expect(sameLengthDifferent).toBe(true);
+    // 표본이 위 조건을 실제로 만들어야 이 테스트가 그 퇴행을 지킨다(코퍼스를 다시 만들어 표본이 바뀌면 여기서 알린다)
+    expect(collided).toBe(true);
     for (const r of runners) {
       expect({ id: r.c.id, hash: getStateHash(r.run.state) }).toEqual({ id: r.c.id, hash: r.c.expected.result.stateHash });
       expect(r.run.checkpoints).toEqual(r.c.expected.checkpoints);
