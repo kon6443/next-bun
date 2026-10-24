@@ -14,11 +14,16 @@ import { buildShareContent } from "@/app/games/_shared/lib/shareSpec";
 import { ACTION_LABELS } from "../../../lib/controls";
 import { formatFrames, formatScore } from "@/app/games/_shared/lib/format";
 import { cloneGameState } from "../../../lib/gameSnapshot";
-import { type EffectTracker, createEffectTracker, observeAfter, observeBefore } from "../../../lib/effects";
+import { type EffectTracker, createEffectTracker, drainCues, observeAfter, observeBefore } from "../../../lib/effects";
+import { getSoundPlayer, replayCues } from "../../../lib/sound/soundPlayer";
+import { SoundToggle } from "../../../components/SoundToggle";
 import { loadReplay } from "@/app/games/_shared/lib/replayLoader";
 import { TETRIS_SHARE } from "../../../lib/share";
-import { type ReplayTimeline, buildTimeline, collectActions } from "../../../lib/replayTimeline";
-import { advanceClock, createClock, resetClock } from "../../../lib/fixedStep";
+import { collectActions } from "../../../lib/replayTimeline";
+import { advanceClock, createClock, resetClock } from "@/app/games/_shared/lib/fixedStep";
+import { type PreparedTetrisReplay, type TetrisHighlightKind, SNAPSHOT_INTERVAL, nearestSnapshot, prepareTetrisReplay } from "../../../lib/replayPrepare";
+import { HighlightMarks, HighlightNav } from "@/app/games/_shared/components/HighlightRail";
+import type { HighlightKindSpec } from "@/app/games/_shared/lib/highlights";
 
 /** 재생 중 React 상태를 갱신하는 간격(프레임) — 탐색·끝은 바로 */
 const PLAYBACK_UI_STEP = 6;
@@ -29,17 +34,25 @@ const FRAME_MS = 1000 / FRAMES_PER_SECOND;
 /** 즉시 동작(회전·하드드롭·홀드) 키를 눌린 것으로 보여 줄 프레임 */
 const FLASH_FRAMES = 8;
 const SEEK_STEP_FRAMES = 5 * FRAMES_PER_SECOND;
-/** 뒤로 탐색할 때 처음부터가 아니라 가장 가까운 스냅샷부터 다시 시뮬레이션한다 */
-const SNAPSHOT_INTERVAL = 10 * FRAMES_PER_SECOND;
+/** 하이라이트로 가면 그 순간 이만큼 앞부터 · "이전"이 방금 간 것을 다시 고르지 않게 (games-polish P4) */
+const HIGHLIGHT_LEAD_FRAMES = 1.5 * FRAMES_PER_SECOND;
+const HIGHLIGHT_SLACK_FRAMES = 2 * FRAMES_PER_SECOND;
+export const TETRIS_HIGHLIGHT_KINDS: Record<TetrisHighlightKind, HighlightKindSpec> = {
+  pc: { label: "퍼펙트 클리어", dot: "bg-amber-300" },
+  tspin: { label: "T-스핀", dot: "bg-fuchsia-400" },
+  tetris: { label: "테트리스", dot: "bg-sky-400" },
+  combo: { label: "콤보", dot: "bg-emerald-400" },
+};
 
 type LoadState =
   | { status: "loading" }
   | { status: "error"; message: string; notFound: boolean }
   | { status: "unsupported"; data: ReplayData }
-  | { status: "ready"; data: ReplayData };
+  /** 재생 전 사전 패스(전 구간 스냅샷·하이라이트) — 긴 판은 몇 초 */
+  | { status: "preparing"; progress: number }
+  | { status: "ready"; data: ReplayData; prepared: PreparedTetrisReplay };
 
 type Playback = { playing: boolean; speed: number; frame: number };
-type Snapshot = { state: GameState; cursor: number };
 
 const HELD_KEYS = [ACTION.LEFT_PRESS, ACTION.RIGHT_PRESS, ACTION.SOFT_DROP_PRESS] as const;
 const FLASH_KEYS = [ACTION.ROTATE_CW, ACTION.ROTATE_CCW, ACTION.HARD_DROP, ACTION.HOLD] as const;
@@ -52,35 +65,41 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
   /** 공유 메뉴가 열려 있으면 재생기 키(Space·←→)를 쉰다 */
   const shareOpenRef = useRef(false);
   shareOpenRef.current = shareOpen;
-  const { kakaoReady, kakaoScript } = useKakaoReady();
+  const { kakao, kakaoScript } = useKakaoReady();
 
   const stateRef = useRef<GameState | null>(null);
   const drawRef = useRef<(() => void) | null>(null);
   /** 플레이와 같은 연출 — 뒤로 탐색하면 프레임이 되돌아가 기록이 스스로 비워진다 */
   const effectsRef = useRef<EffectTracker | null>(null);
   if (effectsRef.current === null) effectsRef.current = createEffectTracker();
-  const timelineRef = useRef<ReplayTimeline | null>(null);
   const cursorRef = useRef(0);
   const bufferRef = useRef<number[]>([]);
   const lastActionFrameRef = useRef<Record<number, number>>({});
-  const snapshotsRef = useRef<Map<number, Snapshot>>(new Map());
   const playbackRef = useRef(playback);
   playbackRef.current = playback;
+  /** 오류 화면의 "다시 시도" — 일시 실패(망·429)면 다시 받는다 (games-polish FE-25) */
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setLoad({ status: "loading" });
     loadReplay("tetris", scoreId)
-      .then((data) => {
+      .then(async (data) => {
         if (cancelled) return;
         if (data.engineVersion !== ENGINE_VERSION) {
           setLoad({ status: "unsupported", data });
           return;
         }
-        timelineRef.current = buildTimeline(data.inputs);
+        // 재생 전에 한 번 끝까지 — 전 구간 스냅샷(탐색은 최대 10초만 다시 돈다, FE-13)·하이라이트. 1분 분량마다 쉰다
+        setLoad({ status: "preparing", progress: 0 });
+        const prepared = await prepareTetrisReplay(data, {
+          onProgress: (progress) => !cancelled && setLoad({ status: "preparing", progress }),
+          isCancelled: () => cancelled,
+        });
+        if (cancelled || prepared === "cancelled") return;
         stateRef.current = createGame({ seed: data.seed, das: data.das, arr: data.arr });
         cursorRef.current = 0;
-        snapshotsRef.current = new Map();
-        setLoad({ status: "ready", data });
+        setLoad({ status: "ready", data, prepared });
         setPlayback({ playing: true, speed: 1, frame: 0 });
       })
       .catch((err) => {
@@ -94,15 +113,16 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
     return () => {
       cancelled = true;
     };
-  }, [scoreId]);
+  }, [scoreId, attempt]);
 
   const data = load.status === "ready" ? load.data : null;
+  const prepared = load.status === "ready" ? load.prepared : null;
   const totalFrames = data?.frames ?? 0;
 
   /** 화면 없이 한 프레임 진행 — 기록이 입력을 공급한다 */
   const advance = useCallback((): boolean => {
     const state = stateRef.current;
-    const timeline = timelineRef.current;
+    const timeline = prepared?.timeline;
     if (!state || !timeline || state.over || state.frame >= totalFrames) return false;
     const frame = state.frame;
     cursorRef.current = collectActions(timeline, cursorRef.current, frame, bufferRef.current);
@@ -111,11 +131,8 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
     if (effects) observeBefore(effects, state);
     const applied = stepFrame(state, bufferRef.current, bufferRef.current.length);
     if (effects) observeAfter(effects, state, bufferRef.current, applied);
-    if (state.frame % SNAPSHOT_INTERVAL === 0 && !snapshotsRef.current.has(state.frame)) {
-      snapshotsRef.current.set(state.frame, { state: cloneGameState(state), cursor: cursorRef.current });
-    }
     return true;
-  }, [totalFrames]);
+  }, [prepared, totalFrames]);
 
   /** 키 오버레이 — 누르고 있는 키 + 방금 누른 즉시 동작 */
   const refreshPressed = useCallback(() => {
@@ -137,26 +154,25 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
 
   const seek = useCallback(
     (target: number) => {
-      if (!data) return;
+      if (!prepared) return;
       const clamped = Math.max(0, Math.min(totalFrames, target));
-      if (!stateRef.current || clamped < stateRef.current.frame) {
-        // 뒤로: 목표 이전의 가장 가까운 스냅샷(없으면 처음)부터 다시 시뮬레이션
-        let base: Snapshot | null = null;
-        for (const [frame, snapshot] of snapshotsRef.current) {
-          if (frame <= clamped && (!base || frame > base.state.frame)) base = snapshot;
-        }
-        stateRef.current = base ? cloneGameState(base.state) : createGame({ seed: data.seed, das: data.das, arr: data.arr });
-        cursorRef.current = base ? base.cursor : 0;
+      // 뒤로, 또는 스냅샷 한 칸보다 멀리 앞으로: 목표 이하 가장 가까운 스냅샷에서 — 전 구간에 있어 최대 10초만 다시 돈다 (FE-13)
+      if (!stateRef.current || clamped < stateRef.current.frame || clamped - stateRef.current.frame > SNAPSHOT_INTERVAL) {
+        const base = nearestSnapshot(prepared, clamped);
+        stateRef.current = cloneGameState(base.state);
+        cursorRef.current = base.cursor;
         lastActionFrameRef.current = {};
       }
       while (stateRef.current.frame < clamped && advance()) {
         // 목표 프레임까지
       }
+      // 건너뛴 구간의 소리는 버린다 — 다음 재생 프레임에 한꺼번에 나지 않게
+      if (effectsRef.current) drainCues(effectsRef.current);
       refreshPressed();
       drawRef.current?.();
       setPlayback((p) => ({ ...p, frame: stateRef.current?.frame ?? 0 }));
     },
-    [advance, data, refreshPressed, totalFrames],
+    [advance, prepared, refreshPressed, totalFrames],
   );
 
   // 재생 루프 — 진행한 뒤 같은 애니메이션 프레임 안에서 그린다
@@ -177,6 +193,8 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
             break;
           }
         }
+        // 효과음 — 같은 관찰에서 나온 신호(플레이와 같은 소리). 빠른 배속은 큰 사건만
+        if (effectsRef.current) getSoundPlayer().playCues(replayCues(drainCues(effectsRef.current), speed));
         refreshPressed();
         const frame = state.frame;
         // React 상태(시간·슬라이더·HUD)는 약 10Hz로만 — 캔버스는 매 화면 프레임 그린다 (FE-06)
@@ -192,6 +210,24 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
     rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
   }, [advance, data, refreshPressed]);
+
+  // 소리 플레이어를 화면에 들어올 때 만들어 둔다 — 첫 조작(오디오 시작 조건)을 놓치지 않게. 배경음악은 재생 중에만, 나가면 끈다
+  useEffect(() => {
+    const player = getSoundPlayer();
+    return () => player.setMusicPlaying(false);
+  }, []);
+  const ready = load.status === "ready";
+  useEffect(() => {
+    getSoundPlayer().setMusicPlaying(ready && playback.playing);
+  }, [ready, playback.playing]);
+
+  /** 끌기 전에 재생 중이었으면 놓을 때 이어서 (FE-17) */
+  const resumeAfterDragRef = useRef(false);
+  const endDrag = useCallback(() => {
+    if (!resumeAfterDragRef.current) return;
+    resumeAfterDragRef.current = false;
+    setPlayback((p) => (p.frame >= totalFrames ? p : { ...p, playing: true }));
+  }, [totalFrames]);
 
   const togglePlay = useCallback(() => {
     const current = playbackRef.current;
@@ -228,13 +264,32 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
   if (load.status !== "ready") {
     return (
       <div className="flex h-full items-center justify-center p-4">
-        <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900/95 p-6 text-center" role={load.status === "loading" ? "status" : "alert"}>
+        <div
+          className="w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900/95 p-6 text-center"
+          role={load.status === "loading" || load.status === "preparing" ? "status" : "alert"}
+        >
           {load.status === "loading" ? (
             <p className="text-sm text-slate-400">리플레이를 불러오는 중...</p>
+          ) : load.status === "preparing" ? (
+            <p className="text-sm text-slate-400" data-testid="tetris-replay-preparing">
+              재생을 준비하는 중… {Math.round(load.progress * 100)}%
+            </p>
           ) : load.status === "unsupported" ? (
             <p className="text-sm text-slate-300">이전 버전 기록이라 재생할 수 없어요.</p>
           ) : (
-            <p className="text-sm text-red-300">{load.notFound ? "기록을 찾을 수 없어요." : load.message}</p>
+            <>
+              <p className="text-sm text-red-300">{load.notFound ? "기록을 찾을 수 없어요." : load.message}</p>
+              {/* 일시 실패(망·429)는 다시 받으면 된다 — 실패는 캐시하지 않는다(replayLoader) (FE-25) */}
+              {!load.notFound && (
+                <button
+                  type="button"
+                  onClick={() => setAttempt((n) => n + 1)}
+                  className="mt-4 inline-flex min-h-11 items-center justify-center rounded-full bg-sky-500/30 px-6 text-sm font-semibold text-white"
+                >
+                  다시 시도
+                </button>
+              )}
+            </>
           )}
           <Link href="/games/tetris/rankings" className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full border border-white/20 px-6 text-sm font-semibold text-slate-200">
             랭킹으로
@@ -246,6 +301,7 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
 
   const state = stateRef.current;
   const loaded = load.data;
+  const highlights = load.prepared.highlights;
 
   return (
     <div className="flex h-full flex-col pt-[env(safe-area-inset-top)]" style={{ touchAction: "auto" }}>
@@ -264,6 +320,7 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
             전체 {loaded.rank}위 · {formatFullDateTime(new Date(loaded.createdAt))}
           </p>
         </div>
+        <SoundToggle className="shrink-0" />
         <button
           type="button"
           onClick={() => setShareOpen(true)}
@@ -286,7 +343,7 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
       {shareOpen && (
         <ShareMenu
           content={buildShareContent(TETRIS_SHARE, loaded)}
-          kakaoReady={kakaoReady}
+          kakao={kakao}
           onClose={() => setShareOpen(false)}
         />
       )}
@@ -316,17 +373,39 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
       <footer className="space-y-2 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2">
         <div className="flex items-center gap-3 text-xs tabular-nums text-slate-400">
           <span>{formatFrames(playback.frame)}</span>
-          <input
-            type="range"
-            min={0}
-            max={totalFrames}
-            value={playback.frame}
-            onChange={(e) => seek(Number(e.target.value))}
-            aria-label="재생 위치"
-            className="h-11 min-w-0 flex-1 accent-sky-400"
-          />
+          <div className="relative min-w-0 flex-1">
+            <HighlightMarks marks={highlights} kinds={TETRIS_HIGHLIGHT_KINDS} max={totalFrames} />
+            <input
+              type="range"
+              min={0}
+              max={totalFrames}
+              value={playback.frame}
+              // 끄는 동안은 재생을 멈춘다 — 재생이 손잡이를 되돌려 끌기와 다투지 않게, 놓으면 이어서 (games-polish FE-17)
+              onPointerDown={() => {
+                if (!playbackRef.current.playing) return;
+                resumeAfterDragRef.current = true;
+                setPlayback((p) => ({ ...p, playing: false, frame: stateRef.current?.frame ?? p.frame }));
+              }}
+              onPointerUp={endDrag}
+              onPointerCancel={endDrag}
+              onChange={(e) => seek(Number(e.target.value))}
+              aria-label="재생 위치"
+              aria-valuetext={`${formatFrames(playback.frame)} / ${formatFrames(totalFrames)}`}
+              data-testid="tetris-replay-seek"
+              className="h-11 w-full accent-sky-400"
+            />
+          </div>
           <span>{formatFrames(totalFrames)}</span>
         </div>
+        <HighlightNav
+          marks={highlights}
+          kinds={TETRIS_HIGHLIGHT_KINDS}
+          position={playback.frame}
+          leadIn={HIGHLIGHT_LEAD_FRAMES}
+          slack={HIGHLIGHT_SLACK_FRAMES}
+          formatAt={formatFrames}
+          onSeek={seek}
+        />
         <div className="flex items-center justify-center gap-2">
           <button
             type="button"

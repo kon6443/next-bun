@@ -7,14 +7,15 @@ type JoinResult = { ok: true; data: unknown } | { ok: false; code: string };
 type JoinOptions = { retrySeatInUse?: boolean; onSeatWait?: () => void } | undefined;
 const joinRoom = vi.fn<(payload: JoinRoomPayload, options: JoinOptions) => Promise<JoinResult>>();
 const clearRoomNotice = vi.fn();
+const reconnect = vi.fn();
 const ctx = {
-  status: 'connected' as const,
+  status: 'connected' as 'connected' | 'disconnected' | 'failed',
   room: null,
   roomNotice: null as { code: string; message: string; replaced?: boolean; kicked?: boolean } | null,
   clearRoomNotice,
   joinRoom: (payload: JoinRoomPayload, _scope: unknown, options?: JoinOptions) => joinRoom(payload, options),
   leaveRoom: vi.fn(),
-  reconnect: vi.fn(),
+  reconnect: () => reconnect(),
 };
 vi.mock('../contexts/BattleSocketContext', () => ({
   useBattleSocket: () => ctx,
@@ -57,6 +58,8 @@ describe('BattleRoom 입장', () => {
     router.replace.mockReset();
     toast.mockReset();
     ctx.roomNotice = null;
+    ctx.status = 'connected';
+    reconnect.mockReset();
   });
 
   it('자동 입장이 응답 없이 실패한 뒤 폼으로 들어가도 저장된 토큰을 싣는다 — 자리가 하나 더 생기지 않게 (FE-01)', async () => {
@@ -150,5 +153,31 @@ describe('BattleRoom 입장', () => {
     });
     expect(joinRoom).toHaveBeenCalledTimes(1);
     expect(joinRoom.mock.calls[0][0]).toEqual(expect.objectContaining({ playerToken: 'secret' }));
+  });
+
+  it('연결이 끝내 실패하면 "입장하는 중" 스피너 대신 안내와 다시 연결 버튼 (FE-33)', () => {
+    ctx.status = 'failed';
+    render(<BattleRoom code={CODE} lockedHint={false} />);
+    expect(screen.queryByRole('status', { name: '입장하는 중' })).toBeNull();
+    expect(screen.getByText('서버에 연결되지 않았어요.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '다시 연결' }));
+    expect(reconnect).toHaveBeenCalledTimes(1);
+    expect(joinRoom).not.toHaveBeenCalled();
+  });
+
+  it('다시 연결하는 중이면 그렇게 알린다 (FE-33)', () => {
+    ctx.status = 'disconnected';
+    render(<BattleRoom code={CODE} lockedHint={false} />);
+    expect(screen.getByText('서버에 다시 연결하는 중이에요…')).toBeInTheDocument();
+  });
+
+  it('자동 입장이 일시 장애(SERVICE_UNAVAILABLE)로 거절되면 문구와 함께 입장 폼으로 — 다시 시도할 수 있다 (BT-03)', async () => {
+    saveRoomSession(CODE, { playerId: 'p1', playerToken: 'secret', playerName: '나' });
+    joinRoom.mockResolvedValueOnce({ ok: false, code: 'SERVICE_UNAVAILABLE' }).mockResolvedValueOnce({ ok: true, data: {} });
+    render(<BattleRoom code={CODE} lockedHint={false} />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('잠시 후 다시 시도해 주세요');
+    expect(screen.getByRole('button', { name: '입장' })).toBeEnabled();
+    await submitForm();
+    expect(joinRoom.mock.calls[1][0]).toEqual(expect.objectContaining({ playerToken: 'secret' }));
   });
 });

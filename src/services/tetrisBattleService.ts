@@ -64,16 +64,31 @@ async function handleApiError(response: Response, errorMessages: ErrorMessageMap
 const RETRY_AFTER_UNAUTHORIZED_MS = 1100;
 
 /**
+ * 응답 대기 상한 — 망이 멈추면 "기록 저장 중"·"경기 저장 중"·재생 준비에 영원히 머물지 않고 기존 실패·재시도 분기로 간다
+ * (gameService.ts FE-08과 같은 방식). 시간이 지나면 TimeoutError → NetworkError(다시 시도 대상)
+ */
+export const SUBMIT_TIMEOUT_MS = 30_000;
+export const LOAD_TIMEOUT_MS = 15_000;
+
+/** AbortSignal.timeout이 없는 오래된 브라우저에서는 상한 없이 */
+function timeoutSignal(ms: number): AbortSignal | undefined {
+  return typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(ms) : undefined;
+}
+
+/**
  * 선택 인증 호출 — 만료·잘못된 토큰은 백엔드가 401로 막으므로 토큰 없이 1회 재시도한다 (gameService.ts와 같은 방식)
  * 제출 인증은 본문의 playerToken이라 로그인 토큰이 없어도 된다
  */
 async function fetchWithOptionalAuth(args: { method: 'POST'; endpoint: string; body?: unknown }, accessToken?: string): Promise<Response> {
-  if (!accessToken) return fetchServiceInstance.backendFetch(args);
+  // 재시도마다 새 상한 — 첫 요청의 시간을 이어 쓰지 않는다
+  const send = (auth: { accessToken?: string; notifyUnauthorized?: boolean }) =>
+    fetchServiceInstance.backendFetch({ ...args, ...auth, signal: timeoutSignal(SUBMIT_TIMEOUT_MS) });
+  if (!accessToken) return send({});
   // 결과 화면에서 전역 로그아웃(로그인 화면 이동)이 일어나지 않게 401 이벤트를 끈다
-  const response = await fetchServiceInstance.backendFetch({ ...args, accessToken, notifyUnauthorized: false });
+  const response = await send({ accessToken, notifyUnauthorized: false });
   if (response.status !== 401) return response;
   await new Promise((resolve) => setTimeout(resolve, RETRY_AFTER_UNAUTHORIZED_MS));
-  return fetchServiceInstance.backendFetch(args);
+  return send({});
 }
 
 // ==================== API ====================
@@ -156,7 +171,12 @@ export type BattleMatch = {
 };
 
 /** 한 참가자의 대전 리플레이 — 백엔드 BattleReplayDetailDto (VERIFIED만) */
-export type BattleReplayDetail = BattleReplayInput & { matchId: string; playerId: string };
+export type BattleReplayDetail = BattleReplayInput & {
+  matchId: string;
+  playerId: string;
+  /** 가비지 이벤트마다 보낸 사람 playerId(garbage 로그와 같은 순서, 모르면 null) — 이 필드가 생긴 뒤 저장된 경기에만 있다 */
+  garbageFrom?: (string | null)[];
+};
 
 /** 경로의 matchId 형식 — 백엔드 MATCH_ID_PATTERN과 같다. 맞지 않으면 묻지 않고 404 */
 export function isBattleMatchId(raw: string): boolean {
@@ -168,6 +188,7 @@ export async function getBattleMatch(matchId: string): Promise<ApiResponse<Battl
   const response = await fetchServiceInstance.backendFetch({
     method: 'GET',
     endpoint: `/api/v1/tetris-battle/matches/${encodeURIComponent(matchId)}`,
+    signal: timeoutSignal(LOAD_TIMEOUT_MS),
   });
   if (!response.ok) {
     await handleApiError(response, {
@@ -184,6 +205,7 @@ export async function getBattleReplay(matchId: string, playerId: string): Promis
   const response = await fetchServiceInstance.backendFetch({
     method: 'GET',
     endpoint: `/api/v1/tetris-battle/matches/${encodeURIComponent(matchId)}/replays/${encodeURIComponent(playerId)}`,
+    signal: timeoutSignal(LOAD_TIMEOUT_MS),
   });
   if (!response.ok) {
     await handleApiError(response, {
@@ -197,16 +219,25 @@ export async function getBattleReplay(matchId: string, playerId: string): Promis
 
 // ==================== 입구 — 로비 방 수·최근 경기 (DESIGN §19) ====================
 
+/** 입구 미리보기 방 — 빈자리가 있는 대기 방(잠긴 방 포함) */
+export type BattleLobbyRoom = { code: string; name: string; playerCount: number; maxPlayers: number; locked: boolean };
+
 /** 지금 로비의 방 수 — 소켓 없이 테트리스 홈에서 쓴다 */
 export type BattleLobbyStats = {
   /** 입장할 수 있는 대기 방 */
   waitingRooms: number;
   /** 경기 중인 방 */
   playingRooms: number;
+  /** 미리보기 최대 3개(사람 많은 순 → 최근) — 이 필드가 생기기 전 서버면 없다(방 수만 보인다) */
+  rooms?: BattleLobbyRoom[];
 };
 
 export async function getBattleLobbyStats(): Promise<ApiResponse<BattleLobbyStats>> {
-  const response = await fetchServiceInstance.backendFetch({ method: 'GET', endpoint: '/api/v1/tetris-battle/lobby' });
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'GET',
+    endpoint: '/api/v1/tetris-battle/lobby',
+    signal: timeoutSignal(LOAD_TIMEOUT_MS),
+  });
   if (!response.ok) {
     await handleApiError(response, {
       429: '요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.',
@@ -242,7 +273,12 @@ export async function getBattleMatchList(params: { limit?: number; cursor?: stri
   const query: Record<string, string> = {};
   if (params.limit !== undefined) query.limit = String(params.limit);
   if (params.cursor) query.cursor = params.cursor;
-  const response = await fetchServiceInstance.backendFetch({ method: 'GET', endpoint: '/api/v1/tetris-battle/matches', query });
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'GET',
+    endpoint: '/api/v1/tetris-battle/matches',
+    query,
+    signal: timeoutSignal(LOAD_TIMEOUT_MS),
+  });
   if (!response.ok) {
     await handleApiError(response, {
       429: '요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.',

@@ -33,20 +33,29 @@ describe('ShareMenu', () => {
     vi.unstubAllGlobals();
   });
 
-  it('카카오 SDK가 준비되지 않으면 카카오톡을 숨기고, Web Share가 없으면 더보기를 숨긴다', () => {
+  it('카카오 키가 없으면(off) 카카오톡을 숨기고, Web Share가 없으면 더보기를 숨긴다', () => {
     setNavigator({});
-    render(<ShareMenu content={content} kakaoReady={false} onClose={() => {}} />);
+    render(<ShareMenu content={content} kakao="off" onClose={() => {}} />);
     expect(screen.queryByRole('button', { name: /카카오톡/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /더보기/ })).toBeNull();
     expect(screen.getByRole('button', { name: /링크 복사/ })).toBeTruthy();
     expect(screen.getByRole('dialog', { name: '리플레이 공유' })).toBeTruthy();
   });
 
+  it('카카오 SDK를 받는 중이면 자리를 잡은 비활성 버튼, 실패하면 안내 한 줄 — 말없이 사라지지 않는다 (games-polish FE-49)', () => {
+    setNavigator({});
+    const { rerender } = render(<ShareMenu content={content} kakao="loading" onClose={() => {}} />);
+    expect(screen.getByRole('button', { name: /카카오톡 준비 중/ })).toBeDisabled();
+    rerender(<ShareMenu content={content} kakao="failed" onClose={() => {}} />);
+    expect(screen.queryByRole('button', { name: /카카오톡/ })).toBeNull();
+    expect(screen.getByText(/카카오톡 공유를 불러오지 못했어요/)).toBeTruthy();
+  });
+
   it('카카오톡: 기록 OG 이미지·리플레이 URL로 피드 카드', () => {
     setNavigator({});
     sendKakaoFeed.mockReturnValue(true);
     const onClose = vi.fn();
-    render(<ShareMenu content={content} kakaoReady onClose={onClose} />);
+    render(<ShareMenu content={content} kakao="ready" onClose={onClose} />);
     fireEvent.click(screen.getByRole('button', { name: /카카오톡/ }));
     expect(sendKakaoFeed).toHaveBeenCalledWith({ ...content.kakao, url: content.url });
     expect(onClose).toHaveBeenCalled();
@@ -56,7 +65,7 @@ describe('ShareMenu', () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     setNavigator({ clipboard: { writeText } as unknown as Clipboard });
     const onClose = vi.fn();
-    render(<ShareMenu content={content} kakaoReady={false} onClose={onClose} />);
+    render(<ShareMenu content={content} kakao="off" onClose={onClose} />);
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /링크 복사/ }));
     });
@@ -67,7 +76,7 @@ describe('ShareMenu', () => {
 
   it('링크 복사 미지원(비보안 컨텍스트)이면 길게 눌러 복사 안내', async () => {
     setNavigator({});
-    render(<ShareMenu content={content} kakaoReady={false} onClose={() => {}} />);
+    render(<ShareMenu content={content} kakao="off" onClose={() => {}} />);
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /링크 복사/ }));
     });
@@ -78,7 +87,7 @@ describe('ShareMenu', () => {
     const share = vi.fn().mockRejectedValue(new DOMException('cancel', 'AbortError'));
     setNavigator({ share });
     const onClose = vi.fn();
-    render(<ShareMenu content={content} kakaoReady={false} onClose={onClose} />);
+    render(<ShareMenu content={content} kakao="off" onClose={onClose} />);
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /더보기/ }));
     });
@@ -90,7 +99,7 @@ describe('ShareMenu', () => {
   it('Esc로 닫는다', () => {
     setNavigator({});
     const onClose = vi.fn();
-    render(<ShareMenu content={content} kakaoReady={false} onClose={onClose} />);
+    render(<ShareMenu content={content} kakao="off" onClose={onClose} />);
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
     expect(onClose).toHaveBeenCalled();
   });

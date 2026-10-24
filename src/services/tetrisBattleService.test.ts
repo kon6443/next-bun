@@ -1,6 +1,15 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getBattleLobbyStats, getBattleMatch, getBattleMatchList, getBattleReplay, isBattleMatchId, submitBattleReplay } from './tetrisBattleService';
+import {
+  LOAD_TIMEOUT_MS,
+  SUBMIT_TIMEOUT_MS,
+  getBattleLobbyStats,
+  getBattleMatch,
+  getBattleMatchList,
+  getBattleReplay,
+  isBattleMatchId,
+  submitBattleReplay,
+} from './tetrisBattleService';
 import { ApiError } from '@/types/api';
 import type { BattleReplayInput } from '@/app/games/tetris/battle-engine';
 
@@ -81,5 +90,47 @@ describe('tetrisBattleService', () => {
 
     fetchMock.mockResolvedValueOnce(json({ code: 'VALIDATION_ERROR', message: 'x', timestamp: 't' }, 422));
     await expect(getBattleMatchList({ cursor: 'bad' })).rejects.toMatchObject({ code: 'VALIDATION_ERROR', status: 422 });
+  });
+
+  it('제출·조회 5종 모두 응답 대기 상한(signal)이 붙는다 — 망이 멈춰도 "저장 중"에 머물지 않는다 (games-polish FE-02)', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    fetchMock.mockImplementation(async () => json({ code: 'SUCCESS', message: '', data: { items: [], nextCursor: null } }, 201));
+    await submitBattleReplay('m1', { playerToken: 'tok', replay });
+    await getBattleMatch('m1');
+    await getBattleReplay('m1', 'p1');
+    await getBattleLobbyStats();
+    await getBattleMatchList();
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    for (const [, init] of fetchMock.mock.calls) expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(timeout.mock.calls.map(([ms]) => ms)).toEqual([SUBMIT_TIMEOUT_MS, LOAD_TIMEOUT_MS, LOAD_TIMEOUT_MS, LOAD_TIMEOUT_MS, LOAD_TIMEOUT_MS]);
+    timeout.mockRestore();
+  });
+
+  it('제출: 401 뒤 토큰 없이 다시 낼 때도 새 상한을 붙인다', async () => {
+    vi.useFakeTimers();
+    fetchMock
+      .mockResolvedValueOnce(json({ code: 'AUTH_UNAUTHORIZED', message: 'x', timestamp: 't' }, 401))
+      .mockResolvedValueOnce(json({ code: 'SUCCESS', message: 'ok', data: { verdict: 'VERIFIED' } }, 201));
+    const pending = submitBattleReplay('m1', { playerToken: 'tok', replay }, 'expired');
+    await vi.advanceTimersByTimeAsync(1100);
+    await pending;
+    vi.useRealTimers();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][1].headers.Authorization).toBeUndefined();
+    expect(fetchMock.mock.calls[1][1].signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('응답이 상한까지 없으면 NetworkError로 끝난다 (제출·조회 재시도 대상)', async () => {
+    const controller = new AbortController();
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(controller.signal);
+    fetchMock.mockImplementation(
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => init.signal?.addEventListener('abort', () => reject(new DOMException('timed out', 'TimeoutError')))),
+    );
+    const pending = getBattleMatch('m1').catch((err: unknown) => err);
+    controller.abort();
+    const err = await pending;
+    timeout.mockRestore();
+    expect((err as Error).name).toBe('NetworkError');
   });
 });

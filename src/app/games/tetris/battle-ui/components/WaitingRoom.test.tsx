@@ -89,4 +89,33 @@ describe('WaitingRoom 접속 표시·내보내기 (D-010·D-011)', () => {
     renderRoom(room([player('p1', '방장'), player('p2', '나')]));
     expect(screen.queryByRole('button', { name: /내보내기/ })).toBeNull();
   });
+
+  it('시작이 성공하면 대전 화면으로 바뀔 때까지 시작 버튼을 잠근 채 둔다 — 실패면 풀고 문구 (FE-34)', async () => {
+    const ready = (p: RoomPlayer): RoomPlayer => ({ ...p, ready: true });
+    ctx.startMatch = vi.fn().mockResolvedValue({ ok: true });
+    const view = renderRoom(room([player('p1', '나'), ready(player('p2', '친구'))]));
+    const button = screen.getByRole('button', { name: '게임 시작' });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    expect(button).toBeDisabled();
+    view.unmount();
+
+    ctx.startMatch = vi.fn().mockResolvedValue({ ok: false, code: 'NOT_ALL_READY' });
+    renderRoom(room([player('p1', '나'), ready(player('p2', '친구'))]));
+    const again = screen.getByRole('button', { name: '게임 시작' });
+    await act(async () => {
+      fireEvent.click(again);
+    });
+    expect(again).toBeEnabled();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+
+  it('대기실에 대전 키보드 조작 — 멈출 수 없으니 일시정지 키는 없다 (games-polish FE-32)', () => {
+    renderRoom(room([player('p1', '나'), player('p2', '친구')]));
+    const guide = screen.getByLabelText('대전 키보드 조작');
+    expect(guide.textContent).toContain('하드 드롭');
+    expect(guide.textContent).not.toContain('일시정지');
+  });
 });
+

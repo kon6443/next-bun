@@ -24,7 +24,7 @@ type Props = {
 
 export function Hud({ hud, exitHref, onRequestExit, soundOn, onToggleSound, onTogglePause, onCycleSpeed, showTotalWaves = true, exitLabel = "스테이지 화면으로 나가기" }: Props) {
   const paused = hud.status === "paused";
-  // 320px까지 한 줄 — 글자는 폭 따라 12~14px, 줄바꿈 금지(넘치면 숫자 칸을 자른다), 버튼은 44px 높이·40px 폭
+  // 320px까지 한 줄 — 글자는 폭 따라 12~14px, 줄바꿈 금지(넘치면 숫자 칸을 자른다), 버튼은 44px 높이·폭은 320px에서 40px → 390px 이상 44px(games-polish FE-43)
   return (
     <header className="flex items-center gap-1 whitespace-nowrap px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] text-sm">
       <Link
@@ -37,7 +37,7 @@ export function Hud({ hud, exitHref, onRequestExit, soundOn, onToggleSound, onTo
           onRequestExit();
         }}
         aria-label={exitLabel}
-        className="flex min-h-11 min-w-10 items-center justify-center rounded-full border border-white/15 text-slate-300"
+        className="flex min-h-11 min-w-[clamp(2.5rem,11.3vw,2.75rem)] items-center justify-center rounded-full border border-white/15 text-slate-300"
       >
         ←
       </Link>
@@ -80,7 +80,7 @@ export function Hud({ hud, exitHref, onRequestExit, soundOn, onToggleSound, onTo
         aria-pressed={soundOn}
         aria-label="효과음"
         onClick={onToggleSound}
-        className="min-h-11 min-w-10 rounded-full border border-white/15 text-base"
+        className="min-h-11 min-w-[clamp(2.5rem,11.3vw,2.75rem)] rounded-full border border-white/15 text-base"
       >
         <span aria-hidden="true">{soundOn ? "🔊" : "🔇"}</span>
       </button>
@@ -91,7 +91,7 @@ export function Hud({ hud, exitHref, onRequestExit, soundOn, onToggleSound, onTo
         disabled={hud.status === "over"}
         onClick={onCycleSpeed}
         aria-label={`배속 ${hud.speed}배 — 누르면 바꿔요 (F)`}
-        className="min-h-11 min-w-10 rounded-full border border-white/15 px-1.5 font-semibold tabular-nums text-slate-100 disabled:opacity-40"
+        className="min-h-11 min-w-[clamp(2.5rem,11.3vw,2.75rem)] rounded-full border border-white/15 px-1.5 font-semibold tabular-nums text-slate-100 disabled:opacity-40"
       >
         {hud.speed}×
       </button>
@@ -102,7 +102,7 @@ export function Hud({ hud, exitHref, onRequestExit, soundOn, onToggleSound, onTo
         disabled={hud.status === "over"}
         onClick={onTogglePause}
         aria-label={paused ? "계속하기 (P)" : "일시정지 (P)"}
-        className="min-h-11 min-w-10 rounded-full border border-white/15 font-semibold text-slate-100 disabled:opacity-40"
+        className="min-h-11 min-w-[clamp(2.5rem,11.3vw,2.75rem)] rounded-full border border-white/15 font-semibold text-slate-100 disabled:opacity-40"
       >
         {paused ? "▶" : "Ⅱ"}
       </button>

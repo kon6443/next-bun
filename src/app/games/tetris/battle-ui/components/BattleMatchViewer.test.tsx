@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { StrictMode } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ApiError } from '@/types/api';
@@ -13,6 +13,14 @@ vi.mock('@/services/tetrisBattleService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/services/tetrisBattleService')>()),
   getBattleMatch: (...a: unknown[]) => getBattleMatch(...a),
   getBattleReplay: (...a: unknown[]) => getBattleReplay(...a),
+}));
+
+const fire = vi.fn();
+vi.mock('../hooks/useAttackTrails', () => ({ useAttackTrails: () => ({ rootRef: { current: null }, fire }) }));
+const sound = { playCues: vi.fn(), play: vi.fn(), setMusicPlaying: vi.fn(), unlock: vi.fn() };
+vi.mock('../../lib/sound/soundPlayer', async (importActual) => ({
+  ...(await importActual<typeof import('../../lib/sound/soundPlayer')>()),
+  getSoundPlayer: () => sound,
 }));
 
 import { BattleMatchViewer } from './BattleMatchViewer';
@@ -161,5 +169,101 @@ describe('대전 경기 페이지 (DESIGN §18)', () => {
     await waitFor(() => expect(screen.getByRole('region', { name: '1위 에이' })).not.toHaveTextContent('기록을 불러오는 중'));
     expect(getBattleMatch).toHaveBeenCalledTimes(1);
     expect(getBattleReplay).toHaveBeenCalledTimes(1);
+  });
+
+  it('판 하나만 기록을 못 받으면(일시 실패) 그 판의 "다시 받기"로 그 판만 다시 받는다 — 경기는 다시 묻지 않는다 (FE-23)', async () => {
+    getBattleMatch.mockResolvedValue({ data: { ...match, players: [match.players[0]] } });
+    getBattleReplay.mockRejectedValueOnce(new ApiError('FORBIDDEN', 'x', 403)).mockResolvedValue({ data: replay });
+    render(<BattleMatchViewer matchId={MATCH_ID} />);
+    const board = await screen.findByRole('region', { name: '1위 에이' });
+    await waitFor(() => expect(board).toHaveTextContent('기록을 불러오지 못했어요'));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '에이 기록 다시 받기' }));
+    });
+    await waitFor(() => expect(board).not.toHaveTextContent('기록을 불러오지 못했어요'));
+    expect(screen.queryByRole('button', { name: '에이 기록 다시 받기' })).toBeNull();
+    expect(getBattleReplay).toHaveBeenCalledTimes(2);
+    expect(getBattleMatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('하이라이트 — 기록이 없는 판도 서버 요약의 KO를 찍고(이름 포함), 막대는 시간으로 읽힌다 (games-polish P4·FE-26)', async () => {
+    getBattleMatch.mockResolvedValue({ data: match });
+    getBattleReplay.mockResolvedValue({ data: replay });
+    render(<BattleMatchViewer matchId={MATCH_ID} />);
+    const slider = await screen.findByTestId('battle-replay-seek');
+    expect(slider.getAttribute('aria-valuetext')).toMatch(/^\d+:\d{2} \/ \d+:\d{2}$/);
+    // p2는 기록 없음(MISSING)·끊김 KO — 서버 frames에 KO 점
+    const next = await screen.findByRole('button', { name: /^다음 하이라이트 — KO 비 / });
+    expect(next).toBeTruthy();
+    expect(screen.getByRole('list', { name: '하이라이트 종류' }).textContent).toContain('KO');
+  });
+
+  describe('다시보기 연출 — 소리·공격 궤적 (games-polish P7)', () => {
+    // survivor 기록: 300프레임에 2줄 가비지 도착 · 1200프레임에 끝(비는 그때 연결 끊김 KO)
+    const GARBAGE_AT = 300;
+    let frame: FrameRequestCallback | null = null;
+    let t = 1000;
+    const step = (ms = 17) => act(() => frame?.((t += ms)));
+    const seekTo = (value: number) => {
+      fireEvent.change(screen.getByRole('slider', { name: '재생 위치' }), { target: { value: String(value) } });
+      step(0);
+    };
+
+    beforeEach(() => {
+      fire.mockReset();
+      Object.values(sound).forEach((fn) => fn.mockReset());
+      vi.stubGlobal('requestAnimationFrame', (fn: FrameRequestCallback) => {
+        frame = fn;
+        return 1;
+      });
+      vi.stubGlobal('cancelAnimationFrame', () => {});
+    });
+    afterEach(() => vi.unstubAllGlobals());
+
+    async function open(garbageFrom?: (string | null)[]) {
+      getBattleMatch.mockResolvedValue({ data: match });
+      getBattleReplay.mockResolvedValue({ data: { ...replay, garbageFrom } });
+      render(<BattleMatchViewer matchId={MATCH_ID} />);
+      await waitFor(() => expect(screen.getByRole('button', { name: '일시정지' })).toBeEnabled());
+      step(0);
+    }
+
+    it('받은 가비지마다 보낸 판 → 받은 판 궤적, 탐색으로 건너뛴 가비지는 날리지 않는다', async () => {
+      await open(['p2']);
+      expect(sound.setMusicPlaying).toHaveBeenLastCalledWith(true);
+      seekTo(GARBAGE_AT + 20);
+      seekTo(GARBAGE_AT - 20);
+      expect(fire).not.toHaveBeenCalled();
+      for (let i = 0; i < 40; i++) step();
+      expect(fire).toHaveBeenCalledTimes(1);
+      expect(fire).toHaveBeenCalledWith('p2', 'p1', 2);
+    });
+
+    it('보낸 사람을 모르는 옛 경기는 궤적 없이 "+N"만', async () => {
+      await open();
+      seekTo(GARBAGE_AT - 20);
+      for (let i = 0; i < 40; i++) step();
+      expect(fire).not.toHaveBeenCalled();
+      expect(screen.getByRole('region', { name: '1위 에이' })).toHaveTextContent('+2');
+    });
+
+    it('크게 보기 중이면 보낸 판이 숨어 있어 궤적 없이 "+N"만', async () => {
+      await open(['p2']);
+      fireEvent.click(screen.getByRole('button', { name: '에이 화면 크게 보기' }));
+      seekTo(GARBAGE_AT - 20);
+      for (let i = 0; i < 40; i++) step();
+      expect(fire).not.toHaveBeenCalled();
+      expect(screen.getByRole('region', { name: '1위 에이' })).toHaveTextContent('+2');
+    });
+
+    it('소리는 1위 판 신호만, 탈락한 판이 있으면 ko — 끝 근처로 탐색해도 건너뛴 소리는 몰려 나지 않는다', async () => {
+      await open(['p2']);
+      seekTo(survivor.frames - 30);
+      expect(sound.playCues).not.toHaveBeenCalled();
+      for (let i = 0; i < 40; i++) step();
+      const largest = Math.max(0, ...sound.playCues.mock.calls.map(([cues]) => (cues as unknown[]).length));
+      expect(largest).toBeLessThanOrEqual(5);
+      expect(sound.play).toHaveBeenCalledWith({ kind: 'ko' });
+    });
   });
 });

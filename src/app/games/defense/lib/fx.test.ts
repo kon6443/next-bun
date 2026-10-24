@@ -8,8 +8,8 @@ import { PARTICLES_PER_TICK, applyTickEvents, createTickNotice, findById } from 
 function views(): { view: RenderView; prev: RenderView } {
   const view = createRenderView();
   const prev = createRenderView();
-  view.enemies.push({ id: 5, kind: 0, x: 1000, y: 1000, hp: 5, maxHp: 10, effects: 0, air: false });
-  prev.enemies.push({ id: 4, kind: 1, x: 2000, y: 2000, hp: 1, maxHp: 10, effects: 0, air: false }, { id: 5, kind: 0, x: 900, y: 900, hp: 5, maxHp: 10, effects: 0, air: false });
+  view.enemies.push({ id: 5, kind: 0, x: 1000, y: 1000, hp: 5, maxHp: 10, air: false });
+  prev.enemies.push({ id: 4, kind: 1, x: 2000, y: 2000, hp: 1, maxHp: 10, air: false }, { id: 5, kind: 0, x: 900, y: 900, hp: 5, maxHp: 10, air: false });
   prev.projectiles.push({ id: 70, x: 0, y: 0, element: 2, damageType: 1 });
   view.towers.push({ id: 2, slot: 0, kind: 1, level: 1, branch: 0, x: 500, y: 500, targetId: 0, ultCooldown: 0, ultimate: false });
   return { view, prev };

@@ -46,7 +46,8 @@ export function useDialog<T extends HTMLElement = HTMLDivElement>(
 
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const getFocusable = () => Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
-    (getFocusable()[0] ?? dialog).focus();
+    // 안쪽 컴포넌트가 이미 자기 첫 포커스를 정했으면(예: 결과 패널 제목) 그대로 둔다 — 자식 effect가 먼저 돈다
+    if (!dialog.contains(document.activeElement)) (getFocusable()[0] ?? dialog).focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {

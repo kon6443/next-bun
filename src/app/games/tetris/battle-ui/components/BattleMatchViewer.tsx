@@ -7,13 +7,20 @@ import { formatFullDateTime } from "@/app/utils/taskUtils";
 import { ShareMenu } from "@/app/games/_shared/components/ShareMenu";
 import { useKakaoReady } from "@/app/games/_shared/hooks/useKakaoReady";
 import { formatFrames } from "@/app/games/_shared/lib/format";
+import { HighlightMarks, HighlightNav } from "@/app/games/_shared/components/HighlightRail";
+import type { HighlightKindSpec } from "@/app/games/_shared/lib/highlights";
 import { FRAMES_PER_SECOND } from "../../engine";
 import { TetrisCanvas } from "../../components/TetrisCanvas";
+import { SoundToggle } from "../../components/SoundToggle";
+import { useReducedEffects } from "../../hooks/useReducedEffects";
+import { getSoundPlayer } from "../../lib/sound/soundPlayer";
+import { useAttackTrails } from "../hooks/useAttackTrails";
+import { boardCues, shouldFireAttack, soundBoardId } from "../lib/replayFx";
 import { type ReplayTrack, useBattleMatchReplay } from "../hooks/useBattleMatchReplay";
 import { useBoardFocus } from "../hooks/useBoardFocus";
-import { isRunnerDone, lastReceivedGarbage } from "../lib/battleReplayRunner";
+import { type BattleHighlightKind, isRunnerDone, lastReceivedGarbage } from "../lib/battleReplayRunner";
 import { buildBattleShareContent } from "../lib/battleShare";
-import { advanceClock, createClock, resetClock } from "../../lib/fixedStep";
+import { advanceClock, createClock, resetClock } from "@/app/games/_shared/lib/fixedStep";
 
 const SPEEDS = [0.5, 1, 2, 4] as const;
 /** 재생은 탭이 잠들면 따라잡지 않는다 — 한 번에 이만큼만(배속 전) */
@@ -27,6 +34,13 @@ const GARBAGE_FLASH_FRAMES = 45;
  * 탐색·끝에 닿음은 바로 반영한다
  */
 const PLAYBACK_UI_STEP = 6;
+/** 하이라이트로 가면 그 순간 이만큼 앞부터 · "이전"이 방금 간 것을 다시 고르지 않게 (games-polish P4) */
+const HIGHLIGHT_LEAD_FRAMES = 1.5 * FRAMES_PER_SECOND;
+const HIGHLIGHT_SLACK_FRAMES = 2 * FRAMES_PER_SECOND;
+export const BATTLE_HIGHLIGHT_KINDS: Record<BattleHighlightKind, HighlightKindSpec> = {
+  attack: { label: "큰 공격", dot: "bg-rose-400" },
+  ko: { label: "KO", dot: "bg-amber-300" },
+};
 
 type Playback = { playing: boolean; speed: number; frame: number };
 
@@ -41,20 +55,34 @@ const KO_LABELS: Record<BattleKoReason, string> = {
  * 재생 방식(배속·탐색·처음부터·키보드)은 싱글 리플레이 재생기와 같다
  */
 export function BattleMatchViewer({ matchId }: { matchId: string }) {
-  const { load, tracks, totalFrames, settled, frameRef, seekAll, retry } = useBattleMatchReplay(matchId);
+  const { load, tracks, totalFrames, settled, frameRef, seekAll, playAll, retry, retryTrack, highlights } = useBattleMatchReplay(matchId);
   const [playback, setPlayback] = useState<Playback>({ playing: true, speed: 1, frame: 0 });
   const [shareOpen, setShareOpen] = useState(false);
   const shareOpenRef = useRef(false);
   shareOpenRef.current = shareOpen;
   const playbackRef = useRef(playback);
   playbackRef.current = playback;
-  const { kakaoReady, kakaoScript } = useKakaoReady();
+  const { kakao, kakaoScript } = useKakaoReady();
   // 판 하나 크게 보기 — 2판 이상일 때 (재생·컨트롤은 그대로 돈다)
   const focus = useBoardFocus(tracks.length > 1);
 
   const ready = load.status === "ready";
   // 재생 루프는 리플레이를 다 받은 뒤에 — 일부만 온 상태로 흘러가지 않게
   const playable = ready && settled;
+
+  // 연출 — 공격 궤적(보이는 판 사이)·소리(크게 보는 판, 없으면 1위 판 하나 + 어느 판이든 탈락음). 재생 루프가 ref로 읽는다
+  const reduced = useReducedEffects();
+  const trails = useAttackTrails(reduced);
+  const fxRef = useRef({ soundBoard: null as string | null, focusedId: null as string | null, fire: trails.fire });
+  fxRef.current = { soundBoard: soundBoardId(tracks.map((t) => t.player), focus.focusedId), focusedId: focus.focusedId, fire: trails.fire };
+  // 소리 플레이어를 화면에 들어올 때 만들어 둔다 — 첫 조작을 놓치지 않게. 배경음악은 재생 중에만, 나가면 끈다
+  useEffect(() => {
+    const player = getSoundPlayer();
+    return () => player.setMusicPlaying(false);
+  }, []);
+  useEffect(() => {
+    getSoundPlayer().setMusicPlaying(playable && playback.playing);
+  }, [playable, playback.playing]);
 
   const seek = useCallback(
     (target: number) => {
@@ -79,7 +107,17 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
           clock.acc -= FRAME_MS;
           frame++;
         }
-        if (frame !== frameRef.current) seekAll(frame);
+        if (frame !== frameRef.current) {
+          let ko = false;
+          playAll(frame, (track, events) => {
+            const { soundBoard, focusedId, fire } = fxRef.current;
+            const id = track.player.playerId;
+            if (events.ko) ko = true;
+            if (id === soundBoard) getSoundPlayer().playCues(boardCues(events.cues, speed));
+            for (const { from, lines } of events.received) if (shouldFireAttack(from, id, lines, speed, focusedId)) fire(from, id, lines);
+          });
+          if (ko) getSoundPlayer().play({ kind: "ko" });
+        }
         const ended = frame >= totalFrames;
         setPlayback((p) =>
           !ended && Math.abs(frame - p.frame) < PLAYBACK_UI_STEP ? p : { ...p, frame, playing: ended ? false : p.playing },
@@ -91,7 +129,7 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
     };
     rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
-  }, [frameRef, playable, seekAll, totalFrames]);
+  }, [frameRef, playable, playAll, totalFrames]);
 
   const togglePlay = useCallback(() => {
     const current = playbackRef.current;
@@ -178,6 +216,7 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
             {match.playerCount}인전 · {formatFullDateTime(new Date(match.startedAt))}
           </p>
         </div>
+        <SoundToggle className="shrink-0" />
         <button
           type="button"
           onClick={() => setShareOpen(true)}
@@ -197,7 +236,7 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
 
       {/* 카카오 SDK — 키가 있을 때만, 공유 버튼이 있는 이 화면에서만 늦게 로드 */}
       {kakaoScript}
-      {shareOpen && <ShareMenu content={buildBattleShareContent(match)} kakaoReady={kakaoReady} onClose={() => setShareOpen(false)} />}
+      {shareOpen && <ShareMenu content={buildBattleShareContent(match)} kakao={kakao} onClose={() => setShareOpen(false)} />}
 
       <ResultTable match={match} />
       {match.disputed && (
@@ -221,7 +260,8 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
       {/* 루트 layout이 이미 <main>으로 감싼다 — 중첩하지 않는다 */}
       {/* 크게 볼 때 다른 판은 숨기기만 한다 — 캔버스를 다시 만들지 않고 재생은 계속 따라간다 */}
       <div
-        className={`grid min-h-0 flex-1 gap-2 px-2 pt-2 ${
+        ref={trails.rootRef}
+        className={`relative grid min-h-0 flex-1 gap-2 px-2 pt-2 ${
           focus.focusedId ? "grid-cols-1" : `grid-cols-2 ${tracks.length > 2 ? "grid-rows-2" : ""}`
         }`}
       >
@@ -233,6 +273,7 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
             matchEnded={playback.frame >= totalFrames}
             hidden={focus.focusedId !== null && focus.focusedId !== track.player.playerId}
             boardProps={focus.boardProps(track.player.playerId, track.player.name)}
+            onRetry={() => void retryTrack(track.player.playerId)}
           />
         ))}
       </div>
@@ -241,17 +282,33 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
       <footer className="space-y-2 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2">
         <div className="flex items-center gap-3 text-xs tabular-nums text-slate-400">
           <span>{formatFrames(playback.frame)}</span>
-          <input
-            type="range"
-            min={0}
-            max={totalFrames}
-            value={playback.frame}
-            onChange={(e) => seek(Number(e.target.value))}
-            aria-label="재생 위치"
-            className="h-11 min-w-0 flex-1 accent-sky-400"
-          />
+          <div className="relative min-w-0 flex-1">
+            <HighlightMarks marks={highlights} kinds={BATTLE_HIGHLIGHT_KINDS} max={totalFrames} />
+            <input
+              type="range"
+              min={0}
+              max={totalFrames}
+              value={playback.frame}
+              onChange={(e) => seek(Number(e.target.value))}
+              aria-label="재생 위치"
+              // 프레임 수가 아니라 시간으로 읽게 (games-polish FE-26)
+              aria-valuetext={`${formatFrames(playback.frame)} / ${formatFrames(totalFrames)}`}
+              data-testid="battle-replay-seek"
+              className="h-11 w-full accent-sky-400"
+            />
+          </div>
           <span>{formatFrames(totalFrames)}</span>
         </div>
+        <HighlightNav
+          marks={highlights}
+          kinds={BATTLE_HIGHLIGHT_KINDS}
+          position={playback.frame}
+          leadIn={HIGHLIGHT_LEAD_FRAMES}
+          slack={HIGHLIGHT_SLACK_FRAMES}
+          formatAt={formatFrames}
+          onSeek={seek}
+          disabled={!playable}
+        />
         <div className="flex items-center justify-center gap-2">
           <button
             type="button"
@@ -335,7 +392,7 @@ const TRACK_MESSAGES: Partial<Record<ReplayTrack["status"], string>> = {
   missing: "기록 없음",
   invalid: "검증되지 않은 기록이라 재생하지 않아요",
   unsupported: "이전 버전 기록이라 재생할 수 없어요",
-  error: "기록을 불러오지 못했어요 · 새로고침하면 다시 받아요",
+  error: "기록을 불러오지 못했어요",
 };
 
 /** 판 하나 — 이름·순위 띠 + 캔버스(왼쪽 가비지 게이지) + 가비지 도착·KO·우승 표시 */
@@ -345,6 +402,7 @@ function ReplayBoard({
   matchEnded,
   hidden,
   boardProps,
+  onRetry,
 }: {
   track: ReplayTrack;
   frame: number;
@@ -353,6 +411,8 @@ function ReplayBoard({
   hidden: boolean;
   /** 크게 보기 버튼 역할 (useBoardFocus) */
   boardProps: ReturnType<ReturnType<typeof useBoardFocus>["boardProps"]>;
+  /** 이 판 기록만 다시 받기 — 일시 실패(error)일 때 */
+  onRetry: () => void;
 }) {
   const { player, runner } = track;
   const message = TRACK_MESSAGES[track.status];
@@ -369,9 +429,21 @@ function ReplayBoard({
       <p className="flex items-center gap-1 truncate px-1 text-xs">
         <span className={`font-bold ${player.place === 1 ? "text-amber-300" : "text-slate-400"}`}>{player.place}위</span>
         <span className="truncate font-semibold text-slate-100">{player.name}</span>
+        {/* 판(크게 보기 버튼) 안에 두면 버튼이 겹친다 — 이름 줄에 (FE-23) */}
+        {track.status === "error" && (
+          <button
+            type="button"
+            onClick={onRetry}
+            aria-label={`${player.name} 기록 다시 받기`}
+            className="ml-auto flex min-h-11 shrink-0 items-center px-2 text-xs font-semibold text-sky-300 hover:text-sky-200"
+          >
+            다시 받기
+          </button>
+        )}
       </p>
       <div
         {...boardProps}
+        data-attack-anchor={player.playerId}
         className={`relative min-h-0 flex-1 overflow-hidden rounded-xl border border-white/5 bg-slate-950/40 ${
           boardProps.role ? "cursor-zoom-in focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400" : ""
         }`}

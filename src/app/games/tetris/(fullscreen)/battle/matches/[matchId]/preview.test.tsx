@@ -76,7 +76,7 @@ describe('대전 경기 링크 미리보기 (DESIGN §18)', () => {
       const res = await GET(new Request('http://x'), params(id));
       expect(res.status).toBe(200);
       expect(res.headers.get('content-type')).toBe('image/png');
-      expect(res.headers.get('cache-control')).toBe('public, max-age=60');
+      expect(res.headers.get('cache-control')).toBe('public, max-age=60, s-maxage=60');
       const bytes = new Uint8Array(await res.arrayBuffer());
       expect(Array.from(bytes.slice(1, 4))).toEqual([0x50, 0x4e, 0x47]); // "PNG"
     }
@@ -86,7 +86,7 @@ describe('대전 경기 링크 미리보기 (DESIGN §18)', () => {
     getBattleMatchSummary.mockResolvedValue(match);
     loadKoreanFont.mockResolvedValueOnce(new Uint8Array(0).buffer);
     const res = await GET(new Request('http://x'), params(MATCH_ID));
-    expect(res.headers.get('cache-control')).toBe('public, max-age=600');
+    expect(res.headers.get('cache-control')).toBe('public, max-age=600, s-maxage=600, stale-while-revalidate=86400');
   });
 });
 

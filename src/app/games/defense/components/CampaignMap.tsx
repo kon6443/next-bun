@@ -1,17 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { CAMPAIGN, stagePath } from "../lib/campaign";
-import { type Progress, bestStars, emptyProgress, isStageUnlocked, loadProgress } from "../lib/progress";
+import { useProgress } from "../hooks/useProgress";
+import { bestStars, isStageUnlocked } from "../lib/progress";
 
 /**
  * 캠페인 지도 (defense DESIGN §F1, F1a 최소) — 스테이지 8개 노드 · 별 0~3 · 잠김
- * 진행은 기기 저장(localStorage) — 서버 렌더에서는 빈 진행(S1만 열림)으로 그리고 마운트 뒤 실제 값으로 바꾼다
+ * 진행은 기기 저장(localStorage) — 읽기 전(서버 렌더·하이드레이션)에는 목록을 비워 둔다(전부 잠김으로 깜빡이지 않게, useProgress)
  */
 export function CampaignMap() {
-  const [progress, setProgress] = useState<Progress>(emptyProgress);
-  useEffect(() => setProgress(loadProgress()), []);
+  const progress = useProgress();
+  if (!progress) return <ol className="grid gap-3" aria-label="캠페인 스테이지" aria-busy="true" />;
 
   return (
     <ol className="grid gap-3" aria-label="캠페인 스테이지">

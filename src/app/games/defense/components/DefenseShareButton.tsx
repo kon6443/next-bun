@@ -19,7 +19,7 @@ type Props = {
 
 export function DefenseShareButton({ subject, wide = false }: Props) {
   const [open, setOpen] = useState(false);
-  const { kakaoReady, kakaoScript } = useKakaoReady();
+  const { kakao, kakaoScript } = useKakaoReady();
   return (
     <>
       <button
@@ -47,7 +47,7 @@ export function DefenseShareButton({ subject, wide = false }: Props) {
         )}
       </button>
       {kakaoScript}
-      {open && <ShareMenu content={buildShareContent(DEFENSE_SHARE, subject)} kakaoReady={kakaoReady} onClose={() => setOpen(false)} />}
+      {open && <ShareMenu content={buildShareContent(DEFENSE_SHARE, subject)} kakao={kakao} onClose={() => setOpen(false)} />}
     </>
   );
 }

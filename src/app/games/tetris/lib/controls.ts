@@ -31,16 +31,19 @@ export const KEY_BINDINGS: Readonly<Record<string, KeyBinding>> = {
   KeyP: { kind: 'pause' },
 };
 
-/** 조작 안내 (시작 화면·일시정지 화면) */
-export const CONTROL_GUIDE: readonly { keys: string; label: string }[] = [
+/** 조작 안내 (시작 화면·일시정지 화면) — pause: 일시정지 키(대전은 멈출 수 없어 뺀다) */
+export const CONTROL_GUIDE: readonly { keys: string; label: string; pause?: true }[] = [
   { keys: '← →', label: '이동 (누르고 있으면 연속)' },
   { keys: '↓', label: '소프트 드롭' },
   { keys: 'Space', label: '하드 드롭' },
   { keys: '↑ · X', label: '시계 방향 회전' },
   { keys: 'Z · Ctrl', label: '반시계 방향 회전' },
   { keys: 'C · Shift', label: '홀드' },
-  { keys: 'Esc · P', label: '일시정지' },
+  { keys: 'Esc · P', label: '일시정지', pause: true },
 ];
+
+/** 대전 조작 안내 — 대전은 멈출 수 없다(useBattlePlay가 일시정지 키를 무시) (games-polish FE-32) */
+export const BATTLE_CONTROL_GUIDE = CONTROL_GUIDE.filter((item) => !item.pause);
 
 /** 리플레이 키 오버레이 — 동작 코드 → 표시 */
 export const ACTION_LABELS: Readonly<Record<number, string>> = {
@@ -48,13 +51,6 @@ export const ACTION_LABELS: Readonly<Record<number, string>> = {
   [ACTION.ROTATE_CCW]: '↺',
   [ACTION.HARD_DROP]: '⤓',
   [ACTION.HOLD]: 'H',
-};
-
-/** 누름 상태가 있는 동작의 뗌 코드 */
-export const RELEASE_OF: Readonly<Record<number, number>> = {
-  [ACTION.LEFT_PRESS]: ACTION.LEFT_RELEASE,
-  [ACTION.RIGHT_PRESS]: ACTION.RIGHT_RELEASE,
-  [ACTION.SOFT_DROP_PRESS]: ACTION.SOFT_DROP_RELEASE,
 };
 
 /**

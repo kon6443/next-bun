@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { TeamsPageLayout, SectionLabel } from "@/app/teams/components";
+import type { ReactNode } from "react";
 import { cardStyles } from "@/styles/teams";
+import { BattleRoomsTeaser } from "./tetris/battle-ui/components/BattleRoomsTeaser";
 
 type GameCard = {
   title: string;
@@ -11,6 +13,8 @@ type GameCard = {
   secondary: { href: string; label: string };
   /** 새 모드 입구 — NEW 배지와 함께 */
   feature?: { href: string; label: string };
+  /** 입구 아래 덧붙임 — 테트리스는 대전 방 미리보기 */
+  extra?: ReactNode;
 };
 
 const GAMES: GameCard[] = [
@@ -22,6 +26,7 @@ const GAMES: GameCard[] = [
     playLabel: "플레이",
     secondary: { href: "/games/tetris/rankings", label: "랭킹 보기" },
     feature: { href: "/games/tetris/battle", label: "친구와 대전" },
+    extra: <BattleRoomsTeaser />,
   },
   {
     title: "타워 디펜스",
@@ -85,6 +90,7 @@ export default function GamesPage() {
                 <span className="rounded-full bg-pink-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">NEW</span>
               </Link>
             )}
+            {game.extra}
           </li>
         ))}
       </ul>

@@ -8,11 +8,9 @@ import { DEFAULT_SETTINGS, type DefenseSettings, SETTINGS_EVENT, loadSettings, u
  */
 export function useDefenseSettings() {
   const [settings, setSettings] = useState<DefenseSettings>(DEFAULT_SETTINGS);
-  const [loaded, setLoaded] = useState(false);
   useEffect(() => {
     const sync = () => setSettings(loadSettings());
     sync();
-    setLoaded(true);
     window.addEventListener(SETTINGS_EVENT, sync);
     window.addEventListener("storage", sync);
     return () => {
@@ -21,5 +19,5 @@ export function useDefenseSettings() {
     };
   }, []);
   const update = useCallback((patch: Partial<Omit<DefenseSettings, "v">>) => setSettings(updateSettings(patch)), []);
-  return { settings, loaded, update };
+  return { settings, update };
 }

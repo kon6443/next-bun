@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ConfirmModal } from "@/app/components/ConfirmModal";
 import { Button } from "@/app/teams/components";
 import { type MatchResultEntry, type RoomPlayer, type RoomStatus, TetrisBattleErrorCodes } from "@/types/tetrisBattleSocket";
-import { useBattleSocket } from "../contexts/BattleSocketContext";
+import { type ConnectionStatus, useBattleSocket } from "../contexts/BattleSocketContext";
 import type { MatchPhase, OpponentState, ReplaySubmitState } from "../hooks/useBattleMatch";
 import type { ReplaySubmitStatus } from "../lib/replaySubmit";
 import type { useBattlePlay } from "../hooks/useBattlePlay";
@@ -16,6 +16,7 @@ import { getSoundPlayer } from "../../lib/sound/soundPlayer";
 import { MatchRecordLinks } from "./MatchRecordLinks";
 import { ChatPanel } from "./ChatPanel";
 import { ChatTicker } from "./ChatTicker";
+import { ConnectionBadge } from "./ConnectionBadge";
 
 type MatchScreenProps = {
   phase: MatchPhase;
@@ -30,6 +31,9 @@ type MatchScreenProps = {
   /** 지금 방 참가자 — 상대 접속 표시·결과 화면 내보내기 대상 */
   roomPlayers: RoomPlayer[];
   roomStatus: RoomStatus;
+  /** 대전 서버 연결 — 경기 중 끊기면 판 위에 알리고, 자동 재시도가 끝나면 다시 연결 버튼을 준다 (games-polish FE-01) */
+  connection: ConnectionStatus;
+  onReconnect: () => void;
   onExit: () => void;
 };
 
@@ -48,6 +52,8 @@ export function MatchScreen({
   trailsRootRef,
   roomPlayers,
   roomStatus,
+  connection,
+  onReconnect,
   onExit,
 }: MatchScreenProps) {
   const reduced = useReducedEffects();
@@ -60,8 +66,7 @@ export function MatchScreen({
   const kickable = isHost && roomStatus !== "PLAYING" ? new Set(roomPlayers.filter((p) => p.playerId !== myPlayerId).map((p) => p.playerId)) : null;
   const [confirmExit, setConfirmExit] = useState(false);
   // 경기 중 나가기는 기권(되돌릴 수 없음) — 확인을 받는다
-  const inGame = phase.kind === "countdown" || phase.kind === "playing";
-  const requestExit = () => (inGame ? setConfirmExit(true) : onExit());
+  const requestExit = () => (inPlay ? setConfirmExit(true) : onExit());
   // 대상은 lock 응답(targetId)으로 정해진다 — 그 전이라도 살아 있는 상대가 한 명뿐이면 그 사람이 대상이다
   const alive = opponents.filter((o) => o.place === null && !o.out);
   const target = targetId ?? (alive.length === 1 ? alive[0].playerId : null);
@@ -119,6 +124,7 @@ export function MatchScreen({
       onExit={requestExit}
       // 내 판이 끝나 관전 중일 때만 상대 판을 크게 볼 수 있다 (FE-28)
       canEnlarge={spectating}
+      reserveControls={phase.kind === "countdown"}
       footer={
         spectating ? (
           <ChatPanel
@@ -140,6 +146,12 @@ export function MatchScreen({
       overlay={
         <>
           {inPlay && <ChatTicker messages={chat} />}
+          {/* 끊긴 동안 판은 이 기기에서만 진행되고 보고는 쌓인다 — 모르고 두지 않게 알린다(결과 화면 위에도) */}
+          {connection !== "connected" && (
+            <div className="absolute inset-x-0 top-2 z-30 flex justify-center">
+              <ConnectionBadge status={connection} onReconnect={onReconnect} />
+            </div>
+          )}
           {myKos > 0 && (
             <span className="pointer-events-none absolute right-2 top-2 rounded-full bg-amber-500/20 px-2 py-1 text-xs font-bold text-amber-200">
               KO {myKos}
@@ -203,7 +215,7 @@ type MatchResultsProps = {
   results: MatchResultEntry[];
   myPlayerId: string;
   isHost: boolean;
-  /** 이 기기에서 이 경기 기록을 제출했을 때만 */
+  /** 이 기기에서 이 경기 기록을 제출했을 때만 — 제출 상태 한 줄 */
   submitStatus: ReplaySubmitStatus | null;
   onRematch: () => Promise<{ ok: true } | { ok: false; code: string }>;
   /** 방장이 내보낼 수 있는 참가자 — 방장이 아니거나 경기 중이면 null */
@@ -303,8 +315,8 @@ function MatchResults({ matchId, results, myPlayerId, isHost, submitStatus, onRe
             {SUBMIT_LABELS[submitStatus].text}
           </p>
         )}
-        {/* 내 기록을 냈을 때만(검증 실패여도 경기는 공개된다 — D-008) — 경기 전체가 저장(공개)될 때까지 기다린 뒤 연다 */}
-        {(submitStatus === "saved" || submitStatus === "invalid") && matchId && <MatchRecordLinks matchId={matchId} />}
+        {/* 경기는 내가 기록을 내지 못했어도(끊김 탈락·제출 실패) 마감 뒤 저장·공개된다(D-008·Q-B5) — 공개될 때까지 기다린 뒤 연다 (games-polish FE-24) */}
+        {matchId && <MatchRecordLinks matchId={matchId} />}
         {error && (
           <p role="alert" className="mt-2 text-center text-sm text-rose-300">
             {error}

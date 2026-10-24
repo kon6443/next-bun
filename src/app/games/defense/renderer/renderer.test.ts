@@ -49,6 +49,17 @@ describe('ParticlePool — 고정 용량 SoA', () => {
     expect(pool.count).toBe(0);
   });
 
+  it('품질을 낮추면(setLimit) 그 칸 수 안에서만 돌려 쓰고 넘치는 것은 지운다 — 배열은 그대로 (FE-09)', () => {
+    const pool = new ParticlePool(4);
+    for (let i = 0; i < 4; i++) pool.spawn(i, 0, 0, 0, 1000, 0);
+    pool.setLimit(2);
+    expect(pool.count).toBe(2);
+    expect(pool.x.length).toBe(4);
+    const slots = [pool.spawn(9, 0, 0, 0, 1000, 0), pool.spawn(9, 0, 0, 0, 1000, 0), pool.spawn(9, 0, 0, 0, 1000, 0)];
+    expect(slots.every((i) => i < 2)).toBe(true);
+    expect(pool.count).toBe(2);
+  });
+
   it('이동: 속도(밀리타일/초) × 시간', () => {
     const pool = new ParticlePool(1);
     pool.spawn(0, 0, 1000, -500, 1000, 0);
@@ -128,7 +139,7 @@ function recordingContext() {
 
 function view(enemies: number, projectiles: number): RenderView {
   const v = createRenderView();
-  for (let i = 0; i < enemies; i++) v.enemies.push({ id: i + 1, kind: 0, x: i * 10, y: i * 10, hp: i % 2 ? 50 : 100, maxHp: 100, effects: 0, air: i % 4 === 0 });
+  for (let i = 0; i < enemies; i++) v.enemies.push({ id: i + 1, kind: 0, x: i * 10, y: i * 10, hp: i % 2 ? 50 : 100, maxHp: 100, air: i % 4 === 0 });
   for (let i = 0; i < projectiles; i++) v.projectiles.push({ id: 10000 + i, x: i, y: i, element: i % 5, damageType: i % 2 });
   v.towers.push({ id: 1, slot: 0, kind: 0, level: 3, branch: 0, x: 3500, y: 3000, targetId: 2, ultCooldown: 0, ultimate: false });
   return v;
@@ -171,7 +182,7 @@ describe('drawSceneLayer — 묶어 그리기·금지 API', () => {
     ) as unknown as CanvasRenderingContext2D;
     const v = createRenderView();
     TOWER_COLORS.forEach((_, kind) => v.towers.push({ id: kind + 1, slot: kind, kind, level: 1, branch: 0, x: 1000 * kind, y: 1000, targetId: 0, ultCooldown: 0, ultimate: false }));
-    ENEMY_COLORS.forEach((_, kind) => v.enemies.push({ id: kind + 1, kind, x: 500 * kind, y: 5000, hp: 10, maxHp: 10, effects: 0, air: kind % 2 === 1 }));
+    ENEMY_COLORS.forEach((_, kind) => v.enemies.push({ id: kind + 1, kind, x: 500 * kind, y: 5000, hp: 10, maxHp: 10, air: kind % 2 === 1 }));
     drawSceneLayer(ctx, frame(v, false), vp, createSceneScratch());
     for (const color of [...TOWER_COLORS, ...ENEMY_COLORS]) expect(fills).toContain(color);
     const towersOnly = createRenderView();
@@ -239,8 +250,8 @@ describe('적 종류별 모양 — 색만으로 구분하지 않는다 (§F0-4)'
   it('졸개는 원(arc), 질주병은 직선 마름모 — 한 화면에 섞여도 각자 모양으로 그리고 2px 이상 어두운 윤곽을 두른다', () => {
     const vp = fitViewport(390, 650, 9000, 15000, 2, 2);
     const v = createRenderView();
-    v.enemies.push({ id: 1, kind: 0, x: 2000, y: 5000, hp: 10, maxHp: 10, effects: 0, air: false });
-    v.enemies.push({ id: 2, kind: 1, x: 4000, y: 5000, hp: 10, maxHp: 10, effects: 0, air: false });
+    v.enemies.push({ id: 1, kind: 0, x: 2000, y: 5000, hp: 10, maxHp: 10, air: false });
+    v.enemies.push({ id: 2, kind: 1, x: 4000, y: 5000, hp: 10, maxHp: 10, air: false });
     const rec = pathRecorder();
     drawSceneLayer(rec.ctx, { prev: v, curr: v, alpha: 1, particles: new ParticlePool(1), numbers: new DamageNumberPool(1), showDamageNumbers: false, timeMs: 0 }, vp, createSceneScratch());
     const body = (color: string) => rec.draws.find((d) => d.op === 'fill' && d.style === color)!;

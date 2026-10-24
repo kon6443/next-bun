@@ -1,6 +1,8 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { sleep } from '@/app/games/_shared/lib/sleep';
+import { ACK_TIMEOUT_MS } from '../lib/ackTimeout';
 import { useSession } from 'next-auth/react';
 import { io } from 'socket.io-client';
 import {
@@ -34,7 +36,7 @@ const SOCKET_CONFIG = {
   reconnectDelay: 1000,
   timeout: 10000,
   /** ack 응답 대기 */
-  ackTimeout: 8000,
+  ackTimeout: ACK_TIMEOUT_MS,
 } as const;
 
 /** 대기실 채팅은 입장 후 받은 것만 — 최근 이만큼만 둔다 */
@@ -67,7 +69,6 @@ export const SERVER_RECONNECT_MIN_GAP_MS = 5000;
  */
 type LeaveOutcome = 'left' | 'other' | 'dropped' | 'superseded';
 
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const REPLACED_MESSAGE = '다른 탭이나 기기에서 이 방에 들어가 여기서는 나왔어요.';
 const KICKED_MESSAGE = '방장이 방에서 내보냈어요.';

@@ -12,8 +12,6 @@ export type RenderEnemy = {
   y: number;
   hp: number;
   maxHp: number;
-  /** 상태효과 비트 (EFFECT_BIT) — E1은 항상 0 */
-  effects: number;
   air: boolean;
 };
 
@@ -60,16 +58,6 @@ export type RenderMap = {
   airPaths: readonly (readonly number[])[];
   slots: readonly { x: number; y: number }[];
 };
-
-/** 상태효과 비트 — E2에서 채운다 */
-export const EFFECT_BIT = {
-  SLOW: 1,
-  STUN: 2,
-  BURN: 4,
-  POISON: 8,
-  SHRED: 16,
-  VULNERABLE: 32,
-} as const;
 
 export function createRenderView(): RenderView {
   return { tick: 0, enemies: [], towers: [], projectiles: [], bossPhase: 0 };

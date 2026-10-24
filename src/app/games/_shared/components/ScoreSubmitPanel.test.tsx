@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { ApiError } from '@/types/api';
 import { ScoreSubmitPanel, rankingsHref } from './ScoreSubmitPanel';
 import { TEST_GAME } from './testGame';
@@ -99,4 +99,109 @@ describe('ScoreSubmitPanel — 게임 사양·보드를 따른다', () => {
     expect(TEST_GAME.storage.loadPendingSubmissions().map((p) => [p.sessionId, p.score])).toEqual([['sess', 3_000_000]]);
     expect(screen.getByRole('button', { name: '다시 등록하기' })).toBeTruthy();
   });
+
+  it('게임 오버 순간 기록을 보관한다 — 등록 전에 새로고침·뒤로가기를 해도 남는다, 등록하면 지운다 (FE-05)', async () => {
+    submitGameScore.mockResolvedValue({ data: { scoreId: 7, score: 3_000_000, ranks: null } });
+    await act(async () => {
+      render(<ScoreSubmitPanel {...props} />);
+    });
+    expect(TEST_GAME.storage.loadPendingSubmissions().map((p) => [p.sessionId, p.playerName, p.score])).toEqual([['sess', '수비왕', 3_000_000]]);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    expect(TEST_GAME.storage.loadPendingSubmissions()).toEqual([]);
+  });
+
+  it('기본 이름이 없으면 이름 없이 보관한다(다시 등록할 때 이름부터 묻는다)', async () => {
+    await act(async () => {
+      render(<ScoreSubmitPanel {...props} defaultName="" />);
+    });
+    expect(TEST_GAME.storage.loadPendingSubmissions().map((p) => p.playerName)).toEqual(['']);
+  });
+
+  it('등록하지 않고 "다시 하기"·"나가기"를 누르면 보관을 지운다 — 일시 실패로 보관한 기록은 남긴다', async () => {
+    const onRestart = vi.fn();
+    const first = await act(async () => render(<ScoreSubmitPanel {...props} onRestart={onRestart} />));
+    fireEvent.click(screen.getByRole('button', { name: '다시 하기' }));
+    // 등록하지 않은 기록이 사라지므로 먼저 묻는다 (FE-27) — 취소면 그대로
+    expect(onRestart).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '등록하러 가기' }));
+    expect(TEST_GAME.storage.loadPendingSubmissions()).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: '다시 하기' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '다시 하기' }));
+    expect(onRestart).toHaveBeenCalledTimes(1);
+    expect(TEST_GAME.storage.loadPendingSubmissions()).toEqual([]);
+    first.unmount();
+
+    const second = await act(async () => render(<ScoreSubmitPanel {...props} />));
+    fireEvent.click(screen.getByRole('link', { name: '나가기' }));
+    expect(TEST_GAME.storage.loadPendingSubmissions()).toEqual([]);
+    second.unmount();
+
+    submitGameScore.mockRejectedValue(new ApiError('GAME_VERIFY_BUSY', '밀림', 503));
+    await act(async () => {
+      render(<ScoreSubmitPanel {...props} />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    // 일시 실패로 보관해 둔 기록은 사라지지 않으니 묻지 않고 바로
+    fireEvent.click(screen.getByRole('button', { name: '다시 하기' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(TEST_GAME.storage.loadPendingSubmissions().map((p) => p.sessionId)).toEqual(['sess']);
+  });
+
+  it('엔진 버전이 달라 거절되면(배포 뒤 옛 화면) 새로고침 버튼을 주고 보관을 지운다', async () => {
+    submitGameScore.mockRejectedValue(new ApiError('GAME_SESSION_INVALID', 'x', 409, 't', { reason: 'ENGINE_VERSION' }));
+    await act(async () => {
+      render(<ScoreSubmitPanel {...props} />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    expect(screen.getByRole('status')).toHaveTextContent('새 버전이 나왔어요');
+    expect(screen.getByRole('button', { name: '새로고침' })).toBeTruthy();
+    expect(TEST_GAME.storage.loadPendingSubmissions()).toEqual([]);
+  });
+
+  it('일시 실패를 보관하지 못하면(저장소 차단·용량) 떠나면 사라진다고 알린다 (FE-46)', async () => {
+    submitGameScore.mockRejectedValue(new ApiError('GAME_VERIFY_BUSY', '밀림', 503));
+    await act(async () => {
+      render(<ScoreSubmitPanel {...props} />);
+    });
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    setItem.mockRestore();
+    expect(screen.getByRole('alert')).toHaveTextContent('이 기기에 보관하지 못해');
+  });
+
+  it('이름 오류는 알림(role=alert)으로 읽히고 입력칸으로 포커스가 돌아온다 — 서버 거절(금칙어)도 같다 (games-polish FE-30)', async () => {
+    submitGameScore.mockRejectedValue(new ApiError('GAME_PLAYER_NAME_FORBIDDEN', '쓸 수 없는 이름이에요.', 422));
+    await act(async () => {
+      render(<ScoreSubmitPanel {...props} />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('쓸 수 없는 이름이에요.');
+    expect(document.activeElement).toBe(screen.getByLabelText('랭킹에 올릴 이름'));
+  });
+
+  it('등록 응답의 이름(서버 정리값)을 공유·최근 이름에 쓴다 — 응답에 없으면 보낸 이름 (games-polish P5)', async () => {
+    submitGameScore.mockResolvedValue({ data: { scoreId: 7, score: 1, detail: {}, ranks: null, playerName: '서버 이름' } });
+    const actions = vi.fn(() => null);
+    await act(async () => {
+      render(<ScoreSubmitPanel {...props} registeredActions={actions} />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    expect(actions).toHaveBeenLastCalledWith(expect.objectContaining({ scoreId: 7 }), '서버 이름');
+    expect(TEST_GAME.storage.loadLastName()).toBe('서버 이름');
+  });
 });
+

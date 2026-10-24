@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatRelativeTime, lobbyStatsLabel } from './battleList';
+import { formatRelativeTime, lobbyStatsLabel, pickQuickJoinRoom } from './battleList';
 
 describe('lobbyStatsLabel — 테트리스 홈 방 수', () => {
   it('들어갈 수 있는 방이 있으면 개수 — 경기 중인 방은 세지 않는다', () => {
@@ -32,5 +32,25 @@ describe('formatRelativeTime — 최근 대전 시각', () => {
 
   it('시계가 조금 어긋나 미래 시각이면 방금', () => {
     expect(formatRelativeTime(new Date(now + 5_000).toISOString(), now)).toBe('방금');
+  });
+});
+
+describe('pickQuickJoinRoom (games-polish P7)', () => {
+  const room = (code: string, playerCount: number, extra: { locked?: boolean; maxPlayers?: number; status?: 'WAITING' | 'PLAYING' } = {}) => ({
+    code,
+    playerCount,
+    maxPlayers: extra.maxPlayers ?? 4,
+    locked: extra.locked ?? false,
+    status: extra.status,
+  });
+
+  it('잠기지 않은 대기 방 중 빈자리 있고 사람이 가장 많은 곳 — 같으면 앞쪽', () => {
+    const rooms = [room('A', 1), room('B', 3, { locked: true }), room('C', 4), room('D', 2, { status: 'PLAYING' }), room('E', 2), room('F', 2)];
+    expect(pickQuickJoinRoom(rooms)?.code).toBe('E');
+  });
+
+  it('들어갈 방이 없으면 null', () => {
+    expect(pickQuickJoinRoom([room('A', 1, { locked: true }), room('B', 2, { maxPlayers: 2 })])).toBeNull();
+    expect(pickQuickJoinRoom([])).toBeNull();
   });
 });
