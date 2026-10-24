@@ -12,7 +12,7 @@ describe('Hud — 좁은 폭(320px)에서도 한 줄', () => {
   // jsdom은 배치를 계산하지 않는다 — 실제 폭 판정은 브라우저 스크린샷(320·390px). 여기서는 줄이 꺾일 자리가 없다는 것만 고정한다
   it('화면 표기는 공백 없는 짧은 기호·숫자(W12/12), 보조기술에는 이름과 "12 / 12" — 웨이브 칸은 줄이지 않는다', () => {
     const noop = () => {};
-    render(<Hud hud={hud} exitHref="/x" soundOn={false} onToggleSound={noop} onTogglePause={noop} onCycleSpeed={noop} />);
+    render(<Hud hud={hud} exitHref="/x" onTogglePause={noop} onCycleSpeed={noop} />);
     const visible = (id: string) => [...screen.getByTestId(id).querySelectorAll('[aria-hidden="true"]')].map((n) => n.textContent).join('');
     const spoken = (id: string) => [...screen.getByTestId(id).querySelectorAll('.sr-only')].map((n) => n.textContent).join(' ');
     expect(visible('defense-wave')).toBe('W12/12');

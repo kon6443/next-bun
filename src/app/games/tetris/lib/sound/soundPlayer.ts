@@ -2,12 +2,14 @@
  * Web Audio 소리 플레이어 — 레시피(recipes.ts)를 실제 노드로 울린다
  * - 효과음·배경음악이 모두 꺼져 있으면 AudioContext를 만들지 않는다(기본 꺼짐)
  * - AudioContext는 사용자 첫 조작(pointerdown·keydown·touchstart) 뒤에만 만들거나 resume한다(iOS 자동재생 정책)
- * - 설정(soundSettings)을 구독해 볼륨·음악 시작/정지를 바로 반영한다
+ * - 게임 공통 소리 설정(_shared/lib/soundSettings)을 구독해 효과음·배경음 켜기/끄기와 음량을 바로 반영한다(재생 중인 소리 포함)
+ * - 공통 소리 모달이 켜는 클릭 안에서 깨울 수 있게 unlock을 등록한다(_shared/lib/soundUnlock)
  */
-import { createAudioContext, createNoiseBuffer, isAudioHalted } from '@/app/games/_shared/lib/webAudio';
+import { createAudioContext, createNoiseBuffer, isAudioHalted, primeAudioContext } from '@/app/games/_shared/lib/webAudio';
+import { getSoundSettings, subscribeSoundSettings, type SoundSettings } from '@/app/games/_shared/lib/soundSettings';
+import { registerSoundUnlock } from '@/app/games/_shared/lib/soundUnlock';
 import type { SoundCue, SoundCueKind } from '../effects';
 import { MUSIC_PATTERN_STEPS, MUSIC_STEP_SECONDS, musicStep, recipeFor, type Voice } from './recipes';
-import { getSoundSettings, subscribeSoundSettings, type SoundSettings } from './soundSettings';
 
 /** 동시에 울리는 효과음 voice 상한 — 넘치면 새 voice를 버린다 */
 export const MAX_SFX_VOICES = 24;
@@ -150,15 +152,19 @@ export function createSoundPlayer(options: SoundPlayerOptions = {}): SoundPlayer
     }
   }
 
+  /** 효과음·배경음 버스 음량 — 꺼져 있으면 0(울리던 소리도 바로 줄어든다) */
+  const sfxLevel = () => (settings.sfx ? SFX_BUS_LEVEL * settings.sfxVolume : 0);
+  const musicLevel = () => (settings.music ? MUSIC_BUS_LEVEL * settings.musicVolume : 0);
+
   function buildGraph(context: AudioContext): void {
     master = context.createGain();
-    master.gain.value = settings.volume;
+    master.gain.value = 1;
     master.connect(context.destination);
     sfxBus = context.createGain();
-    sfxBus.gain.value = SFX_BUS_LEVEL;
+    sfxBus.gain.value = sfxLevel();
     sfxBus.connect(master);
     musicBus = context.createGain();
-    musicBus.gain.value = settings.music ? MUSIC_BUS_LEVEL : 0;
+    musicBus.gain.value = musicLevel();
     musicBus.connect(master);
   }
 
@@ -189,6 +195,8 @@ export function createSoundPlayer(options: SoundPlayerOptions = {}): SoundPlayer
       ctx = createContext();
       if (!ctx) return; // Web Audio 미지원 — 소리 없이 계속
       buildGraph(ctx);
+      // 제스처 안에서 무음 한 번 — WebKit이 출력 경로를 연다(_shared/lib/webAudio)
+      primeAudioContext(ctx);
       // 시작된 뒤 다시 멈추면(끄기 직후 켜기 경합·OS가 세션을 멈춤) 조작 리스너를 다시 걸어 다음 조작에서 깨운다
       const context = ctx;
       context.onstatechange = () => {
@@ -340,9 +348,9 @@ export function createSoundPlayer(options: SoundPlayerOptions = {}): SoundPlayer
 
   function applySettings(): void {
     settings = getSoundSettings();
-    if (ctx && master && musicBus) {
-      setParam(master.gain, settings.volume);
-      setParam(musicBus.gain, settings.music ? MUSIC_BUS_LEVEL : 0);
+    if (ctx && sfxBus && musicBus) {
+      setParam(sfxBus.gain, sfxLevel());
+      setParam(musicBus.gain, musicLevel());
       if (!anyEnabled()) {
         // 모두 껐으면 오디오 장치를 쉬게 한다 — 다시 켜면 다음 조작(또는 토글의 unlock())에서 resume한다
         unlocked = false;
@@ -354,6 +362,7 @@ export function createSoundPlayer(options: SoundPlayerOptions = {}): SoundPlayer
   }
 
   const unsubscribe = subscribeSoundSettings(applySettings);
+  const unregisterUnlock = registerSoundUnlock(unlock);
   // 구독 시 저장소를 다시 읽었을 수 있으니 한 번 맞춘다
   applySettings();
 
@@ -372,6 +381,7 @@ export function createSoundPlayer(options: SoundPlayerOptions = {}): SoundPlayer
       disposed = true;
       syncGestureListeners();
       unsubscribe();
+      unregisterUnlock();
       if (ctx && ctx.state !== 'closed') void ctx.close().catch(() => {});
       ctx = null;
     },

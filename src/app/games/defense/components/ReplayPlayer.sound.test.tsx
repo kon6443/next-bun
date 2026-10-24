@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { ENGINE_VERSION, OP, TICKS_PER_SECOND } from '../engine';
 import { GameDriver } from '../engine-dev/driver';
@@ -9,15 +9,15 @@ import { SOUND } from '../audio/sfx';
 
 import { commandSound } from '../hooks/useDefenseSfx';
 import { LOCAL_REPLAY_VERSION } from '../lib/localReplay';
-import { loadSettings, updateSettings } from '../lib/settings';
+import { __resetSoundSettingsForTests, getSoundSettings } from '@/app/games/_shared/lib/soundSettings';
 import { LocalReplayView } from './ReplayScreens';
 
 const sfx = vi.hoisted(() => ({ play: vi.fn(), setSpeed: vi.fn(), setPaused: vi.fn(), setEnabled: vi.fn() }));
 const useDefenseSfx = vi.hoisted(() => vi.fn());
 vi.mock('../hooks/useDefenseSfx', async (importActual) => ({
   ...(await importActual<typeof import('../hooks/useDefenseSfx')>()),
-  useDefenseSfx: (enabled: boolean) => {
-    useDefenseSfx(enabled);
+  useDefenseSfx: () => {
+    useDefenseSfx();
     return sfx;
   },
 }));
@@ -48,6 +48,7 @@ const frames = async (ms: number) => {
 describe('디펜스 다시보기 소리 (games-polish P7)', () => {
   beforeEach(() => {
     localStorage.clear();
+    __resetSoundSettingsForTests();
     Object.values(sfx).forEach((fn) => fn.mockReset());
     useDefenseSfx.mockReset();
     vi.stubGlobal('ResizeObserver', FakeResizeObserver);
@@ -60,15 +61,14 @@ describe('디펜스 다시보기 소리 (games-polish P7)', () => {
     vi.restoreAllMocks();
   });
 
-  it('디펜스 소리 설정을 따르고, 재생한 구간만 울린다 — 배속은 3단계까지, 멈추면 쉰다', { timeout: 30_000 }, async () => {
+  it('재생한 구간만 울린다 — 배속은 3단계까지, 멈추면 쉰다', { timeout: 30_000 }, async () => {
     const input = saveLocalWin();
-    updateSettings({ sound: true });
     vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance'] });
     render(<LocalReplayView stageId="s1" />);
     await screen.findByTestId('defense-replay', {}, { timeout: 5000 });
-    // 저장된 설정은 마운트 뒤에 읽는다
-    await waitFor(() => expect(useDefenseSfx).toHaveBeenLastCalledWith(true));
-    expect(sfx.setPaused).toHaveBeenLastCalledWith(false);
+    expect(useDefenseSfx).toHaveBeenCalled();
+    // 오디오 쉼 상태는 마운트 effect가 맞춘다 — 부하가 큰 전체 실행에서는 화면이 먼저 보일 수 있어 기다린다
+    await waitFor(() => expect(sfx.setPaused).toHaveBeenLastCalledWith(false));
 
     // 처음 몇 초 — 발사·명중 등 틱 이벤트 소리가 난다
     fireEvent.click(screen.getByTestId('defense-replay-speed-4'));
@@ -114,18 +114,21 @@ describe('디펜스 다시보기 소리 (games-polish P7)', () => {
     expect(sfx.setPaused).not.toHaveBeenCalledWith(true);
   });
 
-  it('소리 버튼 — 디펜스 소리 설정을 바꾸고 그 클릭(제스처) 안에서 켠다', async () => {
+  it('소리 버튼 — 공통 소리 모달(효과음만)을 열고, 바꾸면 공통 설정에 바로 저장된다 (P8)', async () => {
     saveLocalWin();
     render(<LocalReplayView stageId="s1" />);
     await screen.findByTestId('defense-replay', {}, { timeout: 5000 });
-    const toggle = screen.getByRole('button', { name: '효과음' });
-    expect(toggle.getAttribute('aria-pressed')).toBe('false');
-    fireEvent.click(toggle);
-    expect(sfx.setEnabled).toHaveBeenLastCalledWith(true);
-    expect(loadSettings().sound).toBe(true);
-    expect(screen.getByRole('button', { name: '효과음' }).getAttribute('aria-pressed')).toBe('true');
-    fireEvent.click(screen.getByRole('button', { name: '효과음' }));
-    expect(sfx.setEnabled).toHaveBeenLastCalledWith(false);
-    expect(loadSettings().sound).toBe(false);
+    const button = screen.getByTestId('defense-sound');
+    expect(button.dataset.value).toBe('off');
+    fireEvent.click(button);
+    const dialog = screen.getByRole('dialog', { name: '소리 설정' });
+    expect(within(dialog).queryByRole('checkbox', { name: '배경음' })).toBeNull();
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: '효과음' }));
+    expect(getSoundSettings().sfx).toBe(true);
+    fireEvent.change(within(dialog).getByRole('slider', { name: '효과음 음량' }), { target: { value: '30' } });
+    expect(getSoundSettings().sfxVolume).toBeCloseTo(0.3);
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: '소리 설정' })).toBeNull();
+    expect(screen.getByTestId('defense-sound').dataset.value).toBe('on');
   });
 });

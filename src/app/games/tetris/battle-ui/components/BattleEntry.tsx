@@ -1,28 +1,47 @@
 "use client";
 
-import { ButtonLink } from "@/app/teams/components";
+import Link from "next/link";
 import { useBattleLobbyStats } from "../hooks/useBattleLobbyStats";
 import { lobbyStatsLabel } from "../lib/battleList";
 import { BattleRoomsPreview } from "./BattleRoomsPreview";
 
+/** 홈 대전 섹션 — 화면이 보이는 동안 방 목록을 이 간격으로 다시 받는다(서버 캐시 2초, 소켓 없음 D-025) */
+export const LOBBY_REFRESH_MS = 10_000;
+
+/** /games 카드의 대전 링크가 여기로 온다 */
+export const BATTLE_SECTION_ID = "battle";
+
 /**
- * 테트리스 홈의 대전 입구 (DESIGN §19) — "친구와 대전" + 지금 열린 방 수 + 방 미리보기(P7)
- * 방 정보는 소켓 없이 REST 한 번 — 홈 방문자마다 소켓을 열지 않는다(D-025). 실패하면 문구만 숨긴다
- * 미리보기 방(rooms)이 없는 서버면 예전처럼 방 수만
+ * 테트리스 홈의 대전 섹션 (DESIGN §19, games-polish P8) — 대전 입구는 여기 한 곳
+ * 방 목록을 늘 보인다: 열린 방(최대 3)·없으면 빈 상태 + 빠른 참가·방 만들기 + 전체 보기(로비)
+ * 미리보기 방(rooms)이 없는 서버면 방 수 문구와 로비 링크만
  */
 export function BattleEntry() {
-  const stats = useBattleLobbyStats();
+  const stats = useBattleLobbyStats({ refreshMs: LOBBY_REFRESH_MS });
 
   return (
-    <div className="flex flex-col">
-      <ButtonLink href="/games/tetris/battle" size="md" fullWidth className="min-h-11">
-        친구와 대전
-      </ButtonLink>
-      {/* 자리를 미리 잡아 문구가 늦게 와도 아래가 밀리지 않게 */}
-      <p className="mt-1.5 min-h-4 text-center text-xs leading-4 text-slate-400">
-        {stats && lobbyStatsLabel(stats)}
-      </p>
-      {stats?.rooms && <BattleRoomsPreview rooms={stats.rooms} />}
-    </div>
+    <section id={BATTLE_SECTION_ID} aria-labelledby="tetris-battle-heading" className="scroll-mt-4">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h2 id="tetris-battle-heading" className="text-base font-semibold text-white">
+            친구와 대전
+          </h2>
+          {/* 자리를 미리 잡아 문구가 늦게 와도 아래가 밀리지 않게 */}
+          <p className="min-h-4 text-xs leading-4 text-slate-400">{stats && lobbyStatsLabel(stats)}</p>
+        </div>
+        <Link
+          href="/games/tetris/battle"
+          className="flex min-h-11 shrink-0 items-center rounded-full border border-white/20 px-4 text-sm font-semibold text-slate-200 hover:border-white/40"
+        >
+          전체 보기
+        </Link>
+      </div>
+      {/* 목록 자리는 늘 — 받는 중(또는 실패해 다시 묻는 중)에도 방 만들기는 쓸 수 있다. 미리보기 방이 없는 옛 서버면 방 수 문구만 */}
+      {(stats === null || stats.rooms) && (
+        <div className="mt-3">
+          <BattleRoomsPreview rooms={stats?.rooms ?? null} />
+        </div>
+      )}
+    </section>
   );
 }

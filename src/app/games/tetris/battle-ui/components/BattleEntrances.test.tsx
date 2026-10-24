@@ -12,7 +12,8 @@ vi.mock('@/services/tetrisBattleService', () => ({
   getBattleMatchList: (...a: unknown[]) => getBattleMatchList(...a),
 }));
 
-import { BattleEntry } from './BattleEntry';
+import { BattleEntry, LOBBY_REFRESH_MS } from './BattleEntry';
+import { BattleEntryLink } from './BattleEntryLink';
 import { RecentBattles } from './RecentBattles';
 import { BattleMatchArchive } from './BattleMatchArchive';
 import { clearBattleMatchCache } from '../lib/battleMatchLoader';
@@ -38,14 +39,15 @@ describe('대전 입구 (DESIGN §19)', () => {
     clearBattleMatchCache();
   });
 
-  it('친구와 대전 + 열린 방 수 — StrictMode에서도 조회 한 번', async () => {
+  it('친구와 대전 섹션 + 열린 방 수 — StrictMode에서도 조회 한 번, 전체 보기는 로비로', async () => {
     getBattleLobbyStats.mockResolvedValue({ data: { waitingRooms: 2, playingRooms: 1 } });
     render(
       <StrictMode>
         <BattleEntry />
       </StrictMode>,
     );
-    expect(screen.getByRole('link', { name: '친구와 대전' })).toHaveAttribute('href', '/games/tetris/battle');
+    expect(screen.getByRole('region', { name: '친구와 대전' })).toHaveAttribute('id', 'battle');
+    expect(screen.getByRole('link', { name: '전체 보기' })).toHaveAttribute('href', '/games/tetris/battle');
     expect(await screen.findByText('지금 열린 방 2개')).toBeInTheDocument();
     expect(getBattleLobbyStats).toHaveBeenCalledTimes(1);
   });
@@ -72,6 +74,49 @@ describe('대전 입구 (DESIGN §19)', () => {
     expect(screen.getByRole('link', { name: '방 만들기' })).toHaveAttribute('href', '/games/tetris/battle#battle-create');
   });
 
+  it('방이 없으면 빈 상태와 방 만들기 — 목록 자리는 늘 보인다 (P8)', async () => {
+    getBattleLobbyStats.mockResolvedValue({ data: { waitingRooms: 0, playingRooms: 0, rooms: [] } });
+    render(<BattleEntry />);
+    expect(await screen.findByText('지금 열린 방이 없어요')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '방 만들기' })).toHaveAttribute('href', '/games/tetris/battle#battle-create');
+    expect(screen.queryByRole('link', { name: '빠른 참가' })).toBeNull();
+  });
+
+  it('보이는 동안 10초마다 다시 묻고, 탭이 숨으면 멈췄다가 돌아오면 바로 묻는다 (P8)', async () => {
+    vi.useFakeTimers();
+    try {
+      getBattleLobbyStats.mockResolvedValue({ data: { waitingRooms: 0, playingRooms: 0, rooms: [] } });
+      const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+      const { unmount } = render(<BattleEntry />);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(getBattleLobbyStats).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(LOBBY_REFRESH_MS);
+      expect(getBattleLobbyStats).toHaveBeenCalledTimes(2);
+      hidden.mockReturnValue(true);
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(LOBBY_REFRESH_MS * 3);
+      expect(getBattleLobbyStats).toHaveBeenCalledTimes(2);
+      hidden.mockReturnValue(false);
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(getBattleLobbyStats).toHaveBeenCalledTimes(3);
+      unmount();
+      await vi.advanceTimersByTimeAsync(LOBBY_REFRESH_MS * 2);
+      expect(getBattleLobbyStats).toHaveBeenCalledTimes(3);
+      hidden.mockRestore();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('게임 목록 카드의 대전 링크는 하나 — 홈 대전 섹션으로, 열린 방 수 배지 (P8)', async () => {
+    getBattleLobbyStats.mockResolvedValue({ data: { waitingRooms: 2, playingRooms: 0, rooms: [] } });
+    render(<BattleEntryLink />);
+    const link = screen.getByRole('link', { name: /친구와 대전/ });
+    expect(link).toHaveAttribute('href', '/games/tetris#battle');
+    expect(await screen.findByTestId('battle-open-rooms')).toHaveTextContent('열린 방 2');
+  });
+
   it('잠긴 방뿐이면 빠른 참가 없이 방 만들기, 미리보기 필드가 없는 서버면 예전처럼 방 수만 (P7)', async () => {
     getBattleLobbyStats.mockResolvedValue({ data: { waitingRooms: 1, playingRooms: 0, rooms: [{ code: 'LOCK23', name: '비밀 방', playerCount: 1, maxPlayers: 4, locked: true }] } });
     const { unmount } = render(<BattleEntry />);
@@ -89,7 +134,7 @@ describe('대전 입구 (DESIGN §19)', () => {
     getBattleLobbyStats.mockRejectedValue(new ApiError('TOO_MANY_REQUESTS', 'x', 429));
     render(<BattleEntry />);
     await waitFor(() => expect(getBattleLobbyStats).toHaveBeenCalled());
-    expect(screen.getByRole('link', { name: '친구와 대전' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '전체 보기' })).toBeInTheDocument();
     expect(screen.queryByText(/열린 방|방을 만들어/)).toBeNull();
   });
 
@@ -174,5 +219,12 @@ describe('대전 입구 (DESIGN §19)', () => {
     fireEvent.click(await screen.findByRole('button', { name: '다시 시도' }));
     await screen.findByRole('link', { name: /방 2/ });
     expect(getBattleMatchList.mock.calls.map(([p]) => p.cursor)).toEqual([null, 'bad', null, null]);
+  });
+
+  it('받는 중에도 목록 자리와 방 만들기는 보인다 (P8)', async () => {
+    getBattleLobbyStats.mockReturnValue(new Promise(() => {}));
+    render(<BattleEntry />);
+    expect(screen.getByRole('status')).toHaveTextContent('방 목록을 불러오는 중');
+    expect(screen.getByRole('link', { name: '방 만들기' })).toHaveAttribute('href', '/games/tetris/battle#battle-create');
   });
 });

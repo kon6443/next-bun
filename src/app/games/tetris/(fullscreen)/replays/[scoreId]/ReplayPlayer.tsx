@@ -16,7 +16,7 @@ import { formatFrames, formatScore } from "@/app/games/_shared/lib/format";
 import { cloneGameState } from "../../../lib/gameSnapshot";
 import { type EffectTracker, createEffectTracker, drainCues, observeAfter, observeBefore } from "../../../lib/effects";
 import { getSoundPlayer, replayCues } from "../../../lib/sound/soundPlayer";
-import { SoundToggle } from "../../../components/SoundToggle";
+import { SoundButton } from "@/app/games/_shared/components/SoundButton";
 import { loadReplay } from "@/app/games/_shared/lib/replayLoader";
 import { TETRIS_SHARE } from "../../../lib/share";
 import { collectActions } from "../../../lib/replayTimeline";
@@ -246,6 +246,8 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
     if (!data) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (shareOpenRef.current) return;
+      // 대화상자(소리 설정 등) 안의 키는 그 대화상자 몫 — 음량 막대의 ←/→가 뒤의 재생을 옮기지 않게 (P8)
+      if (e.target instanceof Element && e.target.closest('[role="dialog"]')) return;
       if (e.target instanceof HTMLInputElement && e.target.type !== "range") return;
       if (e.code === "Space") {
         // 포커스된 버튼(속도·처음부터 등)은 Space로 그 버튼이 눌리게 둔다
@@ -320,7 +322,7 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
             전체 {loaded.rank}위 · {formatFullDateTime(new Date(loaded.createdAt))}
           </p>
         </div>
-        <SoundToggle className="shrink-0" />
+        <SoundButton className="shrink-0" />
         <button
           type="button"
           onClick={() => setShareOpen(true)}

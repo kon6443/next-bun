@@ -76,6 +76,9 @@ describe('효과음 (audio/sfx)', () => {
     const { ctx, sources } = fakeContext();
     const sfx = new Sfx(() => ctx as unknown as AudioContext);
     sfx.setEnabled(true);
+    // 켤 때의 무음 1샘플(primeAudioContext)은 효과음 자리를 쓰지 않는다 — 셈에서 뺀다
+    expect(sources).toHaveLength(1);
+    sources.length = 0;
     expect(sfx.play(SOUND.FIRE_ARCHER, 0)).toBe(true);
     expect(sfx.play(SOUND.FIRE_ARCHER, 30)).toBe(false); // 1×: 50ms
     expect(sfx.play(SOUND.FIRE_ARCHER, 60)).toBe(true);
@@ -107,5 +110,23 @@ describe('효과음 (audio/sfx)', () => {
     expect(sfx.play(SOUND.DEATH, 0)).toBe(false);
     sfx.setPaused(false);
     expect(ctx.resume).toHaveBeenCalled();
+  });
+
+  it('음량 — 기본 음량(0.6)이면 예전 고정 레벨(0.8)과 같은 크기, 바꾸면 바로 반영 (P8)', () => {
+    const { ctx } = fakeContext();
+    const gains: { gain: { value: number } }[] = [];
+    const createGain = ctx.createGain;
+    ctx.createGain = () => {
+      const g = createGain();
+      gains.push(g);
+      return g;
+    };
+    const sfx = new Sfx(() => ctx as unknown as AudioContext);
+    sfx.setVolume(0.6);
+    sfx.setEnabled(true);
+    const master = gains[0];
+    expect(master.gain.value).toBeCloseTo(0.8);
+    sfx.setVolume(0.3);
+    expect(master.gain.value).toBeCloseTo(0.4);
   });
 });
