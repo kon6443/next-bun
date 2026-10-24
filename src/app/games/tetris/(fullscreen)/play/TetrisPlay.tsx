@@ -17,7 +17,7 @@ import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib
 import { TetrisCanvas } from "../../components/TetrisCanvas";
 import { TouchControls } from "../../components/TouchControls";
 import { EffectsToggle } from "../../components/EffectsToggle";
-import { SoundToggle } from "../../components/SoundToggle";
+import { SoundButton } from "@/app/games/_shared/components/SoundButton";
 import { type GameResult, GameOverPanel } from "../../components/GameOverPanel";
 import { useTetrisPlay } from "../../hooks/useTetrisPlay";
 import { CONTROL_GUIDE } from "../../lib/controls";
@@ -219,7 +219,8 @@ export default function TetrisPlay() {
             <dd className="text-[clamp(11px,3.4vw,14px)] font-bold tracking-tight text-white">{formatFrames(play.hud.frame)}</dd>
           </div>
         </dl>
-        <SoundToggle className="shrink-0" />
+        {/* 소리 설정 모달을 여는 동안 판을 멈춘다 */}
+        <SoundButton className="shrink-0" onOpenChange={(open) => open && play.pause()} />
         <button
           type="button"
           onClick={(e) => {

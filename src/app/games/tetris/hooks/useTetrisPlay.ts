@@ -170,7 +170,8 @@ export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state:
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const binding = KEY_BINDINGS[e.code];
-      if (!binding || isTypingTarget(e.target)) return;
+      // 소리 설정 모달 같은 대화상자 안의 키는 게임으로 보내지 않는다(P·Esc가 뒤의 판을 다시 진행시키지 않게)
+      if (!binding || isTypingTarget(e.target, { includeDialogs: true })) return;
       if (statusRef.current === "ready" || statusRef.current === "over") return;
       if (binding.kind === "pause") {
         e.preventDefault();

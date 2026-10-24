@@ -281,7 +281,7 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
   }
   const noticeRef = useRef(createTickNotice());
   // 효과음 — 켜기·제스처 대기·정리는 훅이 맡는다(다시보기와 공용)
-  const sfx = useDefenseSfx(settings.sound);
+  const sfx = useDefenseSfx();
   const leakAtRef = useRef(-Infinity);
   const shakeUntilRef = useRef(-Infinity);
   /** 이번 판에서 만난 적 — 저장 시점에 도감 기록으로 */
@@ -300,6 +300,9 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
   const [briefing, setBriefing] = useState<Briefing | null>(() => (intro === "briefing" && campaign ? briefingFor(campaign.meta.id) : null));
   const [tutorialOn, setTutorialOn] = useState(intro === "tutorial");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** 소리 설정 모달 — 여는 동안 판을 멈추고(진행 중이었다면), 닫으면 이어 간다 */
+  const [soundOpen, setSoundOpen] = useState(false);
+  const pausedForSoundRef = useRef(false);
   const [confirmExit, setConfirmExit] = useState(false);
   const overlayOpenRef = useRef(false);
   /** 나가기 확인을 띄우며 일시정지했나 — 계속하기면 다시 진행 */
@@ -456,20 +459,8 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
   // 끝난 판은 멈추지 않는다 — 승패음(0.6~0.8초)이 끝까지 나게. 루프는 판이 끝나면 곧 멈춘다
   useEffect(() => sfx.setPaused(hud.status === "paused"), [sfx, hud.status]);
 
-  const toggleSound = useCallback(() => {
-    const on = !settingsRef.current.sound;
-    // 이 클릭이 사용자 제스처 — 여기서 켜야 컨텍스트가 소리를 낸다
-    sfx.setEnabled(on);
-    updateSettings({ sound: on });
-  }, [sfx, updateSettings]);
-  /** 설정 패널 — 효과음을 바꾸는 체크도 제스처 안이라 그 자리에서 켠다/끈다 */
-  const changeSettings = useCallback(
-    (patch: Parameters<typeof updateSettings>[0]) => {
-      if (patch.sound !== undefined) sfx.setEnabled(patch.sound);
-      updateSettings(patch);
-    },
-    [sfx, updateSettings],
-  );
+  /** 설정 패널 — 소리는 공통 소리 모달이 맡는다(켜는 클릭에서 soundUnlock으로 이 화면의 Sfx를 깨운다) */
+  const changeSettings = updateSettings;
 
   // 보스 등장 배너 — 잠깐 보이고 사라진다
   useEffect(() => {
@@ -585,7 +576,7 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
     [dispatch],
   );
 
-  const overlayOpen = !!finished || !!briefing || settingsOpen || confirmExit || choosingAugment;
+  const overlayOpen = !!finished || !!briefing || settingsOpen || soundOpen || confirmExit || choosingAugment;
   overlayOpenRef.current = overlayOpen;
 
   // 데스크톱 단축키 (§F3): 1~6 타워 · U 업그레이드 · A/B 분기 · S 판매 · T 타게팅 · Space 호출 · P/Esc 일시정지 · F 배속 · 방향키 슬롯 이동
@@ -691,6 +682,16 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
     if (pausedForExitRef.current) togglePause();
     setConfirmExit(true);
   };
+  const changeSoundOpen = (open: boolean) => {
+    setSoundOpen(open);
+    if (open) {
+      pausedForSoundRef.current = hud.status === "playing";
+      if (pausedForSoundRef.current) togglePause();
+    } else {
+      if (pausedForSoundRef.current && hud.status === "paused") togglePause();
+      pausedForSoundRef.current = false;
+    }
+  };
   const cancelExit = () => {
     setConfirmExit(false);
     if (pausedForExitRef.current && hud.status === "paused") togglePause();
@@ -705,8 +706,7 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
         hud={hud}
         exitHref={exitHref}
         onRequestExit={hud.wavesStarted > 0 && !finished ? requestExit : undefined}
-        soundOn={settings.sound}
-        onToggleSound={toggleSound}
+        onSoundOpenChange={changeSoundOpen}
         onTogglePause={togglePause}
         onCycleSpeed={cycleSpeed}
         showTotalWaves={mode === "campaign"}

@@ -5,7 +5,7 @@ import { BOARD_COLS, BOARD_VISIBLE_ROWS } from "@/types/tetrisBattleSocket";
 import type { TetrisBattleEmoteId } from "@/types/tetrisBattleSocket";
 import { TetrisCanvas } from "../../components/TetrisCanvas";
 import { TouchControls } from "../../components/TouchControls";
-import { SoundToggle } from "../../components/SoundToggle";
+import { SoundButton } from "@/app/games/_shared/components/SoundButton";
 import type { ReceivedEmote } from "../contexts/BattleSocketContext";
 import type { useBattlePlay } from "../hooks/useBattlePlay";
 import { EmoteBar } from "./EmoteBar";
@@ -146,7 +146,7 @@ export function BattleView({
             </li>
           ))}
         </ul>
-        <SoundToggle className="shrink-0" />
+        <SoundButton className="shrink-0" />
         <button
           ref={emoteToggleRef}
           type="button"

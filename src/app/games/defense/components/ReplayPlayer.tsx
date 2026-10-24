@@ -8,7 +8,7 @@ import type { HighlightKindSpec } from "@/app/games/_shared/lib/highlights";
 import { type FixedStepClock, advanceClock, createClock } from "@/app/games/_shared/lib/fixedStep";
 import { useDefenseCanvas } from "../hooks/useDefenseCanvas";
 import { commandSound, useDefenseSfx } from "../hooks/useDefenseSfx";
-import { useDefenseSettings } from "../hooks/useDefenseSettings";
+import { SoundButton } from "@/app/games/_shared/components/SoundButton";
 import { applyTickEvents, createTickNotice } from "../lib/fx";
 import { TARGET_NAMES, TOWER_NAMES, ENEMY_NAMES } from "../lib/labels";
 import { type DefenseHighlightKind, type PreparedReplay, type ReplayCommand, type ReplayCursor, advanceCursor, initialCursor, seekCursor } from "../lib/replayRunner";
@@ -103,17 +103,10 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
   playingRef.current = playing;
   const speedRef = useRef<number>(speed);
   speedRef.current = speed;
-  // 효과음 — 디펜스 소리 설정을 따른다. 탐색(seekCursor)은 틱 이벤트를 내지 않아 건너뛴 구간은 울리지 않는다
-  const { settings, update: updateSettings } = useDefenseSettings();
-  const sfx = useDefenseSfx(settings.sound);
+  // 효과음 — 게임 공통 소리 설정을 따른다(머리줄 소리 버튼 → 공통 모달). 탐색(seekCursor)은 틱 이벤트를 내지 않아 건너뛴 구간은 울리지 않는다
+  const sfx = useDefenseSfx();
   // 같은 종류 최소 간격은 1~3배속 단계까지 — 0.5배속은 1, 4배속은 3단계
   useEffect(() => sfx.setSpeed(Math.min(3, Math.ceil(speed))), [sfx, speed]);
-  /** 소리 버튼 — 이 클릭이 사용자 제스처라 여기서 켜야 컨텍스트가 소리를 낸다(플레이 HUD 토글과 같은 설정) */
-  const toggleSound = () => {
-    const on = !settings.sound;
-    sfx.setEnabled(on);
-    updateSettings({ sound: on });
-  };
   /** 고정 스텝 시계 — 탐색하면 쌓인 시간을 비운다 (_shared/lib/fixedStep, FE-53) */
   const clockRef = useRef<FixedStepClock>(createClock());
 
@@ -304,17 +297,7 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
             <dd data-testid="defense-replay-wave">{state.wavesStarted}</dd>
           </div>
         </dl>
-        <button
-          type="button"
-          data-testid="defense-sound"
-          data-value={settings.sound ? "on" : "off"}
-          aria-pressed={settings.sound}
-          aria-label="효과음"
-          onClick={toggleSound}
-          className="min-h-11 min-w-11 shrink-0 rounded-full border border-white/15 text-base"
-        >
-          <span aria-hidden="true">{settings.sound ? "🔊" : "🔇"}</span>
-        </button>
+        <SoundButton shape="round" music={false} testId="defense-sound" className="shrink-0" />
         {actions}
       </header>
       <div className="relative min-h-0 flex-1" ref={canvas.containerRef}>

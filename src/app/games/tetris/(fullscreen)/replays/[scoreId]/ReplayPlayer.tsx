@@ -16,7 +16,7 @@ import { formatFrames, formatScore } from "@/app/games/_shared/lib/format";
 import { cloneGameState } from "../../../lib/gameSnapshot";
 import { type EffectTracker, createEffectTracker, drainCues, observeAfter, observeBefore } from "../../../lib/effects";
 import { getSoundPlayer, replayCues } from "../../../lib/sound/soundPlayer";
-import { SoundToggle } from "../../../components/SoundToggle";
+import { SoundButton } from "@/app/games/_shared/components/SoundButton";
 import { loadReplay } from "@/app/games/_shared/lib/replayLoader";
 import { TETRIS_SHARE } from "../../../lib/share";
 import { collectActions } from "../../../lib/replayTimeline";
@@ -320,7 +320,7 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
             전체 {loaded.rank}위 · {formatFullDateTime(new Date(loaded.createdAt))}
           </p>
         </div>
-        <SoundToggle className="shrink-0" />
+        <SoundButton className="shrink-0" />
         <button
           type="button"
           onClick={() => setShareOpen(true)}

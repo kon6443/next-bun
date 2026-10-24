@@ -76,6 +76,9 @@ describe('효과음 (audio/sfx)', () => {
     const { ctx, sources } = fakeContext();
     const sfx = new Sfx(() => ctx as unknown as AudioContext);
     sfx.setEnabled(true);
+    // 켤 때의 무음 1샘플(primeAudioContext)은 효과음 자리를 쓰지 않는다 — 셈에서 뺀다
+    expect(sources).toHaveLength(1);
+    sources.length = 0;
     expect(sfx.play(SOUND.FIRE_ARCHER, 0)).toBe(true);
     expect(sfx.play(SOUND.FIRE_ARCHER, 30)).toBe(false); // 1×: 50ms
     expect(sfx.play(SOUND.FIRE_ARCHER, 60)).toBe(true);
