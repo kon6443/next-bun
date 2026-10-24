@@ -8,6 +8,7 @@ import { greedyBot } from '../engine-dev/sim/bots';
 import { runGame } from '../engine-dev/sim/runner';
 import { AUGMENT_TEXT } from '../lib/labels';
 import { loadResume, saveResume } from '../lib/resume';
+import { RESTORE_CHUNK_TICKS } from '../lib/restoreGame';
 import RankedPlay from './RankedPlay';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
@@ -42,6 +43,13 @@ function saveEndlessAtAugment(): GameDriver {
  * 타워 없이 웨이브를 부르고 카운트다운마다 다시 부르는 무한 판(목숨이 금방 0) — 끝나기 몇 틱 전에 이어하기로 저장
  * 저장 틱까지의 로그로 다시 돌리면 같은 판이라, 이어 가면 곧 게임 오버
  */
+/** 다시 돌리는 데 틱 묶음 여러 개가 드는 긴 무한 판(기준 봇) — 이어하기 진행 표시 확인용 (FE-06) */
+function saveEndlessLong(): void {
+  const driver = GameDriver.fromBoard('endless', 'endless-s1', 7);
+  runGame(driver, greedyBot(), (d) => d.state.tick >= RESTORE_CHUNK_TICKS * 2 && !d.state.augmentPending);
+  saveResume({ engineVersion: ENGINE_VERSION, mode: 'endless', boardKey: 'endless-s1', seed: 7, tick: driver.state.tick, inputs: driver.recorder.inputs, savedAt: 1 });
+}
+
 function saveEndlessNearOver(sessionReceivedAt: number | null): { endTick: number; inputs: number[] } {
   const play = (stopAt: number) => {
     const driver = GameDriver.fromBoard('endless', 'endless-s1', 9);
@@ -217,8 +225,8 @@ describe('RankedPlay — 무한·주간 입구', () => {
     submitGameScore.mockResolvedValue({ code: 'SUCCESS', message: '', data: { scoreId: 11, score: 0, detail: {}, ranks: { daily: 1, weekly: 1, all: 1 } } });
     render(<RankedPlay mode="endless" fixedSeed={null} />);
     fireEvent.click(await screen.findByTestId('defense-resume-continue'));
-    // 이어한 판은 일시정지로 열린다 — 계속하면 곧 끝난다
-    fireEvent.click(screen.getByTestId('defense-pause'));
+    // 이어한 판은 일시정지로 열린다 — 계속하면 곧 끝난다(긴 저장본은 청크로 다시 돌린 뒤 열린다, FE-06)
+    fireEvent.click(await screen.findByTestId('defense-pause', {}, { timeout: 5000 }));
     await screen.findByTestId('defense-ranked-result', {}, { timeout: 3000 });
     // 세션 있는 판 — 보드별 최고 기록을 한 번 남기고 결과에 "개인 최고"
     expect(JSON.parse(localStorage.getItem('defense:best')!).boards['endless-s1']).toBeGreaterThan(0);
@@ -246,11 +254,24 @@ describe('RankedPlay — 무한·주간 입구', () => {
     expect(screen.getByTestId('defense-board').dataset.status).toBe('ready');
   });
 
+  it('긴 저장본은 클릭 안에서 멈추지 않고 "판을 불러오는 중"을 보이다가 연다 — 그동안 버튼은 잠긴다 (FE-06)', async () => {
+    saveEndlessLong();
+    render(<RankedPlay mode="endless" fixedSeed={null} />);
+    const continueButton = await screen.findByTestId('defense-resume-continue');
+    fireEvent.click(continueButton);
+    expect(screen.getByTestId('defense-restoring').textContent).toContain('판을 불러오는 중');
+    expect(continueButton).toBeDisabled();
+    expect(screen.getByTestId('defense-resume-new')).toBeDisabled();
+    expect(await screen.findByTestId('defense-pause', {}, { timeout: 5000 })).toBeTruthy();
+    expect(screen.queryByTestId('defense-restoring')).toBeNull();
+  });
+
   it('세션이 만료된 채 끝난 판은 등록하지 않고 이유를 알린다', async () => {
     saveEndlessNearOver(Date.now() - 4 * 60 * 60 * 1000);
     render(<RankedPlay mode="endless" fixedSeed={null} />);
     fireEvent.click(await screen.findByTestId('defense-resume-continue'));
-    fireEvent.click(screen.getByTestId('defense-pause'));
+    // 긴 저장본은 틱 묶음마다 쉬며 다시 돌린 뒤 열린다(FE-06) — 판이 열릴 때까지 기다린다
+    fireEvent.click(await screen.findByTestId('defense-pause', {}, { timeout: 5000 }));
     const result = await screen.findByTestId('defense-ranked-result', {}, { timeout: 3000 });
     expect(result.textContent).toContain('세션 시간이 지나');
     expect(screen.queryByRole('button', { name: '랭킹 등록' })).toBeNull();
@@ -273,7 +294,7 @@ describe('RankedPlay — 무한·주간 입구', () => {
     saveResume({ engineVersion: ENGINE_VERSION, mode: 'endless', boardKey: 'endless-s1', seed: 1, tick: 0, inputs: [5, OP.CALL_WAVE], savedAt: 1 });
     render(<RankedPlay mode="endless" fixedSeed={3} />);
     fireEvent.click(await screen.findByTestId('defense-resume-continue'));
-    expect(screen.getByTestId('defense-resume-failed').textContent).toContain('이어하기를 불러오지 못해');
+    expect((await screen.findByTestId('defense-resume-failed')).textContent).toContain('이어하기를 불러오지 못해');
     expect(loadResume()).toBeNull();
   });
 
@@ -288,7 +309,8 @@ describe('RankedPlay — 무한·주간 입구', () => {
     saveEndlessNearOver(null);
     render(<RankedPlay mode="endless" fixedSeed={null} />);
     fireEvent.click(await screen.findByTestId('defense-resume-continue'));
-    fireEvent.click(screen.getByTestId('defense-pause'));
+    // 긴 저장본은 틱 묶음마다 쉬며 다시 돌린 뒤 열린다(FE-06) — 판이 열릴 때까지 기다린다
+    fireEvent.click(await screen.findByTestId('defense-pause', {}, { timeout: 5000 }));
     await screen.findByTestId('defense-ranked-result', {}, { timeout: 3000 });
     expect(localStorage.getItem('defense:best')).toBeNull();
     expect(screen.queryByText('개인 최고 기록!')).toBeNull();

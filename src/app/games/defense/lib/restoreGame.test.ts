@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, it, expect } from 'vitest';
 import { MAX_TICKS, OP, TOWER_ID, applyCommand, createCommandRecorder, createGame, findStage, getStateHash, recordCommand, step } from '../engine';
+import { GameDriver } from '../engine-dev/driver';
+import { greedyBot } from '../engine-dev/sim/bots';
+import { runGame } from '../engine-dev/sim/runner';
 import { LeakTracker } from './leakTracker';
 import { clearResume, loadResume, saveResume } from './resume';
-import { restoreGame } from './restoreGame';
+import { RESTORE_CHUNK_TICKS, restoreGame, restoreGameInChunks } from './restoreGame';
 
 const stage = findStage('s1')!;
 
@@ -83,5 +86,22 @@ describe('이어하기 (lib/restoreGame · lib/resume)', () => {
     expect(loadResume()).toBeNull();
     localStorage.setItem('defense:resume', JSON.stringify({ v: 1, boardKey: 's1', inputs: 'x', tick: 1 }));
     expect(loadResume()).toBeNull();
+  });
+
+  it('긴 판은 틱 묶음마다 쉬며 다시 돌린다 — 진행률을 내고 결과(해시)는 한 번에 돌린 것과 같다, 멈추면 cancelled (games-polish FE-06)', async () => {
+    // 기준 봇으로 긴 무한 판(묶음 2개 넘게) — 봇이 증강도 고른다
+    const near = GameDriver.fromBoard('endless', 'endless-s1', 9);
+    runGame(near, greedyBot(), (d) => d.state.tick >= RESTORE_CHUNK_TICKS * 2 + 500 && !d.state.augmentPending);
+    const tick = near.state.tick;
+    expect(tick).toBeGreaterThan(RESTORE_CHUNK_TICKS * 2);
+    const progress: number[] = [];
+    const chunked = await restoreGameInChunks(near.stage, 9, near.recorder.inputs, tick, { onProgress: (r) => progress.push(r) });
+    expect(chunked).not.toBeNull();
+    expect(chunked).not.toBe('cancelled');
+    const whole = restoreGame(near.stage, 9, near.recorder.inputs, tick)!;
+    expect(getStateHash((chunked as typeof whole).state)).toBe(getStateHash(whole.state));
+    expect(progress.length).toBe(Math.floor(tick / RESTORE_CHUNK_TICKS));
+    expect(progress.every((r, i) => r > 0 && r <= 1 && (i === 0 || r > progress[i - 1]))).toBe(true);
+    expect(await restoreGameInChunks(near.stage, 9, near.recorder.inputs, tick, { isCancelled: () => true })).toBe('cancelled');
   });
 });

@@ -18,7 +18,9 @@ import { applyTickEvents, createTickNotice } from "../lib/fx";
 import { DIFFICULTY_NAMES, ENEMY_NAMES, TOWER_NAMES } from "../lib/labels";
 import { hasSeenBriefing, isDifficultyUnlocked, loadProgress, markBriefingSeen, markEnemiesMet, markTutorialDone, saveProgress } from "../lib/progress";
 import { type ResumeSlot, clearResume, loadResume, saveResume } from "../lib/resume";
-import { type RestoredGame, restoreGame } from "../lib/restoreGame";
+import type { RestoredGame } from "../lib/restoreGame";
+import { useChunkedRestore } from "../hooks/useChunkedRestore";
+import { RestoreProgress } from "./RestoreProgress";
 import { type RingOption, currentRange, ringOptions, tapRing } from "../lib/ringOptions";
 import { boardTitle, modeOfBoardKey } from "../lib/rankedBoards";
 import { toRenderMap } from "../lib/toRenderView";
@@ -73,6 +75,7 @@ export default function DefensePlay({ boardKey, seed, fixedSeed }: Props) {
   const [resumeOffer, setResumeOffer] = useState<ResumeSlot | null>(null);
   const [opening, setOpening] = useState<Opening | null>(null);
 
+  const restorer = useChunkedRestore();
   const introFor = useCallback((stageId: string): Intro => {
     const progress = loadProgress();
     if (stageId === "s1" && !progress.tutorialDone) return "tutorial";
@@ -114,8 +117,10 @@ export default function DefensePlay({ boardKey, seed, fixedSeed }: Props) {
     );
   }
   if (resumeOffer && !opening) {
-    const choose = (resume: boolean) => {
-      const restored = resume ? restoreGame(stage, resumeOffer.seed, resumeOffer.inputs, resumeOffer.tick) : null;
+    const choose = async (resume: boolean) => {
+      if (restorer.progress !== null) return;
+      const restored = resume ? await restorer.restore(stage, resumeOffer.seed, resumeOffer.inputs, resumeOffer.tick) : null;
+      if (restored === "cancelled") return;
       if (!restored) clearResume();
       setAttempt((a) => ({ n: a.n, seed: restored ? resumeOffer.seed : a.seed }));
       setOpening({ restore: restored, intro: restored ? null : introFor(parsed.stage.id), notice: resume && !restored ? "이어하기를 불러오지 못해 새로 시작했어요" : null });
@@ -124,15 +129,23 @@ export default function DefensePlay({ boardKey, seed, fixedSeed }: Props) {
       <main className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center" data-testid="defense-resume">
         <h1 className="text-lg font-bold text-white">하던 판이 있어요</h1>
         <p className="text-sm text-slate-300">스테이지 {parsed.stage.number} {DIFFICULTY_NAMES[parsed.difficulty]} — 저장한 곳부터 이어서 할까요?</p>
+        {restorer.progress !== null && <RestoreProgress progress={restorer.progress} />}
         <button
           type="button"
           data-testid="defense-resume-continue"
-          onClick={() => choose(true)}
+          disabled={restorer.progress !== null}
+          onClick={() => void choose(true)}
           className="min-h-12 w-full max-w-xs rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 text-sm font-semibold text-white"
         >
           이어하기
         </button>
-        <button type="button" data-testid="defense-resume-new" onClick={() => choose(false)} className="min-h-12 w-full max-w-xs rounded-full border border-white/20 text-sm font-semibold text-slate-100">
+        <button
+          type="button"
+          data-testid="defense-resume-new"
+          disabled={restorer.progress !== null}
+          onClick={() => void choose(false)}
+          className="min-h-12 w-full max-w-xs rounded-full border border-white/20 text-sm font-semibold text-slate-100 disabled:opacity-50"
+        >
           새로 시작
         </button>
       </main>

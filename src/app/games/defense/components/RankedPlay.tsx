@@ -16,7 +16,9 @@ import { defenseStorage, recordBest } from "../lib/defenseGame";
 import { isRankedUnlocked, loadProgress } from "../lib/progress";
 import { ENDLESS_BOARD_KEY, type RankedMode, boardTitle, modeOfBoardKey, weeklyBoardKeyAt } from "../lib/rankedBoards";
 import { type ResumeSlot, clearResume, loadResume } from "../lib/resume";
-import { type RestoredGame, restoreGame } from "../lib/restoreGame";
+import type { RestoredGame } from "../lib/restoreGame";
+import { useChunkedRestore } from "../hooks/useChunkedRestore";
+import { RestoreProgress } from "./RestoreProgress";
 import { PlaySession } from "./DefensePlay";
 import { RankedResult } from "./RankedResult";
 
@@ -66,6 +68,7 @@ export default function RankedPlay({ mode, fixedSeed }: Props) {
   const [requesting, setRequesting] = useState(false);
   const [run, setRun] = useState<Run | null>(null);
   const [over, setOver] = useState<Over | null>(null);
+  const restorer = useChunkedRestore();
   const clock = useSessionClock(run?.session?.receivedAt ?? null, run?.session?.ttlMs);
 
   useEffect(() => {
@@ -116,9 +119,11 @@ export default function RankedPlay({ mode, fixedSeed }: Props) {
     }
   };
 
-  const resume = (slot: ResumeSlot) => {
+  const resume = async (slot: ResumeSlot) => {
+    if (restorer.progress !== null) return;
     const board = resolveBoard(mode, slot.boardKey, slot.seed);
-    const restored = board ? restoreGame(board, slot.seed, slot.inputs, slot.tick) : null;
+    const restored = board ? await restorer.restore(board, slot.seed, slot.inputs, slot.tick) : null;
+    if (restored === "cancelled") return;
     setResumeOffer(null);
     if (!restored) {
       clearResume();
@@ -231,10 +236,12 @@ export default function RankedPlay({ mode, fixedSeed }: Props) {
       {resumeOffer ? (
         <>
           <p className="text-sm text-slate-200">하던 판이 있어요 — {boardTitle(resumeOffer.boardKey)}</p>
+          {restorer.progress !== null && <RestoreProgress progress={restorer.progress} />}
           <button
             type="button"
             data-testid="defense-resume-continue"
-            onClick={() => resume(resumeOffer)}
+            disabled={restorer.progress !== null}
+            onClick={() => void resume(resumeOffer)}
             className="min-h-12 w-full max-w-xs rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 text-sm font-semibold text-white"
           >
             이어하기
@@ -242,7 +249,7 @@ export default function RankedPlay({ mode, fixedSeed }: Props) {
           <button
             type="button"
             data-testid="defense-resume-new"
-            disabled={busy}
+            disabled={busy || restorer.progress !== null}
             onClick={() => {
               clearResume();
               setResumeOffer(null);
