@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmModal } from "@/app/components/ConfirmModal";
-import { SOUND, Sfx } from "../audio/sfx";
+import { SOUND } from "../audio/sfx";
+import { commandSound, useDefenseSfx } from "../hooks/useDefenseSfx";
 import { AUGMENTS, ENGINE_VERSION, EVENT, EVENT_STRIDE, OP, findStage, slotAvailable, type GameState, type Stage } from "../engine";
 import { useAutoQuality } from "../hooks/useAutoQuality";
 import { useDefenseCanvas } from "../hooks/useDefenseCanvas";
@@ -279,8 +280,8 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
     fx.current = { particles: new ParticlePool(PARTICLE_CAPACITY), numbers: new DamageNumberPool(NUMBER_CAPACITY), effects: new EffectPool(EFFECT_CAPACITY), scratch: createSceneScratch() };
   }
   const noticeRef = useRef(createTickNotice());
-  const sfxRef = useRef<Sfx | null>(null);
-  if (sfxRef.current === null) sfxRef.current = new Sfx();
+  // 효과음 — 켜기·제스처 대기·정리는 훅이 맡는다(다시보기와 공용)
+  const sfx = useDefenseSfx(settings.sound);
   const leakAtRef = useRef(-Infinity);
   const shakeUntilRef = useRef(-Infinity);
   /** 이번 판에서 만난 적 — 저장 시점에 도감 기록으로 */
@@ -308,7 +309,7 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
     const pools = fx.current!;
     const notice = applyTickEvents(events, view, prev, pools, noticeRef.current, settingsRef.current.damageNumbers && qualityNumbersRef.current);
     const now = performance.now();
-    for (const sound of notice.sounds) sfxRef.current!.play(sound, now);
+    for (const sound of notice.sounds) sfx.play(sound, now);
     if (notice.leakedLives > 0) {
       leakAtRef.current = now;
       if (settingsRef.current.vibration) vibrate(30);
@@ -322,7 +323,7 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
       if (events[i] === EVENT.SPAWN && !metRef.current.includes(events[i + 2])) metRef.current.push(events[i + 2]);
       else if (events[i] === EVENT.WAVE_START || events[i] === EVENT.WAVE_CLEAR) saveDueRef.current = true;
     }
-  }, [qualityNumbersRef]);
+  }, [qualityNumbersRef, sfx]);
 
   const reducedMotionRef = useRef(false);
   useEffect(() => {
@@ -402,12 +403,12 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
       // 별·진행도·로컬 다시보기는 캠페인만 — 무한·주간 기록은 서버 등록(결과 화면)
       const outcome = campaign ? settleCampaign({ stageId: campaign.meta.id, difficulty: campaign.difficulty, boardKey, seed, engineVersion: ENGINE_VERSION, ...result }) : null;
       if (!campaign) onRankedOverRef.current?.(result, state);
-      sfxRef.current!.play(result.victory ? SOUND.VICTORY : SOUND.DEFEAT, performance.now());
+      sfx.play(result.victory ? SOUND.VICTORY : SOUND.DEFEAT, performance.now());
       setSelected(null);
       setArmed(null);
       setFinished({ result, campaign: outcome });
     },
-    [campaign, boardKey, seed],
+    [campaign, boardKey, seed, sfx],
   );
 
   const { hud, dispatch, togglePause, cycleSpeed, stateRef, recorderRef } = useDefensePlay({
@@ -451,47 +452,23 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
     };
   }, []);
 
-  // 효과음 — 꺼져 있으면 컨텍스트를 만들지 않는다. 켜져 있는데 아직 소리가 안 나면(저장값 켜짐·제스처 전 suspended·iOS 끊김)
-  // 사용자 활성화를 주는 이벤트(pointerup·touchend·click·keydown — 터치의 pointerdown은 활성화가 아니다)마다 다시 시도한다
-  // 음소거 토글을 누르는 제스처는 건너뛴다(끄려는 손짓에 컨텍스트를 만들지 않게)
-  useEffect(() => {
-    const sfx = sfxRef.current!;
-    if (!settings.sound) {
-      sfx.setEnabled(false);
-      return;
-    }
-    // 이미 만든 컨텍스트면 바로 켠다 — 처음 만드는 것은 아래 제스처에서만(제스처 밖에서 만들면 iOS가 소리를 내지 않는다)
-    if (sfx.created) sfx.setEnabled(true);
-    const unlock = (e: Event) => {
-      if (sfx.created && !sfx.waitingForGesture) return;
-      if (e.target instanceof Element && e.target.closest('[data-testid="defense-sound"]')) return;
-      sfx.setEnabled(true);
-      sfx.unlock();
-    };
-    const events = ["pointerup", "touchend", "click", "keydown"] as const;
-    for (const type of events) window.addEventListener(type, unlock);
-    return () => {
-      for (const type of events) window.removeEventListener(type, unlock);
-    };
-  }, [settings.sound]);
-  useEffect(() => sfxRef.current!.setSpeed(hud.speed), [hud.speed]);
+  useEffect(() => sfx.setSpeed(hud.speed), [sfx, hud.speed]);
   // 끝난 판은 멈추지 않는다 — 승패음(0.6~0.8초)이 끝까지 나게. 루프는 판이 끝나면 곧 멈춘다
-  useEffect(() => sfxRef.current!.setPaused(hud.status === "paused"), [hud.status]);
-  useEffect(() => () => sfxRef.current?.dispose(), []);
+  useEffect(() => sfx.setPaused(hud.status === "paused"), [sfx, hud.status]);
 
   const toggleSound = useCallback(() => {
     const on = !settingsRef.current.sound;
     // 이 클릭이 사용자 제스처 — 여기서 켜야 컨텍스트가 소리를 낸다
-    sfxRef.current!.setEnabled(on);
+    sfx.setEnabled(on);
     updateSettings({ sound: on });
-  }, [updateSettings]);
+  }, [sfx, updateSettings]);
   /** 설정 패널 — 효과음을 바꾸는 체크도 제스처 안이라 그 자리에서 켠다/끈다 */
   const changeSettings = useCallback(
     (patch: Parameters<typeof updateSettings>[0]) => {
-      if (patch.sound !== undefined) sfxRef.current!.setEnabled(patch.sound);
+      if (patch.sound !== undefined) sfx.setEnabled(patch.sound);
       updateSettings(patch);
     },
-    [updateSettings],
+    [sfx, updateSettings],
   );
 
   // 보스 등장 배너 — 잠깐 보이고 사라진다
@@ -560,13 +537,13 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
       const { op } = next.command;
       const ok = dispatch(op, next.command.a, next.command.b);
       if (ok) {
-        const sound = op === OP.BUILD ? SOUND.BUILD : op === OP.SELL ? SOUND.SELL : op === OP.UPGRADE || op === OP.BRANCH ? SOUND.UPGRADE : -1;
-        if (sound >= 0) sfxRef.current!.play(sound, performance.now());
+        const sound = commandSound(op, OP);
+        if (sound >= 0) sfx.play(sound, performance.now());
       }
       // 건설·판매 뒤에는 닫고, 업그레이드·타게팅은 같은 슬롯을 열어 둔다(연속 업그레이드)
       if (ok && (op === OP.BUILD || op === OP.SELL)) close();
     },
-    [armed, dispatch, close],
+    [armed, dispatch, close, sfx],
   );
 
   const callWave = useCallback(() => {
@@ -574,10 +551,10 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
     if (overlayOpenRef.current) return;
     // 직접 부른 웨이브는 엔진이 렌더 이벤트를 내지 않는다(명령 적용은 이벤트 버퍼 없이) — 시작음을 여기서
     if (dispatch(OP.CALL_WAVE)) {
-      sfxRef.current!.play(SOUND.WAVE_START, performance.now());
+      sfx.play(SOUND.WAVE_START, performance.now());
       persistRef.current();
     }
-  }, [dispatch]);
+  }, [dispatch, sfx]);
 
   // 튜토리얼 단계(§F5) — 판 상태로 정하고, 웨이브를 부르면 끝(저장)
   const step = tutorialOn ? tutorialStep({ ringOpen: selected !== null, towers: stateRef.current.towers.length, wavesStarted: hud.wavesStarted }) : null;
