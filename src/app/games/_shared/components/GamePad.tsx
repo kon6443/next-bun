@@ -31,6 +31,10 @@ export type PadButtonSpec = {
   tone?: "neutral" | "primary" | "accent";
 };
 
+/**
+ * 배치 불변 조건: 유지형(hold) press 코드는 배치 안에서 하나씩만 — 입력 큐는 press 코드당 눌림 하나를 추적해서,
+ * 같은 코드를 두 곳(방향·버튼)에 두면 한쪽을 뗄 때 다른 쪽이 눌린 채여도 풀린다
+ */
 export type GamePadLayout = {
   /** 없는 방향은 무동작 — 누르거나 미끄러져 들어가도 입력 없음, 팔은 흐리게 */
   dpad: Partial<Record<PadDirection, PadDirectionSpec>>;
