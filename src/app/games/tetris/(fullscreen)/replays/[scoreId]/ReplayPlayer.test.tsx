@@ -23,7 +23,7 @@ const replayOf = (name: string) => {
 async function ready(name = 'back-to-back') {
   loadReplay.mockResolvedValue(replayOf(name));
   render(<ReplayPlayer scoreId={1} />);
-  return screen.findByTestId('tetris-replay-seek', {}, { timeout: 5000 });
+  return (await screen.findByTestId('tetris-replay-seek', {}, { timeout: 5000 })) as HTMLInputElement;
 }
 
 describe('싱글 리플레이 재생기 (games-polish P4)', () => {
