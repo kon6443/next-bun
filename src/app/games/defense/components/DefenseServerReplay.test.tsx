@@ -15,7 +15,7 @@ vi.mock('@/app/games/_shared/components/ShareMenu', () => ({
     return <div data-testid="share-menu" />;
   },
 }));
-vi.mock('@/app/games/_shared/hooks/useKakaoReady', () => ({ useKakaoReady: () => ({ kakaoReady: false, kakaoScript: null }) }));
+vi.mock('@/app/games/_shared/hooks/useKakaoReady', () => ({ useKakaoReady: () => ({ kakao: 'off', kakaoScript: null }) }));
 vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }));
 
 class FakeResizeObserver {

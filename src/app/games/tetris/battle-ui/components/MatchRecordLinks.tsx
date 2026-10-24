@@ -16,7 +16,7 @@ const linkStyles =
 export function MatchRecordLinks({ matchId }: { matchId: string }) {
   const published = useMatchPublished(matchId, true);
   const [shareOpen, setShareOpen] = useState(false);
-  const { kakaoReady, kakaoScript } = useKakaoReady();
+  const { kakao, kakaoScript } = useKakaoReady();
 
   if (published.status === "unavailable") {
     return <p className="mt-2 text-center text-xs text-slate-500">이 경기는 기록 보기를 열 수 없어요.</p>;
@@ -43,7 +43,7 @@ export function MatchRecordLinks({ matchId }: { matchId: string }) {
       </button>
       {kakaoScript}
       {shareOpen && (
-        <ShareMenu content={buildBattleShareContent(published.match)} kakaoReady={kakaoReady} onClose={() => setShareOpen(false)} />
+        <ShareMenu content={buildBattleShareContent(published.match)} kakao={kakao} onClose={() => setShareOpen(false)} />
       )}
     </div>
   );
