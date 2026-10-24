@@ -120,6 +120,20 @@ describe('리플레이 화면 — 로컬·서버', () => {
     expect((await screen.findByTestId('defense-replay-error')).textContent).toContain('지금 버전의 게임으로 재생할 수 없어요');
   }, 30_000);
 
+  it('재생 중에 막대를 끝으로 끌면 멈춘 상태가 된다 — "Ⅱ"인 채 서 있지 않고 ▶ 한 번이면 처음부터 (games-polish FE-38)', { timeout: 30_000 }, async () => {
+    const { input } = saveLocalWin();
+    render(<LocalReplayView stageId="s1" />);
+    await screen.findByTestId('defense-replay', {}, { timeout: 5000 });
+    const play = screen.getByTestId('defense-replay-play');
+    expect(play.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.change(screen.getByTestId('defense-replay-seek'), { target: { value: String(Math.ceil(input.ticks / TICKS_PER_SECOND) * TICKS_PER_SECOND) } });
+    await waitFor(() => expect(screen.getByTestId('defense-replay-time').textContent).toBe(`${fmt(input.ticks)} / ${fmt(input.ticks)}`));
+    expect(play.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(play);
+    expect(play.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByTestId('defense-replay-time').textContent!.startsWith('0:00')).toBe(true);
+  });
+
   it('하이라이트 — 목숨을 잃은 순간이 막대 점·버튼으로, 다음을 누르면 그 순간 1.5초 앞으로 (games-polish P4)', async () => {
     const driver = GameDriver.fromBoard('endless', 'endless-s1', 5);
     driver.must(OP.CALL_WAVE);

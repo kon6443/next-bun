@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HighlightMarks, HighlightNav } from "@/app/games/_shared/components/HighlightRail";
 import type { HighlightKindSpec } from "@/app/games/_shared/lib/highlights";
 import { useDefenseCanvas } from "../hooks/useDefenseCanvas";
@@ -132,6 +132,8 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
       resetViews();
       setHighlight(highlightSlot >= 0 ? { slot: highlightSlot, tick: cursorRef.current.state.tick } : null);
       setTick(cursorRef.current.state.tick);
+      // 끝으로 탐색했으면 멈춘다 — 재생 중 끝 판정은 루프의 진행 분기에만 있어 "Ⅱ"인 채 멈춰 보였다 (games-polish FE-38)
+      if (cursorRef.current.state.over || cursorRef.current.state.tick >= replay.totalTicks) setPlaying(false);
     },
     [replay, resetViews],
   );
@@ -365,19 +367,27 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
         >
           명령 {replay.commands.length}개 {listOpen ? "닫기" : "보기"}
         </button>
-        {listOpen && (
-          <ol className="max-h-40 overflow-y-auto rounded-xl border border-white/10 bg-slate-950/60 p-1 text-xs" data-testid="defense-replay-commands">
-            {replay.commands.map((c, i) => (
-              <li key={i}>
-                <button type="button" data-testid={`defense-replay-command-${i}`} onClick={() => seek(c.tick, c.slot)} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-2 text-left text-slate-200 hover:bg-white/5">
-                  <span className="w-10 shrink-0 tabular-nums text-slate-400">{formatTicks(c.tick, tps)}</span>
-                  <span>{commandLabel(replay, c)}</span>
-                </button>
-              </li>
-            ))}
-          </ol>
-        )}
+        {listOpen && <CommandList replay={replay} tps={tps} onPick={seek} />}
       </footer>
     </main>
   );
 }
+
+/**
+ * 명령 목록 — 기록마다 고정이라 memo (games-polish FE-39)
+ * 재생 중 화면 상태가 매초 바뀌어도 수천 줄을 다시 만들지 않는다(입력 상한 20000). onPick(seek)은 기록이 같으면 같은 함수
+ */
+const CommandList = memo(function CommandList({ replay, tps, onPick }: { replay: PreparedReplay; tps: number; onPick: (tick: number, slot: number) => void }) {
+  return (
+    <ol className="max-h-40 overflow-y-auto rounded-xl border border-white/10 bg-slate-950/60 p-1 text-xs" data-testid="defense-replay-commands">
+      {replay.commands.map((c, i) => (
+        <li key={i}>
+          <button type="button" data-testid={`defense-replay-command-${i}`} onClick={() => onPick(c.tick, c.slot)} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-2 text-left text-slate-200 hover:bg-white/5">
+            <span className="w-10 shrink-0 tabular-nums text-slate-400">{formatTicks(c.tick, tps)}</span>
+            <span>{commandLabel(replay, c)}</span>
+          </button>
+        </li>
+      ))}
+    </ol>
+  );
+});
