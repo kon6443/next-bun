@@ -323,4 +323,18 @@ describe('gameService', () => {
       expect(fetchMock.mock.calls[1][1].signal).toBeDefined();
     });
   });
+
+  it('세션: 오늘의 테트리스는 board daily, 도전장은 challengeScoreId만 본문에 (games-growth B1·B2)', async () => {
+    fetchMock.mockImplementation(() => Promise.resolve(json({ code: 'SUCCESS', message: 'ok', data: { sessionId: 's', seed: 1, engineVersion: 1, expiresAt: 'x' } }, 201)));
+    await createGameSession('tetris', undefined, 'daily');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ board: 'daily' });
+    await createGameSession('tetris', undefined, { challengeScoreId: 41 });
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ challengeScoreId: 41 });
+  });
+
+  it('세션: 도전장 거절은 백엔드 code 그대로 — 원본 없음 404·지난 버전 409', async () => {
+    fetchMock.mockResolvedValueOnce(json({ code: 'GAME_SCORE_NOT_FOUND', message: 'x' }, 404)).mockResolvedValueOnce(json({ code: 'GAME_CHALLENGE_EXPIRED', message: 'y' }, 409));
+    await expect(createGameSession('tetris', undefined, { challengeScoreId: 9 })).rejects.toMatchObject({ code: 'GAME_SCORE_NOT_FOUND', status: 404 });
+    await expect(createGameSession('tetris', undefined, { challengeScoreId: 9 })).rejects.toMatchObject({ code: 'GAME_CHALLENGE_EXPIRED', status: 409 });
+  });
 });

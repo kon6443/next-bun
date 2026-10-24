@@ -2,7 +2,7 @@ import fetchServiceInstance from './FetchService';
 import { ApiError, type ApiErrorResponse, type ApiResponse, createApiError } from '@/types/api';
 import type {
   GameBoard,
-  GameMode,
+  SessionBoard,
   GameSession,
   GameType,
   PopularReplayList,
@@ -166,23 +166,28 @@ function verifyBusyWaitMs(response: Response): number | null {
 
 /**
  * 게임 세션·시드 발급 — 로그인이면 토큰을 붙인다(선택 인증)
- * board: 플레이 방식(디펜스 endless·weekly, 테트리스 daily) — 생략하면 본문 없이(그 게임의 기본 보드)
+ * target: 플레이 방식(디펜스 endless·weekly, 테트리스 daily) 또는 도전장({ challengeScoreId } — 테트리스만, 원본 기록의 seed로)
+ *   생략하면 본문 없이(그 게임의 기본 보드)
+ * 도전장: 404 GAME_SCORE_NOT_FOUND(원본 없음·숨김·공개 전) · 409 GAME_CHALLENGE_EXPIRED(엔진 버전이 바뀜)
  * 503: GAME_SESSION_UNAVAILABLE(세션 저장소)·GAME_WEEKLY_UNAVAILABLE(주간만)·GAME_DAILY_UNAVAILABLE(데일리 비밀값 없음) — 플레이는 되고 등록만 안 된다
  */
 export async function createGameSession(
   gameType: GameType,
   accessToken?: string,
-  board?: GameMode,
+  target?: SessionBoard | { challengeScoreId: number },
 ): Promise<ApiResponse<GameSession>> {
+  const body = target === undefined ? undefined : typeof target === 'string' ? { board: target } : { challengeScoreId: target.challengeScoreId };
   const response = await fetchWithOptionalAuth(
-    board
-      ? { method: 'POST', endpoint: `/api/v1/games/${gameType}/sessions`, body: { board }, timeoutMs: SESSION_TIMEOUT_MS }
+    body
+      ? { method: 'POST', endpoint: `/api/v1/games/${gameType}/sessions`, body, timeoutMs: SESSION_TIMEOUT_MS }
       : { method: 'POST', endpoint: `/api/v1/games/${gameType}/sessions`, timeoutMs: SESSION_TIMEOUT_MS },
     accessToken,
   );
 
   if (!response.ok) {
     await handleApiError(response, {
+      404: '도전할 기록을 찾을 수 없습니다.',
+      409: '지난 버전 게임의 기록이라 도전할 수 없습니다.',
       429: TOO_MANY,
       503: '지금은 랭킹 등록을 준비할 수 없습니다. 플레이는 그대로 할 수 있어요.',
       default: '게임 세션을 만들지 못했습니다.',

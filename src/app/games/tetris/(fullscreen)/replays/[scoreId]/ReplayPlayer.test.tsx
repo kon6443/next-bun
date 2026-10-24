@@ -175,4 +175,10 @@ describe('싱글 리플레이 재생기 (games-polish P4)', () => {
     expect(stats.viewCalls.length).toBeGreaterThan(0);
     expect(stats.viewCalls.every(([, , playable]) => playable === false)).toBe(true);
   });
+
+  it('도전장 — 이 기록으로 도전장 보내기·직접 도전 링크 (games-growth B2)', async () => {
+    await ready();
+    expect(screen.getByTestId('challenge-share').textContent).toBe('⚔️ 도전장 보내기');
+    expect(screen.getByRole('link', { name: '직접 도전' }).getAttribute('href')).toBe('/games/tetris/challenge/1');
+  });
 });

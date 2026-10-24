@@ -141,4 +141,23 @@ describe('GameOverPanel 예상 순위 요청', () => {
     expect(screen.getByText(/다시 도전한 판이에요/)).toBeTruthy();
     expect(JSON.parse(window.localStorage.getItem('tetris:daily:first')!).rank).toBeUndefined();
   });
+
+  it('도전장: 도전장 순위 하나·원본과 점수 비교·등록 뒤 도전장 다시 보내기 (games-growth B2)', async () => {
+    const original = { rank: 1, scoreId: 7, playerName: '원본왕', score: 400, detail: { lines: 4, level: 1 }, durationMs: 1, createdAt: 'x' } as never;
+    getGameRankings.mockResolvedValue(page([]));
+    submitGameScore.mockResolvedValue({ code: 'SUCCESS', message: 'ok', data: { scoreId: 50, score: 500, detail: {}, ranks: { daily: 2, weekly: 2, all: 2 } } });
+    await act(async () => {
+      render(<GameOverPanel {...props} challenge={{ boardKey: 'challenge-7', original }} />);
+    });
+    expect(getGameRankings).toHaveBeenCalledTimes(1);
+    expect(getGameRankings).toHaveBeenCalledWith('tetris', 'all', 100, 'challenge-7');
+    expect(screen.getByText('도전장 순위')).toBeTruthy();
+    expect(screen.getByTestId('challenge-versus').textContent).toContain('도전 성공!');
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    expect(screen.getByRole('link', { name: '랭킹 보기' }).getAttribute('href')).toBe('/games/tetris/rankings?highlight=50&board=challenge-7');
+    expect(screen.getByTestId('challenge-share').textContent).toBe('⚔️ 도전장 다시 보내기');
+    expect(screen.queryByTestId('result-share')).toBeNull();
+  });
 });

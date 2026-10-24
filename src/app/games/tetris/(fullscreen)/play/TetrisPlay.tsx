@@ -5,12 +5,12 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Button } from "@/app/teams/components";
 import { ConfirmModal } from "@/app/components/ConfirmModal";
-import { createGameSession } from "@/services/gameService";
+import { createGameSession, getGameScore } from "@/services/gameService";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
 import { useMediaQuery } from "@/app/games/_shared/hooks/useMediaQuery";
 import { sessionTtlMs } from "@/app/games/_shared/lib/sessionTtl";
 import { ApiError } from "@/types/api";
-import type { GameSession, ReplayPayload } from "@/types/game";
+import type { GameSession, ReplayPayload, ScoreSummary } from "@/types/game";
 import { extractErrorMessage } from "@/app/utils/errorUtils";
 import { ENGINE_VERSION, type GameState, MAX_FRAMES, MAX_INPUT_LENGTH } from "../../engine";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
@@ -25,6 +25,7 @@ import { CONTROL_GUIDE } from "../../lib/controls";
 import { formatFrames, formatScore } from "@/app/games/_shared/lib/format";
 import { type TetrisSettings, DEFAULT_SETTINGS, loadLastName, loadSettings, recordBestScore } from "../../lib/storage";
 import { isDailyBoardKey, recordDailyRun } from "../../lib/daily";
+import { challengeHeadline, challengeRootId } from "../../lib/challenge";
 
 type SessionState =
   | { status: "loading" }
@@ -34,7 +35,9 @@ type SessionState =
    */
   | { status: "ready"; session: GameSession; receivedAt: number; ttlMs: number }
   /** 발급 실패 — 로컬 시드로 플레이만 한다 */
-  | { status: "failed"; seed: number; error: string };
+  | { status: "failed"; seed: number; error: string }
+  /** 도전장을 열 수 없다(원본 없음·공개 전·지난 버전) — 다른 seed로 하면 도전이 아니므로 시작하지 않는다 */
+  | { status: "blocked"; error: string };
 
 /** 세션 TTL 상한(백엔드 2시간) — 응답 남은 시간이 이보다 길게 잡히면(기기 시계가 늦다 등) 이 값으로 (sessionTtlMs) */
 const SESSION_TTL_FALLBACK_MS = 120 * 60 * 1000;
@@ -47,14 +50,26 @@ function randomSeed(): number {
   return crypto.getRandomValues(new Uint32Array(1))[0];
 }
 
+/** 도전장 세션이 거절된 이유 — 다시 받아도 같으므로 시작을 막는다. 그 밖(망·503)은 null */
+function challengeBlockMessage(err: unknown): string | null {
+  if (!(err instanceof ApiError)) return null;
+  if (err.code === "GAME_CHALLENGE_EXPIRED") return "지난 버전 게임의 기록이라 이 도전장은 더 이상 할 수 없어요.";
+  if (err.status === 404) return "도전할 기록을 찾을 수 없어요. 지워졌거나 아직 공개 전인 기록이에요.";
+  if (err.status === 409 || err.status === 422) return err.getDefaultMessage();
+  return null;
+}
+
 function sessionErrorMessage(err: unknown): string {
   if (err instanceof ApiError && err.code === "GAME_SESSION_UNAVAILABLE") return err.getDefaultMessage();
   if (err instanceof ApiError && err.code === "GAME_DAILY_UNAVAILABLE") return "지금은 오늘의 테트리스를 열 수 없어요. 이번 판은 일반 판으로 등록 없이 플레이해요.";
   return `${extractErrorMessage(err, "랭킹 등록을 준비하지 못했습니다.")} 이번 판은 등록 없이 플레이해요.`;
 }
 
-/** daily: 오늘의 테트리스(games-growth B1) — 데일리 세션(모두 같은 seed)으로, 결과는 오늘 순위·Wordle식 공유 */
-export default function TetrisPlay({ daily = false }: { daily?: boolean }) {
+/**
+ * daily: 오늘의 테트리스(games-growth B1) — 데일리 세션(모두 같은 seed)으로, 결과는 오늘 순위·Wordle식 공유
+ * challengeScoreId: 도전장(B2) — 그 기록(원본)과 같은 seed로, 결과는 원본과 비교·도전장 순위
+ */
+export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?: boolean; challengeScoreId?: number }) {
   const { data: authSession, status: authStatus } = useSession();
   const accessToken = authSession?.user?.accessToken ?? undefined;
 
@@ -72,6 +87,8 @@ export default function TetrisPlay({ daily = false }: { daily?: boolean }) {
     defaultName: string;
     /** 데일리 세션으로 한 판 — isFirstRun: 이 기기의 오늘 첫 판(공유 문구 기준) */
     daily: { boardKey: string; isFirstRun: boolean } | null;
+    /** 도전장 세션으로 한 판 — 도전장 보드(challenge-{원본 id}) */
+    challengeBoardKey: string | null;
   } | null>(null);
   const userNameRef = useRef("");
   userNameRef.current = authSession?.user?.userName ?? "";
@@ -81,6 +98,7 @@ export default function TetrisPlay({ daily = false }: { daily?: boolean }) {
     const isNewBest = recordBestScore(state.score);
     const current = sessionStateRef.current;
     const dailyBoardKey = current.status === "ready" && current.session.boardKey && isDailyBoardKey(current.session.boardKey) ? current.session.boardKey : null;
+    const challengeBoardKey = current.status === "ready" && challengeRootId(current.session.boardKey) !== null ? current.session.boardKey! : null;
     const daily = dailyBoardKey
       ? { boardKey: dailyBoardKey, isFirstRun: recordDailyRun({ boardKey: dailyBoardKey, score: state.score, lines: state.lines, level: state.level }) }
       : null;
@@ -93,6 +111,7 @@ export default function TetrisPlay({ daily = false }: { daily?: boolean }) {
       overLimit: replay.frames > MAX_FRAMES || replay.inputs.length > MAX_INPUT_LENGTH,
       defaultName: candidate ? normalizePlayerName(candidate) : "",
       daily,
+      challengeBoardKey,
     });
   }, []);
 
@@ -108,7 +127,7 @@ export default function TetrisPlay({ daily = false }: { daily?: boolean }) {
     const isLatest = beginSessionRequest();
     setSessionState({ status: "loading" });
     try {
-      const { data } = await createGameSession("tetris", accessToken, daily ? "daily" : undefined);
+      const { data } = await createGameSession("tetris", accessToken, daily ? "daily" : challengeScoreId ? { challengeScoreId } : undefined);
       if (!isLatest()) return;
       if (data.engineVersion !== ENGINE_VERSION) {
         setSessionState({
@@ -122,9 +141,24 @@ export default function TetrisPlay({ daily = false }: { daily?: boolean }) {
       setSessionState({ status: "ready", session: data, receivedAt, ttlMs: sessionTtlMs(data, receivedAt, SESSION_TTL_FALLBACK_MS) });
     } catch (err) {
       if (!isLatest()) return;
-      setSessionState({ status: "failed", seed: randomSeed(), error: sessionErrorMessage(err) });
+      const blocked = challengeScoreId ? challengeBlockMessage(err) : null;
+      if (blocked) setSessionState({ status: "blocked", error: blocked });
+      else setSessionState({ status: "failed", seed: randomSeed(), error: sessionErrorMessage(err) });
     }
-  }, [accessToken, beginSessionRequest, daily]);
+  }, [accessToken, beginSessionRequest, daily, challengeScoreId]);
+
+  // 도전장 원본 기록 — 세션 boardKey(challenge-{원본 id})로. 링크의 id가 도전장 기록이어도 원본을 보인다
+  const [original, setOriginal] = useState<ScoreSummary | null>(null);
+  const originalRequestedRef = useRef<number | null>(null);
+  const rootId = sessionState.status === "ready" ? challengeRootId(sessionState.session.boardKey) : null;
+  useEffect(() => {
+    if (rootId === null || originalRequestedRef.current === rootId) return;
+    originalRequestedRef.current = rootId;
+    getGameScore("tetris", rootId)
+      .then(({ data }) => setOriginal(data))
+      // 원본 요약을 못 받아도 도전은 된다 — 비교만 빠진다
+      .catch(() => {});
+  }, [rootId]);
 
   // 로그인 상태가 정해진 뒤 첫 세션을 받는다 (로그인이면 기록에 USER_ID가 남는다)
   // 이후 세션은 판마다 restart가 새로 받는다
@@ -149,7 +183,7 @@ export default function TetrisPlay({ daily = false }: { daily?: boolean }) {
   const startAfterSessionRef = useRef(false);
 
   const startGame = () => {
-    if (sessionState.status === "loading") return;
+    if (sessionState.status === "loading" || sessionState.status === "blocked") return;
     // 준비 화면에 오래 두어 판 도중(최대 60분) 세션이 만료될 수 있으면 새로 받은 뒤 이어서 시작한다
     if (sessionState.status === "ready" && Date.now() - sessionState.receivedAt > sessionState.ttlMs - SESSION_PLAY_MARGIN_MS) {
       startAfterSessionRef.current = true;
@@ -194,7 +228,7 @@ export default function TetrisPlay({ daily = false }: { daily?: boolean }) {
   };
 
   // "시작" 버튼은 세션을 받는 동안 비활성이라 autoFocus가 안 먹는다 — 활성화될 때 포커스를 준다
-  const startEnabled = phase === "ready" && sessionState.status !== "loading";
+  const startEnabled = phase === "ready" && sessionState.status !== "loading" && sessionState.status !== "blocked";
   useEffect(() => {
     if (startEnabled) startButtonRef.current?.focus();
   }, [startEnabled]);
@@ -261,27 +295,36 @@ export default function TetrisPlay({ daily = false }: { daily?: boolean }) {
         {phase === "ready" && (
           <Overlay>
             <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900/95 p-6 text-center">
-              <p className="text-xs font-semibold tracking-[0.4em] text-slate-400">{daily ? "DAILY" : "TETRIS"}</p>
-              <h1 className="mt-2 text-2xl font-bold text-white">{daily ? "오늘의 테트리스" : "준비됐나요?"}</h1>
+              <p className="text-xs font-semibold tracking-[0.4em] text-slate-400">{daily ? "DAILY" : challengeScoreId ? "CHALLENGE" : "TETRIS"}</p>
+              <h1 className="mt-2 text-2xl font-bold text-white">
+                {daily ? "오늘의 테트리스" : challengeScoreId ? (original ? challengeHeadline(original) : "도전장") : "준비됐나요?"}
+              </h1>
               {daily && <p className="mt-2 text-sm text-slate-300">오늘은 모두 같은 블록 순서예요. 첫 판 기록으로 결과를 공유해요.</p>}
+              {challengeScoreId && sessionState.status !== "blocked" && <p className="mt-2 text-sm text-slate-300">같은 블록 순서로 이 점수를 넘어 보세요.</p>}
               <p className="mt-2 text-sm text-slate-400" role="status">
                 {sessionState.status === "loading"
                   ? "랭킹 등록을 준비하는 중..."
-                  : sessionState.status === "failed"
+                  : sessionState.status === "failed" || sessionState.status === "blocked"
                     ? sessionState.error
                     : "게임이 끝나면 이름을 적어 랭킹에 올릴 수 있어요."}
               </p>
-              <Button
-                type="button"
-                size="md"
-                fullWidth
-                className="mt-5 min-h-11"
-                ref={startButtonRef}
-                onClick={startGame}
-                disabled={sessionState.status === "loading"}
-              >
-                시작
-              </Button>
+              {sessionState.status === "blocked" ? (
+                <Link href="/games/tetris/play" className="mt-5 flex min-h-11 items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 text-sm font-semibold text-white">
+                  일반 게임 하기
+                </Link>
+              ) : (
+                <Button
+                  type="button"
+                  size="md"
+                  fullWidth
+                  className="mt-5 min-h-11"
+                  ref={startButtonRef}
+                  onClick={startGame}
+                  disabled={sessionState.status === "loading"}
+                >
+                  시작
+                </Button>
+              )}
               {sessionState.status === "loading" && sessionSlow && (
                 <Button type="button" variant="secondary" size="md" fullWidth className="mt-2 min-h-11" onClick={startWithoutSession}>
                   등록 없이 시작
@@ -327,6 +370,7 @@ export default function TetrisPlay({ daily = false }: { daily?: boolean }) {
               accessToken={accessToken}
               defaultName={result.defaultName}
               daily={result.daily}
+              challenge={result.challengeBoardKey ? { boardKey: result.challengeBoardKey, original } : null}
               onRestart={restart}
             />
           </Overlay>

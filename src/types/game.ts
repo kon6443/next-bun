@@ -8,8 +8,11 @@ export type GameType = 'tetris' | 'defense';
 
 export type RankingPeriod = 'daily' | 'weekly' | 'all';
 
-/** 세션 모드 — 디펜스 endless·weekly, 테트리스 daily(오늘의 테트리스 — 기본 판은 null) */
-export type GameMode = 'endless' | 'weekly' | 'daily';
+/** 세션 모드 — 디펜스 endless·weekly, 테트리스 daily(오늘의 테트리스)·challenge(도전장 — 기본 판은 null) */
+export type GameMode = 'endless' | 'weekly' | 'daily' | 'challenge';
+
+/** 세션 요청 본문 board로 고를 수 있는 모드 — 도전장은 board가 아니라 challengeScoreId로 */
+export type SessionBoard = Exclude<GameMode, 'challenge'>;
 
 export type GameSession = {
   sessionId: string;

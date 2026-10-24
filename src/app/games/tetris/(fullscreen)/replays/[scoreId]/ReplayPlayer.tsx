@@ -20,6 +20,8 @@ import { getSoundPlayer, replayCues } from "../../../lib/sound/soundPlayer";
 import { SoundButton } from "@/app/games/_shared/components/SoundButton";
 import { loadReplay } from "@/app/games/_shared/lib/replayLoader";
 import { TETRIS_SHARE } from "../../../lib/share";
+import { challengePath } from "../../../lib/challenge";
+import { ChallengeShareButton } from "../../../components/ChallengeShareButton";
 import { collectActions } from "../../../lib/replayTimeline";
 import { advanceClock, createClock, resetClock } from "@/app/games/_shared/lib/fixedStep";
 import { type PreparedTetrisReplay, type TetrisHighlightKind, SNAPSHOT_INTERVAL, nearestSnapshot, prepareTetrisReplay } from "../../../lib/replayPrepare";
@@ -452,6 +454,16 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
               </button>
             ))}
           </div>
+        </div>
+        {/* 도전장 — 같은 블록 순서로 이 기록에 도전 (games-growth B2) */}
+        <div className="flex items-center justify-center gap-2">
+          <ChallengeShareButton original={loaded} label="도전장 보내기" />
+          <Link
+            href={challengePath(loaded.scoreId)}
+            className="flex min-h-11 items-center rounded-full border border-white/20 px-4 text-sm font-semibold text-slate-100"
+          >
+            직접 도전
+          </Link>
         </div>
       </footer>
     </div>
