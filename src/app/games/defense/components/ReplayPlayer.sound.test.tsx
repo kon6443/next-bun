@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { ENGINE_VERSION, OP, TICKS_PER_SECOND } from '../engine';
 import { GameDriver } from '../engine-dev/driver';
@@ -67,7 +67,8 @@ describe('디펜스 다시보기 소리 (games-polish P7)', () => {
     render(<LocalReplayView stageId="s1" />);
     await screen.findByTestId('defense-replay', {}, { timeout: 5000 });
     expect(useDefenseSfx).toHaveBeenCalled();
-    expect(sfx.setPaused).toHaveBeenLastCalledWith(false);
+    // 오디오 쉼 상태는 마운트 effect가 맞춘다 — 부하가 큰 전체 실행에서는 화면이 먼저 보일 수 있어 기다린다
+    await waitFor(() => expect(sfx.setPaused).toHaveBeenLastCalledWith(false));
 
     // 처음 몇 초 — 발사·명중 등 틱 이벤트 소리가 난다
     fireEvent.click(screen.getByTestId('defense-replay-speed-4'));
