@@ -327,24 +327,47 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
   /** 마지막으로 그린 프레임 — 루프가 멈춘 뒤(판 끝) 화면 크기가 바뀌면 다시 그린다 */
   const lastFrameRef = useRef<FrameInfo | null>(null);
   const shakingRef = useRef(false);
+  /** 연출 시계(ms) — 판 시간이 흐를 때만 간다. 일시정지에 적이 흔들리거나 파티클이 사라지지 않게 (FE-40) */
+  const fxClockRef = useRef(0);
+  /** 마지막으로 그린 그림의 재료 — 멈춘 동안 같으면 다시 그리지 않는다 */
+  const drawnRef = useRef<{ curr: RenderView; version: number; selection: object | null; viewport: object; numbers: boolean } | null>(null);
   const onFrame = useCallback(
     (frame: FrameInfo) => {
       const ctx = canvas.fgContextRef.current;
       const viewport = canvas.viewportRef.current;
       const { particles, numbers, effects, scratch } = fx.current!;
       lastFrameRef.current = frame;
-      particles.update(frame.frameMs);
-      numbers.update(frame.frameMs);
-      effects.update(frame.frameMs);
+      const dt = frame.frozen ? 0 : frame.frameMs;
+      fxClockRef.current += dt;
+      particles.update(dt);
+      numbers.update(dt);
+      effects.update(dt);
       if (saveDueRef.current) persistRef.current();
       if (!ctx || !viewport) return;
       const showNumbers = settingsRef.current.damageNumbers && qualityNumbersRef.current;
+      // 멈춘 동안은 판·명령·선택·크기·설정이 그대로면 같은 그림이다 — 매 프레임 다시 그리지 않는다(누수 경고가 사라지는 중이면 그린다)
+      const drawn = drawnRef.current;
+      const leakFading = frame.now - leakAtRef.current < LEAK_PULSE_MS;
+      if (
+        frame.frozen &&
+        !leakFading &&
+        drawn &&
+        drawn.curr === frame.curr &&
+        drawn.version === frame.version &&
+        drawn.selection === selectionRef.current &&
+        drawn.viewport === viewport &&
+        drawn.numbers === showNumbers
+      ) {
+        return;
+      }
+      drawnRef.current = { curr: frame.curr, version: frame.version, selection: selectionRef.current, viewport, numbers: showNumbers };
       const drawStart = performance.now();
-      drawSceneLayer(ctx, { prev: frame.prev, curr: frame.curr, alpha: frame.alpha, particles, numbers, effects, showDamageNumbers: showNumbers, timeMs: frame.now }, viewport, scratch);
+      drawSceneLayer(ctx, { prev: frame.prev, curr: frame.curr, alpha: frame.alpha, particles, numbers, effects, showDamageNumbers: showNumbers, timeMs: fxClockRef.current }, viewport, scratch);
       if (selectionRef.current) drawSelection(ctx, selectionRef.current, viewport);
       drawBossBar(ctx, viewport, frame.curr, ENEMY_NAMES);
       drawLeakPulse(ctx, viewport, 1 - (frame.now - leakAtRef.current) / LEAK_PULSE_MS);
-      recordDrawTime(performance.now() - drawStart, frame.now, particles);
+      // 같은 그림을 건너뛴 프레임은 재지 않는다 — 실제로 그린 시간만 품질 판정에
+      if (!frame.frozen) recordDrawTime(performance.now() - drawStart, frame.now, particles);
       // 화면 흔들림(설정) — 컨테이너만 옮긴다(캔버스 다시 그리기 없음). 끝나면 한 번 원위치
       const container = canvas.containerRef.current;
       const shaking = settingsRef.current.shake && !reducedMotionRef.current && frame.now < shakeUntilRef.current;
@@ -359,7 +382,10 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
   // 크기가 바뀌면 캔버스 백버퍼가 지워진다 — 루프가 돌고 있으면 다음 프레임이 그리지만, 멈춘 뒤에는 여기서 한 번(경과 0)
   useEffect(() => {
     const frame = lastFrameRef.current;
-    if (canvas.viewport && frame) onFrame({ ...frame, frameMs: 0 });
+    if (canvas.viewport && frame) {
+      drawnRef.current = null; // 백버퍼가 지워졌다 — 같은 그림이어도 다시 그린다
+      onFrame({ ...frame, frameMs: 0 });
+    }
   }, [canvas.viewport, onFrame]);
 
   /** 무한·주간 결과 콜백 — 부모가 렌더마다 새 함수를 넘겨도 onOver가 바뀌지 않게 최신 값만 */

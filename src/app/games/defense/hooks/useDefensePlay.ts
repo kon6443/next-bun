@@ -65,7 +65,11 @@ export type PlayResult = {
   inputs: number[];
 };
 
-export type FrameInfo = { prev: RenderView; curr: RenderView; alpha: number; now: number; frameMs: number };
+/**
+ * frozen: 대기·일시정지·증강 고르는 중 — 연출 시간도 멈추고 같은 그림은 다시 그리지 않는다(DefensePlay, games-polish FE-40). 끝난 뒤(over)는 연출이 마저 흐른다
+ * version: 명령으로 화면 상태를 제자리에서 고칠 때마다 오른다(curr 객체는 그대로) — 다시 그릴지 판단용
+ */
+export type FrameInfo = { prev: RenderView; curr: RenderView; alpha: number; now: number; frameMs: number; frozen: boolean; version: number };
 
 type Options = {
   stage: Stage;
@@ -225,7 +229,7 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
     let overFrames = 0;
     const events: number[] = [];
     /** 프레임마다 같은 객체를 고쳐 넘긴다(할당 0) — 받는 쪽은 다음 프레임 전까지만 쓴다 */
-    const frame: FrameInfo = { prev: viewsRef.current!.prev, curr: viewsRef.current!.curr, alpha: 1, now: 0, frameMs: 0 };
+    const frame: FrameInfo = { prev: viewsRef.current!.prev, curr: viewsRef.current!.curr, alpha: 1, now: 0, frameMs: 0, frozen: true, version: 0 };
     const loop = (now: number) => {
       const frameMs = last === 0 ? 0 : now - last;
       last = now;
@@ -261,6 +265,8 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
       frame.alpha = statusRef.current === "ready" || statusRef.current === "augment" ? 1 : acc / TICK_MS;
       frame.now = now;
       frame.frameMs = frameMs;
+      frame.frozen = statusRef.current === "ready" || statusRef.current === "paused" || statusRef.current === "augment";
+      frame.version = versionRef.current;
       callbacksRef.current.onFrame?.(frame);
       if (statusRef.current === "over" && ++overFrames > FRAMES_AFTER_OVER) return;
       rafId = requestAnimationFrame(loop);
