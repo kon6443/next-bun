@@ -13,6 +13,7 @@ import { RankingTable } from "@/app/games/_shared/components/RankingTable";
 import { TETRIS_GAME } from "./lib/game";
 import { BattleEntry } from "./battle-ui/components/BattleEntry";
 import { RecentBattles } from "./battle-ui/components/RecentBattles";
+import { PopularReplaysPreview } from "@/app/games/_shared/components/PopularReplaysPreview";
 import { SoundButton } from "@/app/games/_shared/components/SoundButton";
 import { SoundSettingsEntry } from "@/app/games/_shared/components/SoundSettingsEntry";
 import { CONTROL_GUIDE } from "./lib/controls";
@@ -235,6 +236,8 @@ export default function TetrisHome() {
           <RankingTable game={TETRIS_GAME} items={preview} myScoreIds={myScoreIds} compact />
         )}
       </section>
+
+      <PopularReplaysPreview game={TETRIS_GAME} myScoreIds={myScoreIds} />
 
       <RecentBattles />
 

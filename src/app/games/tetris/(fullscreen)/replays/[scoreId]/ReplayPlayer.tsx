@@ -12,7 +12,8 @@ import { ShareMenu } from "@/app/games/_shared/components/ShareMenu";
 import { useKakaoReady } from "@/app/games/_shared/hooks/useKakaoReady";
 import { buildShareContent } from "@/app/games/_shared/lib/shareSpec";
 import { ACTION_LABELS } from "../../../lib/controls";
-import { formatFrames, formatScore } from "@/app/games/_shared/lib/format";
+import { formatFrames, formatScore, formatViewCount } from "@/app/games/_shared/lib/format";
+import { displayedViewCount, useRecordedViewCount, useReplayWatchReport } from "@/app/games/_shared/hooks/useReplayStats";
 import { cloneGameState } from "../../../lib/gameSnapshot";
 import { type EffectTracker, createEffectTracker, drainCues, observeAfter, observeBefore } from "../../../lib/effects";
 import { getSoundPlayer, replayCues } from "../../../lib/sound/soundPlayer";
@@ -66,6 +67,9 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
   const shareOpenRef = useRef(false);
   shareOpenRef.current = shareOpen;
   const { kakao, kakaoScript } = useKakaoReady();
+  // 재생 준비가 끝난 뒤에만 조회로 센다 — 없는 기록·지원하지 않는 버전은 세지 않는다
+  const recordedViewCount = useRecordedViewCount("tetris", scoreId, load.status === "ready");
+  const addWatched = useReplayWatchReport("tetris", scoreId);
 
   const stateRef = useRef<GameState | null>(null);
   const drawRef = useRef<(() => void) | null>(null);
@@ -184,7 +188,7 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
       const { playing, speed } = playbackRef.current;
       const state = stateRef.current;
       if (playing && state) {
-        advanceClock(clock, timestamp, MAX_CATCH_UP_MS, speed);
+        addWatched(advanceClock(clock, timestamp, MAX_CATCH_UP_MS, speed));
         let ended = false;
         while (clock.acc >= FRAME_MS) {
           clock.acc -= FRAME_MS;
@@ -209,7 +213,7 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
     };
     rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
-  }, [advance, data, refreshPressed]);
+  }, [advance, addWatched, data, refreshPressed]);
 
   // 소리 플레이어를 화면에 들어올 때 만들어 둔다 — 첫 조작(오디오 시작 조건)을 놓치지 않게. 배경음악은 재생 중에만, 나가면 끈다
   useEffect(() => {
@@ -318,8 +322,12 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
           <p className="truncate text-sm font-semibold text-white">
             ▶ {loaded.playerName} · {formatScore(loaded.score)}점
           </p>
-          <p className="text-xs text-slate-500">
-            전체 {loaded.rank}위 · {formatFullDateTime(new Date(loaded.createdAt))}
+          {/* 좁은 화면에서도 한 줄 — 순위·날짜만 말줄임, 조회수는 남긴다 */}
+          <p className="flex justify-center gap-1 text-xs text-slate-500">
+            <span className="truncate">
+              전체 {loaded.rank}위 · {formatFullDateTime(new Date(loaded.createdAt))}
+            </span>
+            <span className="shrink-0">· {formatViewCount(displayedViewCount(recordedViewCount, loaded.viewCount))}</span>
           </p>
         </div>
         <SoundButton className="shrink-0" />

@@ -11,6 +11,7 @@ vi.mock('@/services/gameService', () => ({
 // 대전 입구는 이 테스트와 무관 — 조회 없이
 vi.mock('./battle-ui/components/BattleEntry', () => ({ BattleEntry: () => null }));
 vi.mock('./battle-ui/components/RecentBattles', () => ({ RecentBattles: () => null }));
+vi.mock('@/app/games/_shared/components/PopularReplaysPreview', () => ({ PopularReplaysPreview: () => null }));
 
 import TetrisHome from './TetrisHome';
 import { tetrisStorage } from './lib/storage';

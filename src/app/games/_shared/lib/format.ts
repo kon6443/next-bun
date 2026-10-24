@@ -26,6 +26,22 @@ export function formatScore(score: number): string {
   return score.toLocaleString('ko-KR');
 }
 
+/** 조회수 "조회 1,234" — 조회수 배포 전 응답(필드 없음)은 0 */
+export function formatViewCount(viewCount: number | undefined): string {
+  return `조회 ${(viewCount ?? 0).toLocaleString('ko-KR')}`;
+}
+
+/** 시청 시간 "시청 45초" · "시청 12분" · "시청 3시간 5분" (분 아래는 버린다) */
+export function formatWatchTime(ms: number): string {
+  const totalSeconds = Math.floor(Math.max(0, ms) / 1000);
+  if (totalSeconds < 60) return `시청 ${totalSeconds}초`;
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  if (totalMinutes < 60) return `시청 ${totalMinutes}분`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes === 0 ? `시청 ${hours}시간` : `시청 ${hours}시간 ${minutes}분`;
+}
+
 /**
  * 게임 오버 직후 예상 순위 — 서버 순위 규칙(점수 내림차순, 같은 점수면 기존 기록이 위 = 내 새 기록이 아래)과 같게
  * 목록(상위 limit개) 밖이면 null

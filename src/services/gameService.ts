@@ -5,10 +5,14 @@ import type {
   GameMode,
   GameSession,
   GameType,
+  PopularReplayList,
+  PopularSort,
   RankingList,
   RankingPeriod,
   ReplayDataByGame,
   ReplayPayloadByGame,
+  ReplayViewResult,
+  ReplayWatchResult,
   ScoreDetailByGame,
   ScoreSummary,
   SubmitScoreRequest,
@@ -310,6 +314,69 @@ export async function getGameReplay<G extends GameType>(
       429: TOO_MANY,
       default: '리플레이를 불러오지 못했습니다.',
     });
+  }
+
+  return response.json();
+}
+
+/** 리플레이 조회 기록 — 본문 없이. 브라우저당 하루 1회 거르기는 호출부(replayViews) 몫, 서버가 세지 않아도(counted=false) 200 */
+export async function recordReplayView(gameType: GameType, scoreId: number): Promise<ApiResponse<ReplayViewResult>> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'POST',
+    endpoint: `/api/v1/games/${gameType}/scores/${scoreId}/views`,
+    signal: timeoutSignal(RANKING_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    await handleApiError(response, { 404: '기록을 찾을 수 없습니다.', 429: TOO_MANY, default: '조회 기록을 남기지 못했습니다.' });
+  }
+
+  return response.json();
+}
+
+/** 시청 시간 보고 1회 상한(ms) — 백엔드 검증 범위 1~120000 */
+export const WATCH_REPORT_MAX_MS = 120_000;
+
+/**
+ * 시청 시간 보고 — ms는 쿼리로만, 본문·Content-Type 없이(CORS preflight 없는 단순 요청이라 keepalive로 탭을 닫을 때도 보낼 수 있다)
+ * keepalive: 화면이 사라지는 순간(탭 숨김·이동)에도 요청을 끝까지 보낸다
+ */
+export async function reportReplayWatch(
+  gameType: GameType,
+  scoreId: number,
+  ms: number,
+  options: { keepalive?: boolean } = {},
+): Promise<ApiResponse<ReplayWatchResult>> {
+  const params = new URLSearchParams({ ms: String(ms) });
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'POST',
+    endpoint: `/api/v1/games/${gameType}/scores/${scoreId}/watch?${params.toString()}`,
+    keepalive: options.keepalive,
+    signal: timeoutSignal(RANKING_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    await handleApiError(response, { 404: '기록을 찾을 수 없습니다.', 429: TOO_MANY, default: '시청 시간을 남기지 못했습니다.' });
+  }
+
+  return response.json();
+}
+
+/** 기간별 인기 리플레이 — board(보드 키)를 생략하면 그 게임의 기본 보드. 진행 중인 디펜스 주간 보드는 빈 목록 */
+export async function getPopularReplays<G extends GameType>(
+  gameType: G,
+  query: { period: RankingPeriod; sort: PopularSort; limit: number; board?: string },
+): Promise<ApiResponse<PopularReplayList<ScoreDetailByGame[G]>>> {
+  const params = new URLSearchParams({ period: query.period, sort: query.sort, limit: String(query.limit) });
+  if (query.board) params.set('board', query.board);
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'GET',
+    endpoint: `/api/v1/games/${gameType}/popular-replays?${params.toString()}`,
+    signal: timeoutSignal(RANKING_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    await handleApiError(response, { 429: TOO_MANY, default: '인기 리플레이를 불러오지 못했습니다.' });
   }
 
   return response.json();

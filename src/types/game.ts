@@ -109,7 +109,36 @@ export type RankingItem<D = TetrisScoreDetail> = {
   createdAt: string;
   /** 기록이 속한 랭킹 보드 (테트리스 'default' · 디펜스 endless-s{N}·weekly-YYYY-wNN) — 보드 일반화 전 응답에는 없다 */
   boardKey?: string;
+  /** 누적 조회수 — 조회수 배포 전 응답에는 없다(0으로 표시) */
+  viewCount?: number;
+  /** 누적 시청 시간(ms, 벽시계) — 조회수 배포 전 응답에는 없다 */
+  watchMs?: number;
 };
+
+/** 인기 리플레이 정렬 — 기간 조회수·기간 시청 시간 */
+export type PopularSort = 'views' | 'watch';
+
+/** 인기 리플레이 항목 — rank는 인기 순서(점수 순위가 아니다) */
+export type PopularReplayItem<D = TetrisScoreDetail> = RankingItem<D> & {
+  periodViewCount: number;
+  periodWatchMs: number;
+};
+
+/** GET /games/:gameType/popular-replays */
+export type PopularReplayList<D = TetrisScoreDetail> = {
+  boardKey: string;
+  period: RankingPeriod;
+  sort: PopularSort;
+  /** 기간 시작 (ISO 8601 UTC) — 전체 기간이면 의미 없음 */
+  periodStart: string | null;
+  items: PopularReplayItem<D>[];
+};
+
+/** POST /games/:gameType/scores/:scoreId/views — counted=false(서버가 세지 않음)여도 200 */
+export type ReplayViewResult = { scoreId: number; viewCount: number; counted: boolean };
+
+/** POST /games/:gameType/scores/:scoreId/watch — countedMs는 서버 상한으로 자른 뒤 반영된 양 */
+export type ReplayWatchResult = { scoreId: number; watchMs: number; countedMs: number };
 
 /** 기록 1건 요약 (GET /games/:gameType/scores/:scoreId) — 랭킹 항목과 같은 형태, rank는 전체 기간 순위 */
 export type ScoreSummary<D = TetrisScoreDetail> = RankingItem<D>;
