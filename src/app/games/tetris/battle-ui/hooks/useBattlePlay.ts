@@ -1,5 +1,6 @@
 "use client";
 
+import { useInputQueue } from "../../hooks/useInputQueue";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FRAMES_PER_SECOND, type GameState, type InputRecorder, createInputRecorder, recordInput } from "../../engine";
 import {
@@ -49,11 +50,11 @@ export function useBattlePlay(options: BattlePlayOptions = {}) {
   const gameRef = useRef<GameState | null>(null);
   const recorderRef = useRef<InputRecorder | null>(null);
   const settingsRef = useRef({ das: 0, arr: 0 });
-  const queueRef = useRef<number[]>([]);
-  const heldRef = useRef<Map<number, number>>(new Map());
   /** 소켓으로 받았지만 아직 판에 넘기지 않은 가비지 */
   const incomingRef = useRef<{ id: number; lines: number; hole: number }[]>([]);
   const statusRef = useRef<BattlePlayStatus>("ready");
+  // 대전은 멈추지 않는다 — 진행 밖에서 뗀 것은 버린다
+  const { queueRef, heldRef, press, release, instant } = useInputQueue(statusRef, { keepReleaseWhenStopped: false });
   const afterTickRef = useRef<(() => void) | null>(null);
   const effectsRef = useRef<EffectTracker | null>(null);
   if (effectsRef.current === null) effectsRef.current = createEffectTracker();
@@ -89,7 +90,7 @@ export function useBattlePlay(options: BattlePlayOptions = {}) {
       if (effectsRef.current) resetEffects(effectsRef.current);
       setStatus("playing");
     },
-    [setStatus],
+    [setStatus, heldRef, queueRef],
   );
 
   /** 경기가 끝나(승리·종료) 더 진행하지 않는다 — 탈락은 루프가 스스로 over로 바꾼다 */
@@ -97,7 +98,7 @@ export function useBattlePlay(options: BattlePlayOptions = {}) {
     queueRef.current = [];
     heldRef.current.clear();
     if (statusRef.current === "playing") setStatus("over");
-  }, [setStatus]);
+  }, [setStatus, heldRef, queueRef]);
 
   /** 서버에서 받은 가비지 — 다음 틱에 그 프레임 도착으로 넣는다 */
   const receive = useCallback((ev: { id: number; lines: number; hole: number }) => {
@@ -113,23 +114,6 @@ export function useBattlePlay(options: BattlePlayOptions = {}) {
   }, []);
 
   // ==================== 입력 ====================
-
-  const press = useCallback((pressCode: number, releaseCode: number) => {
-    if (statusRef.current !== "playing" || heldRef.current.has(pressCode)) return;
-    heldRef.current.set(pressCode, releaseCode);
-    queueRef.current.push(pressCode);
-  }, []);
-
-  const release = useCallback((pressCode: number) => {
-    const releaseCode = heldRef.current.get(pressCode);
-    if (releaseCode === undefined) return;
-    heldRef.current.delete(pressCode);
-    if (statusRef.current === "playing") queueRef.current.push(releaseCode);
-  }, []);
-
-  const instant = useCallback((action: number) => {
-    if (statusRef.current === "playing") queueRef.current.push(action);
-  }, []);
 
   // ==================== 루프 ====================
 
@@ -195,7 +179,7 @@ export function useBattlePlay(options: BattlePlayOptions = {}) {
     };
     rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
-  }, [setStatus]);
+  }, [setStatus, heldRef, queueRef]);
 
   // ==================== 키보드 ====================
 
@@ -231,7 +215,7 @@ export function useBattlePlay(options: BattlePlayOptions = {}) {
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", releaseAll);
     };
-  }, [instant, press, release]);
+  }, [instant, press, release, heldRef]);
 
   return { battleRef, gameRef, effectsRef, garbageRef, afterTickRef, status, start, stop, receive, buildReplay, press, release, instant };
 }
