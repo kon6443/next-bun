@@ -1,5 +1,6 @@
 /**
- * 고정 스텝 시계 — 화면 프레임(rAF) 시각을 쌓아 60Hz 논리 프레임 수로 바꾼다 (FE-23: 싱글·대전·두 재생기가 같은 규칙을 쓴다)
+ * 고정 스텝 시계 — 화면 프레임(rAF) 시각을 쌓아 논리 틱 수로 바꾼다 (FE-23: 테트리스 싱글·대전·재생기, games-polish FE-53: 디펜스 플레이·재생기도)
+ * 멈춘 동안에도 시각만 따라가려면 speed 0으로 부른다(쌓이지 않고 last만 갱신 — 재개 첫 프레임이 멈춘 시간을 따라잡지 않게)
  * 쌓기만 맡는다 — 몇 틱을 어떻게 돌릴지(멈춤 조건·끝)는 루프마다 다르다: `while (clock.acc >= FRAME_MS && ...) { 틱; clock.acc -= FRAME_MS }`
  */
 export type FixedStepClock = { last: number; acc: number };

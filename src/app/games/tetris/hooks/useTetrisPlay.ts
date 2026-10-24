@@ -16,7 +16,7 @@ import { KEY_BINDINGS, isTypingTarget } from "../lib/controls";
 import { type EffectTracker, createEffectTracker, drainCues, observeAfter, observeBefore, resetEffects } from "../lib/effects";
 import { getSoundPlayer } from "../lib/sound/soundPlayer";
 import type { ReplayPayload } from "@/types/game";
-import { advanceClock, createClock, resetClock } from "../lib/fixedStep";
+import { advanceClock, createClock, resetClock } from "@/app/games/_shared/lib/fixedStep";
 
 export type PlayStatus = "ready" | "playing" | "paused" | "over";
 

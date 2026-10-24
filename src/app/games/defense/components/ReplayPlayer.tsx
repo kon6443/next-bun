@@ -4,6 +4,7 @@ import Link from "next/link";
 import { type ReactNode, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HighlightMarks, HighlightNav } from "@/app/games/_shared/components/HighlightRail";
 import type { HighlightKindSpec } from "@/app/games/_shared/lib/highlights";
+import { type FixedStepClock, advanceClock, createClock } from "@/app/games/_shared/lib/fixedStep";
 import { useDefenseCanvas } from "../hooks/useDefenseCanvas";
 import { applyTickEvents, createTickNotice } from "../lib/fx";
 import { TARGET_NAMES, TOWER_NAMES, ENEMY_NAMES } from "../lib/labels";
@@ -104,7 +105,8 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
   playingRef.current = playing;
   const speedRef = useRef<number>(speed);
   speedRef.current = speed;
-  const accRef = useRef(0);
+  /** 고정 스텝 시계 — 탐색하면 쌓인 시간을 비운다 (_shared/lib/fixedStep, FE-53) */
+  const clockRef = useRef<FixedStepClock>(createClock());
 
   const resetViews = useCallback(() => {
     const state = cursorRef.current!.state;
@@ -128,7 +130,7 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
       pendingSeekRef.current = null;
       setDragTick(null);
       cursorRef.current = seekCursor(replay, target);
-      accRef.current = 0;
+      clockRef.current.acc = 0;
       resetViews();
       setHighlight(highlightSlot >= 0 ? { slot: highlightSlot, tick: cursorRef.current.state.tick } : null);
       setTick(cursorRef.current.state.tick);
@@ -143,11 +145,12 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
   // 그리기·진행 루프
   useEffect(() => {
     let raf = 0;
-    let last = 0;
+    const clock = clockRef.current;
+    clock.last = 0;
     const events: number[] = [];
     const loop = (now: number) => {
-      const frameMs = last === 0 ? 0 : now - last;
-      last = now;
+      // 연출 진행에 쓰는 화면 프레임 간격 — 시계를 진행하기 전에 잰다
+      const frameMs = clock.last === 0 ? 0 : now - clock.last;
       if (pendingSeekRef.current !== null) {
         const target = pendingSeekRef.current;
         seekRef.current(target);
@@ -155,14 +158,16 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
       const cursor = cursorRef.current!;
       const views = viewsRef.current!;
       const pools = poolsRef.current!;
-      if (playingRef.current && cursor.state.tick < totalTicks && !cursor.state.over) {
-        accRef.current += Math.min(frameMs, MAX_CATCH_UP_MS) * speedRef.current;
+      const advancing = playingRef.current && cursor.state.tick < totalTicks && !cursor.state.over;
+      // 탐색 뒤에 쌓는다(탐색이 쌓인 시간을 비운다) — 재생 중에만(배속 곱), 멈춘 동안은 배속 0으로 시각만 따라간다
+      advanceClock(clock, now, MAX_CATCH_UP_MS, advancing ? speedRef.current : 0);
+      if (advancing) {
         let n = 0;
         let shownSecond = Math.floor(cursor.state.tick / tps);
         // 목숨·웨이브는 바뀐 순간 보인다 — 시간 표시처럼 1초 단위로 기다리지 않게 (games-polish FE-41)
         const shownLives = cursor.state.lives;
         const shownWaves = cursor.state.wavesStarted;
-        while (accRef.current >= tickMs && n < MAX_TICKS_PER_FRAME && cursor.state.tick < totalTicks && !cursor.state.over) {
+        while (clock.acc >= tickMs && n < MAX_TICKS_PER_FRAME && cursor.state.tick < totalTicks && !cursor.state.over) {
           advanceCursor(
             engine,
             cursor,
@@ -179,10 +184,10 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
               if (command.slot >= 0) setHighlight({ slot: command.slot, tick: command.tick });
             },
           );
-          accRef.current -= tickMs;
+          clock.acc -= tickMs;
           n++;
         }
-        if (n === MAX_TICKS_PER_FRAME) accRef.current = 0;
+        if (n === MAX_TICKS_PER_FRAME) clock.acc = 0;
         if (Math.floor(cursor.state.tick / tps) !== shownSecond || cursor.state.over || cursor.state.lives !== shownLives || cursor.state.wavesStarted !== shownWaves) {
           shownSecond = Math.floor(cursor.state.tick / tps);
           setTick(cursor.state.tick);
@@ -198,7 +203,7 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
       const ctx = canvas.fgContextRef.current;
       const viewport = canvas.viewportRef.current;
       if (ctx && viewport) {
-        const alpha = playingRef.current ? Math.min(1, accRef.current / tickMs) : 1;
+        const alpha = playingRef.current ? Math.min(1, clock.acc / tickMs) : 1;
         drawSceneLayer(ctx, { prev: views.prev, curr: views.curr, alpha, particles: pools.particles, numbers: pools.numbers, effects: pools.effects, showDamageNumbers: true, timeMs: now }, viewport, pools.scratch);
         drawBossBar(ctx, viewport, views.curr, ENEMY_NAMES);
       }

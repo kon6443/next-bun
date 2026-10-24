@@ -18,7 +18,7 @@ import { type EffectTracker, createEffectTracker, observeAfter, observeBefore } 
 import { loadReplay } from "@/app/games/_shared/lib/replayLoader";
 import { TETRIS_SHARE } from "../../../lib/share";
 import { collectActions } from "../../../lib/replayTimeline";
-import { advanceClock, createClock, resetClock } from "../../../lib/fixedStep";
+import { advanceClock, createClock, resetClock } from "@/app/games/_shared/lib/fixedStep";
 import { type PreparedTetrisReplay, type TetrisHighlightKind, SNAPSHOT_INTERVAL, nearestSnapshot, prepareTetrisReplay } from "../../../lib/replayPrepare";
 import { HighlightMarks, HighlightNav } from "@/app/games/_shared/components/HighlightRail";
 import type { HighlightKindSpec } from "@/app/games/_shared/lib/highlights";

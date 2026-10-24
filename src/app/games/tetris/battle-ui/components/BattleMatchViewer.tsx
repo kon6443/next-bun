@@ -15,7 +15,7 @@ import { type ReplayTrack, useBattleMatchReplay } from "../hooks/useBattleMatchR
 import { useBoardFocus } from "../hooks/useBoardFocus";
 import { type BattleHighlightKind, isRunnerDone, lastReceivedGarbage } from "../lib/battleReplayRunner";
 import { buildBattleShareContent } from "../lib/battleShare";
-import { advanceClock, createClock, resetClock } from "../../lib/fixedStep";
+import { advanceClock, createClock, resetClock } from "@/app/games/_shared/lib/fixedStep";
 
 const SPEEDS = [0.5, 1, 2, 4] as const;
 /** 재생은 탭이 잠들면 따라잡지 않는다 — 한 번에 이만큼만(배속 전) */

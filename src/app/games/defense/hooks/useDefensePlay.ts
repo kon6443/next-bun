@@ -1,5 +1,6 @@
 "use client";
 
+import { advanceClock, createClock } from "@/app/games/_shared/lib/fixedStep";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   OP,
@@ -224,21 +225,21 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
 
   useEffect(() => {
     let rafId = 0;
-    let last = 0;
-    let acc = 0;
+    const clock = createClock();
     let overFrames = 0;
     const events: number[] = [];
     /** 프레임마다 같은 객체를 고쳐 넘긴다(할당 0) — 받는 쪽은 다음 프레임 전까지만 쓴다 */
     const frame: FrameInfo = { prev: viewsRef.current!.prev, curr: viewsRef.current!.curr, alpha: 1, now: 0, frameMs: 0, frozen: true, version: 0 };
     const loop = (now: number) => {
-      const frameMs = last === 0 ? 0 : now - last;
-      last = now;
+      // 연출(파티클 등)은 멈춘 동안에도 화면 프레임 간격이 필요하다 — 시계를 진행하기 전에 잰다
+      const frameMs = clock.last === 0 ? 0 : now - clock.last;
+      // 진행 중에만 쌓는다(배속 곱) — 멈춘 동안은 배속 0으로 시각만 따라간다
+      advanceClock(clock, now, MAX_CATCH_UP_MS, statusRef.current === "playing" ? speedRef.current : 0);
       const state = stateRef.current;
       const views = viewsRef.current!;
       if (statusRef.current === "playing") {
-        acc += Math.min(frameMs, MAX_CATCH_UP_MS) * speedRef.current;
         let ticks = 0;
-        while (acc >= TICK_MS && ticks < MAX_TICKS_PER_FRAME && !state.over && !state.augmentPending) {
+        while (clock.acc >= TICK_MS && ticks < MAX_TICKS_PER_FRAME && !state.over && !state.augmentPending) {
           events.length = 0;
           step(state, events);
           const swap = views.prev;
@@ -246,23 +247,23 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
           views.curr = toRenderView(state, swap);
           leaksRef.current!.onEvents(events, state);
           callbacksRef.current.onTickEvents?.(events, views.curr, views.prev);
-          acc -= TICK_MS;
+          clock.acc -= TICK_MS;
           ticks++;
         }
-        if (ticks === MAX_TICKS_PER_FRAME) acc = 0;
+        if (ticks === MAX_TICKS_PER_FRAME) clock.acc = 0;
         if (state.over) finish();
         else if (state.augmentPending) {
           // 카드를 고르는 동안 시간이 쌓이지 않게 — 고른 뒤 밀린 틱을 한꺼번에 돌리지 않는다
-          acc = 0;
+          clock.acc = 0;
           setStatus("augment");
         } else publish();
       } else if (statusRef.current === "ready" || statusRef.current === "augment") {
-        acc = 0;
+        clock.acc = 0;
       }
       // 일시정지 중에는 acc를 그대로 둔다 — 멈춘 위치(보간 비율)가 재개 순간 튀지 않게
       frame.prev = views.prev;
       frame.curr = views.curr;
-      frame.alpha = statusRef.current === "ready" || statusRef.current === "augment" ? 1 : acc / TICK_MS;
+      frame.alpha = statusRef.current === "ready" || statusRef.current === "augment" ? 1 : clock.acc / TICK_MS;
       frame.now = now;
       frame.frameMs = frameMs;
       frame.frozen = statusRef.current === "ready" || statusRef.current === "paused" || statusRef.current === "augment";
@@ -273,7 +274,7 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
     };
     const autoPause = () => {
       if (statusRef.current === "playing") setStatus("paused");
-      last = 0;
+      clock.last = 0;
     };
     const onVisibility = () => {
       if (document.hidden) autoPause();
