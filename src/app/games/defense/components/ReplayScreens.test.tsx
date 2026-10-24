@@ -153,6 +153,18 @@ describe('리플레이 화면 — 로컬·서버', () => {
     expect(screen.getByTestId('defense-replay-time').textContent!.startsWith(fmt(Math.max(0, first.at - 1.5 * TICKS_PER_SECOND)))).toBe(true);
   }, 30_000);
 
+  it('서버 기록을 일시 실패로 못 받으면 "다시 시도"로 다시 받는다 — 없는 기록(404)은 버튼 없이 (games-polish FE-25)', async () => {
+    loadReplay.mockRejectedValueOnce(new ApiError('TOO_MANY_REQUESTS', '요청이 너무 잦습니다.', 429)).mockRejectedValueOnce(new ApiError('GAME_SCORE_NOT_FOUND', 'x', 404));
+    render(<ServerReplay scoreId={49} />);
+    const retry = await screen.findByRole('button', { name: '다시 시도' });
+    await act(async () => {
+      fireEvent.click(retry);
+    });
+    expect((await screen.findByTestId('defense-replay-error')).textContent).toContain('기록을 찾을 수 없어요');
+    expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
+    expect(loadReplay).toHaveBeenCalledTimes(2);
+  });
+
   it('캠페인 결과는 대화상자 — 첫 동작에 포커스, Tab은 안에서 돈다, Esc로 닫히지 않는다 (games-polish FE-42)', () => {
     const result = { victory: false, livesLeft: 0, endTick: 900, leakedLivesByEnemy: [], worstWave: 0, inputs: [] };
     const onRetry = vi.fn();
