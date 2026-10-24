@@ -107,4 +107,38 @@ describe('GameOverPanel 예상 순위 요청', () => {
     expect(share.textContent).toBe('이 기록 공유하기');
     expect(share.dataset.brag).toBeUndefined();
   });
+
+  it('오늘의 테트리스: 그날 순위 하나·다시보기 없음·데일리 랭킹 링크, 첫 판이면 순위를 공유 기록에 붙인다 (games-growth B1)', async () => {
+    window.localStorage.setItem('tetris:daily:first', JSON.stringify({ boardKey: 'daily-2026-10-24', score: 500, lines: 5, level: 1 }));
+    getGameRankings.mockResolvedValue(page([]));
+    submitGameScore.mockResolvedValue({ code: 'SUCCESS', message: 'ok', data: { scoreId: 31, score: 500, detail: {}, ranks: { daily: 3, weekly: 3, all: 3 } } });
+    await act(async () => {
+      render(<GameOverPanel {...props} daily={{ boardKey: 'daily-2026-10-24', isFirstRun: true }} />);
+    });
+    expect(getGameRankings).toHaveBeenCalledTimes(1);
+    expect(getGameRankings).toHaveBeenCalledWith('tetris', 'all', 100, 'daily-2026-10-24');
+    expect(screen.getByText('오늘의 순위')).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    expect(screen.queryByRole('link', { name: /내 플레이 다시보기/ })).toBeNull();
+    expect(screen.getByRole('link', { name: '랭킹 보기' }).getAttribute('href')).toBe('/games/tetris/rankings?highlight=31&board=daily-2026-10-24');
+    expect(screen.getByTestId('daily-share')).toBeTruthy();
+    expect(screen.queryByTestId('result-share')).toBeNull();
+    expect(JSON.parse(window.localStorage.getItem('tetris:daily:first')!)).toMatchObject({ scoreId: 31, rank: 3 });
+  });
+
+  it('오늘의 테트리스 다시 도전한 판은 첫 판 기록에 순위를 붙이지 않는다', async () => {
+    window.localStorage.setItem('tetris:daily:first', JSON.stringify({ boardKey: 'daily-2026-10-24', score: 500, lines: 5, level: 1 }));
+    getGameRankings.mockResolvedValue(page([]));
+    submitGameScore.mockResolvedValue({ code: 'SUCCESS', message: 'ok', data: { scoreId: 32, score: 900, detail: {}, ranks: { daily: 1, weekly: 1, all: 1 } } });
+    await act(async () => {
+      render(<GameOverPanel {...props} daily={{ boardKey: 'daily-2026-10-24', isFirstRun: false }} />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    expect(screen.getByText(/다시 도전한 판이에요/)).toBeTruthy();
+    expect(JSON.parse(window.localStorage.getItem('tetris:daily:first')!).rank).toBeUndefined();
+  });
 });

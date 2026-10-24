@@ -9,11 +9,13 @@ export const metadata: Metadata = {
 };
 
 type RankingsPageProps = {
-  searchParams: Promise<{ highlight?: string | string[] }>;
+  searchParams: Promise<{ highlight?: string | string[]; board?: string | string[] }>;
 };
 
+/** ?board= daily(오늘의 테트리스) 또는 daily-YYYY-MM-DD · ?highlight= 강조할 기록 */
 export default async function RankingsPage({ searchParams }: RankingsPageProps) {
-  const { highlight } = await searchParams;
+  const { highlight, board } = await searchParams;
   const highlightId = parseHighlightId(highlight);
-  return <RankingsView highlightId={highlightId} />;
+  const boardParam = typeof board === "string" && (board === "daily" || /^daily-\d{4}-\d{2}-\d{2}$/.test(board)) ? board : null;
+  return <RankingsView highlightId={highlightId} boardParam={boardParam} />;
 }

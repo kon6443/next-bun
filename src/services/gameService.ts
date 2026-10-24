@@ -166,8 +166,8 @@ function verifyBusyWaitMs(response: Response): number | null {
 
 /**
  * 게임 세션·시드 발급 — 로그인이면 토큰을 붙인다(선택 인증)
- * board: 보드가 여러 개인 게임의 플레이 방식(디펜스 endless·weekly) — 생략하면 본문 없이(테트리스는 보내면 422)
- * 503: GAME_SESSION_UNAVAILABLE(세션 저장소)·GAME_WEEKLY_UNAVAILABLE(주간만) — 플레이는 되고 등록만 안 된다
+ * board: 플레이 방식(디펜스 endless·weekly, 테트리스 daily) — 생략하면 본문 없이(그 게임의 기본 보드)
+ * 503: GAME_SESSION_UNAVAILABLE(세션 저장소)·GAME_WEEKLY_UNAVAILABLE(주간만)·GAME_DAILY_UNAVAILABLE(데일리 비밀값 없음) — 플레이는 되고 등록만 안 된다
  */
 export async function createGameSession(
   gameType: GameType,

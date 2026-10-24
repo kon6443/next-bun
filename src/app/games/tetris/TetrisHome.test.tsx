@@ -12,6 +12,7 @@ vi.mock('@/services/gameService', () => ({
 vi.mock('./battle-ui/components/BattleEntry', () => ({ BattleEntry: () => null }));
 vi.mock('./battle-ui/components/RecentBattles', () => ({ RecentBattles: () => null }));
 vi.mock('@/app/games/_shared/components/PopularReplaysPreview', () => ({ PopularReplaysPreview: () => null }));
+vi.mock('./components/DailyCard', () => ({ DailyCard: () => null }));
 
 import TetrisHome from './TetrisHome';
 import { tetrisStorage } from './lib/storage';

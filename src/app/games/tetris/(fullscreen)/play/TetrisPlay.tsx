@@ -24,6 +24,7 @@ import { useTetrisPlay } from "../../hooks/useTetrisPlay";
 import { CONTROL_GUIDE } from "../../lib/controls";
 import { formatFrames, formatScore } from "@/app/games/_shared/lib/format";
 import { type TetrisSettings, DEFAULT_SETTINGS, loadLastName, loadSettings, recordBestScore } from "../../lib/storage";
+import { isDailyBoardKey, recordDailyRun } from "../../lib/daily";
 
 type SessionState =
   | { status: "loading" }
@@ -48,22 +49,29 @@ function randomSeed(): number {
 
 function sessionErrorMessage(err: unknown): string {
   if (err instanceof ApiError && err.code === "GAME_SESSION_UNAVAILABLE") return err.getDefaultMessage();
+  if (err instanceof ApiError && err.code === "GAME_DAILY_UNAVAILABLE") return "지금은 오늘의 테트리스를 열 수 없어요. 이번 판은 일반 판으로 등록 없이 플레이해요.";
   return `${extractErrorMessage(err, "랭킹 등록을 준비하지 못했습니다.")} 이번 판은 등록 없이 플레이해요.`;
 }
 
-export default function TetrisPlay() {
+/** daily: 오늘의 테트리스(games-growth B1) — 데일리 세션(모두 같은 seed)으로, 결과는 오늘 순위·Wordle식 공유 */
+export default function TetrisPlay({ daily = false }: { daily?: boolean }) {
   const { data: authSession, status: authStatus } = useSession();
   const accessToken = authSession?.user?.accessToken ?? undefined;
 
   const [settings, setSettings] = useState<TetrisSettings>(DEFAULT_SETTINGS);
   const isCoarse = useMediaQuery("(pointer: coarse)");
   const [sessionState, setSessionState] = useState<SessionState>({ status: "loading" });
+  /** 판이 끝난 순간의 세션 — 데일리 보드면 오늘 첫 판을 남긴다 */
+  const sessionStateRef = useRef(sessionState);
+  sessionStateRef.current = sessionState;
   const [phase, setPhase] = useState<"ready" | "game">("ready");
   const [result, setResult] = useState<{
     result: GameResult;
     replay: ReplayPayload;
     overLimit: boolean;
     defaultName: string;
+    /** 데일리 세션으로 한 판 — isFirstRun: 이 기기의 오늘 첫 판(공유 문구 기준) */
+    daily: { boardKey: string; isFirstRun: boolean } | null;
   } | null>(null);
   const userNameRef = useRef("");
   userNameRef.current = authSession?.user?.userName ?? "";
@@ -71,6 +79,11 @@ export default function TetrisPlay() {
 
   const onGameOver = useCallback((state: GameState, replay: ReplayPayload) => {
     const isNewBest = recordBestScore(state.score);
+    const current = sessionStateRef.current;
+    const dailyBoardKey = current.status === "ready" && current.session.boardKey && isDailyBoardKey(current.session.boardKey) ? current.session.boardKey : null;
+    const daily = dailyBoardKey
+      ? { boardKey: dailyBoardKey, isFirstRun: recordDailyRun({ boardKey: dailyBoardKey, score: state.score, lines: state.lines, level: state.level }) }
+      : null;
     // 이름 기본값은 판마다: 로그인 닉네임 → 마지막에 쓴 이름 (등록 규칙을 통과하는 것만)
     const candidate = [userNameRef.current, loadLastName()].find((name) => name && validatePlayerName(name) === null);
     setResult({
@@ -79,6 +92,7 @@ export default function TetrisPlay() {
       // 서버 상한(MAX_FRAMES·MAX_INPUT_LENGTH)을 넘은 판은 검증에서 거절된다 — 제출하지 않고 안내만
       overLimit: replay.frames > MAX_FRAMES || replay.inputs.length > MAX_INPUT_LENGTH,
       defaultName: candidate ? normalizePlayerName(candidate) : "",
+      daily,
     });
   }, []);
 
@@ -94,7 +108,7 @@ export default function TetrisPlay() {
     const isLatest = beginSessionRequest();
     setSessionState({ status: "loading" });
     try {
-      const { data } = await createGameSession("tetris", accessToken);
+      const { data } = await createGameSession("tetris", accessToken, daily ? "daily" : undefined);
       if (!isLatest()) return;
       if (data.engineVersion !== ENGINE_VERSION) {
         setSessionState({
@@ -110,7 +124,7 @@ export default function TetrisPlay() {
       if (!isLatest()) return;
       setSessionState({ status: "failed", seed: randomSeed(), error: sessionErrorMessage(err) });
     }
-  }, [accessToken, beginSessionRequest]);
+  }, [accessToken, beginSessionRequest, daily]);
 
   // 로그인 상태가 정해진 뒤 첫 세션을 받는다 (로그인이면 기록에 USER_ID가 남는다)
   // 이후 세션은 판마다 restart가 새로 받는다
@@ -247,8 +261,9 @@ export default function TetrisPlay() {
         {phase === "ready" && (
           <Overlay>
             <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900/95 p-6 text-center">
-              <p className="text-xs font-semibold tracking-[0.4em] text-slate-400">TETRIS</p>
-              <h1 className="mt-2 text-2xl font-bold text-white">준비됐나요?</h1>
+              <p className="text-xs font-semibold tracking-[0.4em] text-slate-400">{daily ? "DAILY" : "TETRIS"}</p>
+              <h1 className="mt-2 text-2xl font-bold text-white">{daily ? "오늘의 테트리스" : "준비됐나요?"}</h1>
+              {daily && <p className="mt-2 text-sm text-slate-300">오늘은 모두 같은 블록 순서예요. 첫 판 기록으로 결과를 공유해요.</p>}
               <p className="mt-2 text-sm text-slate-400" role="status">
                 {sessionState.status === "loading"
                   ? "랭킹 등록을 준비하는 중..."
@@ -311,6 +326,7 @@ export default function TetrisPlay() {
               }
               accessToken={accessToken}
               defaultName={result.defaultName}
+              daily={result.daily}
               onRestart={restart}
             />
           </Overlay>

@@ -13,6 +13,7 @@ import { RankingTable } from "@/app/games/_shared/components/RankingTable";
 import { TETRIS_GAME } from "./lib/game";
 import { BattleEntry } from "./battle-ui/components/BattleEntry";
 import { RecentBattles } from "./battle-ui/components/RecentBattles";
+import { DailyCard } from "./components/DailyCard";
 import { PopularReplaysPreview } from "@/app/games/_shared/components/PopularReplaysPreview";
 import { SoundButton } from "@/app/games/_shared/components/SoundButton";
 import { SoundSettingsEntry } from "@/app/games/_shared/components/SoundSettingsEntry";
@@ -150,6 +151,9 @@ export default function TetrisHome() {
           게임 시작
         </ButtonLink>
       </section>
+
+      {/* 오늘의 테트리스 — 데일리 보드가 있을 때만 (games-growth B1) */}
+      <DailyCard />
 
       {/* 대전 입구는 여기 한 곳 — 첫 화면에 보이게 헤더 바로 아래 (games-polish P8) */}
       <div className={`${cardStyles.section} p-4`}>
