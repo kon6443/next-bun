@@ -1,5 +1,7 @@
+import type { Highlight } from '@/app/games/_shared/lib/highlights';
 import type { GameState, Stage } from '../engine';
 import type { ReplayEngine } from '../engine-versions';
+import { ENEMY_NAMES } from './labels';
 
 /**
  * 리플레이 재생 엔진 쪽 (defense DESIGN §F7·§F10 재생기) — 화면 없이 돌리는 순수 로직, 엔진은 기록 버전으로 주입(engine-versions)
@@ -27,11 +29,20 @@ export type PreparedReplay = {
   totalTicks: number;
   /** 웨이브가 시작된 틱 (웨이브 순) — 진행 막대 눈금 */
   waveTicks: number[];
+  /** 하이라이트 (틱 오름차순) */
+  highlights: Highlight<DefenseHighlightKind>[];
   commands: ReplayCommand[];
   snapshots: Snapshot[];
 };
 
 export type PrepareError = 'BOARD' | 'INVALID' | 'CANCELLED';
+
+/**
+ * 디펜스 하이라이트 (games-polish P4) — 목숨을 잃은 순간·보스를 잡은 순간. 웨이브 시작·클리어는 막대의 웨이브 눈금이 이미 보여 준다
+ * 누수는 몰려 오므로 LEAK_MERGE_SECONDS 안의 것을 한 점으로 합치고 잃은 목숨을 더한다(한 번의 위기 = 점 하나)
+ */
+export type DefenseHighlightKind = 'leak' | 'boss';
+export const LEAK_MERGE_SECONDS = 3;
 
 const SNAPSHOT_EVERY_SECONDS = 30;
 const MAX_SNAPSHOTS = 120;
@@ -120,6 +131,29 @@ export async function prepareReplay(
   take();
   const events: number[] = [];
   const { EVENT, EVENT_STRIDE } = engine;
+  const highlights: Highlight<DefenseHighlightKind>[] = [];
+  /** 적 id → 종류(SPAWN) — DEATH에는 종류가 없다 */
+  const kindOf = new Map<number, number>();
+  let leak: { mark: Highlight<DefenseHighlightKind>; lives: number } | null = null;
+  const leakWindow = LEAK_MERGE_SECONDS * engine.TICKS_PER_SECOND;
+  const collect = (ev: readonly number[], tick: number) => {
+    for (let i = 0; i < ev.length; i += EVENT_STRIDE) {
+      const type = ev[i];
+      if (type === EVENT.SPAWN) kindOf.set(ev[i + 1], ev[i + 2]);
+      else if (type === EVENT.LEAK) {
+        if (leak && tick - leak.mark.at < leakWindow) leak.lives += ev[i + 2];
+        else {
+          leak = { mark: { at: tick, kind: 'leak' }, lives: ev[i + 2] };
+          highlights.push(leak.mark);
+        }
+        leak.mark.detail = `−${leak.lives}`;
+      } else if (type === EVENT.DEATH) {
+        const kind = kindOf.get(ev[i + 1]);
+        if (kind !== undefined && engine.ENEMIES[kind]?.rank === engine.RANK.BOSS) highlights.push({ at: tick, kind: 'boss', detail: ENEMY_NAMES[kind] });
+        kindOf.delete(ev[i + 1]);
+      }
+    }
+  };
   while (!cursor.state.over && cursor.state.tick < header.ticks) {
     const chunkEnd = Math.min(header.ticks, cursor.state.tick + CHUNK_TICKS);
     while (!cursor.state.over && cursor.state.tick < chunkEnd) {
@@ -133,7 +167,9 @@ export async function prepareReplay(
         target,
         events,
         (ev) => {
-          for (let i = 0; ev && i < ev.length; i += EVENT_STRIDE) if (ev[i] === EVENT.WAVE_START) waveStarted = true;
+          if (!ev) return;
+          for (let i = 0; i < ev.length; i += EVENT_STRIDE) if (ev[i] === EVENT.WAVE_START) waveStarted = true;
+          collect(ev, cursor.state.tick);
         },
         (command) => {
           commands.push(command);
@@ -152,7 +188,7 @@ export async function prepareReplay(
   }
   // 끝난 뒤 남은 명령·선언 틱과 다른 끝 = 깨진 기록(simulateReplay NOT_ENDED·INPUT_AFTER_END)
   if (!cursor.state.over || cursor.state.endTick !== header.ticks || cursor.index < header.inputs.length) return 'INVALID';
-  return { engine, stage, seed: header.seed, inputs: header.inputs, totalTicks: header.ticks, waveTicks: dedupe(waveTicks), commands, snapshots };
+  return { engine, stage, seed: header.seed, inputs: header.inputs, totalTicks: header.ticks, waveTicks: dedupe(waveTicks), highlights, commands, snapshots };
 }
 
 function dedupe(ticks: number[]): number[] {

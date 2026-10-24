@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { HighlightMarks, HighlightNav } from "@/app/games/_shared/components/HighlightRail";
+import type { HighlightKindSpec } from "@/app/games/_shared/lib/highlights";
 import { useDefenseCanvas } from "../hooks/useDefenseCanvas";
 import { applyTickEvents, createTickNotice } from "../lib/fx";
 import { TARGET_NAMES, TOWER_NAMES, ENEMY_NAMES } from "../lib/labels";
-import { type PreparedReplay, type ReplayCommand, type ReplayCursor, advanceCursor, initialCursor, seekCursor } from "../lib/replayRunner";
+import { type DefenseHighlightKind, type PreparedReplay, type ReplayCommand, type ReplayCursor, advanceCursor, initialCursor, seekCursor } from "../lib/replayRunner";
 import { toRenderMap, toRenderView } from "../lib/toRenderView";
 import { DamageNumberPool, EffectPool, ParticlePool } from "../renderer/particles";
 import { type RenderView, createRenderView } from "../renderer/renderView";
@@ -36,6 +38,14 @@ const SEEK_STEP_SECONDS = 5;
 /** 명령 순간 슬롯 강조 — 재생 시간 1.2초 */
 const HIGHLIGHT_SECONDS = 1.2;
 const DPR_CAP = 2;
+/** 하이라이트로 가면 그 순간 이만큼 앞부터 — 무엇이 일어나는지 보이게 (games-polish P4) */
+const HIGHLIGHT_LEAD_SECONDS = 1.5;
+/** "이전 하이라이트"가 방금 간 것을 다시 고르지 않게 */
+const HIGHLIGHT_SLACK_SECONDS = 2;
+export const DEFENSE_HIGHLIGHT_KINDS: Record<DefenseHighlightKind, HighlightKindSpec> = {
+  leak: { label: "목숨 잃음", dot: "bg-rose-400" },
+  boss: { label: "보스 처치", dot: "bg-amber-300" },
+};
 
 function formatTicks(ticks: number, tps: number): string {
   const total = Math.floor(ticks / tps);
@@ -236,7 +246,7 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
           <span key={`w${i}`} data-testid="defense-replay-wave-mark" className="absolute top-0 h-2 w-px bg-slate-400/70" style={{ left: `${(t / rangeMax) * 100}%` }} />
         ))}
         {replay.commands.map((c, i) => (
-          <span key={`c${i}`} className="absolute top-0.5 h-1 w-1 -translate-x-1/2 rounded-full bg-amber-300/80" style={{ left: `${(c.tick / rangeMax) * 100}%` }} />
+          <span key={`c${i}`} className="absolute top-0.5 h-1 w-1 -translate-x-1/2 rounded-full bg-sky-300/60" style={{ left: `${(c.tick / rangeMax) * 100}%` }} />
         ))}
       </div>
     ),
@@ -287,8 +297,9 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
       </div>
       <footer className="grid gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2">
         <div className="relative">
-          {/* 웨이브 경계 눈금 · 명령 점 — 막대 위 장식(조작은 range와 명령 목록) */}
+          {/* 웨이브 경계 눈금 · 명령 점 · 하이라이트 — 막대 위 장식(조작은 range·명령 목록·하이라이트 버튼) */}
           {marks}
+          <HighlightMarks marks={replay.highlights} kinds={DEFENSE_HIGHLIGHT_KINDS} max={rangeMax} />
           <input
             type="range"
             min={0}
@@ -336,6 +347,15 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
             ))}
           </div>
         </div>
+        <HighlightNav
+          marks={replay.highlights}
+          kinds={DEFENSE_HIGHLIGHT_KINDS}
+          position={state.tick}
+          leadIn={HIGHLIGHT_LEAD_SECONDS * tps}
+          slack={HIGHLIGHT_SLACK_SECONDS * tps}
+          formatAt={(at) => formatTicks(at, tps)}
+          onSeek={(target) => seek(target)}
+        />
         <button
           type="button"
           aria-expanded={listOpen}

@@ -4,7 +4,7 @@ import { GameDriver } from '../engine-dev/driver';
 import { greedyBot } from '../engine-dev/sim/bots';
 import { runGame } from '../engine-dev/sim/runner';
 import { canReplayVersion, loadReplayEngine } from '../engine-versions';
-import { type PreparedReplay, advanceCursor, initialCursor, prepareReplay, seekCursor } from './replayRunner';
+import { LEAK_MERGE_SECONDS, type PreparedReplay, advanceCursor, initialCursor, prepareReplay, seekCursor } from './replayRunner';
 
 function botGame(mode: string, boardKey: string, seed: number) {
   const driver = GameDriver.fromBoard(mode, boardKey, seed);
@@ -38,6 +38,36 @@ describe('replayRunner — 사전 패스·커서·탐색', { timeout: 30_000 }, 
     const end = seekCursor(replay, replay.totalTicks);
     expect(end.state.over).toBe(true);
     expect(engine.getStateHash(end.state)).toBe(engine.getStateHash(driver.state));
+  });
+
+  it('하이라이트 — 누수는 3초 안의 것을 한 점으로 합쳐 잃은 목숨 합계, 보스는 처치 순간마다 (games-polish P4)', async () => {
+    const { header } = endless;
+    const replay = (await prepareReplay(engine, header)) as PreparedReplay;
+    // 같은 기록을 따로 돌려 누수·보스 처치를 센다
+    const cursor = initialCursor(replay);
+    const leaks: { tick: number; lives: number }[] = [];
+    const bossKills: number[] = [];
+    const kindOf = new Map<number, number>();
+    const events: number[] = [];
+    advanceCursor(engine, cursor, replay.inputs, replay.totalTicks, events, (ev) => {
+      for (let i = 0; ev && i < ev.length; i += engine.EVENT_STRIDE) {
+        if (ev[i] === engine.EVENT.SPAWN) kindOf.set(ev[i + 1], ev[i + 2]);
+        if (ev[i] === engine.EVENT.LEAK) leaks.push({ tick: cursor.state.tick, lives: ev[i + 2] });
+        if (ev[i] === engine.EVENT.DEATH && engine.ENEMIES[kindOf.get(ev[i + 1])!]?.rank === engine.RANK.BOSS) bossKills.push(cursor.state.tick);
+      }
+    });
+    expect(leaks.length).toBeGreaterThan(0);
+    const leakMarks = replay.highlights.filter((h) => h.kind === 'leak');
+    const bossMarks = replay.highlights.filter((h) => h.kind === 'boss');
+    expect(bossKills.length).toBeGreaterThan(0);
+    expect(bossMarks.map((h) => h.at)).toEqual(bossKills);
+    // 합친 점의 목숨 합 = 실제로 잃은 목숨 합, 점끼리는 3초 넘게 떨어져 있지 않아도 되지만 한 점은 시작에서 3초 안의 누수만 모은다
+    expect(leakMarks.reduce((sum, h) => sum + Number(h.detail!.slice(1)), 0)).toBe(leaks.reduce((sum, l) => sum + l.lives, 0));
+    expect(leakMarks.length).toBeLessThan(leaks.length + 1);
+    expect(leakMarks[0].at).toBe(leaks[0].tick);
+    const window = LEAK_MERGE_SECONDS * engine.TICKS_PER_SECOND;
+    for (const l of leaks) expect(leakMarks.some((m) => l.tick >= m.at && l.tick - m.at < window)).toBe(true);
+    expect(replay.highlights.map((h) => h.at)).toEqual([...replay.highlights.map((h) => h.at)].sort((a, b) => a - b));
   });
 
   it('탐색 = 처음부터 이어 돌린 상태와 같다(앞·뒤로, 스냅샷 사이 아무 틱)', async () => {

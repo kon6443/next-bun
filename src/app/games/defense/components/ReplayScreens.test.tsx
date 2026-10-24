@@ -7,6 +7,8 @@ import { GameDriver } from '../engine-dev/driver';
 import { greedyBot } from '../engine-dev/sim/bots';
 import { runGame } from '../engine-dev/sim/runner';
 import { LOCAL_REPLAY_VERSION } from '../lib/localReplay';
+import * as engine from '../engine';
+import { type PreparedReplay, prepareReplay } from '../lib/replayRunner';
 import { LocalReplayView, ServerReplay } from './ReplayScreens';
 import { ResultPanel } from './ResultPanel';
 
@@ -116,6 +118,25 @@ describe('리플레이 화면 — 로컬·서버', () => {
     loadReplay.mockResolvedValue({ ...data, engineVersion: ENGINE_VERSION + 1 });
     render(<ServerReplay scoreId={46} />);
     expect((await screen.findByTestId('defense-replay-error')).textContent).toContain('지금 버전의 게임으로 재생할 수 없어요');
+  }, 30_000);
+
+  it('하이라이트 — 목숨을 잃은 순간이 막대 점·버튼으로, 다음을 누르면 그 순간 1.5초 앞으로 (games-polish P4)', async () => {
+    const driver = GameDriver.fromBoard('endless', 'endless-s1', 5);
+    driver.must(OP.CALL_WAVE);
+    while (!driver.state.over) {
+      if (driver.state.countdown > 0) driver.command(OP.CALL_WAVE);
+      step(driver.state);
+    }
+    const input = driver.toReplayInput();
+    const prepared = (await prepareReplay(engine, { mode: 'endless', boardKey: 'endless-s1', seed: input.seed, ticks: input.ticks, inputs: input.inputs })) as PreparedReplay;
+    const first = prepared.highlights[0];
+    expect(first.kind).toBe('leak');
+    loadReplay.mockResolvedValue({ rank: 2, scoreId: 48, playerName: '수비왕', boardKey: 'endless-s1', score: 1, detail: { wave: 7 }, durationMs: 1, createdAt: 'x', engineVersion: ENGINE_VERSION, seed: input.seed, frames: input.ticks, inputs: input.inputs, params: {} });
+    render(<ServerReplay scoreId={48} />);
+    await screen.findByTestId('defense-replay', {}, { timeout: 8000 });
+    expect(screen.getByTestId('highlight-marks').children).toHaveLength(prepared.highlights.length);
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`^다음 하이라이트 — 목숨 잃음 ${first.detail} ${fmt(first.at)}$`) }));
+    expect(screen.getByTestId('defense-replay-time').textContent!.startsWith(fmt(Math.max(0, first.at - 1.5 * TICKS_PER_SECOND)))).toBe(true);
   }, 30_000);
 
   it('캠페인 결과는 대화상자 — 첫 동작에 포커스, Tab은 안에서 돈다, Esc로 닫히지 않는다 (games-polish FE-42)', () => {
