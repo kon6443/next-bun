@@ -178,4 +178,17 @@ describe('ScoreSubmitPanel — 게임 사양·보드를 따른다', () => {
     setItem.mockRestore();
     expect(screen.getByRole('alert')).toHaveTextContent('이 기기에 보관하지 못해');
   });
+
+  it('이름 오류는 알림(role=alert)으로 읽히고 입력칸으로 포커스가 돌아온다 — 서버 거절(금칙어)도 같다 (games-polish FE-30)', async () => {
+    submitGameScore.mockRejectedValue(new ApiError('GAME_PLAYER_NAME_FORBIDDEN', '쓸 수 없는 이름이에요.', 422));
+    await act(async () => {
+      render(<ScoreSubmitPanel {...props} />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('쓸 수 없는 이름이에요.');
+    expect(document.activeElement).toBe(screen.getByLabelText('랭킹에 올릴 이름'));
+  });
 });
+

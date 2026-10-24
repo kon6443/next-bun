@@ -89,6 +89,11 @@ export function ScoreSubmitPanel<G extends GameType>({
   const nameInputId = `${gameType}-player-name`;
   const [name, setName] = useState(defaultName);
   const [nameError, setNameError] = useState<string | null>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  // 이름 오류면 입력칸으로 돌아간다 — 제출 중 잠겼던 칸에서 포커스를 잃은 키보드 사용자가 다시 찾지 않게 (games-polish FE-30)
+  useEffect(() => {
+    if (nameError) nameInputRef.current?.focus();
+  }, [nameError]);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [canRetry, setCanRetry] = useState(false);
   const [isFinalError, setIsFinalError] = useState(false);
@@ -235,6 +240,7 @@ export function ScoreSubmitPanel<G extends GameType>({
             랭킹에 올릴 이름
           </label>
           <input
+            ref={nameInputRef}
             id={nameInputId}
             value={name}
             onChange={(e) => {
@@ -244,13 +250,19 @@ export function ScoreSubmitPanel<G extends GameType>({
             maxLength={PLAYER_NAME_MAX_LENGTH * 2}
             autoComplete="nickname"
             aria-invalid={nameError ? true : undefined}
-            aria-describedby={`${nameInputId}-help`}
+            aria-describedby={nameError ? `${nameInputId}-error ${nameInputId}-help` : `${nameInputId}-help`}
             disabled={isSubmitting}
             className="min-h-11 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 text-base text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
             placeholder="이름 (1~12자)"
           />
-          <p id={`${nameInputId}-help`} className={`mt-1 text-xs ${nameError ? "text-red-400" : "text-slate-500"}`}>
-            {nameError ?? `${playerNameLength(normalizePlayerName(name))}/${PLAYER_NAME_MAX_LENGTH} · 한글·영문·숫자·공백·_·-`}
+          {/* 오류는 따로 알림 — 설명(aria-describedby)만으로는 스크린리더가 읽지 않는다 (FE-30) */}
+          {nameError && (
+            <p id={`${nameInputId}-error`} role="alert" className="mt-1 text-xs text-red-400">
+              {nameError}
+            </p>
+          )}
+          <p id={`${nameInputId}-help`} className="mt-1 text-xs text-slate-500">
+            {`${playerNameLength(normalizePlayerName(name))}/${PLAYER_NAME_MAX_LENGTH} · 한글·영문·숫자·공백·_·-`}
           </p>
           {submitError && (
             <p role="alert" className="mt-2 rounded-xl border border-red-500/20 bg-red-500/10 p-2.5 text-sm text-red-300">
