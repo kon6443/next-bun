@@ -4,7 +4,7 @@
  * 발광(글로우)도 같은 방식 — shadowBlur는 스프라이트를 만들 때 한 번만 쓰고, 매 프레임은 복사만 한다(모바일 fps)
  */
 
-import { GARBAGE_CELL } from '../battle-engine/constants';
+import { GARBAGE_CELL } from './boardRules';
 
 /** 칸 값(0 빈칸 · 1~7 블록 종류 + 1 · 8 가비지) → 색. 블록 색은 가이드라인 순서 I J L O S T Z */
 export const CELL_COLORS: readonly string[] = [

@@ -1,6 +1,6 @@
 import { ACTION, BOARD_WIDTH, type GameState, type LockEvent, SPAWN_Y } from '../engine';
 import { nextRandom } from '../engine/random';
-import { isPerfectClear } from '../battle-engine/battle';
+import { isPerfectClear } from './boardRules';
 
 /**
  * 화면 연출 기록 — 엔진 프레임 전후 상태를 비교해 연출 이벤트(줄 삭제 파티클·하드 드롭 잔상·흔들림·문구)를 만든다
