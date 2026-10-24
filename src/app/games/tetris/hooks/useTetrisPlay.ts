@@ -41,7 +41,7 @@ export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state:
   const recorderRef = useRef<InputRecorder | null>(null);
   const statusRef = useRef<PlayStatus>("ready");
   // 일시정지 중 뗀 것도 큐에 남겨 재개 첫 프레임에 적용한다
-  const { queueRef, heldRef, press, release, instant, releaseAll } = useInputQueue(statusRef, { keepReleaseWhenStopped: true });
+  const { heldRef, press, release, instant, releaseAll, take, clear } = useInputQueue(statusRef, { keepReleaseWhenStopped: true });
   const lastLockRef = useRef<LockEvent | null>(null);
   /** HUD 시간을 마지막으로 갱신한 프레임 — 판마다 처음부터 */
   const hudFrameRef = useRef(-HUD_TIME_STEP);
@@ -73,7 +73,7 @@ export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state:
     (seed: number, das: number, arr: number) => {
       stateRef.current = createGame({ seed, das, arr });
       recorderRef.current = createInputRecorder();
-      queueRef.current = [];
+      clear();
       heldRef.current.clear();
       lastLockRef.current = null;
       if (effectsRef.current) resetEffects(effectsRef.current);
@@ -81,18 +81,18 @@ export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state:
       setHud(EMPTY_HUD);
       setStatus("playing");
     },
-    [setStatus, heldRef, queueRef],
+    [setStatus, heldRef, clear],
   );
 
   /** 판을 버리고 준비 상태로 — 이전 판이 다시 진행되거나 입력을 받지 않게 */
   const reset = useCallback(() => {
     // 이전 판을 지운다 — 준비 화면 뒤로 끝난 판이 얼어붙어 보이지 않게 (FE-20)
     stateRef.current = null;
-    queueRef.current = [];
+    clear();
     heldRef.current.clear();
     if (effectsRef.current) resetEffects(effectsRef.current);
     setStatus("ready");
-  }, [setStatus, heldRef, queueRef]);
+  }, [setStatus, heldRef, clear]);
 
   // ==================== 입력 ====================
 
@@ -113,8 +113,7 @@ export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state:
     const clock = createClock();
 
     const tick = (state: GameState, recorder: InputRecorder) => {
-      const actions = queueRef.current;
-      queueRef.current = [];
+      const actions = take();
       const frame = state.frame;
       const effects = effectsRef.current;
       if (effects) observeBefore(effects, state);
@@ -163,7 +162,7 @@ export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state:
     };
     rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
-  }, [setStatus, heldRef, queueRef]);
+  }, [setStatus, heldRef, take]);
 
   // ==================== 키보드·자동 일시정지 ====================
 

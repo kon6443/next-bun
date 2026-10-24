@@ -25,10 +25,32 @@ describe('useInputQueue — 싱글·대전 공용 입력 큐 (games-polish FE-54
       const status = { current: 'playing' };
       const { result } = renderHook(() => useInputQueue(status, { keepReleaseWhenStopped: keep }));
       result.current.press(1, 2);
+      expect(result.current.take()).toEqual([1]);
       status.current = 'paused';
       result.current.releaseAll();
-      expect(result.current.queueRef.current).toEqual(expected);
+      expect(result.current.queueRef.current).toEqual(expected.slice(1));
       expect(result.current.heldRef.current.size).toBe(0);
     }
+  });
+
+  it('같은 프레임 탭 — 누름이 아직 큐에 있으면 뗌을 다음 틱으로 미뤄 누름이 한 프레임은 유지된다 (P9)', () => {
+    const status = { current: 'playing' };
+    const { result } = renderHook(() => useInputQueue(status, { keepReleaseWhenStopped: false }));
+    result.current.press(5, 6);
+    result.current.release(5);
+    expect(result.current.take()).toEqual([5]);
+    expect(result.current.take()).toEqual([6]);
+    expect(result.current.take()).toEqual([]);
+    // 누름이 이미 엔진에 갔으면 뗌은 바로 다음 틱
+    result.current.press(5, 6);
+    expect(result.current.take()).toEqual([5]);
+    result.current.release(5);
+    expect(result.current.take()).toEqual([6]);
+    // clear는 미룬 뗌까지 비운다
+    result.current.press(5, 6);
+    result.current.release(5);
+    result.current.clear();
+    expect(result.current.take()).toEqual([]);
+    expect(result.current.take()).toEqual([]);
   });
 });

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BOARD_COLS, BOARD_VISIBLE_ROWS } from "@/types/tetrisBattleSocket";
 import type { TetrisBattleEmoteId } from "@/types/tetrisBattleSocket";
 import { TetrisCanvas } from "../../components/TetrisCanvas";
-import { TouchControls } from "../../components/TouchControls";
+import { GamePad } from "../../components/GamePad";
 import { SoundButton } from "@/app/games/_shared/components/SoundButton";
 import type { ReceivedEmote } from "../contexts/BattleSocketContext";
 import type { useBattlePlay } from "../hooks/useBattlePlay";
@@ -199,7 +199,7 @@ export function BattleView({
       </div>
 
       {isCoarse && (play.status === "playing" || reserveControls) && (
-        <TouchControls onHoldStart={play.press} onHoldEnd={play.release} onInstant={play.instant} />
+        <GamePad onHoldStart={play.press} onHoldEnd={play.release} onInstant={play.instant} active={play.status === "playing"} />
       )}
       {footer}
     </div>

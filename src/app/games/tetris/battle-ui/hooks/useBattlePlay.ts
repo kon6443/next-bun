@@ -54,7 +54,7 @@ export function useBattlePlay(options: BattlePlayOptions = {}) {
   const incomingRef = useRef<{ id: number; lines: number; hole: number }[]>([]);
   const statusRef = useRef<BattlePlayStatus>("ready");
   // 대전은 멈추지 않는다 — 진행 밖에서 뗀 것은 버린다
-  const { queueRef, heldRef, press, release, instant } = useInputQueue(statusRef, { keepReleaseWhenStopped: false });
+  const { heldRef, press, release, instant, take, clear } = useInputQueue(statusRef, { keepReleaseWhenStopped: false });
   const afterTickRef = useRef<(() => void) | null>(null);
   const effectsRef = useRef<EffectTracker | null>(null);
   if (effectsRef.current === null) effectsRef.current = createEffectTracker();
@@ -83,22 +83,22 @@ export function useBattlePlay(options: BattlePlayOptions = {}) {
       gameRef.current = bs.game;
       recorderRef.current = createInputRecorder();
       settingsRef.current = { das, arr };
-      queueRef.current = [];
+      clear();
       heldRef.current.clear();
       incomingRef.current = [];
       garbageRef.current = { pending: 0, active: 0 };
       if (effectsRef.current) resetEffects(effectsRef.current);
       setStatus("playing");
     },
-    [setStatus, heldRef, queueRef],
+    [setStatus, heldRef, clear],
   );
 
   /** 경기가 끝나(승리·종료) 더 진행하지 않는다 — 탈락은 루프가 스스로 over로 바꾼다 */
   const stop = useCallback(() => {
-    queueRef.current = [];
+    clear();
     heldRef.current.clear();
     if (statusRef.current === "playing") setStatus("over");
-  }, [setStatus, heldRef, queueRef]);
+  }, [setStatus, heldRef, clear]);
 
   /** 서버에서 받은 가비지 — 다음 틱에 그 프레임 도착으로 넣는다 */
   const receive = useCallback((ev: { id: number; lines: number; hole: number }) => {
@@ -132,8 +132,7 @@ export function useBattlePlay(options: BattlePlayOptions = {}) {
         incoming.sort((a, b) => a.id - b.id);
         for (const ev of incoming) receiveGarbage(bs, ev);
       }
-      const actions = queueRef.current;
-      queueRef.current = [];
+      const actions = take();
       const game = bs.game;
       const frame = game.frame;
       const effects = effectsRef.current;
@@ -179,7 +178,7 @@ export function useBattlePlay(options: BattlePlayOptions = {}) {
     };
     rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
-  }, [setStatus, heldRef, queueRef]);
+  }, [setStatus, heldRef, take]);
 
   // ==================== 키보드 ====================
 
@@ -208,12 +207,19 @@ export function useBattlePlay(options: BattlePlayOptions = {}) {
     };
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
-    // 창을 벗어나면 누르고 있던 키를 뗀다(keyup을 못 받아 계속 눌린 채로 남지 않게)
+    // 창을 벗어나거나 화면이 숨으면(앱 전환 — 모바일은 blur가 오지 않기도 한다) 누르고 있던 키를 뗀다(keyup을 못 받아 계속 눌린 채로 남지 않게, games-polish P9)
+    const onHidden = () => {
+      if (document.hidden) releaseAll();
+    };
     window.addEventListener("blur", releaseAll);
+    window.addEventListener("pagehide", releaseAll);
+    document.addEventListener("visibilitychange", onHidden);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", releaseAll);
+      window.removeEventListener("pagehide", releaseAll);
+      document.removeEventListener("visibilitychange", onHidden);
     };
   }, [instant, press, release, heldRef]);
 
