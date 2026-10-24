@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { ENGINE_VERSION } from '../engine/constants';
 import { defenseStorage } from '../lib/defenseGame';
@@ -82,10 +82,24 @@ describe('도감·허브 보조 동작', () => {
       fireEvent.click(button);
     });
     expect(submitGameScore).not.toHaveBeenCalled();
-    fireEvent.change(screen.getByLabelText(/다른 이름으로 등록/), { target: { value: '새이름' } });
+    fireEvent.change(screen.getByLabelText(/등록할 이름/), { target: { value: '새이름' } });
     await act(async () => {
       fireEvent.click(button);
     });
     expect(submitGameScore).toHaveBeenCalledWith('defense', { sessionId: 'sess3', playerName: '새이름', replay }, undefined);
   });
+
+  it('허브 — 등록하지 않을 기록은 확인 뒤 버린다(취소면 그대로) (games-polish P5)', async () => {
+    const replay = { engineVersion: ENGINE_VERSION, frames: 100, inputs: [0, 0] };
+    defenseStorage.savePendingSubmission({ sessionId: 'sess4', playerName: '수비왕', replay, score: 1_000_000, savedAt: 1 });
+    render(<HubActions />);
+    fireEvent.click(await screen.findByTestId('defense-pending-discard'));
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+    expect(defenseStorage.loadPendingSubmissions()).toHaveLength(1);
+    fireEvent.click(screen.getByTestId('defense-pending-discard'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '버리기' }));
+    expect(defenseStorage.loadPendingSubmissions()).toEqual([]);
+    expect(screen.queryByTestId('defense-pending')).toBeNull();
+  });
 });
+
