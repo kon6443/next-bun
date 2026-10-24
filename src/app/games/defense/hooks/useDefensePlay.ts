@@ -16,6 +16,7 @@ import {
   step,
 } from "../engine";
 import { LeakTracker } from "../lib/leakTracker";
+import { useLazyRef } from "@/app/games/_shared/hooks/useLazyRef";
 import { toRenderView } from "../lib/toRenderView";
 import { type RenderView, createRenderView } from "../renderer/renderView";
 
@@ -135,12 +136,8 @@ function sameHud(a: HudSnapshot, state: GameState, status: PlayStatus, speed: Sp
 }
 
 export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, onTickEvents, onFrame, onOver }: Options) {
-  const stateRef = useRef<GameState>(null as unknown as GameState);
-  const recorderRef = useRef<CommandRecorder>(null as unknown as CommandRecorder);
-  if (stateRef.current === null) {
-    stateRef.current = restore ? restore.state : createGame(stage, seed);
-    recorderRef.current = restore ? restore.recorder : createCommandRecorder();
-  }
+  const stateRef = useLazyRef<GameState>(() => (restore ? restore.state : createGame(stage, seed)));
+  const recorderRef = useLazyRef<CommandRecorder>(() => (restore ? restore.recorder : createCommandRecorder()));
   // 이어한 판은 일시정지로 연다 — 증강 대기 중에 저장한 판이면 카드 선택부터
   const initialStatus: PlayStatus = stateRef.current.augmentPending ? "augment" : stateRef.current.wavesStarted > 0 ? "paused" : "ready";
   const viewsRef = useRef<{ prev: RenderView; curr: RenderView } | null>(null);
@@ -154,8 +151,7 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
   const callbacksRef = useRef({ onTickEvents, onFrame, onOver });
   callbacksRef.current = { onTickEvents, onFrame, onOver };
   /** 누수 집계(실패 원인) — 이어한 판은 다시 돌리며 모은 것에서 이어 간다 */
-  const leaksRef = useRef<LeakTracker | null>(null);
-  if (leaksRef.current === null) leaksRef.current = restore ? restore.leaks : new LeakTracker();
+  const leaksRef = useLazyRef<LeakTracker>(() => (restore ? restore.leaks : new LeakTracker()));
 
   const [hud, setHud] = useState<HudSnapshot>(() => snapshotOf(stateRef.current, stage, initialStatus, initialSpeed, 0));
   const hudRef = useRef(hud);
@@ -165,7 +161,7 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
     const next = snapshotOf(stateRef.current, stage, statusRef.current, speedRef.current, versionRef.current);
     hudRef.current = next;
     setHud(next);
-  }, [stage]);
+  }, [stage, stateRef]);
 
   const setStatus = useCallback(
     (status: PlayStatus) => {
@@ -178,7 +174,7 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
   const finish = useCallback(() => {
     const state = stateRef.current;
     statusRef.current = "over";
-    const leaks = leaksRef.current!;
+    const leaks = leaksRef.current;
     callbacksRef.current.onOver?.({
       victory: state.victory,
       livesLeft: state.lives,
@@ -188,7 +184,7 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
       inputs: recorderRef.current.inputs.slice(),
     }, state);
     publish();
-  }, [publish]);
+  }, [publish, leaksRef, recorderRef, stateRef]);
 
   /** 명령 — 수락하면 기록하고 true. 끝난 판·무효 명령은 false(엔진이 상태를 바꾸지 않는다) */
   const dispatch = useCallback(
@@ -204,7 +200,7 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
       publish();
       return true;
     },
-    [publish],
+    [publish, recorderRef, stateRef],
   );
 
   const togglePause = useCallback(() => {
@@ -213,7 +209,7 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
     if (status === "over" || status === "augment") return;
     if (status === "paused") setStatus(stateRef.current.wavesStarted > 0 ? "playing" : "ready");
     else setStatus("paused");
-  }, [setStatus]);
+  }, [setStatus, stateRef]);
 
   const cycleSpeed = useCallback(() => {
     const index = SPEEDS.indexOf(speedRef.current);
@@ -243,7 +239,7 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
           const swap = views.prev;
           views.prev = views.curr;
           views.curr = toRenderView(state, swap);
-          leaksRef.current!.onEvents(events, state);
+          leaksRef.current.onEvents(events, state);
           callbacksRef.current.onTickEvents?.(events, views.curr, views.prev);
           clock.acc -= TICK_MS;
           ticks++;
@@ -285,7 +281,7 @@ export function useDefensePlay({ stage, seed, restore = null, initialSpeed = 1, 
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("blur", autoPause);
     };
-  }, [finish, publish, setStatus]);
+  }, [finish, publish, setStatus, leaksRef, stateRef]);
 
   return { hud, dispatch, togglePause, cycleSpeed, stateRef, recorderRef };
 }
