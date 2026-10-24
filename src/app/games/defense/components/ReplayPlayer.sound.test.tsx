@@ -9,10 +9,10 @@ import { SOUND } from '../audio/sfx';
 
 import { commandSound } from '../hooks/useDefenseSfx';
 import { LOCAL_REPLAY_VERSION } from '../lib/localReplay';
-import { updateSettings } from '../lib/settings';
+import { loadSettings, updateSettings } from '../lib/settings';
 import { LocalReplayView } from './ReplayScreens';
 
-const sfx = vi.hoisted(() => ({ play: vi.fn(), setSpeed: vi.fn(), setPaused: vi.fn() }));
+const sfx = vi.hoisted(() => ({ play: vi.fn(), setSpeed: vi.fn(), setPaused: vi.fn(), setEnabled: vi.fn() }));
 const useDefenseSfx = vi.hoisted(() => vi.fn());
 vi.mock('../hooks/useDefenseSfx', async (importActual) => ({
   ...(await importActual<typeof import('../hooks/useDefenseSfx')>()),
@@ -97,5 +97,35 @@ describe('디펜스 다시보기 소리 (games-polish P7)', () => {
       SOUND.WAVE_START,
       -1,
     ]);
+  });
+
+  it('끝에 닿아 멈추면 오디오를 쉬게 하지 않는다 — 마지막 소리가 끝까지 나게(사용자가 멈출 때만 쉼)', { timeout: 30_000 }, async () => {
+    const input = saveLocalWin();
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance'] });
+    render(<LocalReplayView stageId="s1" />);
+    await screen.findByTestId('defense-replay', {}, { timeout: 5000 });
+    // 끝 1초 전으로 가서 끝까지 재생
+    fireEvent.change(screen.getByTestId('defense-replay-seek'), { target: { value: String(Math.floor(input.ticks / TICKS_PER_SECOND - 1) * TICKS_PER_SECOND) } });
+    await frames(64);
+    expect(screen.getByTestId('defense-replay-play').getAttribute('aria-pressed')).toBe('true');
+    await frames(2500);
+    expect(screen.getByTestId('defense-replay-play').getAttribute('aria-pressed')).toBe('false');
+    expect(sfx.setPaused).toHaveBeenLastCalledWith(false);
+    expect(sfx.setPaused).not.toHaveBeenCalledWith(true);
+  });
+
+  it('소리 버튼 — 디펜스 소리 설정을 바꾸고 그 클릭(제스처) 안에서 켠다', async () => {
+    saveLocalWin();
+    render(<LocalReplayView stageId="s1" />);
+    await screen.findByTestId('defense-replay', {}, { timeout: 5000 });
+    const toggle = screen.getByRole('button', { name: '효과음' });
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(toggle);
+    expect(sfx.setEnabled).toHaveBeenLastCalledWith(true);
+    expect(loadSettings().sound).toBe(true);
+    expect(screen.getByRole('button', { name: '효과음' }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: '효과음' }));
+    expect(sfx.setEnabled).toHaveBeenLastCalledWith(false);
+    expect(loadSettings().sound).toBe(false);
   });
 });
