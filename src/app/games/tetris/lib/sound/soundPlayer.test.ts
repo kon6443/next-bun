@@ -136,6 +136,23 @@ describe('soundPlayer', () => {
     expect(sourceCount(fake)).toBe(MAX_SFX_VOICES + voiceCount({ kind: 'lock' }));
   });
 
+  it('자리가 꽉 차 울리지 못한 소리는 쓰로틀 시각을 남기지 않는다 — 자리가 나면 곧바로 같은 소리를 낸다 (games-polish FE-18)', () => {
+    saveSoundSettings({ sfx: true });
+    player = makePlayer();
+    player.unlock();
+    for (let i = 0; i < 20; i++) {
+      clock += 2000;
+      player.playCues([{ kind: 'clear', value: 4 }, { kind: 'perfectClear' }, { kind: 'win' }]);
+    }
+    expect(sourceCount(fake)).toBe(MAX_SFX_VOICES);
+    player.play({ kind: 'move' }); // 자리 없음 — 안 울린다
+    expect(sourceCount(fake)).toBe(MAX_SFX_VOICES);
+    fake.currentTime = 10; // 모두 끝남
+    clock += 1; // move 쓰로틀 간격 안
+    player.play({ kind: 'move' });
+    expect(sourceCount(fake)).toBe(MAX_SFX_VOICES + voiceCount({ kind: 'move' }));
+  });
+
   it('효과음을 끄면 이미 만든 context가 있어도 playCues가 아무것도 하지 않는다', () => {
     saveSoundSettings({ sfx: true });
     player = makePlayer();
