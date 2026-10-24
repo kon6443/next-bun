@@ -67,7 +67,9 @@ export type ErrorCode =
   | 'GAME_PLAYER_NAME_FORBIDDEN'
   | 'GAME_SCORE_NOT_FOUND'
   | 'GAME_VERIFY_BUSY'
-  | 'GAME_WEEKLY_UNAVAILABLE';
+  | 'GAME_WEEKLY_UNAVAILABLE'
+  | 'GAME_DAILY_UNAVAILABLE'
+  | 'GAME_CHALLENGE_EXPIRED';
 
 // ==================== 에러 코드별 메시지 매핑 ====================
 
@@ -114,6 +116,8 @@ export const ERROR_CODE_MESSAGES: Record<ErrorCode, string> = {
   GAME_SCORE_NOT_FOUND: '기록을 찾을 수 없습니다.',
   GAME_VERIFY_BUSY: '기록 확인이 밀려 있습니다. 잠시 후 다시 시도해주세요.',
   GAME_WEEKLY_UNAVAILABLE: '지금은 주간 도전을 열 수 없습니다. 무한 모드는 그대로 할 수 있어요.',
+  GAME_DAILY_UNAVAILABLE: '지금은 오늘의 테트리스를 열 수 없습니다. 일반 판은 그대로 할 수 있어요.',
+  GAME_CHALLENGE_EXPIRED: '지난 버전 게임의 기록이라 도전할 수 없습니다.',
 };
 
 // ==================== API 에러 클래스 ====================

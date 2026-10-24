@@ -20,4 +20,13 @@ describe('fixedStep (FE-23)', () => {
     advanceClock(clock, 9000, 10_000);
     expect(clock.acc).toBe(0);
   });
+
+  it('돌려주는 값은 상한 적용·배속 곱하기 전 실제 경과 ms (재생기 시청 시간)', () => {
+    const clock = createClock();
+    expect(advanceClock(clock, 1000, 100, 4)).toBe(0);
+    expect(advanceClock(clock, 1016, 100, 4)).toBe(16);
+    // 탭이 잠들었다 깨면 상한까지만 — 숨은 시간을 시청으로 세지 않는다
+    expect(advanceClock(clock, 60_000, 100, 0.5)).toBe(100);
+    expect(clock.acc).toBe(16 * 4 + 100 * 0.5);
+  });
 });

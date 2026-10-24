@@ -14,6 +14,8 @@ type ShareMenuProps = {
   /** 카카오 SDK 상태(useKakaoReady) — ready면 카카오톡 버튼, loading이면 비활성 자리, failed면 안내, off면 없음 */
   kakao: KakaoStatus;
   onClose: () => void;
+  /** 대화상자 제목·복사 완료 문구의 대상 — 기본 "리플레이"(도전장은 "도전장") */
+  subject?: string;
 };
 
 // 앱처럼 설치한 경우(PWA standalone)에는 주소창이 없다 — 메뉴 안의 링크를 가리킨다
@@ -26,7 +28,7 @@ const itemStyles =
  * 리플레이 공유 메뉴 — 모바일은 아래에서 올라오는 시트, 넓은 화면은 가운데 대화상자
  * [카카오톡](SDK 준비 시) · [링크 복사] · [더보기](Web Share 지원 시)
  */
-export function ShareMenu({ content, kakao, onClose }: ShareMenuProps) {
+export function ShareMenu({ content, kakao, onClose, subject = "리플레이" }: ShareMenuProps) {
   const titleId = useId();
   const dialogRef = useDialog<HTMLDivElement>(true, onClose);
   // Web Share 지원 여부는 열린 뒤(브라우저)에서만 판단한다
@@ -43,7 +45,7 @@ export function ShareMenu({ content, kakao, onClose }: ShareMenuProps) {
   const handleCopy = async () => {
     const result = await copyText(url);
     if (result === "copied") {
-      toast.success("리플레이 링크를 복사했어요.");
+      toast.success(`${subject} 링크를 복사했어요.`);
       onClose();
     } else {
       toast.error(COPY_FAILED);
@@ -75,7 +77,7 @@ export function ShareMenu({ content, kakao, onClose }: ShareMenuProps) {
       >
         <div className="mb-3 flex items-center justify-between">
           <h2 id={titleId} className="text-base font-semibold text-white">
-            리플레이 공유
+            {subject} 공유
           </h2>
           <button
             type="button"

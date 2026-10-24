@@ -12,11 +12,14 @@ export function createClock(): FixedStepClock {
 /**
  * 지난 시간을 쌓는다 — 한 번에 maxCatchUpMs까지만(탭이 오래 잠들면 수천 틱을 돌지 않게), 배속은 그다음에 곱한다
  * 멈췄다 다시 돌면 첫 프레임은 0부터(resetClock)
+ * @returns 이번에 쌓은 실제 경과 ms(상한 적용, 배속 곱하기 전) — 재생기의 시청 시간(벽시계)
  */
-export function advanceClock(clock: FixedStepClock, timestamp: number, maxCatchUpMs: number, speed = 1): void {
+export function advanceClock(clock: FixedStepClock, timestamp: number, maxCatchUpMs: number, speed = 1): number {
   if (clock.last === 0) clock.last = timestamp;
-  clock.acc += Math.min(timestamp - clock.last, maxCatchUpMs) * speed;
+  const elapsed = Math.min(timestamp - clock.last, maxCatchUpMs);
+  clock.acc += elapsed * speed;
   clock.last = timestamp;
+  return elapsed;
 }
 
 /** 멈춘 동안 — 다시 돌 때 멈춘 시간을 따라잡지 않게 */

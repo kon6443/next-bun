@@ -78,6 +78,10 @@ describe('GameOverPanel 예상 순위 요청', () => {
     expect(screen.getByRole('link', { name: '랭킹 보기' }).getAttribute('href')).toBe('/games/tetris/rankings?highlight=9');
     expect(screen.getByRole('link', { name: '나가기' }).getAttribute('href')).toBe('/games/tetris');
     expect(window.localStorage.getItem('tetris:myScoreIds')).toBe('[9]');
+    // 전체 3위 — 넓은 기간부터 본다, 결과 화면 공유 버튼을 강조하고 자랑 문구로 (games-growth B3)
+    const share = screen.getByTestId('result-share');
+    expect(share.textContent).toBe('전체 3위! 친구에게 자랑하기');
+    expect(share.dataset.brag).toBe('true');
     expect(window.localStorage.getItem('tetris:lastName')).toBe('테스터');
   });
 
@@ -88,5 +92,84 @@ describe('GameOverPanel 예상 순위 요청', () => {
     });
     expect(getGameRankings).toHaveBeenCalledTimes(3);
     expect(screen.getAllByText('—')).toHaveLength(3);
+  });
+
+  it('상위권도 개인 최고도 아니면 공유 버튼은 평소 문구 그대로 (games-growth B3)', async () => {
+    getGameRankings.mockResolvedValue(page([]));
+    submitGameScore.mockResolvedValue({ code: 'SUCCESS', message: 'ok', data: { scoreId: 10, score: 500, detail: {}, ranks: { daily: 11, weekly: 30, all: 300 } } });
+    await act(async () => {
+      render(<GameOverPanel {...props} />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    const share = screen.getByTestId('result-share');
+    expect(share.textContent).toBe('이 기록 공유하기');
+    expect(share.dataset.brag).toBeUndefined();
+  });
+
+  it('오늘의 테트리스: 그날 순위 하나·다시보기 없음·데일리 랭킹 링크, 첫 판이면 순위를 공유 기록에 붙인다 (games-growth B1)', async () => {
+    window.localStorage.setItem('tetris:daily:first', JSON.stringify({ boardKey: 'daily-2026-10-24', score: 500, lines: 5, level: 1 }));
+    getGameRankings.mockResolvedValue(page([]));
+    submitGameScore.mockResolvedValue({ code: 'SUCCESS', message: 'ok', data: { scoreId: 31, score: 500, detail: {}, ranks: { daily: 3, weekly: 3, all: 3 } } });
+    await act(async () => {
+      render(<GameOverPanel {...props} daily={{ boardKey: 'daily-2026-10-24', isFirstRun: true }} />);
+    });
+    expect(getGameRankings).toHaveBeenCalledTimes(1);
+    expect(getGameRankings).toHaveBeenCalledWith('tetris', 'all', 100, 'daily-2026-10-24');
+    expect(screen.getByText('오늘의 순위')).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    expect(screen.queryByRole('link', { name: /내 플레이 다시보기/ })).toBeNull();
+    expect(screen.getByRole('link', { name: '랭킹 보기' }).getAttribute('href')).toBe('/games/tetris/rankings?highlight=31&board=daily-2026-10-24');
+    expect(screen.getByTestId('daily-share')).toBeTruthy();
+    expect(screen.queryByTestId('result-share')).toBeNull();
+    expect(JSON.parse(window.localStorage.getItem('tetris:daily:first')!)).toMatchObject({ scoreId: 31, rank: 3 });
+  });
+
+  it('오늘의 테트리스 다시 도전한 판은 첫 판 기록에 순위를 붙이지 않는다', async () => {
+    window.localStorage.setItem('tetris:daily:first', JSON.stringify({ boardKey: 'daily-2026-10-24', score: 500, lines: 5, level: 1 }));
+    getGameRankings.mockResolvedValue(page([]));
+    submitGameScore.mockResolvedValue({ code: 'SUCCESS', message: 'ok', data: { scoreId: 32, score: 900, detail: {}, ranks: { daily: 1, weekly: 1, all: 1 } } });
+    await act(async () => {
+      render(<GameOverPanel {...props} daily={{ boardKey: 'daily-2026-10-24', isFirstRun: false }} />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    expect(screen.getByText(/다시 도전한 판이에요/)).toBeTruthy();
+    expect(JSON.parse(window.localStorage.getItem('tetris:daily:first')!).rank).toBeUndefined();
+  });
+
+  it('도전장: 도전장 순위 하나·원본과 점수 비교·등록 뒤 도전장 다시 보내기 (games-growth B2)', async () => {
+    const original = { rank: 1, scoreId: 7, playerName: '원본왕', score: 400, detail: { lines: 4, level: 1 }, durationMs: 1, createdAt: 'x' } as never;
+    getGameRankings.mockResolvedValue(page([]));
+    submitGameScore.mockResolvedValue({ code: 'SUCCESS', message: 'ok', data: { scoreId: 50, score: 500, detail: {}, ranks: { daily: 2, weekly: 2, all: 2 } } });
+    await act(async () => {
+      render(<GameOverPanel {...props} challenge={{ boardKey: 'challenge-7', original }} />);
+    });
+    expect(getGameRankings).toHaveBeenCalledTimes(1);
+    expect(getGameRankings).toHaveBeenCalledWith('tetris', 'all', 100, 'challenge-7');
+    expect(screen.getByText('도전장 순위')).toBeTruthy();
+    expect(screen.getByTestId('challenge-versus').textContent).toContain('도전 성공!');
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    expect(screen.getByRole('link', { name: '랭킹 보기' }).getAttribute('href')).toBe('/games/tetris/rankings?highlight=50&board=challenge-7');
+    expect(screen.getByTestId('challenge-share').textContent).toBe('⚔️ 도전장 다시 보내기');
+    expect(screen.queryByTestId('result-share')).toBeNull();
+  });
+
+  it('도전장 판인데 원본을 못 받았으면 일반 공유 — 도전장 보드 순위를 "전체 N위"로 자랑하지 않는다', async () => {
+    getGameRankings.mockResolvedValue(page([]));
+    submitGameScore.mockResolvedValue({ code: 'SUCCESS', message: 'ok', data: { scoreId: 51, score: 500, detail: {}, ranks: { daily: 1, weekly: 1, all: 1 } } });
+    await act(async () => {
+      render(<GameOverPanel {...props} challenge={{ boardKey: 'challenge-7', original: null }} />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    expect(screen.getByTestId('result-share').textContent).toBe('이 기록 공유하기');
   });
 });

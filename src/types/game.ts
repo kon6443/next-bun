@@ -8,8 +8,11 @@ export type GameType = 'tetris' | 'defense';
 
 export type RankingPeriod = 'daily' | 'weekly' | 'all';
 
-/** 세션 모드 — 보드가 여러 개인 게임만 (테트리스는 null) */
-export type GameMode = 'endless' | 'weekly';
+/** 세션 모드 — 디펜스 endless·weekly, 테트리스 daily(오늘의 테트리스)·challenge(도전장 — 기본 판은 null) */
+export type GameMode = 'endless' | 'weekly' | 'daily' | 'challenge';
+
+/** 세션 요청 본문 board로 고를 수 있는 모드 — 도전장은 board가 아니라 challengeScoreId로 */
+export type SessionBoard = Exclude<GameMode, 'challenge'>;
 
 export type GameSession = {
   sessionId: string;
@@ -109,7 +112,55 @@ export type RankingItem<D = TetrisScoreDetail> = {
   createdAt: string;
   /** 기록이 속한 랭킹 보드 (테트리스 'default' · 디펜스 endless-s{N}·weekly-YYYY-wNN) — 보드 일반화 전 응답에는 없다 */
   boardKey?: string;
+  /** 누적 조회수 — 조회수 배포 전 응답에는 없다(0으로 표시) */
+  viewCount?: number;
+  /** 누적 시청 시간(ms, 벽시계) — 조회수 배포 전 응답에는 없다 */
+  watchMs?: number;
+  /** 기록 주인의 최근 입상 횟수(명예의 전당) — 로그인 사용자 기록이고 입상이 있을 때만, 아니면 null(Redis 장애 때도 null) */
+  trophies?: Trophies | null;
 };
+
+/** 기간별 1·2·3위 입상 횟수 */
+export type Trophies = { gold: number; silver: number; bronze: number };
+
+/** 명예의 전당 한 기간 — 지난 주간(테트리스 기본 보드·디펜스 주간 보드)·지난 데일리(테트리스) */
+export type HallOfFamePeriod<D = TetrisScoreDetail> = {
+  kind: 'weekly' | 'daily';
+  boardKey: string;
+  /** ISO 8601 (UTC) */
+  startsAt: string;
+  endsAt: string;
+  /** 1~3위 (rank 1~3) */
+  podium: RankingItem<D>[];
+};
+
+/** GET /games/:gameType/hall-of-fame — 최근 기간 먼저, 빈 기간은 빠진다(최대 10분 지연) */
+export type HallOfFame<D = TetrisScoreDetail> = { periods: HallOfFamePeriod<D>[] };
+
+/** 인기 리플레이 정렬 — 기간 조회수·기간 시청 시간 */
+export type PopularSort = 'views' | 'watch';
+
+/** 인기 리플레이 항목 — rank는 인기 순서(점수 순위가 아니다) */
+export type PopularReplayItem<D = TetrisScoreDetail> = RankingItem<D> & {
+  periodViewCount: number;
+  periodWatchMs: number;
+};
+
+/** GET /games/:gameType/popular-replays */
+export type PopularReplayList<D = TetrisScoreDetail> = {
+  boardKey: string;
+  period: RankingPeriod;
+  sort: PopularSort;
+  /** 기간 시작 (ISO 8601 UTC) — 전체 기간이면 의미 없음 */
+  periodStart: string | null;
+  items: PopularReplayItem<D>[];
+};
+
+/** POST /games/:gameType/scores/:scoreId/views — counted=false(서버가 세지 않음)여도 200 */
+export type ReplayViewResult = { scoreId: number; viewCount: number; counted: boolean };
+
+/** POST /games/:gameType/scores/:scoreId/watch — countedMs는 서버 상한으로 자른 뒤 반영된 양 */
+export type ReplayWatchResult = { scoreId: number; watchMs: number; countedMs: number };
 
 /** 기록 1건 요약 (GET /games/:gameType/scores/:scoreId) — 랭킹 항목과 같은 형태, rank는 전체 기간 순위 */
 export type ScoreSummary<D = TetrisScoreDetail> = RankingItem<D>;

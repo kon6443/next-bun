@@ -3,7 +3,7 @@ import { SITE_CONFIG } from '@/app/config/siteConfig';
 import { absoluteUrl, buildShareContent, buildShareText } from '@/app/games/_shared/lib/shareSpec';
 import { cardText, needsKoreanFont } from '@/app/games/_shared/lib/replayCard';
 import { TETRIS_SHARE } from './share';
-import { buildReplayCard } from './replayCard';
+import { buildReplayCard, tetrisRankLabel } from './replayCard';
 
 const summary = { rank: 3, scoreId: 12, playerName: '테트리스왕', score: 12340, detail: { lines: 40, level: 5, pieces: 1, tSpins: 0, tetrises: 0, maxCombo: 0, engineVersion: 1, das: 10, arr: 2 }, durationMs: 83000, createdAt: 'x' };
 
@@ -48,5 +48,17 @@ describe('미리보기 카드 문구', () => {
     expect(buildReplayCard(null, false)).toMatchObject({ eyebrow: 'TETRIS', name: null, score: null });
     expect(needsKoreanFont(buildReplayCard(summary, true))).toBe(true);
     expect(needsKoreanFont(buildReplayCard(null, true))).toBe(true);
+  });
+});
+
+describe('보드별 순위 문구 — 데일리·도전장 기록은 그 보드 순위로 (games-growth B1·B2)', () => {
+  it('미리보기 설명·카드 머리말이 머리줄과 같은 표현', () => {
+    expect(tetrisRankLabel(undefined, 3)).toBe('전체 3위');
+    expect(tetrisRankLabel('default', 3)).toBe('전체 3위');
+    expect(tetrisRankLabel('daily-2026-10-24', 3)).toBe('10/24 데일리 3위');
+    expect(tetrisRankLabel('challenge-7', 2)).toBe('도전장 2위');
+    expect(TETRIS_SHARE.metaDescription({ ...summary, boardKey: 'daily-2026-10-24' })).toContain('· 10/24 데일리 3위 —');
+    expect(buildReplayCard({ ...summary, boardKey: 'challenge-7' }, true).eyebrow).toBe('테트리스 리플레이 · 도전장 3위');
+    expect(buildReplayCard(summary, true).eyebrow).toBe('테트리스 리플레이 · 전체 3위');
   });
 });
