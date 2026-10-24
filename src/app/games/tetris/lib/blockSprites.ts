@@ -22,9 +22,15 @@ export const CELL_COLORS: readonly string[] = [
 /** 대전 가비지 칸 값 — 블록 값 1~7과 구분 (대전 래퍼 값을 그대로 쓴다 — 두 곳에 따로 적어 어긋나지 않게) */
 export const GARBAGE_CELL_VALUE = GARBAGE_CELL;
 
-/** 크기가 바뀔 때마다 새로 만들므로 상한을 두고 넘으면 비운다 */
+/** 크기가 바뀔 때마다 새로 만들므로 상한을 두고 넘으면 비운다 — 블록·발광은 따로 세어 서로 밀어내지 않게 */
 const CACHE_LIMIT = 96;
-const cache = new Map<string, HTMLCanvasElement>();
+/**
+ * 키는 숫자(픽셀 크기 × 칸 종류 수 + 칸 값) — drawBlock은 프레임마다 수백 번 불려 문자열 키를 만들면 GC가 늘어난다 (games-polish FE-22)
+ * 칸 값은 CELL_COLORS 범위(0~8)라 겹치지 않는다
+ */
+const KEY_STRIDE = CELL_COLORS.length;
+const blockCache = new Map<number, HTMLCanvasElement>();
+const glowCache = new Map<number, HTMLCanvasElement>();
 
 type Rgb = [number, number, number];
 
@@ -90,8 +96,8 @@ function drawSprite(ctx: CanvasRenderingContext2D, px: number, cell: number): vo
 export function getBlockSprite(cell: number, size: number, dpr: number): HTMLCanvasElement | null {
   if (typeof document === 'undefined') return null;
   const px = Math.max(2, Math.round(size * dpr));
-  const key = `${cell}:${px}`;
-  const cached = cache.get(key);
+  const key = px * KEY_STRIDE + cell;
+  const cached = blockCache.get(key);
   if (cached) return cached;
   const canvas = document.createElement('canvas');
   canvas.width = px;
@@ -99,8 +105,8 @@ export function getBlockSprite(cell: number, size: number, dpr: number): HTMLCan
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
   drawSprite(ctx, px, cell);
-  if (cache.size >= CACHE_LIMIT) cache.clear();
-  cache.set(key, canvas);
+  if (blockCache.size >= CACHE_LIMIT) blockCache.clear();
+  blockCache.set(key, canvas);
   return canvas;
 }
 
@@ -125,8 +131,8 @@ export function getGlowSprite(cell: number, size: number, dpr: number): HTMLCanv
   if (typeof document === 'undefined' || cell === GARBAGE_CELL_VALUE || cell <= 0) return null;
   const cellPx = Math.max(2, Math.round(size * dpr));
   const px = Math.round(cellPx * (1 + GLOW_SPREAD * 2));
-  const key = `glow:${cell}:${cellPx}`;
-  const cached = cache.get(key);
+  const key = cellPx * KEY_STRIDE + cell;
+  const cached = glowCache.get(key);
   if (cached) return cached;
   const canvas = document.createElement('canvas');
   canvas.width = px;
@@ -134,8 +140,8 @@ export function getGlowSprite(cell: number, size: number, dpr: number): HTMLCanv
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
   drawGlowSprite(ctx, px, cellPx, cell);
-  if (cache.size >= CACHE_LIMIT) cache.clear();
-  cache.set(key, canvas);
+  if (glowCache.size >= CACHE_LIMIT) glowCache.clear();
+  glowCache.set(key, canvas);
   return canvas;
 }
 
