@@ -19,7 +19,7 @@ vi.mock('@/services/gameService', () => ({ createGameSession, getGameRankings, s
 const session = (mode: 'endless' | 'weekly', boardKey: string) => ({
   code: 'SUCCESS',
   message: '',
-  data: { sessionId: 'sess-1', seed: 3449748544, engineVersion: ENGINE_VERSION, expiresAt: '2099-01-01T00:00:00Z', boardKey, mode },
+  data: { sessionId: 'sess-1', seed: 3449748544, engineVersion: ENGINE_VERSION, expiresAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(), boardKey, mode },
 });
 // next/link 전용 속성(replace·scroll)은 <a>에 넘기지 않는다
 const linkAttrs = (rest: Record<string, unknown>) => Object.fromEntries(Object.entries(rest).filter(([key]) => key !== 'replace' && key !== 'scroll'));
@@ -195,6 +195,13 @@ describe('RankedPlay — 무한·주간 입구', () => {
     const ttl = loadResume()?.sessionTtlMs ?? 0;
     expect(ttl).toBeGreaterThan(19 * 60 * 1000);
     expect(ttl).toBeLessThanOrEqual(20 * 60 * 1000);
+  });
+
+  it('이미 지난 expiresAt이면 받은 즉시 만료 띠 — 등록 불가로 계속 플레이', async () => {
+    createGameSession.mockResolvedValue({ ...session('endless', 'endless-s1'), data: { ...session('endless', 'endless-s1').data, expiresAt: new Date(Date.now() - 1000).toISOString() } });
+    render(<RankedPlay mode="endless" fixedSeed={null} />);
+    fireEvent.click(await screen.findByTestId('defense-ranked-play'));
+    await waitFor(() => expect(screen.getByTestId('defense-session-banner').dataset.expired).toBe('true'));
   });
 
   it('스테이지 4를 깨기 전에는 잠김 — 랭킹 보기는 열려 있다', async () => {
