@@ -11,7 +11,7 @@ import { CHECKPOINT_TICKS, type PortableCase } from './portableRunner';
 const cases = (portableFixture as { cases: PortableCase[] }).cases;
 
 /** 리플레이를 한 틱씩 진행하는 커서 — portableRunner.replayCheckpoints와 같은 규칙(명령 틱까지 step 뒤 적용, 증강 대기 중 멈춤) */
-function stepper(input: ReplayInput) {
+function stepper(id: string, input: ReplayInput) {
   const stage = resolveBoard(input.mode, input.boardKey, input.seed);
   if (!stage) throw new Error(`보드 없음 ${input.boardKey}`);
   const state = createGame(stage, input.seed);
@@ -31,7 +31,7 @@ function stepper(input: ReplayInput) {
     while (i < input.inputs.length && state.tick === commandTick && !state.over) {
       const op = input.inputs[i + 1];
       const count = OP_ARG_COUNTS[op];
-      if (!applyCommand(state, op, count > 0 ? input.inputs[i + 2] : 0, count > 1 ? input.inputs[i + 3] : 0)) throw new Error('명령 거부');
+      if (!applyCommand(state, op, count > 0 ? input.inputs[i + 2] : 0, count > 1 ? input.inputs[i + 3] : 0)) throw new Error(`명령 거부 — ${id} tick ${state.tick}`);
       i += 2 + count;
       commandTick = i < input.inputs.length ? commandTick + input.inputs[i] : Infinity;
     }
@@ -48,29 +48,37 @@ function stepper(input: ReplayInput) {
 describe('판 간 격리 — 판 여러 개를 틱 단위로 번갈아 돌려도 단독 실행과 같다', () => {
   it('증강 있는 무한·주간 판과 캠페인 판을 섞어 4판씩 번갈아', () => {
     const withAugments = cases.filter((c) => c.expected.result.augments.length > 0).slice(0, 4);
-    // 증강 있는 캠페인 판이 양쪽 목록에 겹치지 않게 — 캠페인 몫은 증강 없는 판(효과가 판 시작 난이도 효과뿐)
-    const campaign = cases.filter((c) => c.input.mode === 'campaign' && c.input.ticks < 162000 && !withAugments.includes(c)).slice(0, 4);
+    // 캠페인 몫은 증강 없는 판(효과가 판 시작 난이도 효과뿐) — 위 목록과 겹치지 않는다
+    const campaign = cases.filter((c) => c.input.mode === 'campaign' && c.input.ticks < 162000 && c.expected.result.augments.length === 0).slice(0, 4);
     const group = [...withAugments, ...campaign];
     expect(withAugments.length).toBeGreaterThanOrEqual(3);
     expect(campaign.length).toBeGreaterThanOrEqual(2);
-    const runners = group.map((c) => ({ c, run: stepper(c.input), done: false }));
-    /** 이번 순회에 살아 있는 두 판의 효과가 개수는 같고 내용이 다르다 — 메모가 "배열 동일성"을 빼먹은 퇴행(길이만 비교)이 드러나는 조건 */
-    const sameLengthDifferentAlive = () =>
-      runners.some((a, i) =>
-        runners.some(
-          (b, j) =>
-            j > i && !a.done && !b.done && a.run.state.effects.length > 0 && a.run.state.effects.length === b.run.state.effects.length && JSON.stringify(a.run.state.effects) !== JSON.stringify(b.run.state.effects),
-        ),
-      );
+    const runners = group.map((c) => ({ c, run: stepper(c.id, c.input), done: false }));
+    /**
+     * 메모가 "배열 동일성"을 빼먹은 퇴행(길이만 비교)이 드러나는 조건 — 메모는 한 칸이라 **직전에 statValue를 부른 판**과만 부딪힌다
+     * 실제 step 순서(순회 경계 포함)로 직전에 효과가 있는 채 step한 판과 비교해 배열이 다르고 길이는 같고 내용이 다른 순간이 있었는지 센다
+     * (효과가 없는 판은 statValue가 메모를 건너뛰어 사이에 끼어도 상관없다)
+     */
+    let previous: (typeof runners)[number] | null = null;
     let collided = false;
     // 모든 판이 끝날 때까지 한 틱씩 차례로
     for (let alive = runners.length; alive > 0; ) {
-      if (!collided) collided = sameLengthDifferentAlive();
       alive = 0;
       for (const r of runners) {
         if (r.done) continue;
-        if (r.run.advance()) alive++;
-        else r.done = true;
+        if (!r.run.advance()) {
+          r.done = true;
+          continue;
+        }
+        alive++;
+        // step 중에는 효과가 바뀌지 않는다(명령 적용은 step 전) → step 뒤의 효과가 이번 step에 쓰인 것
+        const effects = r.run.state.effects;
+        if (effects.length === 0) continue;
+        if (!collided && previous) {
+          const other = previous.run.state.effects;
+          collided = other !== effects && other.length === effects.length && JSON.stringify(other) !== JSON.stringify(effects);
+        }
+        previous = r;
       }
     }
     // 표본이 위 조건을 실제로 만들어야 이 테스트가 그 퇴행을 지킨다(코퍼스를 다시 만들어 표본이 바뀌면 여기서 알린다)
