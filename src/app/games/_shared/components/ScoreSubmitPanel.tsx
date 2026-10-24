@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { ConfirmModal } from "@/app/components/ConfirmModal";
 import { Button, ButtonLink } from "@/app/teams/components";
 import { getGameRankings, submitGameScore } from "@/services/gameService";
 import type { GameType, RankingPeriod, ReplayPayloadByGame, ScoreDetailByGame, SubmitScoreResponse } from "@/types/game";
@@ -114,6 +115,14 @@ export function ScoreSubmitPanel<G extends GameType>({
     const playerName = validatePlayerName(defaultName) === null ? normalizePlayerName(defaultName) : "";
     storage.savePendingSubmission({ sessionId, playerName, replay, score, savedAt: Date.now() });
   }, [sessionId, defaultName, replay, score, storage]);
+
+  /** 다시 하면 이 판 기록이 사라지는 경우 — 등록 가능한 판을 아직 등록하지 않았고, 다시 등록할 보관도 없다 (games-polish FE-27) */
+  const [confirmRestart, setConfirmRestart] = useState(false);
+  const wouldLoseRecord = !!sessionId && !registered && !isFinalError && !canRetry;
+  const restart = () => {
+    discardPresaved();
+    onRestart();
+  };
 
   /** 등록하지 않고 직접 떠난다 — 선보관을 지운다. 제출이 일시 실패해 보관한 기록(다시 등록하기)은 남긴다 */
   const discardPresaved = () => {
@@ -270,10 +279,7 @@ export function ScoreSubmitPanel<G extends GameType>({
           className="min-h-11 flex-1"
           disabled={restarting}
           aria-busy={restarting}
-          onClick={() => {
-            discardPresaved();
-            onRestart();
-          }}
+          onClick={() => (wouldLoseRecord ? setConfirmRestart(true) : restart())}
         >
           {restarting ? "준비 중…" : "다시 하기"}
         </Button>
@@ -285,6 +291,19 @@ export function ScoreSubmitPanel<G extends GameType>({
           나가기
         </Link>
       </div>
+      <ConfirmModal
+        isOpen={confirmRestart}
+        onClose={() => setConfirmRestart(false)}
+        onConfirm={() => {
+          setConfirmRestart(false);
+          restart();
+        }}
+        title="등록하지 않고 다시 할까요?"
+        message="이번 판 기록은 랭킹에 올라가지 않고 사라져요."
+        confirmLabel="다시 하기"
+        cancelLabel="등록하러 가기"
+        variant="danger"
+      />
     </div>
   );
 }

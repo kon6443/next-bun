@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { ApiError } from '@/types/api';
 import { ScoreSubmitPanel, rankingsHref } from './ScoreSubmitPanel';
 import { TEST_GAME } from './testGame';
@@ -123,6 +123,12 @@ describe('ScoreSubmitPanel — 게임 사양·보드를 따른다', () => {
     const onRestart = vi.fn();
     const first = await act(async () => render(<ScoreSubmitPanel {...props} onRestart={onRestart} />));
     fireEvent.click(screen.getByRole('button', { name: '다시 하기' }));
+    // 등록하지 않은 기록이 사라지므로 먼저 묻는다 (FE-27) — 취소면 그대로
+    expect(onRestart).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '등록하러 가기' }));
+    expect(TEST_GAME.storage.loadPendingSubmissions()).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: '다시 하기' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '다시 하기' }));
     expect(onRestart).toHaveBeenCalledTimes(1);
     expect(TEST_GAME.storage.loadPendingSubmissions()).toEqual([]);
     first.unmount();
@@ -139,7 +145,9 @@ describe('ScoreSubmitPanel — 게임 사양·보드를 따른다', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
     });
+    // 일시 실패로 보관해 둔 기록은 사라지지 않으니 묻지 않고 바로
     fireEvent.click(screen.getByRole('button', { name: '다시 하기' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
     expect(TEST_GAME.storage.loadPendingSubmissions().map((p) => p.sessionId)).toEqual(['sess']);
   });
 

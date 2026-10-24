@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Button } from "@/app/teams/components";
+import { ConfirmModal } from "@/app/components/ConfirmModal";
 import { createGameSession } from "@/services/gameService";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
 import { sessionTtlMs } from "@/app/games/_shared/lib/sessionTtl";
@@ -171,6 +172,9 @@ export default function TetrisPlay() {
     beginGame(seed);
   };
 
+  /** 일시정지의 "처음부터" — 진행 중인 판을 버리므로 한 번 묻는다 (games-polish FE-27) */
+  const [confirmRestart, setConfirmRestart] = useState(false);
+
   const restart = () => {
     play.reset();
     setResult(null);
@@ -283,7 +287,7 @@ export default function TetrisPlay() {
                 <Button type="button" size="md" fullWidth className="min-h-11" onClick={play.resume} autoFocus>
                   계속하기
                 </Button>
-                <Button type="button" variant="secondary" size="md" fullWidth className="min-h-11" onClick={restart}>
+                <Button type="button" variant="secondary" size="md" fullWidth className="min-h-11" onClick={() => setConfirmRestart(true)}>
                   처음부터
                 </Button>
               </div>
@@ -317,6 +321,19 @@ export default function TetrisPlay() {
       {showControls && (
         <TouchControls onHoldStart={play.press} onHoldEnd={play.release} onInstant={play.instant} />
       )}
+      <ConfirmModal
+        isOpen={confirmRestart}
+        onClose={() => setConfirmRestart(false)}
+        onConfirm={() => {
+          setConfirmRestart(false);
+          restart();
+        }}
+        title="처음부터 다시 할까요?"
+        message="지금 판은 끝나고 기록이 남지 않아요."
+        confirmLabel="처음부터"
+        cancelLabel="계속하기"
+        variant="danger"
+      />
     </div>
   );
 }
