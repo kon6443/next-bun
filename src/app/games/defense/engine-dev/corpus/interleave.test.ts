@@ -48,7 +48,7 @@ function stepper(id: string, input: ReplayInput) {
 describe('판 간 격리 — 판 여러 개를 틱 단위로 번갈아 돌려도 단독 실행과 같다', () => {
   it('증강 있는 무한·주간 판과 캠페인 판을 섞어 4판씩 번갈아', () => {
     const withAugments = cases.filter((c) => c.expected.result.augments.length > 0).slice(0, 4);
-    // 캠페인 몫은 증강 없는 판(효과가 판 시작 난이도 효과뿐) — 위 목록과 겹치지 않는다
+    // 캠페인 몫은 증강 없는 판(효과가 판 시작 효과 — 규칙·난이도 — 뿐) — 위 목록과 겹치지 않는다
     const campaign = cases.filter((c) => c.input.mode === 'campaign' && c.input.ticks < 162000 && c.expected.result.augments.length === 0).slice(0, 4);
     const group = [...withAugments, ...campaign];
     expect(withAugments.length).toBeGreaterThanOrEqual(3);
@@ -58,6 +58,7 @@ describe('판 간 격리 — 판 여러 개를 틱 단위로 번갈아 돌려도
      * 메모가 "배열 동일성"을 빼먹은 퇴행(길이만 비교)이 드러나는 조건 — 메모는 한 칸이라 **직전에 statValue를 부른 판**과만 부딪힌다
      * 실제 step 순서(순회 경계 포함)로 직전에 효과가 있는 채 step한 판과 비교해 배열이 다르고 길이는 같고 내용이 다른 순간이 있었는지 센다
      * (효과가 없는 판은 statValue가 메모를 건너뛰어 사이에 끼어도 상관없다)
+     * 판 생성·끝나는 판의 마지막 명령 적용에서 바뀐 메모는 세지 않는다 — 덜 세는 쪽이라 거짓 통과로 이어지지 않는다
      */
     let previous: (typeof runners)[number] | null = null;
     let collided = false;
@@ -81,7 +82,9 @@ describe('판 간 격리 — 판 여러 개를 틱 단위로 번갈아 돌려도
         previous = r;
       }
     }
-    // 표본이 위 조건을 실제로 만들어야 이 테스트가 그 퇴행을 지킨다(코퍼스를 다시 만들어 표본이 바뀌면 여기서 알린다)
+    // 표본이 위 조건을 만들지 못하면 이 테스트는 그 퇴행을 지킬 수 없다(코퍼스를 다시 만들어 표본이 바뀌면 여기서 알린다)
+    // 필요조건일 뿐 충분조건은 아니다 — 결과에 안 쓰이는 수치만 다르면 낡은 버킷도 같은 해시를 낸다. 충분성은 변이로 확인한다:
+    // effects.ts bucketOf 조건을 길이만 비교로 바꾸면 이 테스트가 실패해야 한다(2026-10-24 확인 — c2 tick 0 명령 거부). 표본을 바꾸면 다시 확인
     expect(collided).toBe(true);
     for (const r of runners) {
       expect({ id: r.c.id, hash: getStateHash(r.run.state) }).toEqual({ id: r.c.id, hash: r.c.expected.result.stateHash });
