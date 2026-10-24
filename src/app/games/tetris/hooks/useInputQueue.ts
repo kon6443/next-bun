@@ -22,6 +22,12 @@ export function useInputQueue(statusRef: { readonly current: string }, { keepRel
     (pressCode: number, releaseCode: number) => {
       if (statusRef.current !== "playing" || heldRef.current.has(pressCode)) return;
       heldRef.current.set(pressCode, releaseCode);
+      // 같은 프레임에 떼고 다시 눌렀으면 미뤄 둔 뗌을 이번 틱으로 당긴다 — 다음 틱의 뗌이 다시 누른 것을 풀지 않게
+      const latched = latchedRef.current.indexOf(releaseCode);
+      if (latched !== -1) {
+        latchedRef.current.splice(latched, 1);
+        queueRef.current.push(releaseCode);
+      }
       queueRef.current.push(pressCode);
     },
     [statusRef],

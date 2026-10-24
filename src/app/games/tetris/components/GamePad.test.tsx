@@ -129,12 +129,13 @@ describe('GamePad — 게임보이형 모바일 패드 (games-polish P9)', () =>
     expect(onInstant).toHaveBeenCalledWith(ACTION.HARD_DROP);
   });
 
-  it('누른 방향 팔만 밝힌다(aria-pressed)', () => {
+  it('누른 방향 팔만 밝힌다(data-pressed — 순간 동작이라 토글로 읽히지 않게)', () => {
     const { down, move } = setup();
     down('left');
-    expect(screen.getByRole('button', { name: '왼쪽 이동' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '왼쪽 이동' })).toHaveAttribute('data-pressed', 'true');
+    expect(screen.getByRole('button', { name: '왼쪽 이동' })).not.toHaveAttribute('aria-pressed');
     move('right');
-    expect(screen.getByRole('button', { name: '왼쪽 이동' })).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByRole('button', { name: '오른쪽 이동' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '왼쪽 이동' })).toHaveAttribute('data-pressed', 'false');
+    expect(screen.getByRole('button', { name: '오른쪽 이동' })).toHaveAttribute('data-pressed', 'true');
   });
 });

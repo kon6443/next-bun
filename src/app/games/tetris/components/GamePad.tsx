@@ -126,9 +126,9 @@ export function GamePad({ onHoldStart, onHoldEnd, onInstant, active }: GamePadPr
   const arm = (dir: PadDirection, label: string, aria: string, position: string, tone = "") => (
     <button
       type="button"
-      tabIndex={0}
       aria-label={aria}
-      aria-pressed={shown === dir}
+      // 누른 방향 표시는 화면용 — 순간 동작이라 토글(aria-pressed)로 읽히지 않게
+      data-pressed={shown === dir}
       onClick={keyboardArm(dir)}
       className={`${ARM_BASE} ${position} ${shown === dir ? ARM_ON : ARM_IDLE} ${tone}`}
     >
@@ -172,7 +172,11 @@ export function GamePad({ onHoldStart, onHoldEnd, onInstant, active }: GamePadPr
           if (pointerRef.current !== null) return; // 두 번째 손가락은 패드를 맡지 않는다
           e.preventDefault();
           pointerRef.current = e.pointerId;
-          e.currentTarget.setPointerCapture?.(e.pointerId);
+          try {
+            e.currentTarget.setPointerCapture?.(e.pointerId);
+          } catch {
+            // 활성 포인터가 아닌 합성 이벤트 등 — 캡처 없이도 이 포인터의 up·cancel이 패드를 놓는다
+          }
           setDirection(directionAt(e), true);
         }}
         onPointerMove={(e) => {

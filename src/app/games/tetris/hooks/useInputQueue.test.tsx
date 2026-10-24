@@ -46,6 +46,15 @@ describe('useInputQueue — 싱글·대전 공용 입력 큐 (games-polish FE-54
     expect(result.current.take()).toEqual([5]);
     result.current.release(5);
     expect(result.current.take()).toEqual([6]);
+    // 같은 프레임에 떼고 다시 누르면 미룬 뗌을 이번 틱으로 당긴다 — 다음 틱의 뗌이 다시 누른 것을 풀지 않게
+    result.current.press(5, 6);
+    result.current.release(5);
+    result.current.press(5, 6);
+    expect(result.current.take()).toEqual([5, 6, 5]);
+    expect(result.current.take()).toEqual([]);
+    expect(result.current.heldRef.current.has(5)).toBe(true);
+    result.current.release(5);
+    expect(result.current.take()).toEqual([6]);
     // clear는 미룬 뗌까지 비운다
     result.current.press(5, 6);
     result.current.release(5);
