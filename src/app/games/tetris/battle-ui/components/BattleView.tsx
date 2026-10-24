@@ -12,6 +12,7 @@ import { EmoteBar } from "./EmoteBar";
 import { EmoteBubble } from "./EmoteBubble";
 import { MiniBoard, type MiniBoardProps } from "./MiniBoard";
 import { useBoardFocus } from "../hooks/useBoardFocus";
+import { useMediaQuery } from "@/app/games/_shared/hooks/useMediaQuery";
 
 export type OpponentView = Omit<MiniBoardProps, "cell">;
 
@@ -40,14 +41,7 @@ type BattleViewProps = {
 
 /** 상대 수·화면 폭 → 미니보드 칸 크기 (DESIGN §7: 2인전은 크게, 3~4인전은 작게) */
 function useMiniCell(opponentCount: number): number {
-  const [wide, setWide] = useState(false);
-  useEffect(() => {
-    const media = window.matchMedia("(min-width: 640px)");
-    setWide(media.matches);
-    const onChange = (e: MediaQueryListEvent) => setWide(e.matches);
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
-  }, []);
+  const wide = useMediaQuery("(min-width: 640px)");
   if (opponentCount <= 1) return wide ? 10 : 6;
   return wide ? 8 : 4;
 }
@@ -92,7 +86,7 @@ export function BattleView({
   footer,
   reserveControls = false,
 }: BattleViewProps) {
-  const [isCoarse, setIsCoarse] = useState(false);
+  const isCoarse = useMediaQuery("(pointer: coarse)");
   const [emoteOpen, setEmoteOpen] = useState(false);
   const emoteToggleRef = useRef<HTMLButtonElement>(null);
   const emotePanelRef = useRef<HTMLDivElement>(null);
@@ -125,14 +119,6 @@ export function BattleView({
   const miniCell = useMiniCell(opponents.length);
   const focus = useBoardFocus(canEnlarge);
   const enlarged = opponents.find((o) => o.playerId === focus.focusedId) ?? null;
-
-  useEffect(() => {
-    const media = window.matchMedia("(pointer: coarse)");
-    setIsCoarse(media.matches);
-    const onChange = (e: MediaQueryListEvent) => setIsCoarse(e.matches);
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
-  }, []);
 
   return (
     <div ref={trailsRootRef} className="relative flex h-full flex-col pt-[env(safe-area-inset-top)]">
