@@ -171,7 +171,12 @@ export type BattleMatch = {
 };
 
 /** 한 참가자의 대전 리플레이 — 백엔드 BattleReplayDetailDto (VERIFIED만) */
-export type BattleReplayDetail = BattleReplayInput & { matchId: string; playerId: string };
+export type BattleReplayDetail = BattleReplayInput & {
+  matchId: string;
+  playerId: string;
+  /** 가비지 이벤트마다 보낸 사람 playerId(garbage 로그와 같은 순서, 모르면 null) — 이 필드가 생긴 뒤 저장된 경기에만 있다 */
+  garbageFrom?: (string | null)[];
+};
 
 /** 경로의 matchId 형식 — 백엔드 MATCH_ID_PATTERN과 같다. 맞지 않으면 묻지 않고 404 */
 export function isBattleMatchId(raw: string): boolean {

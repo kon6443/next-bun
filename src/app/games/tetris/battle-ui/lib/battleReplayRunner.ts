@@ -2,6 +2,7 @@ import {
   type BattleReplayInput,
   type BattleState,
   type GarbageEvent,
+  type StepBattleResult,
   createBattle,
   pendingGarbageLines,
   receiveGarbage,
@@ -69,7 +70,12 @@ export function isRunnerDone(runner: BattleReplayRunner): boolean {
  * @param buffer 프레임 입력을 담을 재사용 배열 (재생기는 판마다 하나씩 둔다)
  */
 export function advanceRunner(runner: BattleReplayRunner, buffer: number[]): boolean {
-  if (isRunnerDone(runner)) return false;
+  return stepRunner(runner, buffer) !== null;
+}
+
+/** advanceRunner와 같되 대전 래퍼 결과(적용한 입력 수·고정)를 돌려준다 — 재생 연출(소리)이 관찰한다. 진행하지 않았으면 null */
+export function stepRunner(runner: BattleReplayRunner, buffer: number[]): StepBattleResult | null {
+  if (isRunnerDone(runner)) return null;
   const bs = runner.bs;
   const frame = bs.game.frame;
   while (runner.garbageCursor < runner.garbage.length && runner.garbage[runner.garbageCursor].frame === frame) {
@@ -77,8 +83,7 @@ export function advanceRunner(runner: BattleReplayRunner, buffer: number[]): boo
     runner.garbageCursor++;
   }
   runner.inputCursor = collectActions(runner.timeline, runner.inputCursor, frame, buffer);
-  stepBattle(bs, buffer, buffer.length);
-  return true;
+  return stepBattle(bs, buffer, buffer.length);
 }
 
 function cloneBattleState(bs: BattleState): BattleState {
