@@ -9,9 +9,14 @@ import type { ReplayShareSpec } from "./shareSpec";
  *
  * 한글 폰트를 못 받으면 ASCII 카드로 그린다(외부 네트워크 없이도 이미지가 나오게). 이모지는 외부 조회를 부르므로 쓰지 않는다
  */
-/** 기록 카드는 순위가 바뀌므로 10분, 폴백 카드(일시 실패 가능)는 1분만 — ImageResponse 기본값(1년 immutable)을 덮어쓴다 */
-const CACHE_OK = "public, max-age=600";
-const CACHE_FALLBACK = "public, max-age=60";
+/**
+ * OG 카드 캐시 — ImageResponse 기본값(1년 immutable)을 덮어쓴다. 리플레이·대전 카드 공용
+ * - 정상 카드 10분: 순위가 바뀌고 운영자 숨김이 있다. 공유 캐시(CDN)에도 같은 10분, 지나면 하루까지는 낡은 카드를 주며 뒤에서 새로 그린다
+ *   — 크롤러·카카오가 몰릴 때 satori 렌더와 요약 조회(Next 서버 IP 하나로 전역 스로틀에 집계, Q-S5)를 줄인다 (games-polish FE-47)
+ * - 폴백 카드(조회·폰트 일시 실패) 1분: 낡은 것을 오래 주지 않게 swr 없이
+ */
+export const OG_CACHE_OK = "public, max-age=600, s-maxage=600, stale-while-revalidate=86400";
+export const OG_CACHE_FALLBACK = "public, max-age=60, s-maxage=60";
 
 export async function renderReplayCardImage<D>(spec: ReplayShareSpec<D>, summary: ScoreSummary<D> | null): Promise<ImageResponse> {
   const koreanCard = spec.card(summary, true);
@@ -62,7 +67,7 @@ export async function renderReplayCardImage<D>(spec: ReplayShareSpec<D>, summary
     {
       ...OG_SIZE,
       fonts: font ? [{ name: "NotoSansKR", data: font, weight: 700, style: "normal" }] : undefined,
-      headers: { "cache-control": summary && font ? CACHE_OK : CACHE_FALLBACK },
+      headers: { "cache-control": summary && font ? OG_CACHE_OK : OG_CACHE_FALLBACK },
     },
   );
 }
