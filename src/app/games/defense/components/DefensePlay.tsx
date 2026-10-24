@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmModal } from "@/app/components/ConfirmModal";
 import { SOUND, Sfx } from "../audio/sfx";
-import { AUGMENTS, ENGINE_VERSION, EVENT, EVENT_STRIDE, OP, findStage, type GameState, type Stage } from "../engine";
+import { AUGMENTS, ENGINE_VERSION, EVENT, EVENT_STRIDE, OP, findStage, slotAvailable, type GameState, type Stage } from "../engine";
 import { useDefenseCanvas } from "../hooks/useDefenseCanvas";
 import { type FrameInfo, type PlayResult, type Speed, useDefensePlay } from "../hooks/useDefensePlay";
 import { useDefenseSettings } from "../hooks/useDefenseSettings";
@@ -488,6 +488,13 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
   const lastPointerRef = useRef("");
   const selectSlot = (slot: number, byKeyboard: boolean) => {
     if (hud.status === "over") return;
+    // 잠긴 자리(개척 전·좁은 땅)는 링이 없다 — 고르지 않고 닫는다(선택 고리만 남지 않게, games-polish FE-08)
+    const state = stateRef.current;
+    if (!state.towers.some((t) => t.slot === slot) && !slotAvailable(state, stage, slot)) {
+      setArmed(null);
+      setSelected(null);
+      return;
+    }
     setArmed(null);
     setKeyboardRing(byKeyboard);
     // 마우스로 누른 버튼에 포커스를 주는 브라우저가 있다 — 남은 포커스가 Enter를 엉뚱한 슬롯으로 보내지 않게 놓는다
@@ -687,7 +694,9 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
         {viewport &&
           stage.map.slots.map((spot, i) => {
             const tower = stateRef.current.towers.find((t) => t.slot === i);
-            const label = tower ? `${TOWER_NAMES[tower.kind]} Lv${tower.level}` : "빈 자리";
+            // 잠긴 자리 — 개척 증강 전·좁은 땅 규칙. 판 중에 바뀌므로(증강) 렌더마다 판정, 배경 맵 대신 버튼에 표시 (FE-08)
+            const locked = !tower && !slotAvailable(stateRef.current, stage, i);
+            const label = tower ? `${TOWER_NAMES[tower.kind]} Lv${tower.level}` : locked ? "잠긴 자리" : "빈 자리";
             return (
               <button
                 key={i}
@@ -700,6 +709,8 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
                 data-level={tower ? tower.level : 0}
                 aria-label={`슬롯 ${i + 1} — ${label}`}
                 aria-pressed={selected === i}
+                aria-disabled={locked || undefined}
+                data-locked={locked || undefined}
                 disabled={hud.status === "over"}
                 onPointerDown={(e) => {
                   lastPointerRef.current = e.pointerType;
@@ -708,7 +719,13 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
                 onClick={(e) => selectSlot(i, e.detail === 0)}
                 className="absolute rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-300"
                 style={{ left: toScreenX(viewport, spot.x) - slotSize / 2, top: toScreenY(viewport, spot.y) - slotSize / 2, width: slotSize, height: slotSize }}
-              />
+              >
+                {locked && (
+                  <span aria-hidden="true" className="pointer-events-none flex h-full w-full items-center justify-center rounded-full bg-slate-950/65 text-xs">
+                    🔒
+                  </span>
+                )}
+              </button>
             );
           })}
         {viewport && selected !== null && options.length > 0 && (

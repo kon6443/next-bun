@@ -97,6 +97,21 @@ describe('RankedPlay — 무한·주간 입구', () => {
     expect(screen.getByTestId('defense-board').dataset.status).toBe('playing');
   });
 
+  it('무한 맵의 잠긴 자리(개척 전)는 "잠긴 자리"로 보이고 눌러도 링·선택 고리가 생기지 않는다 (games-polish FE-08)', async () => {
+    render(<RankedPlay mode="endless" fixedSeed={3} />);
+    fireEvent.click(await screen.findByTestId('defense-ranked-play'));
+    await screen.findByTestId('defense-board');
+    const locked = screen.getAllByRole('button', { name: /잠긴 자리/ });
+    expect(locked.length).toBeGreaterThan(0);
+    expect(locked[0].getAttribute('aria-disabled')).toBe('true');
+    fireEvent.click(locked[0]);
+    expect(locked[0].getAttribute('aria-pressed')).toBe('false');
+    // 열린 자리는 그대로 링이 열린다
+    const open = screen.getByTestId('defense-slot-0');
+    fireEvent.click(open);
+    expect(open.getAttribute('aria-pressed')).toBe('true');
+  });
+
   it('주간 판은 이번 주 규칙 아이콘 줄 — 누르면 설명', async () => {
     render(<RankedPlay mode="weekly" fixedSeed={11} />);
     fireEvent.click(await screen.findByTestId('defense-ranked-play'));
