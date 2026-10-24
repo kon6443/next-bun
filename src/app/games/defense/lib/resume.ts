@@ -23,7 +23,7 @@ export type ResumeSlot = {
   /** 무한·주간 — 이 판을 등록할 세션과 받은 시각(이 기기 Date.now). 없으면 로컬 판(등록 불가) */
   sessionId?: string;
   sessionReceivedAt?: number;
-  /** 받은 순간 세션의 남은 시간(응답 expiresAt 기준) — 없으면(이전 저장본) 4시간 */
+  /** 받은 순간 세션의 남은 시간(응답 ttlSeconds, 없으면 expiresAt 기준 — sessionTtlMs) — 없으면(이전 저장본) 4시간 */
   sessionTtlMs?: number;
 };
 

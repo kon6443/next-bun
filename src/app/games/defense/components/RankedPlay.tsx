@@ -35,7 +35,7 @@ type Props = {
   fixedSeed: number | null;
 };
 
-/** ttlMs: 받은 순간 남은 시간(응답 expiresAt 기준, 4시간 상한) — 만료 판정은 이것과 이 기기에서 흐른 시간으로 */
+/** ttlMs: 받은 순간 남은 시간(응답 ttlSeconds, 없으면 expiresAt 기준, 4시간 상한) — 만료 판정은 이것과 이 기기에서 흐른 시간으로 */
 type Session = { sessionId: string; receivedAt: number; ttlMs: number };
 type Run = { n: number; boardKey: string; seed: number; restore: RestoredGame | null; notice: string | null; session: Session | null; sessionError: string | null };
 type Over = { result: PlayResult; score: number; wave: number; kills: number; isNewBest: boolean; sessionId: string | null; sessionError: string | null };
@@ -108,7 +108,7 @@ export default function RankedPlay({ mode, fixedSeed }: Props) {
       else {
         setOver(null);
         const receivedAt = Date.now();
-        const session = { sessionId: data.sessionId, receivedAt, ttlMs: sessionTtlMs(data.expiresAt, receivedAt, SESSION_TTL_MS) };
+        const session = { sessionId: data.sessionId, receivedAt, ttlMs: sessionTtlMs(data, receivedAt, SESSION_TTL_MS) };
         setRun({ n, boardKey: data.boardKey, seed: data.seed, restore: null, notice, session, sessionError: null });
       }
     } catch (err) {
