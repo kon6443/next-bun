@@ -19,8 +19,10 @@ vi.mock('../contexts/BattleSocketContext', () => ({
   useBattleSocket: () => ctx,
   useEnterScope: () => ({ cancelled: false }),
 }));
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
-vi.mock('react-hot-toast', () => ({ default: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
+const push = vi.fn();
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push, replace: vi.fn() }) }));
+const toastFn = vi.hoisted(() => vi.fn());
+vi.mock('react-hot-toast', () => ({ default: Object.assign(toastFn, { success: vi.fn(), error: vi.fn() }) }));
 vi.mock('next-auth/react', () => ({ useSession: () => ({ data: null, status: 'unauthenticated' }) }));
 
 import { BattleLobby, LIST_RETRY_MS } from './BattleLobby';
@@ -96,5 +98,52 @@ describe('BattleLobby 방 목록 (games-polish 새로고침·FE-33)', () => {
     ctx.status = 'disconnected';
     render(<BattleLobby />);
     expect(screen.getByText('서버에 다시 연결하는 중이에요…')).toBeInTheDocument();
+  });
+
+  describe('빠른 참가·배치 (games-polish P7)', () => {
+    const summary = (code: string, playerCount: number, extra: Partial<RoomSummary> = {}): RoomSummary => ({
+      code,
+      name: `방 ${code}`,
+      playerCount,
+      maxPlayers: 4,
+      locked: false,
+      status: 'WAITING',
+      ...extra,
+    });
+
+    beforeEach(() => {
+      push.mockReset();
+      toastFn.mockReset();
+      listRooms.mockResolvedValue({ ok: true, data: [] });
+    });
+
+    it('방 목록이 이름 카드 바로 다음 — 방 만들기·코드 입장보다 위', async () => {
+      ctx.rooms = [];
+      render(<BattleLobby />);
+      await act(async () => {});
+      const list = screen.getByRole('region', { name: '방 목록' });
+      const create = screen.getByRole('heading', { name: '방 만들기' });
+      const code = screen.getByLabelText('코드로 입장');
+      expect(list.compareDocumentPosition(create) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(list.compareDocumentPosition(code) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('잠기지 않은 대기 방 중 사람이 가장 많은 곳으로 들어간다', async () => {
+      ctx.rooms = [summary('AAAAA2', 1), summary('BBBBB2', 3, { locked: true }), summary('CCCCC2', 2), summary('DDDDD2', 3, { status: 'PLAYING' })];
+      render(<BattleLobby />);
+      await act(async () => {});
+      fireEvent.click(screen.getByRole('button', { name: '빠른 참가' }));
+      expect(push).toHaveBeenCalledWith('/games/tetris/battle/CCCCC2');
+    });
+
+    it('들어갈 방이 없으면 방 만들기로 안내 — 방 이름 칸에 포커스', async () => {
+      ctx.rooms = [summary('BBBBB2', 3, { locked: true })];
+      render(<BattleLobby />);
+      await act(async () => {});
+      fireEvent.click(screen.getByRole('button', { name: '빠른 참가' }));
+      expect(push).not.toHaveBeenCalled();
+      expect(toastFn).toHaveBeenCalledWith(expect.stringContaining('방을 만들어'));
+      expect(screen.getByLabelText(/방 이름/)).toHaveFocus();
+    });
   });
 });

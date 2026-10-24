@@ -219,12 +219,17 @@ export async function getBattleReplay(matchId: string, playerId: string): Promis
 
 // ==================== 입구 — 로비 방 수·최근 경기 (DESIGN §19) ====================
 
+/** 입구 미리보기 방 — 빈자리가 있는 대기 방(잠긴 방 포함) */
+export type BattleLobbyRoom = { code: string; name: string; playerCount: number; maxPlayers: number; locked: boolean };
+
 /** 지금 로비의 방 수 — 소켓 없이 테트리스 홈에서 쓴다 */
 export type BattleLobbyStats = {
   /** 입장할 수 있는 대기 방 */
   waitingRooms: number;
   /** 경기 중인 방 */
   playingRooms: number;
+  /** 미리보기 최대 3개(사람 많은 순 → 최근) — 이 필드가 생기기 전 서버면 없다(방 수만 보인다) */
+  rooms?: BattleLobbyRoom[];
 };
 
 export async function getBattleLobbyStats(): Promise<ApiResponse<BattleLobbyStats>> {

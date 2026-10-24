@@ -50,6 +50,41 @@ describe('대전 입구 (DESIGN §19)', () => {
     expect(getBattleLobbyStats).toHaveBeenCalledTimes(1);
   });
 
+  it('미리보기 방 — 이름·인원·🔒와 들어가기, 빠른 참가는 첫 열린 방, 방 만들기는 로비의 만들기 카드 (P7)', async () => {
+    getBattleLobbyStats.mockResolvedValue({
+      data: {
+        waitingRooms: 3,
+        playingRooms: 0,
+        rooms: [
+          { code: 'LOCK23', name: '비밀 방', playerCount: 3, maxPlayers: 4, locked: true },
+          { code: 'OPEN23', name: '열린 방', playerCount: 2, maxPlayers: 4, locked: false },
+          { code: 'SOLO23', name: '혼자 방', playerCount: 1, maxPlayers: 2, locked: false },
+        ],
+      },
+    });
+    render(<BattleEntry />);
+    const list = await screen.findByRole('list', { name: '열린 방' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(3);
+    expect(within(list).getByRole('img', { name: '비밀번호 방' })).toBeInTheDocument();
+    expect(within(list).getByText('3/4명')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '비밀 방 들어가기' })).toHaveAttribute('href', '/games/tetris/battle/LOCK23?locked=1');
+    expect(screen.getByRole('link', { name: '빠른 참가' })).toHaveAttribute('href', '/games/tetris/battle/OPEN23');
+    expect(screen.getByRole('link', { name: '방 만들기' })).toHaveAttribute('href', '/games/tetris/battle#battle-create');
+  });
+
+  it('잠긴 방뿐이면 빠른 참가 없이 방 만들기, 미리보기 필드가 없는 서버면 예전처럼 방 수만 (P7)', async () => {
+    getBattleLobbyStats.mockResolvedValue({ data: { waitingRooms: 1, playingRooms: 0, rooms: [{ code: 'LOCK23', name: '비밀 방', playerCount: 1, maxPlayers: 4, locked: true }] } });
+    const { unmount } = render(<BattleEntry />);
+    expect(await screen.findByRole('link', { name: '방 만들기' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '빠른 참가' })).toBeNull();
+    unmount();
+    clearBattleMatchCache();
+    getBattleLobbyStats.mockResolvedValue({ data: { waitingRooms: 1, playingRooms: 0 } });
+    render(<BattleEntry />);
+    expect(await screen.findByText('지금 열린 방 1개')).toBeInTheDocument();
+    expect(screen.queryByTestId('battle-rooms-preview')).toBeNull();
+  });
+
   it('방 수 조회가 실패해도 버튼은 그대로, 문구만 없다', async () => {
     getBattleLobbyStats.mockRejectedValue(new ApiError('TOO_MANY_REQUESTS', 'x', 429));
     render(<BattleEntry />);
