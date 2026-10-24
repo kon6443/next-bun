@@ -10,7 +10,8 @@
  * GC: 5회 측정 동안 PerformanceObserver 'gc' 항목을 종류별로 센다(perf_hooks.constants — MINOR 1 스캐빈지 · MAJOR 4 마크·컴팩트, 증분·약한 콜백은 따로)
  * 할당(추정): 판 1회당 스캐빈지 수 × 새 공간 반쪽(semi-space) 용량 — semi-space를 플래그로 고정해 시나리오·전후 비교가 같은 배율이 되게 한다.
  *   major GC가 거둔 젊은 세대 할당은 세지 않는다(하한 추정). 엔진 핫패스 할당 압력 지표
- * 남은 힙: 결과를 붙잡은 채 gc() 전후의 heapUsed 차 — 실행이 남기는 것(결과 객체·캐시)
+ * 남은 힙: 결과를 붙잡은 채 gc() 전후의 heapUsed 차 — 실행이 남기는 것(결과 객체·캐시). ±0.02MB는 잡음 — MB 단위 누수만 본다
+ * 할당 추정 배율은 위 명령의 `--max-semi-space-size=N` 형태만 읽는다(밑줄·공백·NODE_OPTIONS 형태면 측정값으로 돌아가 비교할 수 없다 — env.allocEstimateSemiSpaceMB 확인)
  * 청크 최장 구간: 쉬는 틈(setTimeout 0, 약 1ms)이 다음 묶음에 섞여 약 3% 크게 나온다 — 전후 비교에는 같은 편향
  */
 
@@ -57,7 +58,7 @@ const gc = (globalThis as { gc?: () => void }).gc;
 const SEMI_SPACE_FLAG = /^--max-semi-space-size=(\d+)$/;
 const SEMI_SPACE_MB_AT_START = Number(process.execArgv.map((arg) => SEMI_SPACE_FLAG.exec(arg)?.[1]).find(Boolean) ?? semiSpaceMB());
 
-/** 동기 측정 — 워밍업 1 + 5회, 그리고 gc 뒤 1회의 힙 증가·GC 횟수 */
+/** 동기 측정 — 워밍업 3 + 5회, GC 종류별 횟수, 남은 힙(결과를 붙잡은 채 gc 전후 — 0.01MB 아래는 잡음) */
 /** PerformanceObserver는 비동기로 전달한다 — 센 값을 읽기 전에 한 바퀴 돌린다 */
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 20));
 

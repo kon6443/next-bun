@@ -15,7 +15,9 @@ const PORTABLE_PATH = join(__dirname, 'portable.json');
  * 차등 코퍼스 픽스처 생성 — **현재 엔진**을 기준으로 고정한다. 엔진 동작을 의도적으로 바꿨을 때만(ENGINE_VERSION을 올리는 변경) 다시 만든다
  * 리팩토링(동작 불변) 중에는 절대 다시 만들지 않는다 — 다시 만들면 안전망이 사라진다
  * 가드: 픽스처에 engineVersion을 적고, 기존 픽스처의 engineVersion이 지금 ENGINE_VERSION과 같으면 거부한다
- *   (동작을 바꾸려면 ENGINE_VERSION부터 올린다 — 같은 버전에서 꼭 다시 써야 하면 DEFENSE_CORPUS_FORCE=1, 커밋에 이유를 남긴다)
+ *   ENGINE_VERSION은 서버·이어하기 저장본과 공유하는 리플레이 호환 버전이다 — 코퍼스를 다시 쓰려고 올리지 않는다
+ *   엔진 동작을 의도적으로 바꿔 ENGINE_VERSION을 올린 경우에만 그냥 통과하고, 코퍼스 형식(CORPUS_VERSION)만 바꾼 경우는
+ *   DEFENSE_CORPUS_FORCE=1로 다시 쓰고 커밋에 이유를 남긴다(형식 버전으로 가드를 우회하지 않게 형식 버전은 보지 않는다)
  * DEFENSE_CORPUS_WRITE=1 pnpm exec vitest run src/app/games/defense/engine-dev/corpus/corpus.generate.test.ts
  * 워커 수는 DEFENSE_SIM_WORKERS(기본 4, 코어 − 1 상한)
  */
@@ -24,7 +26,9 @@ describe.runIf(process.env.DEFENSE_CORPUS_WRITE === '1')('디펜스 차등 코�
     if (existsSync(CORPUS_PATH) && process.env.DEFENSE_CORPUS_FORCE !== '1') {
       const current = JSON.parse(readFileSync(CORPUS_PATH, 'utf8')) as { engineVersion?: number };
       if (current.engineVersion === ENGINE_VERSION) {
-        throw new Error(`코퍼스는 이미 ENGINE_VERSION ${ENGINE_VERSION} 기준 — 리팩토링 중 재생성은 안전망을 지운다. 동작을 바꿨다면 ENGINE_VERSION부터 올린다(강제: DEFENSE_CORPUS_FORCE=1)`);
+        throw new Error(
+          `코퍼스는 이미 ENGINE_VERSION ${ENGINE_VERSION} 기준 — 리팩토링 중 재생성은 안전망을 지운다. 코퍼스를 다시 쓰려고 ENGINE_VERSION을 올리지 말 것(서버·저장본 호환 버전). 형식만 바꿨다면 DEFENSE_CORPUS_FORCE=1, 커밋에 이유`,
+        );
       }
     }
     const ids = Array.from({ length: CORPUS_SIZE }, (_, id) => id);

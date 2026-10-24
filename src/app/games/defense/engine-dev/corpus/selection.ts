@@ -20,7 +20,8 @@ export function defaultSampleIds(size = CORPUS_SIZE): number[] {
 
 /**
  * 이식용(portable.json — 백엔드 사본도 쓴다) 대표 표본 — 구성별 고르게
- * (모드·봇)마다 3판 · 캠페인 보드(8스테이지 × 난이도 3)마다 1판 · 주간 서로 다른 주차 키 6개 · idle(판 상한) 2판
+ * (모드·봇)마다 3판 · 캠페인 보드(8스테이지 × 난이도 3 + 시험 스테이지 3)마다 1판 · 주간 서로 다른 주차 키 6개 · idle(판 상한) 최소 2판
+ * (주간 판 내용은 seed로 정해져 주차 키는 라벨일 뿐 — 주간 다양성은 seed가 만든다)
  * 크기는 백엔드 단위 테스트 30초 안(입력 로그 재생 2회 — simulateReplay·중간 해시)
  */
 export function portableIds(size = CORPUS_SIZE): number[] {

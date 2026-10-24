@@ -19,7 +19,8 @@ export type PortableExpected = {
 export type PortableCase = { id: string; input: ReplayInput; expected: PortableExpected };
 
 /**
- * 입력 로그를 다시 돌리며 CHECKPOINT_TICKS마다 해시 — 로그가 깨졌으면 null(simulateReplay가 실패 이유를 준다)
+ * 입력 로그를 다시 돌리며 CHECKPOINT_TICKS마다 해시 — **simulateReplay가 ok인 로그 전제**(computeExpected가 먼저 확인한다)
+ * 인자 범위·헤더·끝 조건 검증은 simulateReplay 몫이다. 단독으로 부를 때는 simulateReplay(input).ok부터 확인한다
  * 끝난 상태의 해시·틱도 돌려준다 — simulateReplay 결과와 같아야 이 루프가 엔진 루프의 거울임이 확인된다(computeExpected)
  */
 export function replayCheckpoints(input: ReplayInput, every = CHECKPOINT_TICKS): { checkpoints: string[]; finalHash: string; endTick: number } | null {
@@ -48,7 +49,7 @@ export function replayCheckpoints(input: ReplayInput, every = CHECKPOINT_TICKS):
     const delta = inputs[i];
     const op = inputs[i + 1];
     const count = OP_ARG_COUNTS[op];
-    // 형식이 깨진 로그(음수·소수 delta, 모르는 명령, 잘린 끝) — 단독으로 불려도 엔진과 다른 판을 만들지 않게
+    // 최소 형식 방어(음수·소수 delta, 모르는 명령, 잘린 끝) — 루프가 엉뚱하게 돌지 않게. 전체 검증은 simulateReplay
     if (!Number.isInteger(delta) || delta < 0 || count === undefined || i + 2 + count > inputs.length) return null;
     commandTick += delta;
     advanceTo(Math.min(commandTick, ticks));
