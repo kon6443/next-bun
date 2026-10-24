@@ -177,4 +177,16 @@ describe('대전 경기 페이지 (DESIGN §18)', () => {
     expect(getBattleReplay).toHaveBeenCalledTimes(2);
     expect(getBattleMatch).toHaveBeenCalledTimes(1);
   });
+
+  it('하이라이트 — 기록이 없는 판도 서버 요약의 KO를 찍고(이름 포함), 막대는 시간으로 읽힌다 (games-polish P4·FE-26)', async () => {
+    getBattleMatch.mockResolvedValue({ data: match });
+    getBattleReplay.mockResolvedValue({ data: replay });
+    render(<BattleMatchViewer matchId={MATCH_ID} />);
+    const slider = await screen.findByTestId('battle-replay-seek');
+    expect(slider.getAttribute('aria-valuetext')).toMatch(/^\d+:\d{2} \/ \d+:\d{2}$/);
+    // p2는 기록 없음(MISSING)·끊김 KO — 서버 frames에 KO 점
+    const next = await screen.findByRole('button', { name: /^다음 하이라이트 — KO 비 / });
+    expect(next).toBeTruthy();
+    expect(screen.getByRole('list', { name: '하이라이트 종류' }).textContent).toContain('KO');
+  });
 });

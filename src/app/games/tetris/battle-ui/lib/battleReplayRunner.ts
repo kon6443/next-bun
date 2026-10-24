@@ -7,6 +7,8 @@ import {
   receiveGarbage,
   stepBattle,
 } from '../../battle-engine';
+import { type Highlight, thinHighlights } from '@/app/games/_shared/lib/highlights';
+import { FRAMES_PER_SECOND } from '../../engine';
 import { cloneGameState } from '../../lib/gameSnapshot';
 import type { GarbageGauge } from '../../lib/renderer';
 import { type ReplayTimeline, buildTimeline, collectActions } from '../../lib/replayTimeline';
@@ -118,12 +120,14 @@ export function seekRunner(
   interval: number,
   buffer: number[],
 ): void {
-  if (target < runner.bs.game.frame) {
+  // 뒤로, 또는 스냅샷 한 칸보다 멀리 앞으로 — 사전 패스로 전 구간 스냅샷이 있으면 최대 interval만 다시 돈다 (games-polish FE-13)
+  if (target < runner.bs.game.frame || target - runner.bs.game.frame > interval) {
     let base: BattleReplaySnapshot | null = null;
     for (const [frame, snapshot] of snapshots) {
       if (frame <= target && (!base || frame > base.bs.game.frame)) base = snapshot;
     }
-    restoreRunner(runner, base);
+    // 앞으로 갈 때 지금보다 앞선 스냅샷이 없으면 지금 자리에서 그대로 간다(되감지 않는다)
+    if (target < runner.bs.game.frame || (base && base.bs.game.frame > runner.bs.game.frame)) restoreRunner(runner, base);
   }
   while (runner.bs.game.frame < target && advanceRunner(runner, buffer)) {
     const frame = runner.bs.game.frame;
@@ -141,4 +145,47 @@ export function garbageGaugeOf(bs: BattleState): GarbageGauge {
 /** 가장 최근에 받은 가비지 — 판 위 "+N" 표시용 */
 export function lastReceivedGarbage(bs: BattleState): GarbageEvent | null {
   return bs.received.length > 0 ? bs.received[bs.received.length - 1] : null;
+}
+
+/**
+ * 대전 하이라이트 (games-polish P4) — 큰 공격(공격 줄 ≥ ATTACK_HIGHLIGHT_MIN — 4줄·T-스핀 더블 이상, 상쇄 전 공격)과 KO(판이 쌓여 끝난 순간)
+ * 싱글·더블·트리플 공격(0~2줄)은 흔해 점이 레일을 뒤덮는다. 같은 판의 큰 공격이 1초 안에 몰리면 첫 것만
+ */
+export type BattleHighlightKind = 'attack' | 'ko';
+export const ATTACK_HIGHLIGHT_MIN = 4;
+const ATTACK_THIN_FRAMES = FRAMES_PER_SECOND;
+/** 1분 분량마다 쉰다 — 판 4개를 받는 동안 화면이 멈추지 않게 */
+const PREPARE_CHUNK_FRAMES = 60 * FRAMES_PER_SECOND;
+
+const pause = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+/**
+ * 판 하나 사전 패스 — 따로 끝까지 돌려 interval마다 스냅샷을 snapshots에 채우고(어느 탐색이든 최대 interval만 다시 돈다, FE-13) 하이라이트를 모은다
+ * 화면을 떠나면(isCancelled) 멈추고 null
+ */
+export async function prepareBattleTrack(
+  replay: BattleReplayInput,
+  snapshots: Map<number, BattleReplaySnapshot>,
+  interval: number,
+  isCancelled?: () => boolean,
+): Promise<Highlight<BattleHighlightKind>[] | null> {
+  const runner = createReplayRunner(replay);
+  const buffer: number[] = [];
+  snapshots.set(0, takeSnapshot(runner));
+  while (!isRunnerDone(runner)) {
+    const chunkEnd = runner.bs.game.frame + PREPARE_CHUNK_FRAMES;
+    while (runner.bs.game.frame < chunkEnd && advanceRunner(runner, buffer)) {
+      const frame = runner.bs.game.frame;
+      if (frame % interval === 0 && !snapshots.has(frame)) snapshots.set(frame, takeSnapshot(runner));
+    }
+    if (isRunnerDone(runner)) break;
+    await pause();
+    if (isCancelled?.()) return null;
+  }
+  const marks: Highlight<BattleHighlightKind>[] = runner.bs.sentLog
+    .filter((lock) => lock.attack >= ATTACK_HIGHLIGHT_MIN)
+    .map((lock) => ({ at: lock.frame, kind: 'attack' as const, detail: `${lock.attack}줄 공격` }));
+  const thinned = thinHighlights(marks, ATTACK_THIN_FRAMES);
+  if (runner.bs.game.over) thinned.push({ at: runner.bs.game.endFrame, kind: 'ko' });
+  return thinned;
 }

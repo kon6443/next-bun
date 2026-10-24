@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { Highlight } from "@/app/games/_shared/lib/highlights";
 import { ApiError } from "@/types/api";
 import { type BattleMatch, type BattleMatchPlayer, isBattleMatchId } from "@/services/tetrisBattleService";
 import { BATTLE_ENGINE_VERSION } from "../../battle-engine";
@@ -8,10 +9,12 @@ import type { GameState } from "../../engine";
 import { FRAMES_PER_SECOND } from "../../engine";
 import type { GarbageGauge } from "../../lib/renderer";
 import {
+  type BattleHighlightKind,
   type BattleReplayRunner,
   type BattleReplaySnapshot,
   createReplayRunner,
   garbageGaugeOf,
+  prepareBattleTrack,
   seekRunner,
 } from "../lib/battleReplayRunner";
 import { loadBattleMatch, loadBattleReplay } from "../lib/battleMatchLoader";
@@ -40,6 +43,8 @@ export type ReplayTrack = {
   stateRef: { current: GameState | null };
   drawRef: { current: (() => void) | null };
   garbageRef: { current: GarbageGauge | null };
+  /** 이 판의 하이라이트(사전 패스) — 받기 전·기록 없음이면 빈 배열 */
+  highlights: Highlight<BattleHighlightKind>[];
 };
 
 function createTrack(player: BattleMatchPlayer): ReplayTrack {
@@ -52,6 +57,7 @@ function createTrack(player: BattleMatchPlayer): ReplayTrack {
     stateRef: { current: null },
     drawRef: { current: null },
     garbageRef: { current: null },
+    highlights: [],
   };
 }
 
@@ -75,6 +81,10 @@ async function fetchTrack(matchId: string, track: ReplayTrack, frame: () => numb
     if (replay.battleEngineVersion !== BATTLE_ENGINE_VERSION) {
       track.status = "unsupported";
     } else {
+      // 사전 패스 — 전 구간 스냅샷(탐색은 최대 10초만 다시 돈다, FE-13)·하이라이트. 1분 분량마다 쉰다
+      const marks = await prepareBattleTrack(replay, track.snapshots, SNAPSHOT_INTERVAL, () => !isLive());
+      if (!marks || !isLive()) return false;
+      track.highlights = marks;
       track.runner = createReplayRunner(replay);
       track.status = "ready";
       seekTrack(track, frame());
@@ -156,6 +166,18 @@ export function useBattleMatchReplay(matchId: string) {
     }
   }, []);
 
+  /**
+   * 경기 하이라이트 — 판마다의 큰 공격·KO를 한 축에(설명 앞에 이름). 기록이 없는 판(미제출·검증 실패)도 서버 요약의 KO는 찍는다
+   * 판은 최대 4개·점은 수십 개라 렌더마다 계산한다(트랙 객체 안의 변경은 trackVersion이 다시 렌더한다)
+   */
+  const highlights = tracks
+    .flatMap((t): Highlight<BattleHighlightKind>[] => {
+      const name = t.player.name;
+      if (t.status === "ready") return t.highlights.map((h) => ({ ...h, detail: [name, h.detail].filter(Boolean).join(" · ") }));
+      return t.player.koReason !== null && t.player.frames > 0 ? [{ at: t.player.frames, kind: "ko", detail: name }] : [];
+    })
+    .sort((a, b) => a.at - b.at);
+
   /** 리플레이를 다 받았거나(실패 포함) 받을 게 없다 — 재생은 이때 시작한다(빈 판 위로 시간만 흐르지 않게) */
   const settled = tracks.every((t) => t.status !== "loading");
 
@@ -174,5 +196,5 @@ export function useBattleMatchReplay(matchId: string) {
     [matchId],
   );
 
-  return { load, tracks, totalFrames, settled, frameRef, seekAll, retry, retryTrack };
+  return { load, tracks, totalFrames, settled, frameRef, seekAll, retry, retryTrack, highlights };
 }
