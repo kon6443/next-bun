@@ -157,4 +157,10 @@ describe('DefensePlay (플레이 화면 조작)', () => {
     expect(playing).toBeGreaterThan(0); // 진행 중에는 매 프레임
     vi.useRealTimers();
   });
+
+  it('보드를 해석할 수 없으면 빈 화면이 아니라 안내와 돌아갈 링크 (FE-45)', () => {
+    render(<DefensePlay boardKey="zz" seed={1} fixedSeed />);
+    expect(screen.getByText('스테이지를 찾지 못했어요.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: '디펜스 처음으로' }).getAttribute('href')).toBe('/games/defense');
+  });
 });

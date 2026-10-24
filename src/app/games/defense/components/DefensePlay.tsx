@@ -104,9 +104,19 @@ export default function DefensePlay({ boardKey, seed, fixedSeed }: Props) {
     }
   }, [parsed, boardKey, introFor]);
 
-  if (!parsed || !stage || !campaign) return null;
+  // 빈 화면 대신 — 잘못된 보드(페이지가 보통 404로 거른다)는 안내, 해금 확인 중은 불러오는 중 (games-polish FE-45)
+  if (!parsed || !stage || !campaign) {
+    return (
+      <main className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+        <p className="text-slate-200">스테이지를 찾지 못했어요.</p>
+        <Link href="/games/defense" className="flex min-h-11 items-center rounded-full border border-white/20 px-5 text-sm font-semibold">
+          디펜스 처음으로
+        </Link>
+      </main>
+    );
+  }
   const exitHref = stagePath(parsed.stage.id);
-  if (access === "checking") return null;
+  if (access === "checking") return <main className="h-full" aria-busy="true" aria-label="불러오는 중" />;
   if (access === "locked") {
     return (
       <main className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
@@ -152,7 +162,7 @@ export default function DefensePlay({ boardKey, seed, fixedSeed }: Props) {
       </main>
     );
   }
-  if (!opening) return null;
+  if (!opening) return <main className="h-full" aria-busy="true" aria-label="불러오는 중" />;
   return (
     <PlaySession
       key={attempt.n}

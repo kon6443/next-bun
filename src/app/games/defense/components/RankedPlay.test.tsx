@@ -244,7 +244,10 @@ describe('RankedPlay — 무한·주간 입구', () => {
     let resolveSession: (value: unknown) => void = () => {};
     createGameSession.mockReturnValue(new Promise((resolve) => (resolveSession = resolve)));
     fireEvent.click(screen.getByRole('button', { name: '다시 하기' }));
-    fireEvent.click(screen.getByRole('button', { name: '다시 하기' }));
+    // 받는 동안은 "준비 중…"으로 잠긴다 — 눌렀는지 모르고 연타하지 않게 (games-polish FE-45)
+    const preparing = screen.getByRole('button', { name: '준비 중…' });
+    expect(preparing).toBeDisabled();
+    fireEvent.click(preparing);
     expect(createGameSession).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('defense-ranked-result')).toBeTruthy();
     await act(async () => {

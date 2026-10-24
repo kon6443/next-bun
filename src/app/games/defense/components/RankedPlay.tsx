@@ -184,6 +184,7 @@ export default function RankedPlay({ mode, fixedSeed }: Props) {
               sessionError={over.sessionError}
               accessToken={accessToken}
               defaultName={candidate ? normalizePlayerName(candidate) : ""}
+              requesting={requesting}
               onRetry={() => {
                 clearResume();
                 setOtherSlot(false);

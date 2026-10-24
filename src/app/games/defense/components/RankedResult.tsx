@@ -29,6 +29,8 @@ type Props = {
   accessToken?: string;
   defaultName: string;
   onRetry: () => void;
+  /** 다음 판 세션을 받는 중 — 다시 하기 버튼에 표시 */
+  requesting?: boolean;
 };
 
 /** 주간 보드는 보드 자체가 1주 — 순위는 보드 전체 하나(daily·weekly·all이 같은 값) */
@@ -39,7 +41,7 @@ function formatTicks(ticks: number): string {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 }
 
-export function RankedResult({ title, result, score, wave, kills, boardKey, weekly, isNewBest, sessionId, sessionError, accessToken, defaultName, onRetry }: Props) {
+export function RankedResult({ title, result, score, wave, kills, boardKey, weekly, isNewBest, sessionId, sessionError, accessToken, defaultName, onRetry, requesting = false }: Props) {
   // aria-modal에 맞게 Tab을 안에 가둔다 — 닫을 수 없는 결과라 Esc는 무시. 첫 포커스는 등록 패널 제목 그대로 (games-polish FE-42)
   const dialogRef = useDialog(true, () => {}, { closeOnEscape: false });
   let worstEnemy = -1;
@@ -94,6 +96,7 @@ export function RankedResult({ title, result, score, wave, kills, boardKey, week
           accessToken={accessToken}
           defaultName={defaultName}
           onRestart={onRetry}
+          restarting={requesting}
         />
       </div>
     </div>
