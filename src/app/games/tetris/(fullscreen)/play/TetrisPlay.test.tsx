@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import type { GameSession } from '@/types/game';
 import { ENGINE_VERSION } from '../../engine';
 
@@ -59,4 +59,27 @@ describe('TetrisPlay 시작 (games-polish FE-12)', () => {
     expect(createGameSession).toHaveBeenCalledTimes(2);
     expect(screen.queryByText('준비됐나요?')).toBeNull();
   });
+
+  it('일시정지의 "처음부터"는 확인을 받는다 — 계속하기면 판이 그대로 (games-polish FE-27)', async () => {
+    createGameSession.mockResolvedValue({ data: session(new Date(Date.now() + 2 * HOUR).toISOString()) });
+    render(<TetrisPlay />);
+    await act(async () => {});
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '시작' }));
+    });
+    fireEvent.click(screen.getByRole('button', { name: '일시정지' }));
+    fireEvent.click(screen.getByRole('button', { name: '처음부터' }));
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.textContent).toContain('처음부터 다시 할까요?');
+    fireEvent.click(within(dialog).getByRole('button', { name: '계속하기' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(createGameSession).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: '처음부터' }));
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '처음부터' }));
+    });
+    expect(createGameSession).toHaveBeenCalledTimes(2);
+    expect(screen.getByText('준비됐나요?')).toBeTruthy();
+  });
 });
+

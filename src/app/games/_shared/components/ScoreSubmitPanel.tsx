@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { ConfirmModal } from "@/app/components/ConfirmModal";
 import { Button, ButtonLink } from "@/app/teams/components";
 import { getGameRankings, submitGameScore } from "@/services/gameService";
 import type { GameType, RankingPeriod, ReplayPayloadByGame, ScoreDetailByGame, SubmitScoreResponse } from "@/types/game";
@@ -88,6 +89,11 @@ export function ScoreSubmitPanel<G extends GameType>({
   const nameInputId = `${gameType}-player-name`;
   const [name, setName] = useState(defaultName);
   const [nameError, setNameError] = useState<string | null>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  // 이름 오류면 입력칸으로 돌아간다 — 제출 중 잠겼던 칸에서 포커스를 잃은 키보드 사용자가 다시 찾지 않게 (games-polish FE-30)
+  useEffect(() => {
+    if (nameError) nameInputRef.current?.focus();
+  }, [nameError]);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [canRetry, setCanRetry] = useState(false);
   const [isFinalError, setIsFinalError] = useState(false);
@@ -114,6 +120,14 @@ export function ScoreSubmitPanel<G extends GameType>({
     const playerName = validatePlayerName(defaultName) === null ? normalizePlayerName(defaultName) : "";
     storage.savePendingSubmission({ sessionId, playerName, replay, score, savedAt: Date.now() });
   }, [sessionId, defaultName, replay, score, storage]);
+
+  /** 다시 하면 이 판 기록이 사라지는 경우 — 등록 가능한 판을 아직 등록하지 않았고, 다시 등록할 보관도 없다 (games-polish FE-27) */
+  const [confirmRestart, setConfirmRestart] = useState(false);
+  const wouldLoseRecord = !!sessionId && !registered && !isFinalError && !canRetry;
+  const restart = () => {
+    discardPresaved();
+    onRestart();
+  };
 
   /** 등록하지 않고 직접 떠난다 — 선보관을 지운다. 제출이 일시 실패해 보관한 기록(다시 등록하기)은 남긴다 */
   const discardPresaved = () => {
@@ -161,7 +175,8 @@ export function ScoreSubmitPanel<G extends GameType>({
       const { data } = await submitGameScore(gameType, { sessionId, playerName, replay }, accessToken);
       setRegistered(data);
       storage.addMyScoreId(data.scoreId);
-      storage.saveLastName(playerName);
+      // 서버가 저장한 이름(정리값)을 다음 기본값으로 — 공유 카드·랭킹 이름과 같게 (games-polish P5, 없으면 보낸 이름)
+      storage.saveLastName(data.playerName ?? playerName);
       storage.removePendingSubmission(sessionId);
     } catch (err) {
       const { kind, message: text, reload } = classifySubmitError(err, canRetry);
@@ -218,7 +233,7 @@ export function ScoreSubmitPanel<G extends GameType>({
             랭킹 보기
           </ButtonLink>
           {/* 등록한 이름 — 등록 뒤에는 입력이 사라지므로 마지막 입력값을 정리한 것 */}
-          {registeredActions?.(registered, normalizePlayerName(name))}
+          {registeredActions?.(registered, registered.playerName ?? normalizePlayerName(name))}
         </div>
       ) : sessionId && !isFinalError ? (
         <form onSubmit={handleSubmit} className="mt-5 text-left" noValidate>
@@ -226,6 +241,7 @@ export function ScoreSubmitPanel<G extends GameType>({
             랭킹에 올릴 이름
           </label>
           <input
+            ref={nameInputRef}
             id={nameInputId}
             value={name}
             onChange={(e) => {
@@ -235,13 +251,19 @@ export function ScoreSubmitPanel<G extends GameType>({
             maxLength={PLAYER_NAME_MAX_LENGTH * 2}
             autoComplete="nickname"
             aria-invalid={nameError ? true : undefined}
-            aria-describedby={`${nameInputId}-help`}
+            aria-describedby={nameError ? `${nameInputId}-error ${nameInputId}-help` : `${nameInputId}-help`}
             disabled={isSubmitting}
             className="min-h-11 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 text-base text-white placeholder-slate-500 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
             placeholder="이름 (1~12자)"
           />
-          <p id={`${nameInputId}-help`} className={`mt-1 text-xs ${nameError ? "text-red-400" : "text-slate-500"}`}>
-            {nameError ?? `${playerNameLength(normalizePlayerName(name))}/${PLAYER_NAME_MAX_LENGTH} · 한글·영문·숫자·공백·_·-`}
+          {/* 오류는 따로 알림 — 설명(aria-describedby)만으로는 스크린리더가 읽지 않는다 (FE-30) */}
+          {nameError && (
+            <p id={`${nameInputId}-error`} role="alert" className="mt-1 text-xs text-red-400">
+              {nameError}
+            </p>
+          )}
+          <p id={`${nameInputId}-help`} className="mt-1 text-xs text-slate-500">
+            {`${playerNameLength(normalizePlayerName(name))}/${PLAYER_NAME_MAX_LENGTH} · 한글·영문·숫자·공백·_·-`}
           </p>
           {submitError && (
             <p role="alert" className="mt-2 rounded-xl border border-red-500/20 bg-red-500/10 p-2.5 text-sm text-red-300">
@@ -270,10 +292,7 @@ export function ScoreSubmitPanel<G extends GameType>({
           className="min-h-11 flex-1"
           disabled={restarting}
           aria-busy={restarting}
-          onClick={() => {
-            discardPresaved();
-            onRestart();
-          }}
+          onClick={() => (wouldLoseRecord ? setConfirmRestart(true) : restart())}
         >
           {restarting ? "준비 중…" : "다시 하기"}
         </Button>
@@ -285,6 +304,19 @@ export function ScoreSubmitPanel<G extends GameType>({
           나가기
         </Link>
       </div>
+      <ConfirmModal
+        isOpen={confirmRestart}
+        onClose={() => setConfirmRestart(false)}
+        onConfirm={() => {
+          setConfirmRestart(false);
+          restart();
+        }}
+        title="등록하지 않고 다시 할까요?"
+        message="이번 판 기록은 랭킹에 올라가지 않고 사라져요."
+        confirmLabel="다시 하기"
+        cancelLabel="등록하러 가기"
+        variant="danger"
+      />
     </div>
   );
 }

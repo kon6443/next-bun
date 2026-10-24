@@ -24,4 +24,18 @@ describe('TouchControls (FE-10)', () => {
     expect(within(rotate).queryByRole('button', { name: '하드 드롭' })).toBeNull();
     expect(within(screen.getByRole('group', { name: '드롭·홀드' })).getByRole('button', { name: '하드 드롭' })).toBeInTheDocument();
   });
+
+  it('이동·소프트 드롭도 키보드·보조기기 누름(detail 0)이면 누르고 바로 떼 한 칸 — 터치의 뒤따르는 click은 무시 (games-polish FE-29)', () => {
+    const onHoldStart = vi.fn();
+    const onHoldEnd = vi.fn();
+    render(<TouchControls onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} onInstant={vi.fn()} />);
+    const left = screen.getByRole('button', { name: '왼쪽 이동' });
+    fireEvent.click(left, { detail: 0 });
+    expect(onHoldStart).toHaveBeenCalledTimes(1);
+    expect(onHoldEnd).toHaveBeenCalledTimes(1);
+    expect(onHoldEnd.mock.invocationCallOrder[0]).toBeGreaterThan(onHoldStart.mock.invocationCallOrder[0]);
+    fireEvent.click(left, { detail: 1 });
+    expect(onHoldStart).toHaveBeenCalledTimes(1);
+  });
 });
+

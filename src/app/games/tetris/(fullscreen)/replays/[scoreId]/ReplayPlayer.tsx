@@ -63,7 +63,7 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
   /** 공유 메뉴가 열려 있으면 재생기 키(Space·←→)를 쉰다 */
   const shareOpenRef = useRef(false);
   shareOpenRef.current = shareOpen;
-  const { kakaoReady, kakaoScript } = useKakaoReady();
+  const { kakao, kakaoScript } = useKakaoReady();
 
   const stateRef = useRef<GameState | null>(null);
   const drawRef = useRef<(() => void) | null>(null);
@@ -326,7 +326,7 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
       {shareOpen && (
         <ShareMenu
           content={buildShareContent(TETRIS_SHARE, loaded)}
-          kakaoReady={kakaoReady}
+          kakao={kakao}
           onClose={() => setShareOpen(false)}
         />
       )}

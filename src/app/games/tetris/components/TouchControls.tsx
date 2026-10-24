@@ -89,6 +89,12 @@ export function TouchControls({ onHoldStart, onHoldEnd, onInstant }: TouchContro
             onPointerUp={() => onHoldEnd(b.press)}
             onPointerCancel={() => onHoldEnd(b.press)}
             onLostPointerCapture={() => onHoldEnd(b.press)}
+            // 키보드·스위치·스크린리더 누름은 포인터 없이 click만 온다(detail 0) — 누르고 바로 떼 한 칸만 (games-polish FE-29)
+            onClick={(e) => {
+              if (e.detail !== 0) return;
+              onHoldStart(b.press, b.release);
+              onHoldEnd(b.press);
+            }}
           >
             {b.label}
           </button>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { TeamsPageLayout, ButtonLink, Button, SectionLabel, EmptyState, LoadingSpinnerSimple } from "@/app/teams/components";
 import { cardStyles } from "@/styles/teams";
+import { ConfirmModal } from "@/app/components/ConfirmModal";
 import { getGameRankings, submitGameScore } from "@/services/gameService";
 import type { RankingItem } from "@/types/game";
 import { extractErrorMessage } from "@/app/utils/errorUtils";
@@ -49,6 +50,8 @@ export default function TetrisHome() {
   const pending = pendingList[0] ?? null;
   // 게임 오버 순간 이름 없이 보관한 기록(기본 이름이 없었다)이면 이름부터 묻는다 (games-polish FE-05)
   const askName = needsNewName || pending?.playerName === "";
+  /** 보관 기록 버리기 확인 — 게임 오버 순간 선보관(FE-05)이라 등록할 마음이 없는 기록도 남는다 (games-polish P5) */
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
 
@@ -73,12 +76,11 @@ export default function TetrisHome() {
       .catch((err) => setPreviewError(extractErrorMessage(err, "랭킹을 불러오지 못했습니다.")));
   }, []);
 
+  // 저장은 핸들러에서 한 번 — 상태 업데이터는 순수해야 한다(StrictMode가 두 번 부른다, games-polish FE-52)
   const updateSettings = (patch: Partial<TetrisSettings>) => {
-    setSettings((prev) => {
-      const next = { ...prev, ...patch };
-      saveSettings(next);
-      return next;
-    });
+    const next = { ...settings, ...patch };
+    setSettings(next);
+    saveSettings(next);
   };
 
   const retryPending = async () => {
@@ -101,7 +103,7 @@ export default function TetrisHome() {
         accessToken,
       );
       addMyScoreId(data.scoreId);
-      saveLastName(playerName);
+      saveLastName(data.playerName ?? playerName);
       dropPending(pending.sessionId);
       setMyScoreIds(new Set(loadMyScoreIds()));
       setPendingMessage(data.ranks ? `등록했어요! 전체 ${data.ranks.all}위` : "등록했어요! 순위는 랭킹에서 확인해 주세요.");
@@ -157,7 +159,7 @@ export default function TetrisHome() {
               {askName && (
                 <div className="mt-3">
                   <label htmlFor="tetris-pending-name" className="mb-1 block text-xs text-slate-400">
-                    다른 이름으로 등록 (1~12자)
+                    {pending.playerName === "" ? "등록할 이름 (1~12자)" : "다른 이름으로 등록 (1~12자)"}
                   </label>
                   <input
                     id="tetris-pending-name"
@@ -178,6 +180,30 @@ export default function TetrisHome() {
               >
                 {isRetrying ? "등록 중..." : "다시 등록하기"}
               </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="ml-2 mt-3 min-h-11"
+                onClick={() => setConfirmDiscard(true)}
+                disabled={isRetrying}
+              >
+                버리기
+              </Button>
+              <ConfirmModal
+                isOpen={confirmDiscard}
+                onClose={() => setConfirmDiscard(false)}
+                onConfirm={() => {
+                  setConfirmDiscard(false);
+                  dropPending(pending.sessionId);
+                  setPendingMessage(null);
+                }}
+                title="이 기록을 버릴까요?"
+                message="버리면 랭킹에 다시 등록할 수 없어요."
+                confirmLabel="버리기"
+                cancelLabel="취소"
+                variant="danger"
+              />
             </>
           )}
           {pendingMessage && <p className="mt-2 text-sm text-slate-300">{pendingMessage}</p>}

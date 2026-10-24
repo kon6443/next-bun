@@ -10,7 +10,7 @@ const loadReplay = vi.fn();
 vi.mock('@/app/games/_shared/lib/replayLoader', () => ({ loadReplay: (...a: unknown[]) => loadReplay(...a) }));
 // 판은 그리지 않는다 — 재생 컨트롤만 본다
 vi.mock('../../../components/TetrisCanvas', () => ({ TetrisCanvas: () => null }));
-vi.mock('@/app/games/_shared/hooks/useKakaoReady', () => ({ useKakaoReady: () => ({ kakaoReady: false, kakaoScript: null }) }));
+vi.mock('@/app/games/_shared/hooks/useKakaoReady', () => ({ useKakaoReady: () => ({ kakao: 'off', kakaoScript: null }) }));
 
 import ReplayPlayer from './ReplayPlayer';
 

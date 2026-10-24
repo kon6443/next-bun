@@ -3,7 +3,7 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { TeamsPageLayout, ButtonLink, Button, SectionLabel, EmptyState, TeamListSkeleton } from "@/app/teams/components";
 import { cardStyles } from "@/styles/teams";
-import { getGameRankings } from "@/services/gameService";
+import { getGameRankings, getGameScore } from "@/services/gameService";
 import type { GameType, RankingList, RankingPeriod, ScoreDetailByGame } from "@/types/game";
 import { extractErrorMessage } from "@/app/utils/errorUtils";
 import { formatFullDateTime } from "@/app/utils/taskUtils";
@@ -61,6 +61,26 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
       if (requestId === requestIdRef.current) setError(extractErrorMessage(err, "랭킹을 불러오지 못했습니다."));
     }
   }, [game.gameType, board]);
+
+  /**
+   * 링크로 가리킨 기록이 이 목록(상위 50)에 없으면 그 기록의 전체 기간 순위를 한 번 받아 알린다 — 강조할 행이 없어 아무 표시가 없던 것 (games-polish FE-14)
+   * null = 아직 모름(목록에 있거나 받는 중), "unknown" = 받지 못함
+   */
+  const [outside, setOutside] = useState<{ rank: number } | "unknown" | null>(null);
+  const missing = highlightId !== null && list !== null && !list.items.some((item) => item.scoreId === highlightId);
+  useEffect(() => {
+    if (!missing || highlightId === null) {
+      setOutside(null);
+      return;
+    }
+    let cancelled = false;
+    getGameScore(game.gameType, highlightId)
+      .then(({ data }) => !cancelled && setOutside({ rank: data.rank }))
+      .catch(() => !cancelled && setOutside("unknown"));
+    return () => {
+      cancelled = true;
+    };
+  }, [missing, highlightId, game.gameType]);
 
   useEffect(() => {
     if (waiting) return;
@@ -122,7 +142,16 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
             }
           />
         ) : (
-          <RankingTable game={game} items={list.items} myScoreIds={myScoreIds} highlightId={highlightId} replayUnavailable={replayUnavailable} />
+          <>
+            {missing && (
+              <p role="status" className="mb-3 rounded-xl border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-sm text-amber-100" data-testid="ranking-outside">
+                {outside && outside !== "unknown"
+                  ? `가리킨 기록은 이 목록(상위 ${LIMIT}위)에 없어요 · 전체 기간 ${outside.rank}위`
+                  : `가리킨 기록은 이 목록(상위 ${LIMIT}위)에 없어요.`}
+              </p>
+            )}
+            <RankingTable game={game} items={list.items} myScoreIds={myScoreIds} highlightId={highlightId} replayUnavailable={replayUnavailable} />
+          </>
         )}
       </section>
     </TeamsPageLayout>

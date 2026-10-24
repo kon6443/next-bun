@@ -286,6 +286,8 @@ export function createSoundPlayer(options: SoundPlayerOptions = {}): SoundPlayer
       const recipe = recipeFor(cue);
       const last = lastPlayedAt.get(cue.kind);
       if (last !== undefined && ms - last < recipe.throttleMs) continue;
+      // 자리가 없으면 그만 — 울리지 않은 소리로 쓰로틀 시각을 남기면 다음 같은 소리가 막힌다 (games-polish FE-18)
+      if (sfxVoiceEnds.length >= MAX_SFX_VOICES) return;
       lastPlayedAt.set(cue.kind, ms);
       for (const voice of recipe.voices) {
         if (sfxVoiceEnds.length >= MAX_SFX_VOICES) return; // 남은 신호는 덜 중요한 것들

@@ -116,10 +116,24 @@ export function TetrisCanvas({ stateRef, drawRef, effectsRef, garbageRef, classN
     resize();
     const observer = new ResizeObserver(resize);
     observer.observe(container);
+    // 모니터를 옮기거나 확대 비율이 바뀌어 DPR만 바뀌면 크기 변화가 없다 — 현재 DPR 해상도 질의가 풀리면 다시 맞추고 새 DPR로 다시 건다
+    // (디펜스 useDefenseCanvas와 같은 방식, games-polish FE-19)
+    let media: MediaQueryList | null = null;
+    const watchDpr = () => {
+      media?.removeEventListener("change", onDpr);
+      media = typeof window.matchMedia === "function" ? window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`) : null;
+      media?.addEventListener("change", onDpr);
+    };
+    const onDpr = () => {
+      resize();
+      watchDpr();
+    };
+    watchDpr();
     drawRef.current = draw;
 
     return () => {
       observer.disconnect();
+      media?.removeEventListener("change", onDpr);
       if (drawRef.current === draw) drawRef.current = null;
     };
   }, [stateRef, drawRef, effectsRef, garbageRef]);

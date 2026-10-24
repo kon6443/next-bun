@@ -79,14 +79,14 @@ describe('리플레이 링크 미리보기 (DESIGN §3)', () => {
     getGameScoreSummary.mockResolvedValue(summary);
     loadKoreanFont.mockResolvedValueOnce(null);
     const fallback = await GET(new Request('http://x'), params('12'));
-    expect(fallback.headers.get('cache-control')).toBe('public, max-age=60');
+    expect(fallback.headers.get('cache-control')).toBe('public, max-age=60, s-maxage=60');
     getGameScoreSummary.mockResolvedValue(null);
     const missing = await GET(new Request('http://x'), params('99'));
-    expect(missing.headers.get('cache-control')).toBe('public, max-age=60');
+    expect(missing.headers.get('cache-control')).toBe('public, max-age=60, s-maxage=60');
     // 한글 폰트를 받은 경우의 헤더만 확인 (빈 폰트라 렌더는 하지 않는다)
     getGameScoreSummary.mockResolvedValue(summary);
     loadKoreanFont.mockResolvedValueOnce(font);
     const ok = await GET(new Request('http://x'), params('12'));
-    expect(ok.headers.get('cache-control')).toBe('public, max-age=600');
+    expect(ok.headers.get('cache-control')).toBe('public, max-age=600, s-maxage=600, stale-while-revalidate=86400');
   }, 30000);
 });

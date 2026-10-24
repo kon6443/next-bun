@@ -57,7 +57,7 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
   shareOpenRef.current = shareOpen;
   const playbackRef = useRef(playback);
   playbackRef.current = playback;
-  const { kakaoReady, kakaoScript } = useKakaoReady();
+  const { kakao, kakaoScript } = useKakaoReady();
   // 판 하나 크게 보기 — 2판 이상일 때 (재생·컨트롤은 그대로 돈다)
   const focus = useBoardFocus(tracks.length > 1);
 
@@ -206,7 +206,7 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
 
       {/* 카카오 SDK — 키가 있을 때만, 공유 버튼이 있는 이 화면에서만 늦게 로드 */}
       {kakaoScript}
-      {shareOpen && <ShareMenu content={buildBattleShareContent(match)} kakaoReady={kakaoReady} onClose={() => setShareOpen(false)} />}
+      {shareOpen && <ShareMenu content={buildBattleShareContent(match)} kakao={kakao} onClose={() => setShareOpen(false)} />}
 
       <ResultTable match={match} />
       {match.disputed && (

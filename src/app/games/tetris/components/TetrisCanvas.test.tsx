@@ -44,3 +44,31 @@ describe('TetrisCanvas (FE-11)', () => {
     expect(drawGame.mock.calls.length).toBe(initial + 2);
   });
 });
+
+describe('TetrisCanvas DPR (games-polish FE-19)', () => {
+  it('크기는 그대로인데 DPR만 바뀌면(모니터 이동·확대) 백버퍼를 새 DPR로 다시 맞춘다', () => {
+    const listeners: (() => void)[] = [];
+    // jsdom에는 matchMedia가 없다 — 해상도 질의 리스너만 모은다
+    const matchMedia = vi.fn(
+      (query: string) =>
+        ({
+          matches: true,
+          media: query,
+          addEventListener: (_: string, fn: () => void) => listeners.push(fn),
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    );
+    vi.stubGlobal('matchMedia', matchMedia);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 100, height: 200, top: 0, left: 0, right: 100, bottom: 200, x: 0, y: 0, toJSON: () => ({}) });
+    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 1 });
+    const { container } = render(<TetrisCanvas stateRef={{ current: null }} drawRef={{ current: null }} />);
+    const canvas = container.querySelector('canvas')!;
+    expect(canvas.width).toBe(100);
+    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 2 });
+    listeners[listeners.length - 1]();
+    expect(canvas.width).toBe(200);
+    expect(matchMedia).toHaveBeenLastCalledWith('(resolution: 2dppx)');
+    vi.unstubAllGlobals();
+  });
+});
+

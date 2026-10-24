@@ -8,6 +8,7 @@ import { type ConnectionStatus, useBattleSocket } from "../contexts/BattleSocket
 import { battleErrorMessage } from "../lib/battleErrors";
 import { ChatPanel } from "./ChatPanel";
 import { ConnectionBadge } from "./ConnectionBadge";
+import { BATTLE_CONTROL_GUIDE } from "../../lib/controls";
 import { EmoteBar } from "./EmoteBar";
 import { EmoteBubble } from "./EmoteBubble";
 import { PresenceDot } from "./PresenceDot";
@@ -205,6 +206,18 @@ export function WaitingRoom({ room, connection, onReconnect, onExit, onCopyInvit
                 {error}
               </p>
             )}
+            {/* 키보드 조작 — 데스크톱 대전에서 볼 곳이 없었다. 터치 기기는 버튼이라 숨긴다 (games-polish FE-32) */}
+            <details className="mt-3 text-xs text-slate-400 [@media(pointer:coarse)]:hidden">
+              <summary className="flex min-h-11 cursor-pointer items-center">키보드 조작</summary>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5" aria-label="대전 키보드 조작">
+                {BATTLE_CONTROL_GUIDE.map(({ keys, label }) => (
+                  <div key={keys} className="contents">
+                    <dt className="font-mono font-semibold text-sky-300">{keys}</dt>
+                    <dd>{label}</dd>
+                  </div>
+                ))}
+              </dl>
+            </details>
           </section>
 
           <ChatPanel

@@ -17,12 +17,12 @@ describe('소리 UI', () => {
 
   it('SoundToggle — 기본은 꺼짐이고 누르면 sfx:true로 저장된다', () => {
     render(<SoundToggle />);
-    const button = screen.getByRole('button', { name: '소리 켜기' });
+    const button = screen.getByRole('button', { name: '소리', pressed: false });
     expect(button).toHaveAttribute('aria-pressed', 'false');
 
     fireEvent.click(button);
     expect(stored()).toMatchObject({ sfx: true });
-    const on = screen.getByRole('button', { name: '소리 끄기' });
+    const on = screen.getByRole('button', { name: '소리', pressed: true });
     expect(on).toHaveAttribute('aria-pressed', 'true');
 
     fireEvent.click(on);
@@ -33,9 +33,9 @@ describe('소리 UI', () => {
     window.localStorage.setItem(SOUND_SETTINGS_KEY, JSON.stringify({ sfx: false, music: true, volume: 0.6 }));
     __resetSoundSettingsForTests();
     render(<SoundToggle />);
-    fireEvent.click(screen.getByRole('button', { name: '소리 끄기' }));
+    fireEvent.click(screen.getByRole('button', { name: '소리', pressed: true }));
     expect(stored()).toMatchObject({ sfx: false, music: false });
-    expect(screen.getByRole('button', { name: '소리 켜기' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: '소리' })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('SoundSettingsPanel — 토글과 볼륨 슬라이더가 저장값을 바꾸고 다른 화면에도 바로 반영된다', () => {
@@ -53,7 +53,7 @@ describe('소리 UI', () => {
 
     fireEvent.click(sfx);
     expect(stored()).toMatchObject({ sfx: true, music: false });
-    expect(screen.getByRole('button', { name: '소리 끄기' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '소리' })).toHaveAttribute('aria-pressed', 'true');
 
     fireEvent.click(music);
     expect(stored()).toMatchObject({ music: true });

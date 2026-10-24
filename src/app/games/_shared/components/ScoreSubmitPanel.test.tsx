@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { ApiError } from '@/types/api';
 import { ScoreSubmitPanel, rankingsHref } from './ScoreSubmitPanel';
 import { TEST_GAME } from './testGame';
@@ -123,6 +123,12 @@ describe('ScoreSubmitPanel — 게임 사양·보드를 따른다', () => {
     const onRestart = vi.fn();
     const first = await act(async () => render(<ScoreSubmitPanel {...props} onRestart={onRestart} />));
     fireEvent.click(screen.getByRole('button', { name: '다시 하기' }));
+    // 등록하지 않은 기록이 사라지므로 먼저 묻는다 (FE-27) — 취소면 그대로
+    expect(onRestart).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '등록하러 가기' }));
+    expect(TEST_GAME.storage.loadPendingSubmissions()).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: '다시 하기' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '다시 하기' }));
     expect(onRestart).toHaveBeenCalledTimes(1);
     expect(TEST_GAME.storage.loadPendingSubmissions()).toEqual([]);
     first.unmount();
@@ -139,7 +145,9 @@ describe('ScoreSubmitPanel — 게임 사양·보드를 따른다', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
     });
+    // 일시 실패로 보관해 둔 기록은 사라지지 않으니 묻지 않고 바로
     fireEvent.click(screen.getByRole('button', { name: '다시 하기' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
     expect(TEST_GAME.storage.loadPendingSubmissions().map((p) => p.sessionId)).toEqual(['sess']);
   });
 
@@ -170,4 +178,30 @@ describe('ScoreSubmitPanel — 게임 사양·보드를 따른다', () => {
     setItem.mockRestore();
     expect(screen.getByRole('alert')).toHaveTextContent('이 기기에 보관하지 못해');
   });
+
+  it('이름 오류는 알림(role=alert)으로 읽히고 입력칸으로 포커스가 돌아온다 — 서버 거절(금칙어)도 같다 (games-polish FE-30)', async () => {
+    submitGameScore.mockRejectedValue(new ApiError('GAME_PLAYER_NAME_FORBIDDEN', '쓸 수 없는 이름이에요.', 422));
+    await act(async () => {
+      render(<ScoreSubmitPanel {...props} />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('쓸 수 없는 이름이에요.');
+    expect(document.activeElement).toBe(screen.getByLabelText('랭킹에 올릴 이름'));
+  });
+
+  it('등록 응답의 이름(서버 정리값)을 공유·최근 이름에 쓴다 — 응답에 없으면 보낸 이름 (games-polish P5)', async () => {
+    submitGameScore.mockResolvedValue({ data: { scoreId: 7, score: 1, detail: {}, ranks: null, playerName: '서버 이름' } });
+    const actions = vi.fn(() => null);
+    await act(async () => {
+      render(<ScoreSubmitPanel {...props} registeredActions={actions} />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    expect(actions).toHaveBeenLastCalledWith(expect.objectContaining({ scoreId: 7 }), '서버 이름');
+    expect(TEST_GAME.storage.loadLastName()).toBe('서버 이름');
+  });
 });
+

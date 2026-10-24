@@ -10,6 +10,7 @@ import type {
   ReplayDataByGame,
   ReplayPayloadByGame,
   ScoreDetailByGame,
+  ScoreSummary,
   SubmitScoreRequest,
   SubmitScoreResponse,
 } from '@/types/game';
@@ -269,6 +270,24 @@ export async function getGameRankings<G extends GameType>(
 
   if (!response.ok) {
     await handleApiError(response, { 429: TOO_MANY, default: '랭킹을 불러오지 못했습니다.' });
+  }
+
+  return response.json();
+}
+
+/**
+ * 기록 1건 요약 — rank는 그 보드 전체 기간 순위(백엔드 games.service rankOf(…, null)). 숨김·없는 기록은 404
+ * 랭킹 목록(상위 50) 밖의 강조 기록 안내에 쓴다 (games-polish FE-14·Q-S4)
+ */
+export async function getGameScore<G extends GameType>(gameType: G, scoreId: number): Promise<ApiResponse<ScoreSummary<ScoreDetailByGame[G]>>> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'GET',
+    endpoint: `/api/v1/games/${gameType}/scores/${scoreId}`,
+    signal: timeoutSignal(RANKING_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    await handleApiError(response, { 404: '기록을 찾을 수 없습니다.', 429: TOO_MANY, default: '기록을 불러오지 못했습니다.' });
   }
 
   return response.json();

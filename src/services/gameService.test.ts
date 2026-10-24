@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createGameSession, getGameBoards, getGameRankings, getGameReplay, RANKING_TIMEOUT_MS, SESSION_TIMEOUT_MS, submitGameScore } from './gameService';
+import { createGameSession, getGameBoards, getGameRankings, getGameReplay, getGameScore, RANKING_TIMEOUT_MS, SESSION_TIMEOUT_MS, submitGameScore } from './gameService';
 import { ApiError } from '@/types/api';
 
 // 서비스 → FetchService → fetch 경로 전체를 실제로 타고, 네트워크만 stub 한다 (백엔드 API 준비 전 mock)
@@ -71,6 +71,14 @@ describe('gameService', () => {
     for (const [, init] of fetchMock.mock.calls) expect(init.signal).toBeInstanceOf(AbortSignal);
     expect(timeout.mock.calls.map(([ms]) => ms)).toEqual([RANKING_TIMEOUT_MS, RANKING_TIMEOUT_MS]);
     timeout.mockRestore();
+  });
+
+  it('기록 1건: GET /games/:g/scores/:id (전체 기간 순위), 응답 대기 상한 (games-polish FE-14)', async () => {
+    fetchMock.mockResolvedValue(json({ code: 'SUCCESS', message: 'ok', data: { scoreId: 7, rank: 137 } }));
+    const { data } = await getGameScore('defense', 7);
+    expect(data.rank).toBe(137);
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/v1\/games\/defense\/scores\/7$/);
+    expect(fetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
   });
 
   it('응답이 상한까지 없으면 NetworkError로 끝난다 (다시 시도 대상)', async () => {
