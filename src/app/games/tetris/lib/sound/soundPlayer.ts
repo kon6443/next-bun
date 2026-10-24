@@ -4,6 +4,7 @@
  * - AudioContext는 사용자 첫 조작(pointerdown·keydown·touchstart) 뒤에만 만들거나 resume한다(iOS 자동재생 정책)
  * - 설정(soundSettings)을 구독해 볼륨·음악 시작/정지를 바로 반영한다
  */
+import { createAudioContext, createNoiseBuffer, isAudioHalted } from '@/app/games/_shared/lib/webAudio';
 import type { SoundCue, SoundCueKind } from '../effects';
 import { MUSIC_PATTERN_STEPS, MUSIC_STEP_SECONDS, musicStep, recipeFor, type Voice } from './recipes';
 import { getSoundSettings, subscribeSoundSettings, type SoundSettings } from './soundSettings';
@@ -70,19 +71,6 @@ export type SoundPlayerOptions = {
   eventTarget?: EventTarget | null;
 };
 
-/** 옛 iOS Safari는 접두어가 붙은 생성자만 있다 */
-type GlobalWithAudio = { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext };
-
-function defaultCreateContext(): AudioContext | null {
-  try {
-    const w = globalThis as GlobalWithAudio;
-    const Ctor = w.AudioContext ?? w.webkitAudioContext;
-    return Ctor ? new Ctor() : null;
-  } catch {
-    return null;
-  }
-}
-
 function defaultNow(): number {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
 }
@@ -99,7 +87,7 @@ const NOOP_PLAYER: SoundPlayer = {
 export function createSoundPlayer(options: SoundPlayerOptions = {}): SoundPlayer {
   if (typeof window === 'undefined' && options.eventTarget === undefined) return NOOP_PLAYER;
 
-  const createContext = options.createContext ?? defaultCreateContext;
+  const createContext = options.createContext ?? createAudioContext;
   const now = options.now ?? defaultNow;
   const eventTarget = options.eventTarget === undefined ? window : options.eventTarget;
 
@@ -191,7 +179,7 @@ export function createSoundPlayer(options: SoundPlayerOptions = {}): SoundPlayer
       const context = ctx;
       context.onstatechange = () => {
         // iOS는 전화·다른 앱 오디오로 'interrupted'가 되기도 한다 — running·closed가 아니면 모두 멈춘 것으로 본다
-        const halted = context.state !== 'running' && context.state !== 'closed';
+        const halted = isAudioHalted(context);
         if (halted && unlocked && anyEnabled()) {
           unlocked = false;
           syncGestureListeners();
@@ -215,11 +203,7 @@ export function createSoundPlayer(options: SoundPlayerOptions = {}): SoundPlayer
   }
 
   function getNoiseBuffer(context: AudioContext): AudioBuffer {
-    if (noiseBuffer) return noiseBuffer;
-    const length = Math.floor(context.sampleRate * 0.5);
-    noiseBuffer = context.createBuffer(1, length, context.sampleRate);
-    const data = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+    if (!noiseBuffer) noiseBuffer = createNoiseBuffer(context);
     return noiseBuffer;
   }
 
