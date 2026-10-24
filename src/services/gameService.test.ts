@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createGameSession, getGameBoards, getGameRankings, getGameReplay, getGameScore, getPopularReplays, RANKING_TIMEOUT_MS, recordReplayView, reportReplayWatch, SESSION_TIMEOUT_MS, submitGameScore } from './gameService';
+import { createGameSession, getGameBoards, getHallOfFame, getGameRankings, getGameReplay, getGameScore, getPopularReplays, RANKING_TIMEOUT_MS, recordReplayView, reportReplayWatch, SESSION_TIMEOUT_MS, submitGameScore } from './gameService';
 import { ApiError } from '@/types/api';
 
 // 서비스 → FetchService → fetch 경로 전체를 실제로 타고, 네트워크만 stub 한다 (백엔드 API 준비 전 mock)
@@ -336,5 +336,12 @@ describe('gameService', () => {
     fetchMock.mockResolvedValueOnce(json({ code: 'GAME_SCORE_NOT_FOUND', message: 'x' }, 404)).mockResolvedValueOnce(json({ code: 'GAME_CHALLENGE_EXPIRED', message: 'y' }, 409));
     await expect(createGameSession('tetris', undefined, { challengeScoreId: 9 })).rejects.toMatchObject({ code: 'GAME_SCORE_NOT_FOUND', status: 404 });
     await expect(createGameSession('tetris', undefined, { challengeScoreId: 9 })).rejects.toMatchObject({ code: 'GAME_CHALLENGE_EXPIRED', status: 409 });
+  });
+
+  it('명예의 전당: GET /games/:g/hall-of-fame, 응답 대기 상한 (games-growth B5)', async () => {
+    fetchMock.mockResolvedValue(json({ code: 'SUCCESS', message: 'ok', data: { periods: [] } }));
+    await getHallOfFame('tetris');
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/v1\/games\/tetris\/hall-of-fame$/);
+    expect(fetchMock.mock.calls[0][1].signal).toBeDefined();
   });
 });

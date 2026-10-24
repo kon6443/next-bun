@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { RankingsView } from "@/app/games/_shared/components/RankingsView";
+import { HallOfFame } from "@/app/games/_shared/components/HallOfFame";
 import { getGameBoards } from "@/services/gameService";
 import type { GameBoard } from "@/types/game";
 import { TETRIS_GAME } from "../lib/game";
-import { DAILY_PLAY_PATH, dailyBoards, dailyDateLabel, dailyReplayState, isDailyBoardKey } from "../lib/daily";
+import { DAILY_PLAY_PATH, DAILY_REPLAY_DELAY_MS, dailyBoards, dailyDateLabel, dailyReplayState, isDailyBoardKey } from "../lib/daily";
 
 type Props = {
   highlightId: number | null;
@@ -72,6 +73,8 @@ export default function TetrisRankingsView({ highlightId, boardParam }: Props) {
       header={header}
       replayUnavailable={replayUnavailable}
       playHref={selected ? DAILY_PLAY_PATH : undefined}
+      // 명예의 전당 — 지난 주간(기본 보드, 리플레이 바로 공개)·지난 데일리(그날 끝 + 2시간 뒤 공개) (games-growth B5)
+      footer={<HallOfFame game={TETRIS_GAME} replayDelayMs={{ daily: DAILY_REPLAY_DELAY_MS }} />}
     />
   );
 }

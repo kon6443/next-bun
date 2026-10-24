@@ -10,6 +10,7 @@ vi.mock('@/services/gameService', () => ({
   getGameRankings: (...a: unknown[]) => getGameRankings(...a),
   getGameScore: vi.fn(),
   getPopularReplays: vi.fn(),
+  getHallOfFame: () => Promise.resolve({ data: { periods: [] } }),
 }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/games/tetris/rankings' }));
 vi.mock('next-auth/react', () => ({ useSession: () => ({ data: null, status: 'unauthenticated' }) }));

@@ -4,6 +4,7 @@ import type { GameType, RankingItem, ScoreDetailByGame } from "@/types/game";
 import { formatFullDateTime } from "@/app/utils/taskUtils";
 import { formatScore, formatViewCount } from "../lib/format";
 import type { GameUiConfig } from "../lib/gameConfig";
+import { TrophyBadge } from "./TrophyBadge";
 
 type RankingTableProps<G extends GameType, I extends RankingItem<ScoreDetailByGame[G]>> = {
   game: GameUiConfig<G>;
@@ -68,6 +69,7 @@ export function RankingTable<G extends GameType, I extends RankingItem<ScoreDeta
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-white">
                 {item.playerName}
+                <TrophyBadge trophies={item.trophies} />
                 {mine && <span className="ml-1.5 rounded-full bg-sky-500/30 px-1.5 py-0.5 text-[10px] text-sky-100">나</span>}
               </p>
               {!compact && (

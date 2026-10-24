@@ -116,7 +116,26 @@ export type RankingItem<D = TetrisScoreDetail> = {
   viewCount?: number;
   /** 누적 시청 시간(ms, 벽시계) — 조회수 배포 전 응답에는 없다 */
   watchMs?: number;
+  /** 기록 주인의 최근 입상 횟수(명예의 전당) — 로그인 사용자 기록이고 입상이 있을 때만, 아니면 null(Redis 장애 때도 null) */
+  trophies?: Trophies | null;
 };
+
+/** 기간별 1·2·3위 입상 횟수 */
+export type Trophies = { gold: number; silver: number; bronze: number };
+
+/** 명예의 전당 한 기간 — 지난 주간(테트리스 기본 보드·디펜스 주간 보드)·지난 데일리(테트리스) */
+export type HallOfFamePeriod<D = TetrisScoreDetail> = {
+  kind: 'weekly' | 'daily';
+  boardKey: string;
+  /** ISO 8601 (UTC) */
+  startsAt: string;
+  endsAt: string;
+  /** 1~3위 (rank 1~3) */
+  podium: RankingItem<D>[];
+};
+
+/** GET /games/:gameType/hall-of-fame — 최근 기간 먼저, 빈 기간은 빠진다(최대 10분 지연) */
+export type HallOfFame<D = TetrisScoreDetail> = { periods: HallOfFamePeriod<D>[] };
 
 /** 인기 리플레이 정렬 — 기간 조회수·기간 시청 시간 */
 export type PopularSort = 'views' | 'watch';

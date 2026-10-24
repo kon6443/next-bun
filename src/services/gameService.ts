@@ -5,6 +5,7 @@ import type {
   SessionBoard,
   GameSession,
   GameType,
+  HallOfFame,
   PopularReplayList,
   PopularSort,
   RankingList,
@@ -382,6 +383,21 @@ export async function getPopularReplays<G extends GameType>(
 
   if (!response.ok) {
     await handleApiError(response, { 429: TOO_MANY, default: '인기 리플레이를 불러오지 못했습니다.' });
+  }
+
+  return response.json();
+}
+
+/** 명예의 전당 — 지난 기간별 1~3위 */
+export async function getHallOfFame<G extends GameType>(gameType: G): Promise<ApiResponse<HallOfFame<ScoreDetailByGame[G]>>> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'GET',
+    endpoint: `/api/v1/games/${gameType}/hall-of-fame`,
+    signal: timeoutSignal(RANKING_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    await handleApiError(response, { 429: TOO_MANY, default: '명예의 전당을 불러오지 못했습니다.' });
   }
 
   return response.json();

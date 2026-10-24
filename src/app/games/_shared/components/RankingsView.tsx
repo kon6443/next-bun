@@ -44,10 +44,12 @@ type RankingsViewProps<G extends GameType> = {
   playHref?: string;
   /** 어느 보드를 볼지 정하는 중(디펜스 /boards 응답 전) — 같은 화면 틀에 skeleton만, 랭킹은 아직 부르지 않는다 */
   waiting?: boolean;
+  /** 목록 아래 게임별 영역(명예의 전당 등) */
+  footer?: ReactNode;
 };
 
 /** 게임 랭킹 화면 — 기간 탭 × 정렬(점수·조회·시청) + 상위 50개 (게임별 page는 클라이언트 래퍼에서 game 사양을 넘긴다) */
-export function RankingsView<G extends GameType>({ game, highlightId, board, showPeriods = true, header, replayUnavailable = null, playHref, waiting = false }: RankingsViewProps<G>) {
+export function RankingsView<G extends GameType>({ game, highlightId, board, showPeriods = true, header, replayUnavailable = null, playHref, waiting = false, footer }: RankingsViewProps<G>) {
   const [selectedPeriod, setPeriod] = useState<RankingPeriod>("daily");
   const period: RankingPeriod = showPeriods ? selectedPeriod : "all";
   const [sort, setSort] = useState<SortKey>("score");
@@ -209,6 +211,7 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
           </>
         )}
       </section>
+      {footer}
     </TeamsPageLayout>
   );
 }

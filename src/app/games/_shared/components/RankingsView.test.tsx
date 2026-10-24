@@ -152,4 +152,13 @@ describe('RankingsView — 게임 사양을 따른다', () => {
     expect(screen.getByText('· 시청 2분')).toBeTruthy();
     expect(screen.queryByText('· 조회 99')).toBeNull();
   });
+
+  it('입상 기록(trophies)이 있으면 이름 옆에 배지 — 없으면(null) 없음 (games-growth B5)', async () => {
+    getGameRankings.mockResolvedValue({ code: 'SUCCESS', message: 'ok', data: { items: [{ ...item, trophies: { gold: 2, silver: 1, bronze: 0 } }, { ...item, scoreId: 6, rank: 2, trophies: null }], periodStart: null } });
+    await act(async () => {
+      render(<RankingsView game={TEST_GAME} highlightId={null} board="endless-s1" />);
+    });
+    expect(screen.getAllByTestId('trophy-badge')).toHaveLength(1);
+    expect(screen.getByRole('img', { name: '명예의 전당 1위 2회·2위 1회' })).toBeTruthy();
+  });
 });
