@@ -103,7 +103,7 @@ export default function TetrisHome() {
         accessToken,
       );
       addMyScoreId(data.scoreId);
-      saveLastName(playerName);
+      saveLastName(data.playerName ?? playerName);
       dropPending(pending.sessionId);
       setMyScoreIds(new Set(loadMyScoreIds()));
       setPendingMessage(data.ranks ? `등록했어요! 전체 ${data.ranks.all}위` : "등록했어요! 순위는 랭킹에서 확인해 주세요.");

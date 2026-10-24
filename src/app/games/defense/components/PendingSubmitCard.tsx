@@ -54,7 +54,7 @@ export function PendingSubmitCard() {
     try {
       const { data } = await submitGameScore("defense", { sessionId: pending.sessionId, playerName, replay: pending.replay }, accessToken);
       defenseStorage.addMyScoreId(data.scoreId);
-      defenseStorage.saveLastName(playerName);
+      defenseStorage.saveLastName(data.playerName ?? playerName);
       drop(pending.sessionId);
       setMessage(data.ranks ? `등록했어요! ${data.ranks.all}위` : "등록했어요! 순위는 랭킹에서 확인해 주세요.");
     } catch (err) {

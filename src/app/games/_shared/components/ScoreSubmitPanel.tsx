@@ -175,7 +175,8 @@ export function ScoreSubmitPanel<G extends GameType>({
       const { data } = await submitGameScore(gameType, { sessionId, playerName, replay }, accessToken);
       setRegistered(data);
       storage.addMyScoreId(data.scoreId);
-      storage.saveLastName(playerName);
+      // 서버가 저장한 이름(정리값)을 다음 기본값으로 — 공유 카드·랭킹 이름과 같게 (games-polish P5, 없으면 보낸 이름)
+      storage.saveLastName(data.playerName ?? playerName);
       storage.removePendingSubmission(sessionId);
     } catch (err) {
       const { kind, message: text, reload } = classifySubmitError(err, canRetry);
@@ -232,7 +233,7 @@ export function ScoreSubmitPanel<G extends GameType>({
             랭킹 보기
           </ButtonLink>
           {/* 등록한 이름 — 등록 뒤에는 입력이 사라지므로 마지막 입력값을 정리한 것 */}
-          {registeredActions?.(registered, normalizePlayerName(name))}
+          {registeredActions?.(registered, registered.playerName ?? normalizePlayerName(name))}
         </div>
       ) : sessionId && !isFinalError ? (
         <form onSubmit={handleSubmit} className="mt-5 text-left" noValidate>

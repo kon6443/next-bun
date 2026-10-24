@@ -190,5 +190,18 @@ describe('ScoreSubmitPanel — 게임 사양·보드를 따른다', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('쓸 수 없는 이름이에요.');
     expect(document.activeElement).toBe(screen.getByLabelText('랭킹에 올릴 이름'));
   });
+
+  it('등록 응답의 이름(서버 정리값)을 공유·최근 이름에 쓴다 — 응답에 없으면 보낸 이름 (games-polish P5)', async () => {
+    submitGameScore.mockResolvedValue({ data: { scoreId: 7, score: 1, detail: {}, ranks: null, playerName: '서버 이름' } });
+    const actions = vi.fn(() => null);
+    await act(async () => {
+      render(<ScoreSubmitPanel {...props} registeredActions={actions} />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    expect(actions).toHaveBeenLastCalledWith(expect.objectContaining({ scoreId: 7 }), '서버 이름');
+    expect(TEST_GAME.storage.loadLastName()).toBe('서버 이름');
+  });
 });
 
