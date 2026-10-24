@@ -5,6 +5,7 @@
  * - 일시정지·화면 숨김이면 suspend
  * - 음량은 게임 공통 소리 설정의 효과음 음량(setVolume) — 마스터 gain에 곱한다
  */
+import { DEFAULT_SOUND_SETTINGS } from '@/app/games/_shared/lib/soundSettings';
 import { createAudioContext, createNoiseBuffer, isAudioHalted, primeAudioContext } from '@/app/games/_shared/lib/webAudio';
 
 export const SOUND = {
@@ -29,8 +30,11 @@ export const SOUND = {
 const SOUND_COUNT = 17;
 
 const MAX_VOICES = 12;
-/** 음량 1일 때 마스터 gain — 컴프레서 앞에서 겹쳐도 거슬리지 않게 */
-const MASTER_LEVEL = 0.8;
+/**
+ * 마스터 gain = 음량 × 이 값 — 공통 설정의 기본 음량(0.6)에서 예전 고정 레벨(0.8)과 같은 크기가 나게 맞춘다(P8: 음량 설정이 생기며 기본이 작아지지 않게)
+ * 최대(1)면 약 1.33 — 뒤의 컴프레서가 겹침을 누른다
+ */
+const MASTER_LEVEL = 0.8 / DEFAULT_SOUND_SETTINGS.sfxVolume;
 const MAX_PER_KIND = 3;
 const MIN_INTERVAL_MS: readonly number[] = [50, 100, 150];
 
@@ -62,7 +66,7 @@ export class Sfx {
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
   private enabled = false;
-  private volume = 1;
+  private volume = DEFAULT_SOUND_SETTINGS.sfxVolume;
   private paused = false;
   private speedIndex = 0;
   private voices = 0;

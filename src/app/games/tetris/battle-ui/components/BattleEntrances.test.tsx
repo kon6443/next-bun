@@ -220,4 +220,11 @@ describe('대전 입구 (DESIGN §19)', () => {
     await screen.findByRole('link', { name: /방 2/ });
     expect(getBattleMatchList.mock.calls.map(([p]) => p.cursor)).toEqual([null, 'bad', null, null]);
   });
+
+  it('받는 중에도 목록 자리와 방 만들기는 보인다 (P8)', async () => {
+    getBattleLobbyStats.mockReturnValue(new Promise(() => {}));
+    render(<BattleEntry />);
+    expect(screen.getByRole('status')).toHaveTextContent('방 목록을 불러오는 중');
+    expect(screen.getByRole('link', { name: '방 만들기' })).toHaveAttribute('href', '/games/tetris/battle#battle-create');
+  });
 });

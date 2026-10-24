@@ -11,11 +11,16 @@ const PREVIEW_ROOMS = 3;
  * 대전 입구의 방 목록 (games-polish P7·P8) — 테트리스 홈 대전 섹션
  * 방마다 이름·인원·🔒와 "들어가기" · 없으면 빈 상태 · 아래에 "빠른 참가"(잠기지 않은 방이 있을 때)·"방 만들기"
  */
-export function BattleRoomsPreview({ rooms }: { rooms: readonly BattleLobbyRoom[] }) {
-  const quick = pickQuickJoinRoom(rooms);
+/** rooms가 null이면 받는 중 — 목록 자리에 안내, 방 만들기는 그대로 */
+export function BattleRoomsPreview({ rooms }: { rooms: readonly BattleLobbyRoom[] | null }) {
+  const quick = rooms ? pickQuickJoinRoom(rooms) : null;
   return (
     <div className="flex flex-col gap-2" data-testid="battle-rooms-preview">
-      {rooms.length > 0 ? (
+      {rooms === null ? (
+        <p className="rounded-2xl border border-dashed border-slate-700/60 px-4 py-3 text-center text-sm text-slate-500" role="status">
+          방 목록을 불러오는 중…
+        </p>
+      ) : rooms.length > 0 ? (
         <ul className="flex flex-col gap-1.5" aria-label="열린 방">
           {rooms.slice(0, PREVIEW_ROOMS).map((room) => (
             <li key={room.code} className="flex items-center gap-2 rounded-2xl border border-slate-700/50 bg-slate-900/60 py-1 pl-3 pr-1">

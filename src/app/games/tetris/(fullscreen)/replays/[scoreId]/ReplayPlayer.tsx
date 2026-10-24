@@ -246,6 +246,8 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
     if (!data) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (shareOpenRef.current) return;
+      // 대화상자(소리 설정 등) 안의 키는 그 대화상자 몫 — 음량 막대의 ←/→가 뒤의 재생을 옮기지 않게 (P8)
+      if (e.target instanceof Element && e.target.closest('[role="dialog"]')) return;
       if (e.target instanceof HTMLInputElement && e.target.type !== "range") return;
       if (e.code === "Space") {
         // 포커스된 버튼(속도·처음부터 등)은 Space로 그 버튼이 눌리게 둔다

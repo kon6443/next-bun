@@ -68,7 +68,11 @@ export function loadSoundSettings(): SoundSettings {
     if (raw !== null) return normalizeSoundSettings(JSON.parse(raw));
     const migrated = migrateLegacy();
     if (!migrated) return { ...DEFAULT_SOUND_SETTINGS };
-    window.localStorage.setItem(SOUND_SETTINGS_KEY, JSON.stringify(migrated));
+    try {
+      window.localStorage.setItem(SOUND_SETTINGS_KEY, JSON.stringify(migrated));
+    } catch {
+      // 쓰기만 막혔으면(용량 초과 등) 옮긴 값으로 동작한다 — 다음 방문에 다시 옮긴다
+    }
     return migrated;
   } catch {
     return { ...DEFAULT_SOUND_SETTINGS };

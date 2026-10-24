@@ -36,9 +36,10 @@ export function BattleEntry() {
           전체 보기
         </Link>
       </div>
-      {stats?.rooms && (
+      {/* 목록 자리는 늘 — 받는 중(또는 실패해 다시 묻는 중)에도 방 만들기는 쓸 수 있다. 미리보기 방이 없는 옛 서버면 방 수 문구만 */}
+      {(stats === null || stats.rooms) && (
         <div className="mt-3">
-          <BattleRoomsPreview rooms={stats.rooms} />
+          <BattleRoomsPreview rooms={stats?.rooms ?? null} />
         </div>
       )}
     </section>

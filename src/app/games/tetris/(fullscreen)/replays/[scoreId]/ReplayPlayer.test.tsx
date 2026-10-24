@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { ApiError } from '@/types/api';
 import golden from '../../../engine/__fixtures__/golden-replays.json';
 import { ENGINE_VERSION, FRAMES_PER_SECOND } from '../../../engine';
@@ -102,5 +102,18 @@ describe('싱글 리플레이 재생기 (games-polish P4)', () => {
     expect(sound.playCues).toHaveBeenCalled();
     const largest = Math.max(...sound.playCues.mock.calls.map(([cues]) => (cues as unknown[]).length));
     expect(largest).toBeLessThanOrEqual(5);
+  });
+
+  it('소리 설정 모달 안의 키(음량 막대 ←/→·Space)는 뒤의 재생을 옮기지 않는다 (P8)', async () => {
+    const slider = await ready();
+    fireEvent.click(screen.getByRole('button', { name: '일시정지' }));
+    const before = slider.value;
+    fireEvent.click(screen.getByRole('button', { name: /소리 설정/ }));
+    const dialog = screen.getByRole('dialog', { name: '소리 설정' });
+    const volume = within(dialog).getByRole('slider', { name: '효과음 음량' });
+    fireEvent.keyDown(volume, { code: 'ArrowRight', key: 'ArrowRight' });
+    fireEvent.keyDown(dialog, { code: 'Space', key: ' ' });
+    expect((screen.getByTestId('tetris-replay-seek') as HTMLInputElement).value).toBe(before);
+    expect(screen.getByRole('button', { name: '재생' })).toBeTruthy();
   });
 });

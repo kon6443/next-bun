@@ -1,6 +1,7 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useDialog } from "@/app/hooks";
 import { useSoundSettings } from "../hooks/useSoundSettings";
 import type { SoundSettings } from "../lib/soundSettings";
@@ -16,11 +17,14 @@ type Props = {
  * 게임 공통 소리 설정 모달 (games-polish P8) — 효과음·배경음 켜기/끄기와 음량. 바꾸면 바로 적용(울리던 소리 포함)
  * 켜는 조작은 제스처 핸들러 안에서 저장 → unlockSounds()로 화면의 플레이어를 바로 깨운다(Safari·iOS 조건)
  * 키보드: 열리면 첫 컨트롤로 포커스, Tab은 안에서 돌고, Esc로 닫힌다(useDialog)
+ * body로 포털 — 버튼이 놓인 자리(HUD의 nowrap·transform 조상 등)의 스타일을 물려받지 않게
  */
 export function SoundSettingsModal({ onClose, music = true }: Props) {
   const dialogRef = useDialog<HTMLDivElement>(true, onClose);
   const titleId = useId();
   const { settings, update } = useSoundSettings();
+  /** 배경을 누르기 시작했나 — 음량 막대를 끌다 배경에서 놓아도(click은 공통 조상인 배경에 온다) 닫히지 않게 */
+  const pressedBackdropRef = useRef(false);
 
   /** 저장(구독한 플레이어가 같은 호출 안에서 반영) → 켜졌으면 같은 제스처 안에서 오디오 시작 */
   const change = (partial: Partial<SoundSettings>) => {
@@ -28,12 +32,16 @@ export function SoundSettingsModal({ onClose, music = true }: Props) {
     if (next.sfx || next.music) unlockSounds();
   };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 sm:items-center sm:p-4"
       style={{ touchAction: "auto" }}
+      onPointerDown={(e) => {
+        pressedBackdropRef.current = e.target === e.currentTarget;
+      }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget && pressedBackdropRef.current) onClose();
+        pressedBackdropRef.current = false;
       }}
     >
       <div
@@ -76,7 +84,8 @@ export function SoundSettingsModal({ onClose, music = true }: Props) {
           />
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

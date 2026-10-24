@@ -688,7 +688,11 @@ export function PlaySession({ stage, mode, title, campaign, onRankedOver, ranked
       pausedForSoundRef.current = hud.status === "playing";
       if (pausedForSoundRef.current) togglePause();
     } else {
-      if (pausedForSoundRef.current && hud.status === "paused") togglePause();
+      if (pausedForSoundRef.current && hud.status === "paused") {
+        // 닫는 클릭(제스처) 안에서 오디오를 다시 켠다 — effect의 setPaused(false)는 제스처 밖이라 Safari가 막을 수 있다
+        sfx.setPaused(false);
+        togglePause();
+      }
       pausedForSoundRef.current = false;
     }
   };

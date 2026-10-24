@@ -92,4 +92,12 @@ describe('게임 공통 소리 설정 (games-polish P8)', () => {
     expect(getSoundSettings()).toEqual({ ...OFF, sfxVolume: 0.2 });
     unsubscribe();
   });
+
+  it('옮긴 값을 쓰지 못해도(용량 초과 등) 이번 방문은 옮긴 값으로 동작한다', () => {
+    window.localStorage.setItem(LEGACY_TETRIS_SOUND_KEY, JSON.stringify({ sfx: true, music: false, volume: 0.4 }));
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('quota');
+    });
+    expect(loadSoundSettings()).toEqual({ sfx: true, sfxVolume: 0.4, music: false, musicVolume: 0.4 });
+  });
 });

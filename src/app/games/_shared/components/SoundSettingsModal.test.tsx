@@ -81,4 +81,27 @@ describe('공통 소리 버튼·모달 (games-polish P8)', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '닫기' }));
     expect(screen.getByRole('button', { name: /소리 설정/ })).toHaveTextContent('효과음 켜짐');
   });
+
+  it('음량 막대를 끌다 배경에서 놓아도 닫히지 않고, 배경을 눌렀다 떼면 닫힌다', () => {
+    render(<SoundButton />);
+    fireEvent.click(screen.getByRole('button', { name: /소리 설정/ }));
+    const dialog = screen.getByRole('dialog', { name: '소리 설정' });
+    const backdrop = dialog.parentElement!;
+    fireEvent.pointerDown(within(dialog).getByRole('checkbox', { name: '효과음' }));
+    fireEvent.click(backdrop);
+    expect(screen.getByRole('dialog', { name: '소리 설정' })).toBeInTheDocument();
+    fireEvent.pointerDown(backdrop);
+    fireEvent.click(backdrop);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('body로 포털 — 버튼이 놓인 자리의 스타일(nowrap 등)을 물려받지 않는다', () => {
+    render(
+      <header data-testid="hud" className="whitespace-nowrap">
+        <SoundButton />
+      </header>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /소리 설정/ }));
+    expect(screen.getByTestId('hud').contains(screen.getByRole('dialog'))).toBe(false);
+  });
 });
