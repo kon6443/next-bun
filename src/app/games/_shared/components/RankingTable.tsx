@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import type { GameType, RankingItem, ScoreDetailByGame } from "@/types/game";
 import { formatFullDateTime } from "@/app/utils/taskUtils";
@@ -20,6 +21,12 @@ const medal = (rank: number) => (rank === 1 ? "🥇" : rank === 2 ? "🥈" : ran
 
 /** 랭킹 목록 — 좁은 화면에서도 가로 스크롤 없이 카드형 행 */
 export function RankingTable<G extends GameType>({ game, items, myScoreIds, highlightId = null, compact = false, replayUnavailable = null }: RankingTableProps<G>) {
+  // 링크로 가리킨 기록이 목록에 있으면 화면 가운데로 — 모바일에서 50위 목록 아래쪽이면 보이지 않았다 (games-polish FE-14)
+  const highlightRef = useRef<HTMLLIElement>(null);
+  const highlightShown = highlightId !== null && items.some((item) => item.scoreId === highlightId);
+  useEffect(() => {
+    if (highlightShown) highlightRef.current?.scrollIntoView?.({ block: "center" });
+  }, [highlightShown]);
   return (
     <ol className="grid grid-cols-1 gap-2">
       {items.map((item) => {
@@ -28,6 +35,7 @@ export function RankingTable<G extends GameType>({ game, items, myScoreIds, high
         return (
           <li
             key={item.scoreId}
+            ref={highlighted ? highlightRef : undefined}
             aria-current={highlighted ? "true" : undefined}
             className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 ${
               highlighted
