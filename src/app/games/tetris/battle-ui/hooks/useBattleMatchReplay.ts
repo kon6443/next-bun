@@ -9,19 +9,24 @@ import { BATTLE_ENGINE_VERSION } from "../../battle-engine";
 import type { GameState } from "../../engine";
 import { FRAMES_PER_SECOND } from "../../engine";
 import type { GarbageGauge } from "../../lib/renderer";
+import { type EffectTracker, type SoundCue, createEffectTracker, drainCues, noteGarbageRise, observeAfter, observeBefore, resetEffects } from "../../lib/effects";
 import {
   type BattleHighlightKind,
   type BattleReplayRunner,
   type BattleReplaySnapshot,
   createReplayRunner,
   garbageGaugeOf,
+  isRunnerDone,
   prepareBattleTrack,
   seekRunner,
+  stepRunner,
 } from "../lib/battleReplayRunner";
 import { loadBattleMatch, loadBattleReplay } from "../lib/battleMatchLoader";
 
 /** 뒤로 탐색할 때 처음부터가 아니라 가장 가까운 스냅샷부터 다시 진행한다 (기존 재생기와 같은 방식) */
 const SNAPSHOT_INTERVAL = 10 * FRAMES_PER_SECOND;
+/** 재생 한 번에 프레임마다 관찰하며 진행할 최대 거리 — 넘으면(탭 복귀 등) 조용히 탐색한다 */
+const PLAY_STEP_LIMIT_FRAMES = FRAMES_PER_SECOND;
 /** 리플레이 GET 사이 간격 — 조회 스로틀(IP당 초당 3) 안에 들도록 순차로 받는다 */
 const REPLAY_FETCH_GAP_MS = 400;
 
@@ -46,7 +51,14 @@ export type ReplayTrack = {
   garbageRef: { current: GarbageGauge | null };
   /** 이 판의 하이라이트(사전 패스) — 받기 전·기록 없음이면 빈 배열 */
   highlights: Highlight<BattleHighlightKind>[];
+  /** 소리 신호만 모으는 연출 기록 — 캔버스에는 넘기지 않는다(판 연출은 그대로) */
+  sound: EffectTracker;
+  /** 받은 가비지마다 보낸 사람(리플레이 garbageFrom) — 옛 경기는 null */
+  garbageFrom: readonly (string | null)[] | null;
 };
+
+/** 재생 중 한 판에서 일어난 일 — 소리 신호·받은 가비지(보낸 사람을 모르면 null)·탈락 순간 */
+export type TrackPlayEvents = { cues: SoundCue[]; received: { from: string | null; lines: number }[]; ko: boolean };
 
 function createTrack(player: BattleMatchPlayer): ReplayTrack {
   return {
@@ -59,6 +71,8 @@ function createTrack(player: BattleMatchPlayer): ReplayTrack {
     drawRef: { current: null },
     garbageRef: { current: null },
     highlights: [],
+    sound: createEffectTracker(),
+    garbageFrom: null,
   };
 }
 
@@ -68,8 +82,46 @@ function seekTrack(track: ReplayTrack, target: number): void {
   const runner = track.runner;
   if (!runner) return;
   seekRunner(runner, track.snapshots, target, SNAPSHOT_INTERVAL, track.buffer);
+  // 건너뛴 구간은 관찰하지 않는다 — 소리가 쌓이지 않게
+  resetEffects(track.sound);
   track.stateRef.current = runner.bs.game;
   track.garbageRef.current = garbageGaugeOf(runner.bs);
+}
+
+/** 판 하나를 from → target(가까운 앞)까지 한 프레임씩 진행하며 소리 신호·받은 가비지·탈락을 모은다 */
+function playTrack(track: ReplayTrack, from: number, target: number): TrackPlayEvents {
+  const events: TrackPlayEvents = { cues: [], received: [], ko: false };
+  const runner = track.runner;
+  const player = track.player;
+  if (!runner) {
+    // 기록이 없는 판 — 서버 요약의 탈락 시점을 지나는 순간
+    events.ko = player.koReason !== null && player.frames > 0 && from < player.frames && player.frames <= target;
+    return events;
+  }
+  const wasDone = isRunnerDone(runner);
+  const fx = track.sound;
+  while (runner.bs.game.frame < target) {
+    const bs = runner.bs;
+    const receivedBefore = bs.received.length;
+    const garbageBefore = runner.garbageCursor;
+    observeBefore(fx, bs.game);
+    const result = stepRunner(runner, track.buffer);
+    if (!result) break;
+    observeAfter(fx, bs.game, track.buffer, result.applied);
+    if (result.lock && result.lock.garbageApplied > 0) noteGarbageRise(fx, bs.game.frame - 1, result.lock.garbageApplied);
+    // 이번 프레임에 받은 가비지 — garbageFrom은 garbage 로그 순서라 로그 위치로 보낸 사람을 찾는다
+    for (let i = receivedBefore; i < bs.received.length; i++) {
+      const event = bs.received[i];
+      let index = -1;
+      for (let g = garbageBefore; g < runner.garbageCursor; g++) if (runner.garbage[g].id === event.id) index = g;
+      events.received.push({ from: (index >= 0 && track.garbageFrom?.[index]) || null, lines: event.lines });
+    }
+  }
+  events.cues = drainCues(fx);
+  events.ko = player.koReason !== null && !wasDone && isRunnerDone(runner);
+  track.stateRef.current = runner.bs.game;
+  track.garbageRef.current = garbageGaugeOf(runner.bs);
+  return events;
 }
 
 /** 판 하나의 리플레이를 받아 지금 프레임까지 맞춘다 — 화면을 떠났으면(isLive false) 아무것도 바꾸지 않고 false */
@@ -85,6 +137,7 @@ async function fetchTrack(matchId: string, track: ReplayTrack, frame: () => numb
       const marks = await prepareBattleTrack(replay, track.snapshots, SNAPSHOT_INTERVAL, () => !isLive());
       if (!marks || !isLive()) return false;
       track.highlights = marks;
+      track.garbageFrom = replay.garbageFrom ?? null;
       track.runner = createReplayRunner(replay);
       track.status = "ready";
       seekTrack(track, frame());
@@ -167,6 +220,26 @@ export function useBattleMatchReplay(matchId: string) {
   }, []);
 
   /**
+   * 재생 — 공통 프레임을 target으로. 가까운 앞이면 판마다 한 프레임씩 진행하며 일어난 일을 onTrack에 넘기고,
+   * 뒤로·멀리(탭 복귀 등)면 조용히 탐색한다(건너뛴 구간의 소리·연출 없음)
+   */
+  const playAll = useCallback(
+    (target: number, onTrack: (track: ReplayTrack, events: TrackPlayEvents) => void) => {
+      const from = frameRef.current;
+      if (target < from || target - from > PLAY_STEP_LIMIT_FRAMES) {
+        seekAll(target);
+        return;
+      }
+      frameRef.current = target;
+      for (const track of tracksRef.current) {
+        onTrack(track, playTrack(track, from, target));
+        track.drawRef.current?.();
+      }
+    },
+    [seekAll],
+  );
+
+  /**
    * 경기 하이라이트 — 판마다의 큰 공격·KO를 한 축에(설명 앞에 이름). 기록이 없는 판(미제출·검증 실패)도 서버 요약의 KO는 찍는다
    * 판은 최대 4개·점은 수십 개라 렌더마다 계산한다(트랙 객체 안의 변경은 trackVersion이 다시 렌더한다)
    */
@@ -196,5 +269,5 @@ export function useBattleMatchReplay(matchId: string) {
     [matchId],
   );
 
-  return { load, tracks, totalFrames, settled, frameRef, seekAll, retry, retryTrack, highlights };
+  return { load, tracks, totalFrames, settled, frameRef, seekAll, playAll, retry, retryTrack, highlights };
 }

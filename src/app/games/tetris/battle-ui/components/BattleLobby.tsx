@@ -19,6 +19,7 @@ import { type ConnectionStatus, useBattleSocket, useEnterScope } from "../contex
 import { usePlayerName } from "../hooks/usePlayerName";
 import { battleErrorMessage } from "../lib/battleErrors";
 import { normalizeRoomCode, normalizeRoomName, validateRoomName, validateRoomPassword } from "../lib/roomForm";
+import { battleRoomPath, pickQuickJoinRoom } from "../lib/battleList";
 import { ConnectionBadge } from "./ConnectionBadge";
 
 const cardStyles = "rounded-3xl border border-slate-700/50 bg-slate-800/50 p-5";
@@ -32,10 +33,8 @@ const LIST_RETRYABLE_CODES = new Set<string>([TetrisBattleErrorCodes.RATE_LIMITE
 export const LIST_RETRY_MS = 2000;
 const LIST_RETRIES = 3;
 
-const roomPath = (code: string, locked = false) => `/games/tetris/battle/${code}${locked ? "?locked=1" : ""}`;
-
 /**
- * 대전 로비 — 이름 · 방 만들기 · 코드로 입장 · 방 목록
+ * 대전 로비 — 이름 · 방 목록(빠른 참가) · 방 만들기 · 코드로 입장 — 들어온 사람이 먼저 열린 방을 보게 (games-polish P7)
  */
 export function BattleLobby() {
   const router = useRouter();
@@ -111,7 +110,7 @@ export function BattleLobby() {
     setCreating(false);
     if (!result.ok) return setError(battleErrorMessage(result.code));
     player.remember(resolved.name);
-    router.push(roomPath(result.data.room.code));
+    router.push(battleRoomPath(result.data.room.code));
   };
 
   const submitCode = (e: React.FormEvent) => {
@@ -119,7 +118,20 @@ export function BattleLobby() {
     const normalized = normalizeRoomCode(code);
     if (!normalized) return setError("방 코드 6자리를 확인해 주세요.");
     setError(null);
-    router.push(roomPath(normalized));
+    router.push(battleRoomPath(normalized));
+  };
+
+  /** 잠기지 않은 대기 방 중 사람이 가장 많은 곳으로 — 없으면 방 만들기로 안내 */
+  const quickJoin = () => {
+    const target = rooms ? pickQuickJoinRoom(rooms) : null;
+    if (target) {
+      router.push(battleRoomPath(target.code));
+      return;
+    }
+    toast("바로 들어갈 방이 없어요. 방을 만들어 보세요.");
+    const nameInput = document.getElementById("battle-room-name");
+    nameInput?.scrollIntoView?.({ block: "center" });
+    nameInput?.focus();
   };
 
   return (
@@ -158,7 +170,29 @@ export function BattleLobby() {
           </p>
         )}
 
-        <form onSubmit={submitCreate} className={cardStyles}>
+        <section className={cardStyles} aria-labelledby="battle-room-list">
+          <div className="flex items-center justify-between">
+            <h2 id="battle-room-list" className="text-base font-semibold text-white">
+              방 목록
+            </h2>
+            <button
+              type="button"
+              onClick={refreshList}
+              disabled={status !== "connected" || listing}
+              aria-busy={listing}
+              className="min-h-11 px-2 text-xs text-sky-300 disabled:opacity-40"
+            >
+              새로고침
+            </button>
+          </div>
+          <RoomList rooms={rooms} error={listError} status={status} onReconnect={reconnect} />
+          <Button type="button" variant="secondary" size="md" fullWidth className="mt-3 min-h-11" onClick={quickJoin} disabled={rooms === null}>
+            빠른 참가
+          </Button>
+        </section>
+
+        {/* 입구의 "방 만들기"가 여기로 온다(#battle-create) */}
+        <form id="battle-create" onSubmit={submitCreate} className={`${cardStyles} scroll-mt-4`}>
           <h2 className="text-base font-semibold text-white">방 만들기</h2>
           <label htmlFor="battle-room-name" className="mt-3 block text-xs text-slate-400">
             방 이름 (비우면 &ldquo;내 이름의 방&rdquo;)
@@ -225,24 +259,6 @@ export function BattleLobby() {
             </Button>
           </div>
         </form>
-
-        <section className={cardStyles} aria-labelledby="battle-room-list">
-          <div className="flex items-center justify-between">
-            <h2 id="battle-room-list" className="text-base font-semibold text-white">
-              방 목록
-            </h2>
-            <button
-              type="button"
-              onClick={refreshList}
-              disabled={status !== "connected" || listing}
-              aria-busy={listing}
-              className="min-h-11 px-2 text-xs text-sky-300 disabled:opacity-40"
-            >
-              새로고침
-            </button>
-          </div>
-          <RoomList rooms={rooms} error={listError} status={status} onReconnect={reconnect} />
-        </section>
       </div>
     </div>
   );
@@ -302,7 +318,7 @@ function RoomList({ rooms, error, status, onReconnect }: RoomListProps) {
             </div>
             {joinable ? (
               <Link
-                href={roomPath(r.code, r.locked)}
+                href={battleRoomPath(r.code, r.locked)}
                 className="flex min-h-11 items-center rounded-full border border-sky-400/50 px-4 text-xs font-semibold text-sky-200 hover:bg-sky-500/10"
               >
                 입장

@@ -11,6 +11,11 @@ vi.mock('@/app/games/_shared/lib/replayLoader', () => ({ loadReplay: (...a: unkn
 // 판은 그리지 않는다 — 재생 컨트롤만 본다
 vi.mock('../../../components/TetrisCanvas', () => ({ TetrisCanvas: () => null }));
 vi.mock('@/app/games/_shared/hooks/useKakaoReady', () => ({ useKakaoReady: () => ({ kakao: 'off', kakaoScript: null }) }));
+const sound = { playCues: vi.fn(), setMusicPlaying: vi.fn(), unlock: vi.fn() };
+vi.mock('../../../lib/sound/soundPlayer', async (importActual) => ({
+  ...(await importActual<typeof import('../../../lib/sound/soundPlayer')>()),
+  getSoundPlayer: () => sound,
+}));
 
 import ReplayPlayer from './ReplayPlayer';
 
@@ -29,6 +34,8 @@ async function ready(name = 'back-to-back') {
 describe('싱글 리플레이 재생기 (games-polish P4)', () => {
   beforeEach(() => {
     loadReplay.mockReset();
+    sound.playCues.mockReset();
+    sound.setMusicPlaying.mockReset();
   });
 
   it('하이라이트 — 4줄 순간이 막대 점·버튼으로, 다음을 누르면 그 순간 1.5초 앞으로', async () => {
@@ -75,5 +82,25 @@ describe('싱글 리플레이 재생기 (games-polish P4)', () => {
     render(<ReplayPlayer scoreId={1} />);
     expect(await screen.findByText('기록을 찾을 수 없어요.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
+  });
+
+  it('소리: 재생 중에만 배경음악, 탐색으로 건너뛴 구간의 효과음은 버린다 (P7)', async () => {
+    // 입력이 촘촘한 기록 — 건너뛴 구간에 이동·고정음이 많다
+    const slider = await ready('combo');
+    expect(sound.setMusicPlaying).toHaveBeenLastCalledWith(true);
+    fireEvent.click(screen.getByRole('button', { name: '일시정지' }));
+    expect(sound.setMusicPlaying).toHaveBeenLastCalledWith(false);
+    // 멈춘 채 멀리 탐색 — 건너뛴 이동·고정음이 다음 재생 프레임에 몰려 나면 안 된다
+    // 이 기록은 앞 10초에 하드 드롭·줄 삭제가 몰려 있다 — 그 구간을 건너뛴다
+    fireEvent.change(slider, { target: { value: '590' } });
+    sound.playCues.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: '재생' }));
+    expect(sound.setMusicPlaying).toHaveBeenLastCalledWith(true);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 120));
+    });
+    expect(sound.playCues).toHaveBeenCalled();
+    const largest = Math.max(...sound.playCues.mock.calls.map(([cues]) => (cues as unknown[]).length));
+    expect(largest).toBeLessThanOrEqual(5);
   });
 });

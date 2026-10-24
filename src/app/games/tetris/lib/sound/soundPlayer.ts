@@ -48,6 +48,20 @@ export function orderCuesByPriority(cues: readonly SoundCue[]): readonly SoundCu
   return cues.length > 1 ? [...cues].sort((a, b) => priorityOf(a) - priorityOf(b)) : cues;
 }
 
+/** 큰 사건 — 퍼펙트·승패·KO·T-스핀·4줄·B2B·레벨업. 이동·고정음·한두 줄 삭제·콤보는 뺀다 */
+export function isBigCue(cue: SoundCue): boolean {
+  if (cue.kind === 'clear') return (cue.value ?? 0) >= 4;
+  return priorityOf(cue) <= 2;
+}
+
+/** 다시보기 배속이 이 이상이면 큰 사건만 울린다 — 4배속의 이동·고정음은 소음이 된다 */
+export const REPLAY_BIG_CUES_ONLY_SPEED = 4;
+
+/** 다시보기에서 울릴 신호 — 배속이 빠르면 큰 사건만 (games-polish P7) */
+export function replayCues(cues: readonly SoundCue[], speed: number): readonly SoundCue[] {
+  return speed >= REPLAY_BIG_CUES_ONLY_SPEED ? cues.filter(isBigCue) : cues;
+}
+
 export type SoundPlayer = {
   /** 한 틱에 쌓인 신호를 울린다 — 효과음이 꺼져 있거나 아직 조작 전이면 아무것도 하지 않는다 */
   playCues(cues: readonly SoundCue[]): void;

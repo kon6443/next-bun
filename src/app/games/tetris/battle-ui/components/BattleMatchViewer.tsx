@@ -11,6 +11,11 @@ import { HighlightMarks, HighlightNav } from "@/app/games/_shared/components/Hig
 import type { HighlightKindSpec } from "@/app/games/_shared/lib/highlights";
 import { FRAMES_PER_SECOND } from "../../engine";
 import { TetrisCanvas } from "../../components/TetrisCanvas";
+import { SoundToggle } from "../../components/SoundToggle";
+import { useReducedEffects } from "../../hooks/useReducedEffects";
+import { getSoundPlayer } from "../../lib/sound/soundPlayer";
+import { useAttackTrails } from "../hooks/useAttackTrails";
+import { boardCues, shouldFireAttack, soundBoardId } from "../lib/replayFx";
 import { type ReplayTrack, useBattleMatchReplay } from "../hooks/useBattleMatchReplay";
 import { useBoardFocus } from "../hooks/useBoardFocus";
 import { type BattleHighlightKind, isRunnerDone, lastReceivedGarbage } from "../lib/battleReplayRunner";
@@ -50,7 +55,7 @@ const KO_LABELS: Record<BattleKoReason, string> = {
  * 재생 방식(배속·탐색·처음부터·키보드)은 싱글 리플레이 재생기와 같다
  */
 export function BattleMatchViewer({ matchId }: { matchId: string }) {
-  const { load, tracks, totalFrames, settled, frameRef, seekAll, retry, retryTrack, highlights } = useBattleMatchReplay(matchId);
+  const { load, tracks, totalFrames, settled, frameRef, seekAll, playAll, retry, retryTrack, highlights } = useBattleMatchReplay(matchId);
   const [playback, setPlayback] = useState<Playback>({ playing: true, speed: 1, frame: 0 });
   const [shareOpen, setShareOpen] = useState(false);
   const shareOpenRef = useRef(false);
@@ -64,6 +69,20 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
   const ready = load.status === "ready";
   // 재생 루프는 리플레이를 다 받은 뒤에 — 일부만 온 상태로 흘러가지 않게
   const playable = ready && settled;
+
+  // 연출 — 공격 궤적(보이는 판 사이)·소리(크게 보는 판, 없으면 1위 판 하나 + 어느 판이든 탈락음). 재생 루프가 ref로 읽는다
+  const reduced = useReducedEffects();
+  const trails = useAttackTrails(reduced);
+  const fxRef = useRef({ soundBoard: null as string | null, focusedId: null as string | null, fire: trails.fire });
+  fxRef.current = { soundBoard: soundBoardId(tracks.map((t) => t.player), focus.focusedId), focusedId: focus.focusedId, fire: trails.fire };
+  // 소리 플레이어를 화면에 들어올 때 만들어 둔다 — 첫 조작을 놓치지 않게. 배경음악은 재생 중에만, 나가면 끈다
+  useEffect(() => {
+    const player = getSoundPlayer();
+    return () => player.setMusicPlaying(false);
+  }, []);
+  useEffect(() => {
+    getSoundPlayer().setMusicPlaying(playable && playback.playing);
+  }, [playable, playback.playing]);
 
   const seek = useCallback(
     (target: number) => {
@@ -88,7 +107,17 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
           clock.acc -= FRAME_MS;
           frame++;
         }
-        if (frame !== frameRef.current) seekAll(frame);
+        if (frame !== frameRef.current) {
+          let ko = false;
+          playAll(frame, (track, events) => {
+            const { soundBoard, focusedId, fire } = fxRef.current;
+            const id = track.player.playerId;
+            if (events.ko) ko = true;
+            if (id === soundBoard) getSoundPlayer().playCues(boardCues(events.cues, speed));
+            for (const { from, lines } of events.received) if (shouldFireAttack(from, id, lines, speed, focusedId)) fire(from, id, lines);
+          });
+          if (ko) getSoundPlayer().play({ kind: "ko" });
+        }
         const ended = frame >= totalFrames;
         setPlayback((p) =>
           !ended && Math.abs(frame - p.frame) < PLAYBACK_UI_STEP ? p : { ...p, frame, playing: ended ? false : p.playing },
@@ -100,7 +129,7 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
     };
     rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
-  }, [frameRef, playable, seekAll, totalFrames]);
+  }, [frameRef, playable, playAll, totalFrames]);
 
   const togglePlay = useCallback(() => {
     const current = playbackRef.current;
@@ -187,6 +216,7 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
             {match.playerCount}인전 · {formatFullDateTime(new Date(match.startedAt))}
           </p>
         </div>
+        <SoundToggle className="shrink-0" />
         <button
           type="button"
           onClick={() => setShareOpen(true)}
@@ -230,7 +260,8 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
       {/* 루트 layout이 이미 <main>으로 감싼다 — 중첩하지 않는다 */}
       {/* 크게 볼 때 다른 판은 숨기기만 한다 — 캔버스를 다시 만들지 않고 재생은 계속 따라간다 */}
       <div
-        className={`grid min-h-0 flex-1 gap-2 px-2 pt-2 ${
+        ref={trails.rootRef}
+        className={`relative grid min-h-0 flex-1 gap-2 px-2 pt-2 ${
           focus.focusedId ? "grid-cols-1" : `grid-cols-2 ${tracks.length > 2 ? "grid-rows-2" : ""}`
         }`}
       >
@@ -412,6 +443,7 @@ function ReplayBoard({
       </p>
       <div
         {...boardProps}
+        data-attack-anchor={player.playerId}
         className={`relative min-h-0 flex-1 overflow-hidden rounded-xl border border-white/5 bg-slate-950/40 ${
           boardProps.role ? "cursor-zoom-in focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400" : ""
         }`}

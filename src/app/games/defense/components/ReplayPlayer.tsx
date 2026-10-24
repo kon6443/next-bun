@@ -7,6 +7,8 @@ import { HighlightMarks, HighlightNav } from "@/app/games/_shared/components/Hig
 import type { HighlightKindSpec } from "@/app/games/_shared/lib/highlights";
 import { type FixedStepClock, advanceClock, createClock } from "@/app/games/_shared/lib/fixedStep";
 import { useDefenseCanvas } from "../hooks/useDefenseCanvas";
+import { commandSound, useDefenseSfx } from "../hooks/useDefenseSfx";
+import { useDefenseSettings } from "../hooks/useDefenseSettings";
 import { applyTickEvents, createTickNotice } from "../lib/fx";
 import { TARGET_NAMES, TOWER_NAMES, ENEMY_NAMES } from "../lib/labels";
 import { type DefenseHighlightKind, type PreparedReplay, type ReplayCommand, type ReplayCursor, advanceCursor, initialCursor, seekCursor } from "../lib/replayRunner";
@@ -101,6 +103,13 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
   playingRef.current = playing;
   const speedRef = useRef<number>(speed);
   speedRef.current = speed;
+  // 효과음 — 디펜스 소리 설정을 따른다. 탐색(seekCursor)은 틱 이벤트를 내지 않아 건너뛴 구간은 울리지 않는다
+  const { settings } = useDefenseSettings();
+  const sfx = useDefenseSfx(settings.sound);
+  // 같은 종류 최소 간격은 1~3배속 단계까지 — 0.5배속은 1, 4배속은 3단계
+  useEffect(() => sfx.setSpeed(Math.min(3, Math.ceil(speed))), [sfx, speed]);
+  // 멈춤·끝(재생이 멈춘다)이면 오디오도 쉰다
+  useEffect(() => sfx.setPaused(!playing), [sfx, playing]);
   /** 고정 스텝 시계 — 탐색하면 쌓인 시간을 비운다 (_shared/lib/fixedStep, FE-53) */
   const clockRef = useRef<FixedStepClock>(createClock());
 
@@ -174,10 +183,14 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
               const swap = views.prev;
               views.prev = views.curr;
               views.curr = toRenderView(cursor.state, swap);
-              if (ev) applyTickEvents(ev, views.curr, views.prev, pools, noticeRef.current, true);
+              if (!ev) return;
+              const notice = applyTickEvents(ev, views.curr, views.prev, pools, noticeRef.current, true);
+              for (const sound of notice.sounds) sfx.play(sound, now);
             },
             (command) => {
               if (command.slot >= 0) setHighlight({ slot: command.slot, tick: command.tick });
+              const sound = commandSound(command.op, engine.OP);
+              if (sound >= 0) sfx.play(sound, now);
             },
           );
           clock.acc -= tickMs;
@@ -207,7 +220,7 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [engine, replay.inputs, totalTicks, tps, tickMs, canvas.fgContextRef, canvas.viewportRef]);
+  }, [engine, replay.inputs, totalTicks, tps, tickMs, canvas.fgContextRef, canvas.viewportRef, sfx]);
 
   const togglePlay = useCallback(() => {
     const cursor = cursorRef.current!;
