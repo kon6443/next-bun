@@ -5,7 +5,8 @@ import { useDialog } from "@/app/hooks/useDialog";
 import type { RankingPeriod } from "@/types/game";
 import { ENGINE_VERSION, TICKS_PER_SECOND } from "../engine";
 import type { PlayResult } from "../hooks/useDefensePlay";
-import { DEFENSE_GAME, REPLAY_PLAYER_READY } from "../lib/defenseGame";
+import { formatFrames } from "@/app/games/_shared/lib/format";
+import { DEFENSE_GAME, REPLAY_PLAYER_READY, worstLeakedEnemy } from "../lib/defenseGame";
 import { DefenseShareButton } from "./DefenseShareButton";
 import { ENEMY_NAMES } from "../lib/labels";
 
@@ -36,18 +37,10 @@ type Props = {
 /** 주간 보드는 보드 자체가 1주 — 순위는 보드 전체 하나(daily·weekly·all이 같은 값) */
 const WEEKLY_PERIODS: readonly { key: RankingPeriod; label: string }[] = [{ key: "all", label: "이번 주 순위" }];
 
-function formatTicks(ticks: number): string {
-  const total = Math.floor(ticks / TICKS_PER_SECOND);
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
-}
-
 export function RankedResult({ title, result, score, wave, kills, boardKey, weekly, isNewBest, sessionId, sessionError, accessToken, defaultName, onRetry, requesting = false }: Props) {
   // aria-modal에 맞게 Tab을 안에 가둔다 — 닫을 수 없는 결과라 Esc는 무시. 첫 포커스는 등록 패널 제목 그대로 (games-polish FE-42)
   const dialogRef = useDialog(true, () => {}, { closeOnEscape: false });
-  let worstEnemy = -1;
-  result.leakedLivesByEnemy.forEach((lives, kind) => {
-    if ((lives ?? 0) > (result.leakedLivesByEnemy[worstEnemy] ?? 0)) worstEnemy = kind;
-  });
+  const worstEnemy = worstLeakedEnemy(result.leakedLivesByEnemy);
   const stats = (
     <div className="mt-3">
       <p className="text-xs text-slate-400">{title}</p>
@@ -64,7 +57,7 @@ export function RankedResult({ title, result, score, wave, kills, boardKey, week
         </div>
         <div className="rounded-lg bg-slate-800/60 p-2">
           <dt className="text-xs text-slate-400">시간</dt>
-          <dd className="font-semibold tabular-nums text-white">{formatTicks(result.endTick)}</dd>
+          <dd className="font-semibold tabular-nums text-white">{formatFrames(result.endTick, TICKS_PER_SECOND)}</dd>
         </div>
       </dl>
       {!result.victory && worstEnemy >= 0 && (

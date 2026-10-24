@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, it, expect } from 'vitest';
-import { defenseStatLine, formatDefenseScore, loadBest, loadBests, recordBest, splitDefenseScore } from './defenseGame';
+import { defenseStatLine, worstLeakedEnemy, formatDefenseScore, loadBest, loadBests, recordBest, splitDefenseScore } from './defenseGame';
 
 describe('defenseGame — 보드별 최고 점수·랭킹 요약', () => {
   beforeEach(() => localStorage.clear());
@@ -34,5 +34,13 @@ describe('defenseGame — 보드별 최고 점수·랭킹 요약', () => {
   it('랭킹 행 요약 — 처치·시간(웨이브는 점수 칸)', () => {
     expect(defenseStatLine({ wave: 24, kills: 812 }, 1_880_000)).toBe('처치 812 · 31:20');
     expect(defenseStatLine({}, 0)).toBe('0:00');
+  });
+});
+
+describe('worstLeakedEnemy (games-polish FE-58)', () => {
+  it('목숨을 가장 많이 잃게 한 종류, 같으면 앞 종류, 안 샜으면 -1 (빈 칸 허용)', () => {
+    expect(worstLeakedEnemy([])).toBe(-1);
+    expect(worstLeakedEnemy([0, 0])).toBe(-1);
+    expect(worstLeakedEnemy([1, , 3, 3])).toBe(2);
   });
 });

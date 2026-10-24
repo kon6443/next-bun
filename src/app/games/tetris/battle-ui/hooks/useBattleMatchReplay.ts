@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { sleep } from "@/app/games/_shared/lib/sleep";
 import type { Highlight } from "@/app/games/_shared/lib/highlights";
 import { ApiError } from "@/types/api";
 import { type BattleMatch, type BattleMatchPlayer, isBattleMatchId } from "@/services/tetrisBattleService";
@@ -61,7 +62,6 @@ function createTrack(player: BattleMatchPlayer): ReplayTrack {
   };
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** 판 하나를 target 프레임까지 진행한다 — target이 지금보다 앞이면 가장 가까운 스냅샷부터 다시 */
 function seekTrack(track: ReplayTrack, target: number): void {

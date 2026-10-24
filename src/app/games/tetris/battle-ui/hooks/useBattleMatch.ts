@@ -15,7 +15,8 @@ import type { MatchSync } from "../contexts/BattleSocketContext";
 import { decodeBoard, encodeBoard } from "../lib/boardCodec";
 import type { ReplaySubmitStatus } from "../lib/replaySubmit";
 import { useBattlePlay } from "./useBattlePlay";
-import { ACK_TIMEOUT_MS, useMatchOutbox } from "./useMatchOutbox";
+import { ACK_TIMEOUT_MS } from "../lib/ackTimeout";
+import { useMatchOutbox } from "./useMatchOutbox";
 import { getSoundPlayer } from "../../lib/sound/soundPlayer";
 
 /** 승리음은 마지막 KO 폭발음 뒤에 */

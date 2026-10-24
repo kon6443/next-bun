@@ -66,8 +66,7 @@ export function MatchScreen({
   const kickable = isHost && roomStatus !== "PLAYING" ? new Set(roomPlayers.filter((p) => p.playerId !== myPlayerId).map((p) => p.playerId)) : null;
   const [confirmExit, setConfirmExit] = useState(false);
   // 경기 중 나가기는 기권(되돌릴 수 없음) — 확인을 받는다
-  const inGame = phase.kind === "countdown" || phase.kind === "playing";
-  const requestExit = () => (inGame ? setConfirmExit(true) : onExit());
+  const requestExit = () => (inPlay ? setConfirmExit(true) : onExit());
   // 대상은 lock 응답(targetId)으로 정해진다 — 그 전이라도 살아 있는 상대가 한 명뿐이면 그 사람이 대상이다
   const alive = opponents.filter((o) => o.place === null && !o.out);
   const target = targetId ?? (alive.length === 1 ? alive[0].playerId : null);

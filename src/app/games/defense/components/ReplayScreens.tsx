@@ -8,7 +8,8 @@ import { ApiError } from "@/types/api";
 import type { ParamsReplayData } from "@/types/game";
 import { canReplayVersion, loadReplayEngine } from "../engine-versions";
 import { CAMPAIGN, stagePath } from "../lib/campaign";
-import { formatDefenseScore } from "../lib/defenseGame";
+import { rankingsHref } from "@/app/games/_shared/components/ScoreSubmitPanel";
+import { DEFENSE_GAME, formatDefenseScore } from "../lib/defenseGame";
 import { DIFFICULTY_NAMES } from "../lib/labels";
 import { type LocalReplay, loadLocalReplay } from "../lib/localReplay";
 import { boardTitle, modeOfBoardKey } from "../lib/rankedBoards";
@@ -112,10 +113,10 @@ export function ServerReplay({ scoreId, actions }: { scoreId: number; actions?: 
   // 헤더는 받은 기록이 바뀔 때만 새로 — 준비 effect가 렌더마다 다시 돌지 않게
   const header = useMemo<ReplayHeader | null>(() => (data && data.boardKey && mode ? { mode, boardKey: data.boardKey, seed: data.seed, ticks: data.frames, inputs: data.inputs } : null), [data, mode]);
   const prepared = usePreparedReplay(header, data && mode ? data.engineVersion : null);
-  const rankingsHref = data?.boardKey ? `/games/defense/rankings?board=${data.boardKey}&highlight=${scoreId}` : "/games/defense/rankings";
+  const exitHref = data?.boardKey ? rankingsHref(DEFENSE_GAME.rankingsPath, scoreId, data.boardKey) : DEFENSE_GAME.rankingsPath;
   if (error || (data && !mode)) {
     return (
-      <Status exitHref={rankingsHref} exitLabel="랭킹으로" testId="defense-replay-error">
+      <Status exitHref={exitHref} exitLabel="랭킹으로" testId="defense-replay-error">
         <p className="text-sm text-slate-200">{error?.message ?? "재생할 수 없는 기록이에요."}</p>
         {error?.retryable && (
           <button
@@ -131,14 +132,14 @@ export function ServerReplay({ scoreId, actions }: { scoreId: number; actions?: 
   }
   if (!data || prepared.status === "loading") {
     return (
-      <Status exitHref={rankingsHref} exitLabel="랭킹으로" testId="defense-replay-pending">
+      <Status exitHref={exitHref} exitLabel="랭킹으로" testId="defense-replay-pending">
         <Loading progress={prepared.status === "loading" ? prepared.progress : 0} />
       </Status>
     );
   }
   if (prepared.status === "error") {
     return (
-      <Status exitHref={rankingsHref} exitLabel="랭킹으로" testId="defense-replay-error">
+      <Status exitHref={exitHref} exitLabel="랭킹으로" testId="defense-replay-error">
         <p className="text-sm text-slate-200">{prepared.message}</p>
       </Status>
     );
@@ -149,7 +150,7 @@ export function ServerReplay({ scoreId, actions }: { scoreId: number; actions?: 
       replay={prepared.replay}
       title={boardTitle(data.boardKey!)}
       subtitle={`${data.playerName} · ${formatDefenseScore(data.score)} · ${data.rank}위`}
-      exitHref={rankingsHref}
+      exitHref={exitHref}
       exitLabel="랭킹으로"
       actions={actions?.(data)}
     />

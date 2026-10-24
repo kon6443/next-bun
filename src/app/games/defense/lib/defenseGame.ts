@@ -18,6 +18,15 @@ export const SCORE_PER_WAVE = 1_000_000;
 const SCORE_PER_PERMILLE = 1_000;
 
 /** 점수 → 클리어 웨이브·진척(‰) */
+/** 가장 많이 샌 적 종류(목숨 기준, 같으면 앞 종류) — 하나도 안 샜으면 -1 */
+export function worstLeakedEnemy(leakedLivesByEnemy: readonly (number | undefined)[]): number {
+  let worst = -1;
+  leakedLivesByEnemy.forEach((lives, kind) => {
+    if ((lives ?? 0) > (leakedLivesByEnemy[worst] ?? 0)) worst = kind;
+  });
+  return worst;
+}
+
 export function splitDefenseScore(score: number): { wave: number; progress: number } {
   const safe = Math.max(0, Math.floor(score));
   return { wave: Math.floor(safe / SCORE_PER_WAVE), progress: Math.floor((safe % SCORE_PER_WAVE) / SCORE_PER_PERMILLE) };

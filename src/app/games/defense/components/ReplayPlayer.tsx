@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { type ReactNode, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { formatFrames } from "@/app/games/_shared/lib/format";
 import { HighlightMarks, HighlightNav } from "@/app/games/_shared/components/HighlightRail";
 import type { HighlightKindSpec } from "@/app/games/_shared/lib/highlights";
 import { type FixedStepClock, advanceClock, createClock } from "@/app/games/_shared/lib/fixedStep";
@@ -47,11 +48,6 @@ export const DEFENSE_HIGHLIGHT_KINDS: Record<DefenseHighlightKind, HighlightKind
   leak: { label: "목숨 잃음", dot: "bg-rose-400" },
   boss: { label: "보스 처치", dot: "bg-amber-300" },
 };
-
-function formatTicks(ticks: number, tps: number): string {
-  const total = Math.floor(ticks / tps);
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
-}
 
 /** 명령 한 줄 — 명령 목록·접근성 이름 */
 function commandLabel(replay: PreparedReplay, command: ReplayCommand): string {
@@ -319,7 +315,7 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
               pendingSeekRef.current = target;
             }}
             aria-label="재생 위치"
-            aria-valuetext={`${formatTicks(tick, tps)} / ${formatTicks(totalTicks, tps)}`}
+            aria-valuetext={`${formatFrames(tick, tps)} / ${formatFrames(totalTicks, tps)}`}
             data-testid="defense-replay-seek"
             className="mt-2 h-11 w-full accent-sky-400"
           />
@@ -337,7 +333,7 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
             {playing ? "Ⅱ" : "▶"}
           </button>
           <span className="text-xs tabular-nums text-slate-300" data-testid="defense-replay-time">
-            {formatTicks(tick, tps)} / {formatTicks(totalTicks, tps)}
+            {formatFrames(tick, tps)} / {formatFrames(totalTicks, tps)}
           </span>
           <div role="group" aria-label="재생 배속" className="ml-auto flex gap-1">
             {SPEEDS.map((s) => (
@@ -360,7 +356,7 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
           position={state.tick}
           leadIn={HIGHLIGHT_LEAD_SECONDS * tps}
           slack={HIGHLIGHT_SLACK_SECONDS * tps}
-          formatAt={(at) => formatTicks(at, tps)}
+          formatAt={(at) => formatFrames(at, tps)}
           onSeek={(target) => seek(target)}
         />
         <button
@@ -388,7 +384,7 @@ const CommandList = memo(function CommandList({ replay, tps, onPick }: { replay:
       {replay.commands.map((c, i) => (
         <li key={i}>
           <button type="button" data-testid={`defense-replay-command-${i}`} onClick={() => onPick(c.tick, c.slot)} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-2 text-left text-slate-200 hover:bg-white/5">
-            <span className="w-10 shrink-0 tabular-nums text-slate-400">{formatTicks(c.tick, tps)}</span>
+            <span className="w-10 shrink-0 tabular-nums text-slate-400">{formatFrames(c.tick, tps)}</span>
             <span>{commandLabel(replay, c)}</span>
           </button>
         </li>
