@@ -82,7 +82,8 @@ export function subscribeReducedEffects(listener: () => void): () => void {
     // addEventListener가 없는 옛 Safari — 기기 설정 변경은 다시 들어올 때 반영된다
   }
   const onStorage = (e: StorageEvent) => {
-    if (e.key !== REDUCED_EFFECTS_KEY) return;
+    // clear()는 key가 null — 다른 탭에서 저장소를 비워도 따라간다(소리 설정과 같은 기준, games-polish FE-20)
+    if (e.key !== REDUCED_EFFECTS_KEY && e.key !== null) return;
     memoryPref = null;
     listener();
   };
