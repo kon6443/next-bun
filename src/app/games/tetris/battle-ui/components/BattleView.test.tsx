@@ -118,3 +118,33 @@ describe('BattleView 터치 버튼 자리 (games-polish FE-11)', () => {
     spy.mockRestore();
   });
 });
+
+describe('BattleView 이모트 창 (games-polish FE-31)', () => {
+  const renderPlain = () =>
+    render(
+      <BattleView play={play} meId="p1" opponents={[]} emotes={{}} trailsRootRef={{ current: null }} onEmote={vi.fn()} onExit={vi.fn()} />,
+    );
+
+  it('열면 첫 이모트로 포커스, Esc로 닫으면 토글로 돌아온다', () => {
+    renderPlain();
+    const toggle = screen.getByRole('button', { name: '이모트' });
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    const panel = document.getElementById('battle-emote-panel')!;
+    expect(panel.contains(document.activeElement)).toBe(true);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(document.getElementById('battle-emote-panel')).toBeNull();
+    expect(document.activeElement).toBe(toggle);
+  });
+
+  it('바깥을 누르면 닫힌다 — 판을 가린 채 남지 않게, 창 안을 누르면 그대로', () => {
+    renderPlain();
+    fireEvent.click(screen.getByRole('button', { name: '이모트' }));
+    const panel = document.getElementById('battle-emote-panel')!;
+    fireEvent.pointerDown(panel);
+    expect(document.getElementById('battle-emote-panel')).not.toBeNull();
+    fireEvent.pointerDown(document.body);
+    expect(document.getElementById('battle-emote-panel')).toBeNull();
+  });
+});
+

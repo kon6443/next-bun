@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BOARD_COLS, BOARD_VISIBLE_ROWS } from "@/types/tetrisBattleSocket";
 import type { TetrisBattleEmoteId } from "@/types/tetrisBattleSocket";
 import { TetrisCanvas } from "../../components/TetrisCanvas";
@@ -94,6 +94,34 @@ export function BattleView({
 }: BattleViewProps) {
   const [isCoarse, setIsCoarse] = useState(false);
   const [emoteOpen, setEmoteOpen] = useState(false);
+  const emoteToggleRef = useRef<HTMLButtonElement>(null);
+  const emotePanelRef = useRef<HTMLDivElement>(null);
+  /** 이모트 창 닫기 — 키보드로 닫았으면 토글로 포커스를 돌려준다 */
+  const closeEmotes = useCallback((returnFocus: boolean) => {
+    setEmoteOpen(false);
+    if (returnFocus) emoteToggleRef.current?.focus();
+  }, []);
+  // 열리면 첫 이모트로 포커스, Esc·바깥 누르기로 닫는다 — 판을 가린 채 남지 않게 (games-polish FE-31)
+  useEffect(() => {
+    if (!emoteOpen) return;
+    emotePanelRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      closeEmotes(true);
+    };
+    const onPointer = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (emotePanelRef.current?.contains(target) || emoteToggleRef.current?.contains(target)) return;
+      closeEmotes(false);
+    };
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+    };
+  }, [emoteOpen, closeEmotes]);
   const miniCell = useMiniCell(opponents.length);
   const focus = useBoardFocus(canEnlarge);
   const enlarged = opponents.find((o) => o.playerId === focus.focusedId) ?? null;
@@ -134,9 +162,11 @@ export function BattleView({
         </ul>
         <SoundToggle className="shrink-0" />
         <button
+          ref={emoteToggleRef}
           type="button"
           onClick={() => setEmoteOpen((v) => !v)}
           aria-expanded={emoteOpen}
+          aria-controls="battle-emote-panel"
           aria-label="이모트"
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-700/60 bg-slate-900/70 text-xl"
         >
@@ -144,11 +174,15 @@ export function BattleView({
         </button>
       </header>
       {emoteOpen && (
-        <div className="absolute right-2 top-[calc(env(safe-area-inset-top)+3.5rem)] z-20 rounded-2xl border border-white/10 bg-slate-950/95 p-2 shadow-[0_12px_30px_rgba(2,6,23,0.7)]">
+        <div
+          ref={emotePanelRef}
+          id="battle-emote-panel"
+          className="absolute right-2 top-[calc(env(safe-area-inset-top)+3.5rem)] z-20 rounded-2xl border border-white/10 bg-slate-950/95 p-2 shadow-[0_12px_30px_rgba(2,6,23,0.7)]"
+        >
           <EmoteBar
             compact
             onSend={(id) => {
-              setEmoteOpen(false);
+              closeEmotes(true);
               onEmote(id);
             }}
           />
