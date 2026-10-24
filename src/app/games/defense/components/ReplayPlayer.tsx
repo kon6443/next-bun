@@ -104,12 +104,16 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
   const speedRef = useRef<number>(speed);
   speedRef.current = speed;
   // 효과음 — 디펜스 소리 설정을 따른다. 탐색(seekCursor)은 틱 이벤트를 내지 않아 건너뛴 구간은 울리지 않는다
-  const { settings } = useDefenseSettings();
+  const { settings, update: updateSettings } = useDefenseSettings();
   const sfx = useDefenseSfx(settings.sound);
   // 같은 종류 최소 간격은 1~3배속 단계까지 — 0.5배속은 1, 4배속은 3단계
   useEffect(() => sfx.setSpeed(Math.min(3, Math.ceil(speed))), [sfx, speed]);
-  // 멈춤·끝(재생이 멈춘다)이면 오디오도 쉰다
-  useEffect(() => sfx.setPaused(!playing), [sfx, playing]);
+  /** 소리 버튼 — 이 클릭이 사용자 제스처라 여기서 켜야 컨텍스트가 소리를 낸다(플레이 HUD 토글과 같은 설정) */
+  const toggleSound = () => {
+    const on = !settings.sound;
+    sfx.setEnabled(on);
+    updateSettings({ sound: on });
+  };
   /** 고정 스텝 시계 — 탐색하면 쌓인 시간을 비운다 (_shared/lib/fixedStep, FE-53) */
   const clockRef = useRef<FixedStepClock>(createClock());
 
@@ -247,6 +251,10 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
   }, [togglePlay, seek, tps]);
 
   const state = cursorRef.current.state;
+  // 오디오는 사용자가 멈출 때만 쉰다 — 끝에 닿아 멈춘 것은 그대로 두어 마지막 소리(누수·폭발)가 끝까지 나게(플레이와 같은 규칙)
+  const ended = state.over || state.tick >= totalTicks;
+  const audioPaused = !playing && !ended;
+  useEffect(() => sfx.setPaused(audioPaused), [sfx, audioPaused]);
   const viewport = canvas.viewport;
   // 보이는 시간(tick 상태)은 초 단위로만 갱신된다 — 강조 판정은 지금 커서 틱으로
   const nowTick = state.tick;
@@ -296,6 +304,17 @@ export function ReplayPlayer({ replay, title, subtitle, exitHref, exitLabel, act
             <dd data-testid="defense-replay-wave">{state.wavesStarted}</dd>
           </div>
         </dl>
+        <button
+          type="button"
+          data-testid="defense-sound"
+          data-value={settings.sound ? "on" : "off"}
+          aria-pressed={settings.sound}
+          aria-label="효과음"
+          onClick={toggleSound}
+          className="min-h-11 min-w-11 shrink-0 rounded-full border border-white/15 text-base"
+        >
+          <span aria-hidden="true">{settings.sound ? "🔊" : "🔇"}</span>
+        </button>
         {actions}
       </header>
       <div className="relative min-h-0 flex-1" ref={canvas.containerRef}>
