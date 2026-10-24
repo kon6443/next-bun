@@ -15,7 +15,7 @@ describe('isGamesPath — "게임" 탭 활성', () => {
 
 describe('isFullscreenGamePath — 하단 내비 숨김', () => {
   it('낚시 플레이·테트리스 플레이·리플레이', () => {
-    for (const path of ['/fishing', '/games/tetris/play', '/games/tetris/replays/12', '/games/tetris/battle', '/games/tetris/battle/ABC234']) {
+    for (const path of ['/fishing', '/games/tetris/play', '/games/tetris/play/daily', '/games/tetris/replays/12', '/games/tetris/battle', '/games/tetris/battle/ABC234', '/games/tetris/challenge/41']) {
       expect(isFullscreenGamePath(path)).toBe(true);
     }
   });

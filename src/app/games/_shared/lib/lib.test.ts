@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { estimateRank, formatDurationMs, formatFrames, framesToMs } from './format';
+import { estimateRank, formatDurationMs, formatFrames, formatViewCount, formatWatchTime, framesToMs } from './format';
 import { normalizePlayerName, validatePlayerName } from './playerName';
 import { classifySubmitError } from './submitError';
 import { ApiError } from '@/types/api';
@@ -112,5 +112,21 @@ describe('등록 실패 분류', () => {
     expect(classifySubmitError(new TypeError('x'), false).kind).toBe('retry');
     expect(classifySubmitError(api('TOO_MANY_REQUESTS', 429), false).kind).toBe('retry');
     expect(classifySubmitError(api('INTERNAL_SERVER_ERROR', 500), false).kind).toBe('retry');
+  });
+});
+
+describe('조회수·시청 시간 표시 (replay-views)', () => {
+  it('조회수는 천 단위 구분, 응답에 없으면 0', () => {
+    expect(formatViewCount(1234)).toBe('조회 1,234');
+    expect(formatViewCount(undefined)).toBe('조회 0');
+  });
+
+  it('시청 시간은 초·분·시간 — 아래 단위는 버린다', () => {
+    expect(formatWatchTime(-5)).toBe('시청 0초');
+    expect(formatWatchTime(59_999)).toBe('시청 59초');
+    expect(formatWatchTime(60_000)).toBe('시청 1분');
+    expect(formatWatchTime(59 * 60_000 + 59_000)).toBe('시청 59분');
+    expect(formatWatchTime(60 * 60_000)).toBe('시청 1시간');
+    expect(formatWatchTime(3 * 60 * 60_000 + 5 * 60_000 + 30_000)).toBe('시청 3시간 5분');
   });
 });

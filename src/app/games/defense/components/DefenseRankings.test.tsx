@@ -7,7 +7,9 @@ import { RankedCards } from './RankedCards';
 
 const getGameBoards = vi.hoisted(() => vi.fn());
 const getGameRankings = vi.hoisted(() => vi.fn());
-vi.mock('@/services/gameService', () => ({ getGameBoards, getGameRankings }));
+// 명예의 전당은 HallOfFame 테스트 몫 — 여기서는 빈 목록(섹션 숨김)
+const getHallOfFame = vi.hoisted(() => vi.fn(() => Promise.resolve({ data: { periods: [] } })));
+vi.mock('@/services/gameService', () => ({ getGameBoards, getGameRankings, getHallOfFame }));
 // next/link 전용 속성(replace·scroll)은 <a>에 넘기지 않는다
 const linkAttrs = (rest: Record<string, unknown>) => Object.fromEntries(Object.entries(rest).filter(([key]) => key !== 'replace' && key !== 'scroll'));
 vi.mock('next/link', () => ({ default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...linkAttrs(rest)}>{children}</a> }));

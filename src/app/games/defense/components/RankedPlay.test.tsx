@@ -239,7 +239,8 @@ describe('RankedPlay — 무한·주간 입구', () => {
     expect(screen.getByRole('link', { name: '랭킹 보기' }).getAttribute('href')).toBe('/games/defense/rankings?highlight=11&board=endless-s1');
     // 재생기·공유 — 무한 기록은 등록 직후 다시보기·공유
     expect(screen.getByRole('link', { name: /내 플레이 다시보기/ }).getAttribute('href')).toBe('/games/defense/replays/11');
-    expect(screen.getByTestId('defense-share').textContent).toBe('이 기록 공유하기');
+    // 전체 1위 — 공유 버튼을 강조하고 자랑 문구로 (games-growth B3)
+    expect(screen.getByTestId('result-share').textContent).toBe('전체 1위! 친구에게 자랑하기');
     // 결과 화면에서 다시 하기 = 새 세션(세션은 판마다 1회용) — 받는 동안 결과는 그대로, 연타해도 한 번만
     let resolveSession: (value: unknown) => void = () => {};
     createGameSession.mockReturnValue(new Promise((resolve) => (resolveSession = resolve)));
