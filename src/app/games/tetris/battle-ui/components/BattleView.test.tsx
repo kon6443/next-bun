@@ -171,3 +171,41 @@ describe('BattleView 미니보드 칸 — 가로 휴대폰 (보드 크기 A0)', 
     spy.mockRestore();
   });
 });
+
+describe('BattleView 상대 판 자리 — 세로 화면 높이가 한계면 판 옆 줄 (보드 크기 A)', () => {
+  const media = (portrait: boolean) =>
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({ matches: query === '(orientation: portrait)' ? portrait : false, media: query, addEventListener: () => {}, removeEventListener: () => {} }) as unknown as MediaQueryList,
+    );
+  /** 판 영역(헤더·패드를 뺀 줄) 크기 — 모든 요소가 같은 크기를 돌려주지만 판정은 이 줄만 잰다 */
+  const rowSize = (width: number, height: number) =>
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width, height, top: 0, left: 0, right: width, bottom: height, x: 0, y: 0, toJSON: () => ({}) });
+  const renderOne = () =>
+    render(
+      <BattleView play={play} meId="p1" opponents={[opponent('p2', '친구')]} emotes={{}} trailsRootRef={{ current: null }} onEmote={vi.fn()} onExit={vi.fn()} />,
+    );
+
+  it('375×667 1명(판 영역 375×292, 높이가 한계) — 옆 줄로 옮긴다: 셀 12 → 17 계산, 미니보드는 공격 궤적 기준점 그대로', () => {
+    const spies = [media(true), rowSize(375, 292)];
+    renderOne();
+    expect(screen.getByTestId('opponents-side')).toBeInTheDocument();
+    expect(screen.queryByTestId('opponents-header')).toBeNull();
+    expect(screen.getByText('친구').closest('[data-attack-anchor]')?.getAttribute('data-attack-anchor')).toBe('p2');
+    spies.forEach((s) => s.mockRestore());
+  });
+
+  it('390×844 1명(판 영역 390×463, 폭이 한계) — 헤더 그대로: 옆 줄이면 셀이 20 → 18로 준다', () => {
+    const spies = [media(true), rowSize(390, 463)];
+    renderOne();
+    expect(screen.getByTestId('opponents-header')).toBeInTheDocument();
+    spies.forEach((s) => s.mockRestore());
+  });
+
+  it('가로 화면은 대상이 아니다 — 높이가 한계여도 헤더 그대로', () => {
+    const spies = [media(false), rowSize(844, 161)];
+    renderOne();
+    expect(screen.getByTestId('opponents-header')).toBeInTheDocument();
+    spies.forEach((s) => s.mockRestore());
+  });
+});
