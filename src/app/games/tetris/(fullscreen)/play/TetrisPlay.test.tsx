@@ -123,7 +123,7 @@ describe('TetrisPlay 시작 (games-polish FE-12)', () => {
       fireEvent.click(screen.getByRole('button', { name: '시작' }));
     });
     expect(screen.getByRole('button', { name: '일시정지' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '설정' }));
+    fireEvent.click(screen.getByRole('button', { name: /^설정 \(소리/ }));
     const dialog = screen.getByRole('dialog', { name: '설정' });
     expect(screen.queryByRole('button', { name: '일시정지' })).toBeNull();
     fireEvent.keyDown(within(dialog).getByRole('button', { name: '닫기' }), { code: 'KeyP', key: 'p' });

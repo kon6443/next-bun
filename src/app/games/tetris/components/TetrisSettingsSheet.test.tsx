@@ -63,10 +63,20 @@ describe('테트리스 설정 시트 (D-001)', () => {
   it('설정 버튼 — 열고 닫을 때 알린다(게임은 열 때 멈춘다), 톱니는 "설정"으로 읽힌다', () => {
     const onOpenChange = vi.fn();
     render(<GameSettingsButton onOpenChange={onOpenChange} renderSheet={(close) => <TetrisSettingsSheet onClose={close} />} />);
-    fireEvent.click(screen.getByRole('button', { name: '설정' }));
+    fireEvent.click(screen.getByRole('button', { name: /^설정 \(소리/ }));
     expect(screen.getByRole('dialog', { name: '설정' })).toBeTruthy();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(onOpenChange.mock.calls).toEqual([[true], [false]]);
+  });
+
+  it('톱니는 소리 버튼 자리를 대신한다 — 꺼져 있으면 음소거 배지·이름에 "소리 꺼짐", 켜면 배지가 사라진다', () => {
+    render(<GameSettingsButton renderSheet={(close) => <TetrisSettingsSheet onClose={close} />} />);
+    const button = screen.getByRole('button', { name: '설정 (소리 꺼짐)' });
+    expect(within(button).getByTestId('settings-sound-off')).toBeTruthy();
+    fireEvent.click(button);
+    fireEvent.click(within(screen.getByRole('dialog', { name: '설정' })).getByRole('checkbox', { name: '효과음' }));
+    expect(screen.getByRole('button', { name: '설정 (소리 켜짐)' })).toBe(button);
+    expect(within(button).queryByTestId('settings-sound-off')).toBeNull();
   });
 });
