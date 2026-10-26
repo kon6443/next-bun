@@ -241,6 +241,8 @@ export default function SkinsCatalogView() {
           )}
         </div>
       </section>
+      {/* 하단 내비(떠 있는 카드형)에 마지막 카드가 가리지 않게 — 테트리스 홈과 같은 여백 */}
+      <div aria-hidden="true" className="h-8" />
     </TeamsPageLayout>
   );
 }
