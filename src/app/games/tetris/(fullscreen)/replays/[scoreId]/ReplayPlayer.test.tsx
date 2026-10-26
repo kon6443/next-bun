@@ -8,6 +8,8 @@ import { formatFrames } from '@/app/games/_shared/lib/format';
 
 const loadReplay = vi.fn();
 const getGameScore = vi.fn();
+// 설정 시트의 스킨 줄이 로그인 상태를 본다 — 게스트
+vi.mock('next-auth/react', () => ({ useSession: () => ({ data: null, status: 'unauthenticated' }) }));
 vi.mock('@/services/gameService', () => ({ getGameScore: (...a: unknown[]) => getGameScore(...a) }));
 vi.mock('@/app/games/_shared/lib/replayLoader', () => ({ loadReplay: (...a: unknown[]) => loadReplay(...a) }));
 // 판은 그리지 않는다 — 재생 컨트롤만 본다
@@ -120,12 +122,12 @@ describe('싱글 리플레이 재생기 (games-polish P4)', () => {
     expect(largest).toBeLessThanOrEqual(5);
   });
 
-  it('소리 설정 모달 안의 키(음량 막대 ←/→·Space)는 뒤의 재생을 옮기지 않는다 (P8)', async () => {
+  it('설정 시트 안의 키(음량 막대 ←/→·Space)는 뒤의 재생을 옮기지 않는다 (P8)', async () => {
     const slider = await ready();
     fireEvent.click(screen.getByRole('button', { name: '일시정지' }));
     const before = slider.value;
-    fireEvent.click(screen.getByRole('button', { name: /소리 설정/ }));
-    const dialog = screen.getByRole('dialog', { name: '소리 설정' });
+    fireEvent.click(screen.getByRole('button', { name: '설정' }));
+    const dialog = screen.getByRole('dialog', { name: '설정' });
     const volume = within(dialog).getByRole('slider', { name: '효과음 음량' });
     fireEvent.keyDown(volume, { code: 'ArrowRight', key: 'ArrowRight' });
     fireEvent.keyDown(dialog, { code: 'Space', key: ' ' });

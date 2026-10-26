@@ -115,7 +115,7 @@ describe('TetrisPlay 시작 (games-polish FE-12)', () => {
     expect(screen.getByText('준비됐나요?')).toBeTruthy();
   });
 
-  it('소리 설정 모달을 열면 판을 멈추고, 모달 안의 P·Esc는 뒤의 판을 다시 진행시키지 않는다 (P8)', async () => {
+  it('설정 시트을 열면 판을 멈추고, 모달 안의 P·Esc는 뒤의 판을 다시 진행시키지 않는다 (P8)', async () => {
     createGameSession.mockResolvedValue({ data: session(new Date(Date.now() + 2 * HOUR).toISOString()) });
     render(<TetrisPlay />);
     await act(async () => {});
@@ -123,13 +123,13 @@ describe('TetrisPlay 시작 (games-polish FE-12)', () => {
       fireEvent.click(screen.getByRole('button', { name: '시작' }));
     });
     expect(screen.getByRole('button', { name: '일시정지' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /소리 설정/ }));
-    const dialog = screen.getByRole('dialog', { name: '소리 설정' });
+    fireEvent.click(screen.getByRole('button', { name: '설정' }));
+    const dialog = screen.getByRole('dialog', { name: '설정' });
     expect(screen.queryByRole('button', { name: '일시정지' })).toBeNull();
     fireEvent.keyDown(within(dialog).getByRole('button', { name: '닫기' }), { code: 'KeyP', key: 'p' });
     expect(screen.queryByRole('button', { name: '일시정지' })).toBeNull();
     fireEvent.keyDown(dialog, { code: 'Escape', key: 'Escape' });
-    expect(screen.queryByRole('dialog', { name: '소리 설정' })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: '설정' })).toBeNull();
     expect(screen.queryByRole('button', { name: '일시정지' })).toBeNull();
   });
 

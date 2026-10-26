@@ -19,8 +19,8 @@ import { TetrisCanvas } from "../../components/TetrisCanvas";
 import { useMySkins } from "../../hooks/useMySkins";
 import { GamePad } from "@/app/games/_shared/components/GamePad";
 import { TETRIS_PAD_LAYOUT } from "../../lib/tetrisPadLayout";
-import { EffectsToggle } from "../../components/EffectsToggle";
-import { SoundButton } from "@/app/games/_shared/components/SoundButton";
+import { TetrisSettingsSheet } from "../../components/TetrisSettingsSheet";
+import { GameSettingsButton } from "@/app/games/_shared/components/GameSettingsButton";
 import { type GameResult, GameOverPanel } from "../../components/GameOverPanel";
 import { useTetrisPlay } from "../../hooks/useTetrisPlay";
 import { CONTROL_GUIDE } from "../../lib/controls";
@@ -48,6 +48,9 @@ const SESSION_TTL_FALLBACK_MS = 120 * 60 * 1000;
 const SESSION_PLAY_MARGIN_MS = 61 * 60 * 1000;
 /** 세션 응답이 이만큼 늦으면 "등록 없이 시작"을 보인다 — 발급 상한(10초)까지 시작을 막지 않게 (games-polish FE-12) */
 export const SLOW_SESSION_MS = 3000;
+/** 준비·일시정지 메뉴의 "설정" — 메뉴의 보조 버튼(secondary)과 같은 모양 */
+const OVERLAY_SETTINGS_CLASS =
+  "mt-2 min-h-11 w-full rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40";
 
 function randomSeed(): number {
   return crypto.getRandomValues(new Uint32Array(1))[0];
@@ -179,7 +182,11 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
     requestSession();
   }, [authStatus, requestSession]);
 
-  const { start: startPlay } = play;
+  const { start: startPlay, pause: pausePlay } = play;
+  const pauseOnOpen = useCallback((open: boolean) => {
+    if (open) pausePlay();
+  }, [pausePlay]);
+  const renderSettings = useCallback((close: () => void) => <TetrisSettingsSheet onClose={close} controls="next-game" />, []);
   const beginGame = useCallback(
     (seed: number) => {
       setResult(null);
@@ -283,8 +290,8 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
             <dd className="text-[clamp(11px,3.4vw,14px)] font-bold tracking-tight text-white">{formatFrames(play.hud.frame)}</dd>
           </div>
         </dl>
-        {/* 소리 설정 모달을 여는 동안 판을 멈춘다 */}
-        <SoundButton className="shrink-0" onOpenChange={(open) => open && play.pause()} />
+        {/* 설정 시트(소리·조작·연출·스킨)를 여는 동안 판을 멈춘다 — DAS·ARR은 다음 판부터 */}
+        <GameSettingsButton className="shrink-0" onOpenChange={pauseOnOpen} renderSheet={renderSettings} />
         <button
           type="button"
           onClick={(e) => {
@@ -344,7 +351,9 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
                   등록 없이 시작
                 </Button>
               )}
-              <EffectsToggle className="mt-3" />
+              <GameSettingsButton onOpenChange={pauseOnOpen} renderSheet={renderSettings} className={OVERLAY_SETTINGS_CLASS}>
+                설정
+              </GameSettingsButton>
               {!isCoarse && <ControlGuide />}
             </div>
           </Overlay>
@@ -362,7 +371,9 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
                   처음부터
                 </Button>
               </div>
-              <EffectsToggle className="mt-3" />
+              <GameSettingsButton onOpenChange={pauseOnOpen} renderSheet={renderSettings} className={OVERLAY_SETTINGS_CLASS}>
+                설정
+              </GameSettingsButton>
               {!isCoarse && <ControlGuide />}
             </div>
           </Overlay>

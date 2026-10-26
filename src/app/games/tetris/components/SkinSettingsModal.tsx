@@ -146,37 +146,3 @@ export function SkinSettingsSection({ onNavigate }: { onNavigate?: () => void })
     </>
   );
 }
-
-
-/** 설정 목록의 진입 줄 — 소리 설정 줄과 같은 모양 */
-export function SkinSettingsEntry({ onOpenChange }: { onOpenChange?: (open: boolean) => void }) {
-  const [open, setOpen] = useState(false);
-  const { equipped, loggedIn } = useMySkins();
-  const show = (next: boolean) => {
-    setOpen(next);
-    onOpenChange?.(next);
-  };
-  const summary = loggedIn
-    ? SKIN_SLOTS.map((s) => `${SKIN_SLOT_LABELS[s]} ${SKIN_ITEM_LABELS[equipped[s]] ?? equipped[s]}`).join(" · ")
-    : "로그인하면 스킨 선택";
-  return (
-    <>
-      <button
-        type="button"
-        data-testid="skin-settings-entry"
-        onClick={() => show(true)}
-        aria-haspopup="dialog"
-        className="flex min-h-12 w-full items-center gap-3 rounded-xl px-2 text-left hover:bg-white/5"
-      >
-        <span className="flex-1">
-          <span className="block text-sm font-semibold text-slate-100">스킨</span>
-          <span className="block text-xs text-slate-400">{summary}</span>
-        </span>
-        <span aria-hidden="true" className="text-slate-400">
-          ›
-        </span>
-      </button>
-      {open && <SkinSettingsModal onClose={() => show(false)} />}
-    </>
-  );
-}

@@ -8,7 +8,6 @@ import { ConfirmModal } from "@/app/components/ConfirmModal";
 import { getGameRankings, submitGameScore } from "@/services/gameService";
 import type { RankingItem } from "@/types/game";
 import { extractErrorMessage } from "@/app/utils/errorUtils";
-import { ARR_MAX, ARR_MIN, DAS_MAX, DAS_MIN } from "./engine";
 import { RankingTable } from "@/app/games/_shared/components/RankingTable";
 import { TETRIS_GAME } from "./lib/game";
 import { BattleEntry } from "./battle-ui/components/BattleEntry";
@@ -16,12 +15,11 @@ import { RecentBattles } from "./battle-ui/components/RecentBattles";
 import { DailyCard } from "./components/DailyCard";
 import { tetrisRankLabel } from "./lib/replayCard";
 import { PopularReplaysPreview } from "@/app/games/_shared/components/PopularReplaysPreview";
-import { SoundButton } from "@/app/games/_shared/components/SoundButton";
-import { SoundSettingsEntry } from "@/app/games/_shared/components/SoundSettingsEntry";
+import { GameSettingsButton } from "@/app/games/_shared/components/GameSettingsButton";
 import { ReloginButton } from "@/app/games/_shared/components/ReloginButton";
-import { SkinSettingsEntry } from "./components/SkinSettingsModal";
+import { TetrisSettingsSheet } from "./components/TetrisSettingsSheet";
 import { CONTROL_GUIDE } from "./lib/controls";
-import { formatScore, framesToMs } from "@/app/games/_shared/lib/format";
+import { formatScore } from "@/app/games/_shared/lib/format";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
 import { classifySubmitError } from "@/app/games/_shared/lib/submitError";
 import {
@@ -33,7 +31,6 @@ import {
   removePendingSubmission,
   saveLastName,
 } from "./lib/storage";
-import { useTetrisSettings } from "./hooks/useTetrisSettings";
 
 const PREVIEW_LIMIT = 5;
 
@@ -45,8 +42,6 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
   const [pendingName, setPendingName] = useState("");
 
   const [best, setBest] = useState(0);
-  // 조작 설정 — 구독 스토어(플레이·설정 시트와 같은 값). 저장은 바꿀 때 한 번(StrictMode에도, games-polish FE-52)
-  const { settings, update: updateSettings } = useTetrisSettings();
   const [myScoreIds, setMyScoreIds] = useState<ReadonlySet<number>>(new Set());
   const [preview, setPreview] = useState<RankingItem[] | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -132,8 +127,8 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
         <div className="flex items-center justify-between">
           <SectionLabel spacing="wide">Tetris</SectionLabel>
           <div className="flex items-center gap-2">
-            {/* 소리 설정은 첫 화면에서 — 설정 섹션까지 내려가지 않아도 되게 (P8) */}
-            <SoundButton />
+            {/* 설정(소리·조작·연출·스킨)은 첫 화면에서 — 아래 섹션까지 내려가지 않아도 되게 (P8·D-001) */}
+            <GameSettingsButton testId="tetris-settings-open" renderSheet={(close) => <TetrisSettingsSheet onClose={close} />} />
             <ButtonLink href="/games" variant="secondary" size="md">
               ← 게임 목록
             </ButtonLink>
@@ -259,38 +254,20 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
         <p className="mt-3 text-xs text-slate-500">모바일은 화면 아래 버튼으로 조작해요. 여러 버튼을 동시에 누를 수 있어요.</p>
 
         <h2 className="mt-6 text-base font-semibold text-white">설정</h2>
-        <div className="mt-3 space-y-4">
-          <RangeSetting
-            id="tetris-das"
-            label="이동 반복 시작 (DAS)"
-            hint="누르고 있을 때 연속 이동이 시작되기까지"
-            min={DAS_MIN}
-            max={DAS_MAX}
-            value={settings.das}
-            display={`${framesToMs(settings.das)}ms`}
-            onChange={(das) => updateSettings({ das })}
-          />
-          <RangeSetting
-            id="tetris-arr"
-            label="이동 반복 간격 (ARR)"
-            hint="0이면 벽까지 한 번에"
-            min={ARR_MIN}
-            max={ARR_MAX}
-            value={settings.arr}
-            display={settings.arr === 0 ? "즉시" : `${framesToMs(settings.arr)}ms`}
-            onChange={(arr) => updateSettings({ arr })}
-          />
-          <label className="flex min-h-11 items-center justify-between gap-3 text-sm text-slate-300">
-            <span>진동 (지원하는 기기)</span>
-            <input
-              type="checkbox"
-              checked={settings.vibration}
-              onChange={(e) => updateSettings({ vibration: e.target.checked })}
-              className="h-5 w-5 accent-sky-400"
-            />
-          </label>
-          <SoundSettingsEntry />
-          <SkinSettingsEntry />
+        <div className="mt-2 space-y-2">
+          <GameSettingsButton
+            testId="tetris-settings-entry"
+            renderSheet={(close) => <TetrisSettingsSheet onClose={close} />}
+            className="flex min-h-12 w-full items-center gap-3 rounded-xl px-2 text-left hover:bg-white/5"
+          >
+            <span className="flex-1">
+              <span className="block text-sm font-semibold text-slate-100">설정 열기</span>
+              <span className="block text-xs text-slate-400">조작(DAS·ARR·진동) · 소리 · 연출 · 스킨</span>
+            </span>
+            <span aria-hidden="true" className="text-slate-400">
+              ›
+            </span>
+          </GameSettingsButton>
           <ButtonLink href="/games/tetris/skins" variant="secondary" size="md" fullWidth className="min-h-11">
             스킨 도감 — 모든 스킨과 얻는 방법
           </ButtonLink>
@@ -301,43 +278,5 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
       {/* 하단 내비(떠 있는 카드형)에 마지막 항목이 가리지 않게 — 디펜스 허브와 같은 여백 */}
       <div aria-hidden="true" className="h-8" />
     </TeamsPageLayout>
-  );
-}
-
-type RangeSettingProps = {
-  id: string;
-  label: string;
-  hint: string;
-  min: number;
-  max: number;
-  value: number;
-  display: string;
-  onChange: (value: number) => void;
-};
-
-function RangeSetting({ id, label, hint, min, max, value, display, onChange }: RangeSettingProps) {
-  return (
-    <div>
-      <div className="flex items-center justify-between text-sm">
-        <label htmlFor={id} className="text-slate-300">
-          {label}
-        </label>
-        <span className="font-mono text-sky-300">{display}</span>
-      </div>
-      <input
-        id={id}
-        type="range"
-        min={min}
-        max={max}
-        step={1}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        aria-describedby={`${id}-hint`}
-        className="mt-1 h-11 w-full accent-sky-400"
-      />
-      <p id={`${id}-hint`} className="text-xs text-slate-500">
-        {hint}
-      </p>
-    </div>
   );
 }

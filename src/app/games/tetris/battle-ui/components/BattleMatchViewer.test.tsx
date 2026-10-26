@@ -9,6 +9,8 @@ import type { BattleReplayInput } from '../../battle-engine';
 
 const getBattleMatch = vi.fn();
 const getBattleReplay = vi.fn();
+// 설정 시트의 스킨 줄이 로그인 상태를 본다 — 게스트
+vi.mock('next-auth/react', () => ({ useSession: () => ({ data: null, status: 'unauthenticated' }) }));
 vi.mock('@/services/tetrisBattleService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/services/tetrisBattleService')>()),
   getBattleMatch: (...a: unknown[]) => getBattleMatch(...a),
@@ -267,7 +269,7 @@ describe('대전 경기 페이지 (DESIGN §18)', () => {
     });
   });
 
-  it('소리 설정 모달 안의 ←/→는 뒤의 경기 재생을 옮기지 않는다 (P8)', async () => {
+  it('설정 시트 안의 ←/→는 뒤의 경기 재생을 옮기지 않는다 (P8)', async () => {
     getBattleMatch.mockResolvedValue({ data: match });
     getBattleReplay.mockResolvedValue({ data: replay });
     render(<BattleMatchViewer matchId={MATCH_ID} />);
@@ -275,8 +277,8 @@ describe('대전 경기 페이지 (DESIGN §18)', () => {
     fireEvent.click(screen.getByRole('button', { name: '일시정지' }));
     const seek = screen.getByRole('slider', { name: '재생 위치' }) as HTMLInputElement;
     const before = seek.value;
-    fireEvent.click(screen.getByRole('button', { name: /소리 설정/ }));
-    const dialog = screen.getByRole('dialog', { name: '소리 설정' });
+    fireEvent.click(screen.getByRole('button', { name: '설정' }));
+    const dialog = screen.getByRole('dialog', { name: '설정' });
     fireEvent.keyDown(within(dialog).getByRole('slider', { name: '효과음 음량' }), { code: 'ArrowRight', key: 'ArrowRight' });
     expect(seek.value).toBe(before);
   });

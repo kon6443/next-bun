@@ -18,7 +18,8 @@ import { displayedViewCount, useRecordedViewCount, useReplayWatchReport } from "
 import { cloneGameState } from "../../../lib/gameSnapshot";
 import { type EffectTracker, createEffectTracker, drainCues, observeAfter, observeBefore } from "../../../lib/effects";
 import { getSoundPlayer, replayCues } from "../../../lib/sound/soundPlayer";
-import { SoundButton } from "@/app/games/_shared/components/SoundButton";
+import { GameSettingsButton } from "@/app/games/_shared/components/GameSettingsButton";
+import { TetrisSettingsSheet } from "../../../components/TetrisSettingsSheet";
 import { loadReplay } from "@/app/games/_shared/lib/replayLoader";
 import { TETRIS_SHARE } from "../../../lib/share";
 import { challengePath, challengeRootId } from "../../../lib/challenge";
@@ -357,7 +358,7 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
             <span className="shrink-0">· {formatViewCount(displayedViewCount(recordedViewCount, loaded.viewCount))}</span>
           </p>
         </div>
-        <SoundButton className="shrink-0" />
+        <GameSettingsButton className="shrink-0" renderSheet={(close) => <TetrisSettingsSheet onClose={close} />} />
         <button
           type="button"
           onClick={() => setShareOpen(true)}
