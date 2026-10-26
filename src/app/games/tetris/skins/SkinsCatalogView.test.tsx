@@ -9,12 +9,13 @@ vi.mock('@/services/gameService', () => ({ getTetrisSkinCatalog }));
 const getMySkins = vi.hoisted(() => vi.fn());
 const updateMySkins = vi.hoisted(() => vi.fn());
 vi.mock('@/services/userService', () => ({ getMySkins, updateMySkins }));
-vi.mock('react-hot-toast', () => ({ default: { error: vi.fn(), success: vi.fn() } }));
+const toastSuccess = vi.hoisted(() => vi.fn());
+vi.mock('react-hot-toast', () => ({ default: { error: vi.fn(), success: toastSuccess } }));
 const startLogin = vi.hoisted(() => vi.fn());
 vi.mock('@/app/auth/useKakaoLogin', () => ({ useKakaoLogin: () => ({ start: startLogin, isStarting: false }) }));
 
 import { ApiError } from '@/types/api';
-import { __resetMySkinsForTests } from '../lib/mySkins';
+import { __resetMySkinsForTests, resetMySkins } from '../lib/mySkins';
 import SkinsCatalogView, { unlockLabel } from './SkinsCatalogView';
 
 const item = (id: string, unlock: string, owned: boolean, equipped = false) => ({ id, unlock, owned, equipped });
@@ -169,5 +170,23 @@ describe('스킨 도감 (D-005)', () => {
     // 만료 안내는 내 장착 조회만으로 먼저 뜰 수 있다 — 도감 목록이 그려진 뒤를 본다
     const neon = await screen.findByTestId('catalog-block-neon');
     expect(within(neon).queryByRole('button', { name: '장착' })).toBeNull();
+  });
+
+  it('장착이 저장되면 성공 토스트, 응답 전에 세대가 바뀌면(로그아웃 등) 알리지 않는다', async () => {
+    login();
+    getTetrisSkinCatalog.mockResolvedValue(catalog(true));
+    getMySkins.mockResolvedValue(mine());
+    let resolvePut!: (v: unknown) => void;
+    updateMySkins.mockReturnValueOnce(new Promise((r) => (resolvePut = r))).mockResolvedValueOnce(mine({ ...equipped, board: 'gameboy' }));
+    render(<SkinsCatalogView />);
+    const neon = await screen.findByTestId('catalog-block-neon');
+    await waitFor(() => expect(within(neon).getByRole('button', { name: '장착' })).toBeEnabled());
+    toastSuccess.mockReset();
+    fireEvent.click(within(neon).getByRole('button', { name: '장착' }));
+    await act(async () => {
+      resetMySkins();
+      resolvePut(mine({ ...equipped, block: 'neon' }));
+    });
+    expect(toastSuccess).not.toHaveBeenCalled();
   });
 });

@@ -179,7 +179,8 @@ describe('내 스킨 — 장착', () => {
     updateMySkins.mockRejectedValueOnce(expired());
     const first = equipMySkin('board', 'neon', 't1');
     const second = equipMySkin('board', 'gameboy', 't1');
-    await expect(first).rejects.toMatchObject({ status: 401 });
+    // 실패는 마지막 선택 하나로만 알린다(토스트 한 번) — 밀린 앞 선택은 조용히
+    await expect(first).resolves.toBe(false);
     await expect(second).rejects.toMatchObject({ status: 401 });
     expect(updateMySkins).toHaveBeenCalledTimes(1);
     expect(getMySkinsState()).toMatchObject({ status: 'expired', equipped: { board: 'default' } });
@@ -211,5 +212,36 @@ describe('내 스킨 — 장착', () => {
     await expect(equipMySkin('block', 'neon', 'b')).rejects.toThrow('net');
     expect(updateMySkins).toHaveBeenLastCalledWith({ block: 'neon' }, 'b');
     expect(getMySkinsState().equipped.block).toBe('high-contrast');
+  });
+
+  it('같은 슬롯: 앞 요청 실패 · 마지막 선택 성공 — 앞은 조용히(false), 마지막은 true', async () => {
+    await loaded();
+    updateMySkins.mockRejectedValueOnce(new Error('net')).mockResolvedValueOnce(ok({ block: 'gameboy' }));
+    const first = equipMySkin('block', 'neon', 't1');
+    const second = equipMySkin('block', 'gameboy', 't1');
+    await expect(first).resolves.toBe(false);
+    await expect(second).resolves.toBe(true);
+    expect(getMySkinsState().equipped.block).toBe('gameboy');
+  });
+
+  it('성공하면 보낸 값이 아니라 서버가 돌려준 장착으로, 응답의 카탈로그도 반영한다', async () => {
+    await loaded();
+    const updated = { block: [{ id: 'neon', owned: true, unlock: 'free' }], effect: [], board: [], background: [] };
+    updateMySkins.mockResolvedValueOnce({ code: 'SUCCESS', message: '', data: { equipped: { ...base, block: 'gameboy' }, catalog: updated } });
+    await equipMySkin('block', 'neon', 't1');
+    expect(getMySkinsState().equipped.block).toBe('gameboy');
+    expect(getMySkinsState().catalog?.block).toEqual(updated.block);
+  });
+
+  it('불러온 뒤(ready)가 아니면 보내지 않는다 — 불러오는 중·만료(다른 슬롯에서 만료가 난 뒤 포함)', async () => {
+    getMySkins.mockReturnValueOnce(new Promise(() => {}));
+    void loadMySkins('t1');
+    await expect(equipMySkin('block', 'neon', 't1')).resolves.toBe(false);
+    __resetMySkinsForTests();
+    await loaded();
+    updateMySkins.mockRejectedValueOnce(expired());
+    await expect(equipMySkin('board', 'neon', 't1')).rejects.toMatchObject({ status: 401 });
+    await expect(equipMySkin('effect', 'neon', 't1')).resolves.toBe(false);
+    expect(updateMySkins).toHaveBeenCalledTimes(1);
   });
 });

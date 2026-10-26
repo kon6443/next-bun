@@ -6,6 +6,7 @@
  *   보낸 순서 = 서버 저장 순서 = 응답 순서라, 마지막 응답이 곧 서버 최종값이다(응답 순서가 뒤바뀌어 어긋나는 일이 없다)
  * 슬롯마다 서버가 확정한 값(confirmed)을 따로 둔다 — 그 슬롯에 보낼 것이 없어지면 확정값을 보인다(실패하면 저장된 적 없는 값이 남지 않게)
  * 세대(generation) — 로그아웃·다른 토큰으로 다시 불러오면 바뀐다. 이전 세대의 응답·실패는 반영하지도 알리지도 않는다
+ *   (같은 계정으로 다시 로그인한 직후 이전 세대 PUT이 늦게 저장되면 화면과 어긋날 수 있다 — 토큰 갱신이 없어 재로그인 때만 생기는 좁은 경우라 받아들인다)
  */
 
 import { getMySkins, type SkinCatalogItem, type SkinSlotName, updateMySkins } from '@/services/userService';
@@ -139,8 +140,11 @@ async function send(slot: SkinSlotName, choice: Queued, gen: number): Promise<vo
   }
   // 보낼 것이 없다(또는 만료라 보내도 같다) — 확정값을 보인다
   setState({ ...state, ...(expired ? { status: 'expired' as const } : {}), equipped: { ...state.equipped, [slot]: confirmed[slot] } });
-  after?.waiters.forEach((w) => w.reject(error));
-  if (error !== null) choice.waiters.forEach((w) => w.reject(error));
+  if (after) {
+    // 만료라 기다리던 선택을 보내지 않는다 — 실패는 마지막 선택 하나로만 알린다(토스트 한 번), 밀린 앞 선택은 조용히
+    after.waiters.forEach((w) => w.reject(error));
+    choice.waiters.forEach((w) => w.resolve(false));
+  } else if (error !== null) choice.waiters.forEach((w) => w.reject(error));
   else choice.waiters.forEach((w) => w.resolve(true));
 }
 
@@ -149,7 +153,8 @@ async function send(slot: SkinSlotName, choice: Queued, gen: number): Promise<vo
  * 이 선택이 실패하면 서버 확정값으로 돌아가고 에러를 다시 던진다(호출부가 토스트)
  */
 export function equipMySkin(slot: SkinSlotName, id: string, accessToken: string): Promise<boolean> {
-  if (state.equipped[slot] === id) return Promise.resolve(false);
+  // 불러온 뒤(ready)에만 — 불러오는 중이면 늦은 GET이 장착을 덮고, 만료·실패면 보유를 모른다(다른 슬롯에서 만료가 났어도 더 보내지 않는다)
+  if (state.status !== 'ready' || state.equipped[slot] === id) return Promise.resolve(false);
   setState({ ...state, equipped: { ...state.equipped, [slot]: id } });
   return new Promise<boolean>((resolve, reject) => {
     const choice: Queued = { id, accessToken, waiters: [{ resolve, reject }] };
