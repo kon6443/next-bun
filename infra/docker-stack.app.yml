@@ -54,7 +54,9 @@ services:
         monitor: 5s
         max_failure_ratio: 0
       restart_policy:
-        condition: on-failure
+        # any — unhealthy로 내려진 컨테이너는 graceful shutdown(SIGTERM → exit 0)으로 끝나면 Completed가 된다.
+        # on-failure는 Completed를 재시작하지 않아(swarmkit restart.go shouldRestart) 레플리카가 다음 배포까지 빠진 채 남는다
+        condition: any
         delay: 10s
 
 networks:
