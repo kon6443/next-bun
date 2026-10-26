@@ -23,8 +23,22 @@ on:
 permissions:
   contents: read
 
+# PR 은 새 push 가 오면 이전 실행(verify)을 취소한다. main push·수동 실행은 실행마다 그룹이 달라 취소되지 않는다(배포 중단 금지)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # 디펜스 개발용 장기 스위트(차등 코퍼스·병렬 시뮬·스모크, 합쳐 테스트 시간의 절반 이상) — verify-sim 잡이 같은 커밋에서 따로 돌리고
+  # verify 는 뺀다. 두 잡의 합이 전체 테스트다. 파일 이름이 바뀌면 그 파일은 exclude 에 걸리지 않아 verify 에서 돈다(빠지지 않는다).
+  # 셋 다 사라지면 verify-sim 이 0개를 찾아 vitest 가 실패한다 — 그때 이 목록을 고친다
+  SLOW_TESTS: >-
+    src/app/games/defense/engine-dev/corpus/corpus.test.ts
+    src/app/games/defense/engine-dev/sim/pool.test.ts
+    src/app/games/defense/engine-dev/sim/smoke.test.ts
+
 jobs:
-  # 배포 전 게이트: lint·typecheck·test 가 실패하면 이미지 빌드·배포로 넘어가지 않는다.
+  # 배포 전 게이트: lint·typecheck·test(verify·verify-sim) 가 실패하면 배포로 넘어가지 않는다.
   # build 는 아래 Docker 빌드(Dockerfile 의 Node `next build`)가 수행하므로 여기서 중복하지 않는다.
   verify:
     runs-on: ubuntu-24.04-arm
@@ -56,20 +70,48 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # 장기 스위트(SLOW_TESTS)는 verify-sim 이 돌린다
       - name: Test
-        run: pnpm test:run
+        run: |
+          read -ra slow <<< "$SLOW_TESTS"
+          args=()
+          for file in "${slow[@]}"; do args+=(--exclude "$file"); done
+          pnpm test:run "${args[@]}"
 
-  deploy:
-    needs: verify
+  # 장기 스위트만 — verify 와 동시에 돈다(디펜스 엔진 결정성 검증 범위는 그대로)
+  verify-sim:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test (slow suites)
+        run: |
+          read -ra slow <<< "$SLOW_TESTS"
+          pnpm test:run "${slow[@]}"
+
+  # 이미지 빌드는 verify 결과를 쓰지 않는다(Dockerfile 안에서 따로 install·build) — verify 와 동시에 돌려 배포까지의 시간을 줄인다.
+  # verify 가 실패하면 deploy 가 돌지 않아 이 이미지는 배포되지 않는다(SHA 태그 이미지만 레지스트리에 남는다)
+  build:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04-arm
+    # 레지스트리·카카오 키 시크릿이 prod environment 범위다(저장소 시크릿 없음).
+    # prod 에 승인 규칙을 걸면 build 도 승인을 기다려 병렬 효과가 사라진다 — 그때는 시크릿을 build 전용 environment 로 나눈다
     environment: prod
-    # 배포 두 개가 동시에 stack deploy 하지 않게 하나씩 — 진행 중 배포는 끊지 않고 대기열로
-    # (실행 순서까지 보장하지는 않는다: 옛 push 의 verify 가 늦게 끝나면 옛 SHA 가 나중에 배포될 수 있다)
-    concurrency:
-      group: deploy-prod-next
-      cancel-in-progress: false
-
+    outputs:
+      image-tag: ${{ steps.sha.outputs.short }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -103,6 +145,22 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  deploy:
+    needs: [verify, verify-sim, build]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04-arm
+    environment: prod
+    # 배포 두 개가 동시에 stack deploy 하지 않게 하나씩 — 진행 중 배포는 끊지 않고 대기열로
+    # (실행 순서까지 보장하지는 않는다: 옛 push 의 verify·build 가 늦게 끝나면 옛 SHA 가 나중에 배포될 수 있다)
+    concurrency:
+      group: deploy-prod-next
+      cancel-in-progress: false
+
+    steps:
+      # 스택 YAML(infra/) 을 서버로 보내려고 받는다
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Rsync stack YAML to Swarm manager
         env:
           SSH_KEY: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
@@ -131,7 +189,9 @@ jobs:
           script: |
             set -euo pipefail
             export REGISTRY_URL=${{ secrets.REGISTRY_URL }}
-            export IMAGE_TAG=${{ steps.sha.outputs.short }}
+            export IMAGE_TAG=${{ needs.build.outputs.image-tag }}
+            # build 잡 출력이 비면(시크릿 마스킹 등) 잘못된 이미지 참조로 배포하지 않게 바로 멈춘다
+            [ -n "$IMAGE_TAG" ] || { echo "Deploy failed: image tag 비어 있음"; exit 1; }
 
             SERVICE=prod_next_app
             DEADLINE=$((SECONDS + 900))   # 전체 대기 상한 15분

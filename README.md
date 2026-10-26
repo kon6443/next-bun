@@ -32,8 +32,14 @@ Next.js 15 App Router 기반(운영 런타임 Node 24, 패키지 매니저 pnpm)
 
 ## 배포
 `main` 브랜치에 push하면 `.github/workflows/oci_build_and_deploy_next.yml`이 실행된다.
-1. `verify` 잡: lint → typecheck → test:run — 실패하면 배포하지 않는다
-2. `deploy` 잡: 이미지 빌드(Dockerfile — pnpm으로 의존성 설치, Node로 `next build`, 운영 런타임 Node 24) → 레지스트리 push → Swarm 배포
+1. 동시에 도는 세 잡 — 하나라도 실패하면 배포하지 않는다
+   - `verify`: lint → typecheck → test:run(디펜스 장기 스위트 제외)
+   - `verify-sim`: 디펜스 장기 스위트(워크플로 `env.SLOW_TESTS`) — 두 잡의 합이 전체 테스트
+   - `build`: 이미지 빌드(Dockerfile — pnpm으로 의존성 설치, Node로 `next build`, 운영 런타임 Node 24) → 레지스트리 push(SHA 태그)
+2. `deploy` 잡(셋 다 성공한 뒤): 스택 YAML 전송 → Swarm 롤링 배포 → 완료까지 대기(롤백 판정은 `infra/docker-stack.app.yml` healthcheck·`update_config.monitor`)
+
+PR에서는 `verify`·`verify-sim`만 돈다. 같은 PR에 새 push가 오면 이전 실행은 취소된다.
+Actions의 수동 실행(`workflow_dispatch`)은 고른 브랜치를 그대로 빌드·배포한다 — main이 아닌 브랜치로 돌리지 않는다.
 
 서버에서 백엔드를 부르는 로그인 호출은 런타임 env `SERVER_API_BASE`(`infra/docker-stack.app.yml`, 같은 overlay 내부 주소)로 직행한다. 없으면 `NEXT_PUBLIC_API`로 폴백한다(`src/services/serverFetch.ts`).
 
