@@ -4,7 +4,6 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { SOUND_SETTINGS_KEY, __resetSoundSettingsForTests, getSoundSettings } from '../lib/soundSettings';
 import { registerSoundUnlock } from '../lib/soundUnlock';
 import { SoundButton } from './SoundButton';
-import { SoundSettingsEntry } from './SoundSettingsEntry';
 
 describe('공통 소리 버튼·모달 (games-polish P8)', () => {
   let unregister: (() => void) | null = null;
@@ -69,17 +68,14 @@ describe('공통 소리 버튼·모달 (games-polish P8)', () => {
     expect(unlock).toHaveBeenCalledTimes(2);
   });
 
-  it('설정 화면 줄 — 지금 상태를 보이고, 배경음이 없는 게임은 효과음만', () => {
-    render(<SoundSettingsEntry music={false} />);
-    const entry = screen.getByRole('button', { name: /소리 설정/ });
-    expect(entry).toHaveTextContent('효과음 꺼짐');
-    expect(entry).not.toHaveTextContent('배경음');
-    fireEvent.click(entry);
+  it('배경음이 없는 게임(디펜스) — 모달은 효과음만, 켜짐 표시도 효과음만 본다', () => {
+    render(<SoundButton music={false} />);
+    fireEvent.click(screen.getByRole('button', { name: '소리 설정 (꺼짐)' }));
     const dialog = screen.getByRole('dialog', { name: '소리 설정' });
     expect(within(dialog).queryByRole('checkbox', { name: '배경음' })).toBeNull();
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '효과음' }));
     fireEvent.click(within(dialog).getByRole('button', { name: '닫기' }));
-    expect(screen.getByRole('button', { name: /소리 설정/ })).toHaveTextContent('효과음 켜짐');
+    expect(screen.getByRole('button', { name: '소리 설정 (켜짐)' })).toBeTruthy();
   });
 
   it('음량 막대를 끌다 배경에서 놓아도 닫히지 않고, 배경을 눌렀다 떼면 닫힌다', () => {

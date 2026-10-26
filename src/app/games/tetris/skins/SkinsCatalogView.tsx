@@ -80,7 +80,9 @@ export default function SkinsCatalogView() {
   const canEquip = signedIn && mine.status === "ready";
   const isEquipped = (s: TetrisSkinSlot, item: TetrisSkinCatalogItem) =>
     signedIn ? (mine.status === "ready" ? mine.equipped[s] === item.id : item.equipped) : false;
-  const visible = itemsOf(slot).filter((item) => (filter === "owned" ? item.owned : filter === "missing" ? !item.owned : true));
+  // 게스트는 보유 정보가 없다 — 보유 필터를 숨기고 전부(UX 점검: "미보유"를 고르면 전부 나왔다)
+  const activeFilter: Filter = signedIn ? filter : "all";
+  const visible = itemsOf(slot).filter((item) => (activeFilter === "owned" ? item.owned : activeFilter === "missing" ? !item.owned : true));
 
   const equip = async (item: TetrisSkinCatalogItem) => {
     if (!canEquip || !item.owned || isEquipped(slot, item)) return;
@@ -168,19 +170,21 @@ export default function SkinsCatalogView() {
           ))}
         </div>
 
-        <div className="mt-3 flex gap-2" role="group" aria-label="보기">
-          {FILTERS.map((f) => (
-            <button
-              key={f.key}
-              type="button"
-              aria-pressed={filter === f.key}
-              onClick={() => setFilter(f.key)}
-              className={`min-h-11 rounded-full border px-4 text-sm ${filter === f.key ? "border-sky-400 bg-sky-500/10 text-white" : "border-slate-700/50 text-slate-400"}`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+        {signedIn && (
+          <div className="mt-3 flex gap-2" role="group" aria-label="보기">
+            {FILTERS.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                aria-pressed={filter === f.key}
+                onClick={() => setFilter(f.key)}
+                className={`min-h-11 rounded-full border px-4 text-sm ${filter === f.key ? "border-sky-400 bg-sky-500/10 text-white" : "border-slate-700/50 text-slate-400"}`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div id={`${tabsId}-panel`} role="tabpanel" aria-labelledby={`${tabsId}-${slot}`} className="mt-4">
           {load.status === "loading" ? (
@@ -193,7 +197,7 @@ export default function SkinsCatalogView() {
               </button>
             </div>
           ) : visible.length === 0 ? (
-            <p className="text-sm text-slate-400">{filter === "owned" && !signedIn ? "로그인하면 보유한 스킨이 보여요." : "해당하는 스킨이 없어요."}</p>
+            <p className="text-sm text-slate-400">해당하는 스킨이 없어요.</p>
           ) : (
             <ul className="grid grid-cols-2 gap-5 sm:grid-cols-3 sm:gap-4">
               {visible.map((item) => {

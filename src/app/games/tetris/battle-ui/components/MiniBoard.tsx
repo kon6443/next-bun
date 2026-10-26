@@ -116,7 +116,8 @@ export const MiniBoard = memo(function MiniBoard({
       {/* 이름이 길어도 판 폭을 넘지 않게 — 늘어난 캡션이 상대 줄을 넓혀 옆 버튼과 겹치지 않도록 */}
       <figcaption className="flex items-center gap-1 text-[11px] leading-none text-slate-300" style={{ maxWidth: width + 6 }}>
         {isTarget && !out && (
-          <span className="text-rose-300" role="img" aria-label="공격 대상">
+          // 뜻은 대기실 범례와 같은 문구 — 마우스를 올리면 툴팁으로도
+          <span className="text-rose-300" role="img" aria-label="공격 대상" title="공격 대상 — 줄을 지우면 이 상대에게 방해 줄이 가요">
             ▲
           </span>
         )}

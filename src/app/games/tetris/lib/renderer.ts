@@ -37,7 +37,7 @@ import { type BoardSkin, type BoardSkins, DEFAULT_BOARD_SKINS, blockSkin, boardS
 
 /** 판 위에 보여 줄 숨은 줄 수 (생성 위치) */
 const SPAWN_ROWS_SHOWN = 2;
-const SIDE_COLUMNS = 3; // 옆 패널 폭 (판 칸 단위)
+const SIDE_COLUMNS = 2.5; // 옆 패널 폭 (판 칸 단위) — 미니 블록(칸의 0.6) I 4칸 = 2.4칸이 들어가는 최소, 판을 키운다(D-004 S3)
 const MINI_SCALE = 0.6;
 
 export type BoardLayout = {

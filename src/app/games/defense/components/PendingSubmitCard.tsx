@@ -7,6 +7,7 @@ import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib
 import type { PendingSubmission } from "@/app/games/_shared/lib/storage";
 import { classifySubmitError } from "@/app/games/_shared/lib/submitError";
 import { ReloginButton } from "@/app/games/_shared/components/ReloginButton";
+import { invalidateRankings } from "@/app/games/_shared/components/RankingsView";
 import { submitGameScore } from "@/services/gameService";
 import { defenseStorage, formatDefenseScore } from "../lib/defenseGame";
 
@@ -57,6 +58,7 @@ export function PendingSubmitCard() {
     setNeedsLogin(false);
     try {
       const { data } = await submitGameScore("defense", { sessionId: pending.sessionId, playerName, replay: pending.replay }, accessToken);
+      invalidateRankings("defense");
       defenseStorage.addMyScoreId(data.scoreId);
       defenseStorage.saveLastName(data.playerName ?? playerName);
       drop(pending.sessionId);

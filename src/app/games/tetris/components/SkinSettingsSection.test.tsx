@@ -12,7 +12,7 @@ vi.mock('react-hot-toast', () => ({ default: { error: toastError } }));
 
 import { ApiError } from '@/types/api';
 import { __resetMySkinsForTests } from '../lib/mySkins';
-import { SkinSettingsModal } from './SkinSettingsModal';
+import { TetrisSettingsSheet } from './TetrisSettingsSheet';
 
 const equipped = { block: 'default', effect: 'default', board: 'default', background: 'default' };
 const item = (id: string, owned = true) => ({ id, owned, unlock: owned ? 'free' : 'achievement' });
@@ -44,9 +44,9 @@ const login = () => {
   session.value = { data: { user: { accessToken: 'tok' } }, status: 'authenticated' };
 };
 
-describe('스킨 모달', () => {
+describe('스킨 장착 — 설정 시트의 스킨 상세', () => {
   it('게스트 — 로그인 안내, 카드를 눌러도 바꾸지 않는다(서버 호출 없음)', () => {
-    render(<SkinSettingsModal onClose={() => {}} />);
+    render(<TetrisSettingsSheet onClose={() => {}} initialGroup="skin" />);
     expect(screen.getByText(/로그인하면 스킨을 고를 수 있어요/)).toBeTruthy();
     const neon = screen.getByTestId('skin-item-block-neon');
     expect(neon.getAttribute('aria-disabled')).toBe('true');
@@ -60,7 +60,7 @@ describe('스킨 모달', () => {
     login();
     getMySkins.mockResolvedValue(ok());
     updateMySkins.mockResolvedValue(ok({ ...equipped, block: 'neon' }));
-    render(<SkinSettingsModal onClose={() => {}} />);
+    render(<TetrisSettingsSheet onClose={() => {}} initialGroup="skin" />);
     await waitFor(() => expect(screen.getByTestId('skin-item-block-gold-2027')).toBeTruthy());
     fireEvent.click(screen.getByTestId('skin-item-block-neon'));
     expect(screen.getByTestId('skin-item-block-neon').getAttribute('aria-checked')).toBe('true');
@@ -71,7 +71,7 @@ describe('스킨 모달', () => {
   it('잠긴 아이템은 고를 수 없다(서버 SSOT 보유 여부)', async () => {
     login();
     getMySkins.mockResolvedValue(ok());
-    render(<SkinSettingsModal onClose={() => {}} />);
+    render(<TetrisSettingsSheet onClose={() => {}} initialGroup="skin" />);
     const locked = await screen.findByTestId('skin-item-block-gold-2027');
     expect(locked.getAttribute('aria-disabled')).toBe('true');
     expect(locked.textContent).toContain('잠김');
@@ -83,7 +83,7 @@ describe('스킨 모달', () => {
     login();
     getMySkins.mockResolvedValue(ok());
     updateMySkins.mockRejectedValue(new ApiError('USER_SKIN_NOT_OWNED', '아직 얻지 않은 스킨입니다.', 403));
-    render(<SkinSettingsModal onClose={() => {}} />);
+    render(<TetrisSettingsSheet onClose={() => {}} initialGroup="skin" />);
     await screen.findByTestId('skin-item-block-gold-2027');
     fireEvent.click(screen.getByTestId('skin-item-block-gameboy'));
     await waitFor(() => expect(toastError).toHaveBeenCalledWith('아직 얻지 않은 스킨입니다.'));
@@ -93,7 +93,7 @@ describe('스킨 모달', () => {
   it('슬롯 탭 — 배경 탭은 그 슬롯 아이템만', async () => {
     login();
     getMySkins.mockResolvedValue(ok());
-    render(<SkinSettingsModal onClose={() => {}} />);
+    render(<TetrisSettingsSheet onClose={() => {}} initialGroup="skin" />);
     await screen.findByTestId('skin-item-block-gold-2027');
     fireEvent.click(screen.getByRole('tab', { name: '배경' }));
     expect(screen.getByTestId('skin-item-background-neon')).toBeTruthy();
@@ -103,7 +103,7 @@ describe('스킨 모달', () => {
   it('로그인 만료(내 장착 조회 401) — 다시 로그인 안내, 카드는 고를 수 없다(기본으로 보인다)', async () => {
     login();
     getMySkins.mockRejectedValue(new ApiError('AUTH_UNAUTHORIZED', '만료', 401));
-    render(<SkinSettingsModal onClose={() => {}} />);
+    render(<TetrisSettingsSheet onClose={() => {}} initialGroup="skin" />);
     expect(await screen.findByText(/로그인이 만료됐어요/)).toBeTruthy();
     expect(screen.getByRole('button', { name: '다시 로그인' })).toBeTruthy();
     const neon = screen.getByTestId('skin-item-block-neon');
@@ -115,14 +115,14 @@ describe('스킨 모달', () => {
   it('불러오기 실패면 보유를 모르니 고를 수 없다 — 미보유를 골라 403을 보지 않게', async () => {
     login();
     getMySkins.mockRejectedValue(new Error('down'));
-    render(<SkinSettingsModal onClose={() => {}} />);
+    render(<TetrisSettingsSheet onClose={() => {}} initialGroup="skin" />);
     expect(await screen.findByText(/불러오지 못해 기본 스킨으로 보여요/)).toBeTruthy();
     fireEvent.click(screen.getByTestId('skin-item-block-neon'));
     expect(updateMySkins).not.toHaveBeenCalled();
   });
 
   it('장착 중은 글자로도 보인다(색만 아님), 슬롯 탭은 화살표로 옮긴다', async () => {
-    render(<SkinSettingsModal onClose={() => {}} />);
+    render(<TetrisSettingsSheet onClose={() => {}} initialGroup="skin" />);
     expect(within(screen.getByTestId('skin-item-block-default')).getByText('● 장착 중')).toBeTruthy();
     const blockTab = screen.getByRole('tab', { name: '블록' });
     blockTab.focus();

@@ -192,6 +192,10 @@ export function useTetrisPlay(options: { vibration: boolean; onGameOver: (state:
     const onKeyUp = (e: KeyboardEvent) => {
       const binding = KEY_BINDINGS[e.code];
       if (binding?.kind === "hold") release(binding.press);
+      // 판 조작 키의 keyup도 막는다 — 포커스가 남은 머리줄 버튼(톱니·❚❚)을 브라우저에 따라 Space keyup이 누른다(대전과 같은 방어, FE-36)
+      if (binding && binding.kind !== "pause" && statusRef.current === "playing" && !isTypingTarget(e.target, { includeDialogs: true })) {
+        e.preventDefault();
+      }
     };
     const onHidden = () => {
       if (document.hidden) pause();

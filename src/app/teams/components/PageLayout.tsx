@@ -1,6 +1,7 @@
 import { teamsPageBackground, layoutStyles, MOBILE_MAX_WIDTH } from "@/styles/teams";
 
-type MaxWidth = "lg" | "4xl" | "5xl" | "6xl";
+/** lg-wide: 모바일·태블릿은 lg, 데스크톱(lg 이상)은 5xl — 2단 배치 화면용 */
+type MaxWidth = "lg" | "lg-wide" | "4xl" | "5xl" | "6xl";
 
 type TeamsPageLayoutProps = {
   children: React.ReactNode;
@@ -12,6 +13,7 @@ type TeamsPageLayoutProps = {
 
 const maxWidthClasses: Record<MaxWidth, string> = {
   "lg": MOBILE_MAX_WIDTH,
+  "lg-wide": `${MOBILE_MAX_WIDTH} lg:max-w-5xl`,
   "4xl": "max-w-4xl",
   "5xl": "max-w-5xl",
   "6xl": "max-w-6xl",

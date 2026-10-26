@@ -12,7 +12,8 @@ import type { HighlightKindSpec } from "@/app/games/_shared/lib/highlights";
 import { FRAMES_PER_SECOND } from "../../engine";
 import { TetrisCanvas } from "../../components/TetrisCanvas";
 import { toBoardSkins } from "../../lib/skins";
-import { SoundButton } from "@/app/games/_shared/components/SoundButton";
+import { GameSettingsButton } from "@/app/games/_shared/components/GameSettingsButton";
+import { TetrisSettingsSheet } from "../../components/TetrisSettingsSheet";
 import { useReducedEffects } from "../../hooks/useReducedEffects";
 import { getSoundPlayer } from "../../lib/sound/soundPlayer";
 import { useAttackTrails } from "../hooks/useAttackTrails";
@@ -219,7 +220,7 @@ export function BattleMatchViewer({ matchId }: { matchId: string }) {
             {match.playerCount}인전 · {formatFullDateTime(new Date(match.startedAt))}
           </p>
         </div>
-        <SoundButton className="shrink-0" />
+        <GameSettingsButton className="shrink-0" renderSheet={(close) => <TetrisSettingsSheet onClose={close} />} />
         <button
           type="button"
           onClick={() => setShareOpen(true)}

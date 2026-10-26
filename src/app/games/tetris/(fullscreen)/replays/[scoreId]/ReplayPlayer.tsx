@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ApiError } from "@/types/api";
 import type { ReplayData } from "@/types/game";
 import { extractErrorMessage } from "@/app/utils/errorUtils";
-import { formatFullDateTime } from "@/app/utils/taskUtils";
+import { formatCompactDateTime } from "@/app/utils/dateUtils";
 import { ACTION, ENGINE_VERSION, FRAMES_PER_SECOND, type GameState, createGame, stepFrame } from "../../../engine";
 import { TetrisCanvas } from "../../../components/TetrisCanvas";
 import { toBoardSkins } from "../../../lib/skins";
@@ -18,7 +18,8 @@ import { displayedViewCount, useRecordedViewCount, useReplayWatchReport } from "
 import { cloneGameState } from "../../../lib/gameSnapshot";
 import { type EffectTracker, createEffectTracker, drainCues, observeAfter, observeBefore } from "../../../lib/effects";
 import { getSoundPlayer, replayCues } from "../../../lib/sound/soundPlayer";
-import { SoundButton } from "@/app/games/_shared/components/SoundButton";
+import { GameSettingsButton } from "@/app/games/_shared/components/GameSettingsButton";
+import { TetrisSettingsSheet } from "../../../components/TetrisSettingsSheet";
 import { loadReplay } from "@/app/games/_shared/lib/replayLoader";
 import { TETRIS_SHARE } from "../../../lib/share";
 import { challengePath, challengeRootId } from "../../../lib/challenge";
@@ -347,17 +348,17 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
         </Link>
         <div className="min-w-0 flex-1 text-center">
           <p className="truncate text-sm font-semibold text-white">
-            ▶ {loaded.playerName} · {formatScore(loaded.score)}점
+            {loaded.playerName} · {formatScore(loaded.score)}점
           </p>
           {/* 좁은 화면에서도 한 줄 — 순위·날짜만 말줄임, 조회수는 남긴다 */}
           <p className="flex justify-center gap-1 text-xs text-slate-500">
             <span className="truncate">
-              {rankLabel} · {formatFullDateTime(new Date(loaded.createdAt))}
+              {rankLabel} · {formatCompactDateTime(new Date(loaded.createdAt))}
             </span>
             <span className="shrink-0">· {formatViewCount(displayedViewCount(recordedViewCount, loaded.viewCount))}</span>
           </p>
         </div>
-        <SoundButton className="shrink-0" />
+        <GameSettingsButton className="shrink-0" renderSheet={(close) => <TetrisSettingsSheet onClose={close} />} />
         <button
           type="button"
           onClick={() => setShareOpen(true)}
@@ -404,8 +405,9 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
       <div className="relative min-h-0 flex-1">
         {/* 기록 주인의 보드 스킨(D-003) — 이전 서버·익명이면 기본 */}
         <TetrisCanvas stateRef={stateRef} drawRef={drawRef} effectsRef={effectsRef} skins={toBoardSkins(loadedData?.skins)} />
-        <KeyOverlay pressed={pressed} />
       </div>
+      {/* 입력 표시는 판 밖(판 아래 줄) — 판 위에 겹치면 바닥 줄을 가린다(UX 점검) */}
+      <KeyOverlay pressed={pressed} />
 
       {/* 재생 컨트롤 */}
       <footer className="space-y-2 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2">
@@ -509,7 +511,7 @@ const OVERLAY_KEYS: { code: number; label: string }[] = [
 /** 어떤 입력으로 플레이했는지 — 누르고 있는 키·방금 누른 키를 밝게 */
 function KeyOverlay({ pressed }: { pressed: Record<number, boolean> }) {
   return (
-    <div className="pointer-events-none absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1" aria-hidden="true">
+    <div className="pointer-events-none flex justify-center gap-1 pt-1" aria-hidden="true" data-testid="replay-key-overlay">
       {OVERLAY_KEYS.map(({ code, label }) => (
         <span
           key={code}

@@ -147,3 +147,42 @@ describe('BattleLobby 방 목록 (games-polish 새로고침·FE-33)', () => {
     });
   });
 });
+
+describe('BattleLobby 입력 오류는 고칠 자리 옆에 (UX 점검)', () => {
+  beforeEach(() => {
+    listRooms.mockReset();
+    listRooms.mockResolvedValue({ ok: true, data: [] });
+    ctx.status = 'connected';
+    ctx.rooms = [];
+    ctx.createRoom.mockReset();
+    window.localStorage.clear();
+  });
+
+  it('이름을 비우고 아래 "방 만들기" — 이름 칸으로 포커스하고 오류는 이름 카드 안에, 방은 만들지 않는다', async () => {
+    render(<BattleLobby />);
+    await act(async () => {});
+    fireEvent.change(screen.getByLabelText('내 이름'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: '방 만들기' }));
+    const name = screen.getByLabelText('내 이름');
+    expect(document.activeElement).toBe(name);
+    expect(name).toHaveAttribute('aria-invalid', 'true');
+    const alert = screen.getByRole('alert');
+    expect(name.closest('section')?.contains(alert)).toBe(true);
+    expect(ctx.createRoom).not.toHaveBeenCalled();
+  });
+
+  it('방 만들기 실패(서버)는 방 만들기 카드 안에, 코드 오류는 코드 칸 옆에', async () => {
+    ctx.createRoom.mockResolvedValue({ ok: false, code: 'RATE_LIMITED' });
+    render(<BattleLobby />);
+    await act(async () => {});
+    fireEvent.change(screen.getByLabelText('내 이름'), { target: { value: '테트' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '방 만들기' }));
+    });
+    expect(document.getElementById('battle-create')?.contains(screen.getByRole('alert'))).toBe(true);
+    fireEvent.change(screen.getByLabelText('코드로 입장'), { target: { value: '12' } });
+    fireEvent.click(screen.getByRole('button', { name: '입장' }));
+    expect(document.activeElement).toBe(screen.getByLabelText('코드로 입장'));
+    expect(screen.getByLabelText('코드로 입장').closest('form')?.contains(screen.getByRole('alert'))).toBe(true);
+  });
+});
