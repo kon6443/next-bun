@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { RANKINGS_CACHE_MS, RANKINGS_DEBOUNCE_MS, RankingsView, resetRankingsCache } from './RankingsView';
 import { TEST_GAME } from './testGame';
@@ -15,12 +15,18 @@ vi.mock('@/services/gameService', () => ({
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/games/defense/rankings' }));
 vi.mock('next-auth/react', () => ({ useSession: () => ({ data: null, status: 'unauthenticated' }) }));
 
+/** 디바운스만큼 시간을 보내고 응답까지 받는다(가짜 타이머 — 부하에 따라 흔들리지 않게) */
+const passDebounce = async () => {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(RANKINGS_DEBOUNCE_MS);
+  });
+};
 /** 탭을 누르고 디바운스가 지나 응답까지 받는다 */
 const clickTab = async (name: string) => {
   await act(async () => {
     fireEvent.click(screen.getByRole('button', { name }));
-    await new Promise((resolve) => setTimeout(resolve, RANKINGS_DEBOUNCE_MS + 10));
   });
+  await passDebounce();
 };
 
 const item = { rank: 1, scoreId: 5, playerName: '수비왕', score: 3_500_000, detail: { wave: 3 }, durationMs: 60_000, createdAt: '2026-10-21T00:00:00Z' };
@@ -32,6 +38,11 @@ describe('RankingsView — 게임 사양을 따른다', () => {
     getPopularReplays.mockReset();
     window.localStorage.clear();
     resetRankingsCache();
+    // 디바운스 타이머만 가짜로 — 서비스 응답(마이크로태스크)은 그대로
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('제목·뒤로가기·행의 요약·리플레이 링크가 사양에서 온다, 보드를 넘긴다', async () => {
@@ -170,8 +181,8 @@ describe('RankingsView — 게임 사양을 따른다', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: '주간' }));
       fireEvent.click(screen.getByRole('button', { name: '전체' }));
-      await new Promise((resolve) => setTimeout(resolve, RANKINGS_DEBOUNCE_MS + 10));
     });
+    await passDebounce();
     expect(getGameRankings.mock.calls.map((call) => call[1])).toEqual(['daily', 'all']);
     // 일간으로 돌아오면 받아 둔 목록 — 부르지 않고 바로 보인다
     await clickTab('일간');
@@ -190,9 +201,7 @@ describe('RankingsView — 게임 사양을 따른다', () => {
     first.unmount();
     const second = await act(async () => render(<RankingsView game={TEST_GAME} highlightId={null} board="weekly-2026-w43" showPeriods={false} />));
     expect(getGameRankings).toHaveBeenCalledTimes(1);
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, RANKINGS_DEBOUNCE_MS + 10));
-    });
+    await passDebounce();
     expect(getGameRankings).toHaveBeenLastCalledWith('defense', 'all', 50, 'weekly-2026-w43');
     second.unmount();
     await act(async () => {
