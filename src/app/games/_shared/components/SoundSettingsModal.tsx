@@ -1,8 +1,7 @@
 "use client";
 
-import { useId, useRef } from "react";
-import { createPortal } from "react-dom";
-import { useDialog } from "@/app/hooks";
+import { useId } from "react";
+import { SettingsSheet } from "@/app/components/SettingsSheet";
 import { useSoundSettings } from "../hooks/useSoundSettings";
 import type { SoundSettings } from "../lib/soundSettings";
 import { unlockSounds } from "../lib/soundUnlock";
@@ -16,15 +15,19 @@ type Props = {
 /**
  * 게임 공통 소리 설정 모달 (games-polish P8) — 효과음·배경음 켜기/끄기와 음량. 바꾸면 바로 적용(울리던 소리 포함)
  * 켜는 조작은 제스처 핸들러 안에서 저장 → unlockSounds()로 화면의 플레이어를 바로 깨운다(Safari·iOS 조건)
- * 키보드: 열리면 첫 컨트롤로 포커스, Tab은 안에서 돌고, Esc로 닫힌다(useDialog)
- * body로 포털 — 버튼이 놓인 자리(HUD의 nowrap·transform 조상 등)의 스타일을 물려받지 않게
+ * 껍데기(포털·키보드·배경 닫기)는 공통 SettingsSheet, 본문은 SoundSettingsSection(공통 설정 시트에서도 쓴다)
  */
 export function SoundSettingsModal({ onClose, music = true }: Props) {
-  const dialogRef = useDialog<HTMLDivElement>(true, onClose);
-  const titleId = useId();
+  return (
+    <SettingsSheet title="소리 설정" testId="sound-settings" onClose={onClose}>
+      <SoundSettingsSection music={music} />
+    </SettingsSheet>
+  );
+}
+
+/** 소리 설정 본문 — 모달·공통 설정 시트가 같이 쓴다 */
+export function SoundSettingsSection({ music = true }: { music?: boolean }) {
   const { settings, update } = useSoundSettings();
-  /** 배경을 누르기 시작했나 — 음량 막대를 끌다 배경에서 놓아도(click은 공통 조상인 배경에 온다) 닫히지 않게 */
-  const pressedBackdropRef = useRef(false);
 
   /** 저장(구독한 플레이어가 같은 호출 안에서 반영) → 켜졌으면 같은 제스처 안에서 오디오 시작 */
   const change = (partial: Partial<SoundSettings>) => {
@@ -32,60 +35,26 @@ export function SoundSettingsModal({ onClose, music = true }: Props) {
     if (next.sfx || next.music) unlockSounds();
   };
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 sm:items-center sm:p-4"
-      style={{ touchAction: "auto" }}
-      onPointerDown={(e) => {
-        pressedBackdropRef.current = e.target === e.currentTarget;
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && pressedBackdropRef.current) onClose();
-        pressedBackdropRef.current = false;
-      }}
-    >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-        data-testid="sound-settings"
-        className="w-full max-w-sm rounded-t-3xl border border-white/10 bg-slate-900 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] focus:outline-none sm:rounded-3xl sm:pb-4"
-      >
-        <div className="mb-2 flex items-center justify-between">
-          <h2 id={titleId} className="text-base font-semibold text-white">
-            소리 설정
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="닫기"
-            className="flex h-11 w-11 items-center justify-center rounded-full text-xl text-slate-400 hover:text-slate-200"
-          >
-            ×
-          </button>
-        </div>
-        <p className="mb-3 text-xs text-slate-500">모든 게임에 함께 적용돼요. 처음에는 꺼져 있어요.</p>
+  return (
+    <>
+      <p className="mb-3 text-xs text-slate-500">모든 게임에 함께 적용돼요. 처음에는 꺼져 있어요.</p>
+      <SoundRow
+        label="효과음"
+        on={settings.sfx}
+        volume={settings.sfxVolume}
+        onToggle={(on) => change({ sfx: on })}
+        onVolume={(sfxVolume) => change({ sfxVolume })}
+      />
+      {music && (
         <SoundRow
-          label="효과음"
-          on={settings.sfx}
-          volume={settings.sfxVolume}
-          onToggle={(on) => change({ sfx: on })}
-          onVolume={(sfxVolume) => change({ sfxVolume })}
+          label="배경음"
+          on={settings.music}
+          volume={settings.musicVolume}
+          onToggle={(on) => change({ music: on })}
+          onVolume={(musicVolume) => change({ musicVolume })}
         />
-        {music && (
-          <SoundRow
-            label="배경음"
-            on={settings.music}
-            volume={settings.musicVolume}
-            onToggle={(on) => change({ music: on })}
-            onVolume={(musicVolume) => change({ musicVolume })}
-          />
-        )}
-      </div>
-    </div>,
-    document.body,
+      )}
+    </>
   );
 }
 
