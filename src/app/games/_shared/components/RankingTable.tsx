@@ -13,7 +13,7 @@ type RankingTableProps<G extends GameType, I extends RankingItem<ScoreDetailByGa
   stat?: (item: I) => string;
   /** 인기 목록 — rank가 점수 순위가 아니라 인기 순서라 읽는 이름을 바꾼다 */
   popular?: boolean;
-  /** 이 브라우저에서 등록한 기록 — "나" 배지 */
+  /** 이 브라우저에서 등록한 기록 — "나" 배지. 서버가 알려 준 내 기록(item.isMine, 로그인 계정 기준)과 합친다 — 비로그인으로 이 브라우저에서 낸 기록도 "나" */
   myScoreIds: ReadonlySet<number>;
   /** 링크로 가리킨 기록 (?highlight=) — 테두리 강조만, "나"로 단정하지 않는다 */
   highlightId?: number | null;
@@ -47,7 +47,7 @@ export function RankingTable<G extends GameType, I extends RankingItem<ScoreDeta
     <ol className="grid grid-cols-1 gap-2">
       {items.map((item) => {
         const rankLabel = popular ? `인기 ${item.rank}번째` : `${item.rank}위`;
-        const mine = myScoreIds.has(item.scoreId);
+        const mine = item.isMine === true || myScoreIds.has(item.scoreId);
         const highlighted = item.scoreId === highlightId;
         return (
           <li

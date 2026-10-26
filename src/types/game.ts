@@ -118,7 +118,16 @@ export type RankingItem<D = TetrisScoreDetail> = {
   watchMs?: number;
   /** 기록 주인의 최근 입상 횟수(명예의 전당) — 로그인 사용자 기록이고 입상이 있을 때만, 아니면 null(Redis 장애 때도 null) */
   trophies?: Trophies | null;
+  /**
+   * 요청자의 기록인지 — 로그인 토큰으로 조회했고 그 계정의 기록이면 true(비로그인·만료 토큰은 false)
+   * 랭킹·기록 요약·인기 리플레이 목록·명예의 전당에 붙는다. 재생 데이터(GET scores/{id}/replay)는 공용 캐시라 늘 false
+   * 이 필드 배포 전 응답에는 없다 — false로 본다
+   */
+  isMine?: boolean;
 };
+
+/** GET /games/:gameType/me/best — 로그인 계정의 숨기지 않은 기록 중 최고점. 비로그인·만료·기록 없음은 모두 null */
+export type MyBestScore = { score: number | null; scoreId: number | null; boardKey: string | null };
 
 /** 기간별 1·2·3위 입상 횟수 */
 export type Trophies = { gold: number; silver: number; bronze: number };

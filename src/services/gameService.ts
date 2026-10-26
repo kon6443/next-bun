@@ -6,6 +6,7 @@ import type {
   GameSession,
   GameType,
   HallOfFame,
+  MyBestScore,
   PopularReplayList,
   PopularSort,
   RankingList,
@@ -273,20 +274,38 @@ export async function getGameBoards(gameType: GameType): Promise<ApiResponse<{ i
   return response.json();
 }
 
-/** 기간별 랭킹 — board(보드 키)를 생략하면 그 게임의 기본 보드 (테트리스 URL은 board 없이 그대로) */
+/**
+ * 선택 인증 조회(랭킹·기록·인기 리플레이·명예의 전당) — 로그인이면 토큰을 실어 내 기록에 isMine을 받는다
+ * 계약상 만료·무효 토큰도 200(isMine false)이지만, 그 백엔드 배포 전이나 회귀로 401이 오면 토큰 없이 한 번 더 부른다 —
+ * 공개 조회라 익명 결과로 충분하고, 로그인 사용자만 목록을 못 받는 일이 없게(전역 로그아웃 알림도 내지 않는다)
+ * 재시도도 새 시간 상한으로 — 이 경로에서는 최대 대기가 약 2배(운영 백엔드는 200이라 타지 않는 안전장치)
+ */
+async function viewerGet(endpoint: string, accessToken: string | undefined): Promise<Response> {
+  const request = (token?: string) =>
+    fetchServiceInstance.backendFetch({
+      method: 'GET',
+      endpoint,
+      ...(token ? { accessToken: token, notifyUnauthorized: false } : {}),
+      signal: timeoutSignal(RANKING_TIMEOUT_MS),
+    });
+  const response = await request(accessToken);
+  return accessToken && response.status === 401 ? request() : response;
+}
+
+/**
+ * 기간별 랭킹 — board(보드 키)를 생략하면 그 게임의 기본 보드 (테트리스 URL은 board 없이 그대로)
+ * accessToken을 넘기면 내 기록에 isMine=true(viewerGet)
+ */
 export async function getGameRankings<G extends GameType>(
   gameType: G,
   period: RankingPeriod,
   limit: number,
   board?: string,
+  accessToken?: string,
 ): Promise<ApiResponse<RankingList<ScoreDetailByGame[G]>>> {
   const params = new URLSearchParams({ period, limit: String(limit) });
   if (board) params.set('board', board);
-  const response = await fetchServiceInstance.backendFetch({
-    method: 'GET',
-    endpoint: `/api/v1/games/${gameType}/rankings?${params.toString()}`,
-    signal: timeoutSignal(RANKING_TIMEOUT_MS),
-  });
+  const response = await viewerGet(`/api/v1/games/${gameType}/rankings?${params.toString()}`, accessToken);
 
   if (!response.ok) {
     await handleApiError(response, { 429: TOO_MANY, default: '랭킹을 불러오지 못했습니다.' });
@@ -297,14 +316,14 @@ export async function getGameRankings<G extends GameType>(
 
 /**
  * 기록 1건 요약 — rank는 그 보드 전체 기간 순위(백엔드 games.service rankOf(…, null)). 숨김·없는 기록은 404
- * 랭킹 목록(상위 50) 밖의 강조 기록 안내에 쓴다 (games-polish FE-14·Q-S4)
+ * 랭킹 목록(상위 50) 밖의 강조 기록 안내에 쓴다 (games-polish FE-14·Q-S4). accessToken을 넘기면 isMine(viewerGet) — 지금 호출부는 rank만 써서 넘기지 않는다
  */
-export async function getGameScore<G extends GameType>(gameType: G, scoreId: number): Promise<ApiResponse<ScoreSummary<ScoreDetailByGame[G]>>> {
-  const response = await fetchServiceInstance.backendFetch({
-    method: 'GET',
-    endpoint: `/api/v1/games/${gameType}/scores/${scoreId}`,
-    signal: timeoutSignal(RANKING_TIMEOUT_MS),
-  });
+export async function getGameScore<G extends GameType>(
+  gameType: G,
+  scoreId: number,
+  accessToken?: string,
+): Promise<ApiResponse<ScoreSummary<ScoreDetailByGame[G]>>> {
+  const response = await viewerGet(`/api/v1/games/${gameType}/scores/${scoreId}`, accessToken);
 
   if (!response.ok) {
     await handleApiError(response, { 404: '기록을 찾을 수 없습니다.', 429: TOO_MANY, default: '기록을 불러오지 못했습니다.' });
@@ -378,18 +397,18 @@ export async function reportReplayWatch(
   return response.json();
 }
 
-/** 기간별 인기 리플레이 — board(보드 키)를 생략하면 그 게임의 기본 보드. 진행 중인 디펜스 주간 보드는 빈 목록 */
+/**
+ * 기간별 인기 리플레이 — board(보드 키)를 생략하면 그 게임의 기본 보드. 진행 중인 디펜스 주간 보드는 빈 목록
+ * accessToken을 넘기면 isMine(viewerGet)
+ */
 export async function getPopularReplays<G extends GameType>(
   gameType: G,
   query: { period: RankingPeriod; sort: PopularSort; limit: number; board?: string },
+  accessToken?: string,
 ): Promise<ApiResponse<PopularReplayList<ScoreDetailByGame[G]>>> {
   const params = new URLSearchParams({ period: query.period, sort: query.sort, limit: String(query.limit) });
   if (query.board) params.set('board', query.board);
-  const response = await fetchServiceInstance.backendFetch({
-    method: 'GET',
-    endpoint: `/api/v1/games/${gameType}/popular-replays?${params.toString()}`,
-    signal: timeoutSignal(RANKING_TIMEOUT_MS),
-  });
+  const response = await viewerGet(`/api/v1/games/${gameType}/popular-replays?${params.toString()}`, accessToken);
 
   if (!response.ok) {
     await handleApiError(response, { 429: TOO_MANY, default: '인기 리플레이를 불러오지 못했습니다.' });
@@ -398,16 +417,35 @@ export async function getPopularReplays<G extends GameType>(
   return response.json();
 }
 
-/** 명예의 전당 — 지난 기간별 1~3위 */
-export async function getHallOfFame<G extends GameType>(gameType: G): Promise<ApiResponse<HallOfFame<ScoreDetailByGame[G]>>> {
+/** 명예의 전당 — 지난 기간별 1~3위. accessToken을 넘기면 isMine(viewerGet) — 지금 화면은 "나" 표시가 없어 넘기지 않는다 */
+export async function getHallOfFame<G extends GameType>(gameType: G, accessToken?: string): Promise<ApiResponse<HallOfFame<ScoreDetailByGame[G]>>> {
+  const response = await viewerGet(`/api/v1/games/${gameType}/hall-of-fame`, accessToken);
+
+  if (!response.ok) {
+    await handleApiError(response, { 429: TOO_MANY, default: '명예의 전당을 불러오지 못했습니다.' });
+  }
+
+  return response.json();
+}
+
+/**
+ * 로그인 계정의 최고점 — board를 생략하면 그 게임의 모든 보드. 비로그인·만료 토큰·기록 없음은 200 + 모두 null
+ * 이 엔드포인트 배포 전(404)·실패는 throw — 호출부가 브라우저 최고점으로 폴백한다
+ */
+export async function getMyBestScore(gameType: GameType, accessToken: string, board?: string): Promise<ApiResponse<MyBestScore>> {
+  const params = new URLSearchParams();
+  if (board) params.set('board', board);
+  const query = params.toString();
   const response = await fetchServiceInstance.backendFetch({
     method: 'GET',
-    endpoint: `/api/v1/games/${gameType}/hall-of-fame`,
+    endpoint: `/api/v1/games/${gameType}/me/best${query ? `?${query}` : ''}`,
+    accessToken,
+    notifyUnauthorized: false,
     signal: timeoutSignal(RANKING_TIMEOUT_MS),
   });
 
   if (!response.ok) {
-    await handleApiError(response, { 429: TOO_MANY, default: '명예의 전당을 불러오지 못했습니다.' });
+    await handleApiError(response, { 429: TOO_MANY, default: '내 최고 점수를 불러오지 못했습니다.' });
   }
 
   return response.json();

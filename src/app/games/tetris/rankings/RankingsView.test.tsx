@@ -37,7 +37,7 @@ describe('테트리스 랭킹 — 오늘의 테트리스 보드 탭 (games-growt
     await act(async () => {
       render(<TetrisRankingsView highlightId={null} boardParam={null} />);
     });
-    expect(getGameRankings).toHaveBeenCalledWith('tetris', 'daily', 50, undefined);
+    expect(getGameRankings).toHaveBeenCalledWith('tetris', 'daily', 50, undefined, undefined);
     expect(screen.getByRole('group', { name: '랭킹 기간' })).toBeTruthy();
     expect(screen.getByRole('link', { name: '오늘의 테트리스 10/24' }).getAttribute('href')).toBe('/games/tetris/rankings?board=daily-2026-10-24');
     expect(screen.getByRole('link', { name: '10/23 데일리' })).toBeTruthy();
@@ -47,7 +47,7 @@ describe('테트리스 랭킹 — 오늘의 테트리스 보드 탭 (games-growt
     await act(async () => {
       render(<TetrisRankingsView highlightId={null} boardParam="daily" />);
     });
-    expect(getGameRankings).toHaveBeenCalledWith('tetris', 'all', 50, 'daily-2026-10-24');
+    expect(getGameRankings).toHaveBeenCalledWith('tetris', 'all', 50, 'daily-2026-10-24', undefined);
     expect(screen.queryByRole('group', { name: '랭킹 기간' })).toBeNull();
     expect(screen.getByRole('link', { name: '오늘의 테트리스 10/24' }).getAttribute('aria-current')).toBe('page');
     const replay = screen.getByRole('button', { name: /리플레이 — 하루가 끝나고 2시간 뒤 공개돼요/ }) as HTMLButtonElement;
@@ -60,7 +60,7 @@ describe('테트리스 랭킹 — 오늘의 테트리스 보드 탭 (games-growt
     await act(async () => {
       render(<TetrisRankingsView highlightId={null} boardParam="daily-2026-10-23" />);
     });
-    expect(getGameRankings).toHaveBeenCalledWith('tetris', 'all', 50, 'daily-2026-10-23');
+    expect(getGameRankings).toHaveBeenCalledWith('tetris', 'all', 50, 'daily-2026-10-23', undefined);
     expect(screen.getByRole('link', { name: /리플레이 보기/ }).getAttribute('href')).toBe('/games/tetris/replays/5');
   });
 
@@ -77,7 +77,7 @@ describe('테트리스 랭킹 — 오늘의 테트리스 보드 탭 (games-growt
     await act(async () => {
       render(<TetrisRankingsView highlightId={50} boardParam="challenge-7" />);
     });
-    expect(getGameRankings).toHaveBeenCalledWith('tetris', 'all', 50, 'challenge-7');
+    expect(getGameRankings).toHaveBeenCalledWith('tetris', 'all', 50, 'challenge-7', undefined);
     expect(screen.queryByRole('group', { name: '랭킹 기간' })).toBeNull();
     expect(getGameScore).toHaveBeenCalledWith('tetris', 7);
     expect(screen.getByTestId('challenge-board').textContent).toContain('원본왕님의 12,340점에 도전한 기록이에요.');

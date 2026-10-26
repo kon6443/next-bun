@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { TeamsPageLayout, ButtonLink, Button, SectionLabel, EmptyState, LoadingSpinnerSimple } from "@/app/teams/components";
 import { cardStyles } from "@/styles/teams";
 import { ConfirmModal } from "@/app/components/ConfirmModal";
-import { getGameRankings, submitGameScore } from "@/services/gameService";
+import { getGameRankings, getMyBestScore, submitGameScore } from "@/services/gameService";
 import type { RankingItem } from "@/types/game";
 import { extractErrorMessage } from "@/app/utils/errorUtils";
 import { RankingTable } from "@/app/games/_shared/components/RankingTable";
@@ -42,7 +42,10 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
   const [needsNewName, setNeedsNewName] = useState(false);
   const [pendingName, setPendingName] = useState("");
 
-  const [best, setBest] = useState(0);
+  /** 내 최고 점수 — null = 아직 모름(로그인이면 서버 값을 기다린다) */
+  const [best, setBest] = useState<number | null>(null);
+  /** 등록하면 올려 서버 최고점을 다시 받는다 */
+  const [bestVersion, setBestVersion] = useState(0);
   const [myScoreIds, setMyScoreIds] = useState<ReadonlySet<number>>(new Set());
   const [preview, setPreview] = useState<RankingItem[] | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -60,7 +63,6 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
 
   // 브라우저 저장소는 마운트 후에 읽는다 (서버 렌더와 어긋나지 않게)
   useEffect(() => {
-    setBest(loadBestScore());
     setMyScoreIds(new Set(loadMyScoreIds()));
     setPendingList(loadPendingSubmissions());
   }, []);
@@ -72,11 +74,37 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
     setNeedsNewName(false);
   };
 
+  /**
+   * 내 최고 점수 — 로그인이면 계정의 서버 기록(모든 보드: 이 브라우저 최고점도 일반·데일리·도전장 판을 모두 센다), 서버에 기록이 없거나
+   * 불러오지 못하면(엔드포인트 배포 전 404 포함) 이 브라우저 최고점. 비로그인도 브라우저 최고점
+   * 서버 값을 우선한다 — 같은 브라우저를 쓴 다른 사람·게스트 판이 계정 기록으로 보이지 않게(등록하지 않은 판은 서버에 없다)
+   */
   useEffect(() => {
-    getGameRankings("tetris", "daily", PREVIEW_LIMIT)
-      .then(({ data }) => setPreview(data.items))
-      .catch((err) => setPreviewError(extractErrorMessage(err, "랭킹을 불러오지 못했습니다.")));
-  }, []);
+    if (authStatus === "loading") return;
+    if (!accessToken) {
+      setBest(loadBestScore());
+      return;
+    }
+    let cancelled = false;
+    getMyBestScore("tetris", accessToken)
+      .then(({ data }) => !cancelled && setBest(data.score ?? loadBestScore()))
+      .catch(() => !cancelled && setBest(loadBestScore()));
+    return () => {
+      cancelled = true;
+    };
+  }, [authStatus, accessToken, bestVersion]);
+
+  // 오늘 랭킹 미리보기 — 로그인이면 토큰을 실어 내 기록(isMine)을 받는다. 로그인 상태가 정해진 뒤 한 번
+  useEffect(() => {
+    if (authStatus === "loading") return;
+    let cancelled = false;
+    getGameRankings("tetris", "daily", PREVIEW_LIMIT, undefined, accessToken)
+      .then(({ data }) => !cancelled && setPreview(data.items))
+      .catch((err) => !cancelled && setPreviewError(extractErrorMessage(err, "랭킹을 불러오지 못했습니다.")));
+    return () => {
+      cancelled = true;
+    };
+  }, [authStatus, accessToken]);
 
   const retryPending = async () => {
     if (!pending || isRetrying) return;
@@ -103,6 +131,7 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
       saveLastName(data.playerName ?? playerName);
       dropPending(pending.sessionId);
       setMyScoreIds(new Set(loadMyScoreIds()));
+      setBestVersion((v) => v + 1);
       // 데일리·도전장 판이면 그 보드 순위로 읽히게(결과 화면의 "오늘의 순위"·"도전장 순위"와 같은 값)
       setPendingMessage(data.ranks ? `등록했어요! ${tetrisRankLabel(pending.board, data.ranks.all)}` : "등록했어요! 순위는 랭킹에서 확인해 주세요.");
     } catch (err) {
@@ -144,7 +173,7 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
               줄을 지우고 점수를 쌓으세요. 끝나면 이름을 적어 랭킹에 올릴 수 있어요. (로그인 없이도 가능)
             </p>
             <p className="mt-4 text-sm text-slate-300">
-              내 최고 점수 <strong className="ml-1 text-lg text-amber-300">{best > 0 ? formatScore(best) : "-"}</strong>
+              내 최고 점수 <strong className="ml-1 text-lg text-amber-300">{best === null ? "…" : best > 0 ? formatScore(best) : "-"}</strong>
             </p>
             <ButtonLink href="/games/tetris/play" size="md" fullWidth className="mt-5 min-h-11">
               게임 시작
@@ -245,7 +274,7 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
           </section>
         </div>
         <div className="flex min-w-0 flex-col gap-3 sm:gap-6">
-          <PopularReplaysPreview game={TETRIS_GAME} myScoreIds={myScoreIds} />
+          <PopularReplaysPreview game={TETRIS_GAME} myScoreIds={myScoreIds} accessToken={accessToken} ready={authStatus !== "loading"} />
 
           <RecentBattles />
 
