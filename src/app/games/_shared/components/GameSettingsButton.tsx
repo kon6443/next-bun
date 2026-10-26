@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useSoundSettings } from "../hooks/useSoundSettings";
 import { unlockSounds } from "../lib/soundUnlock";
 
@@ -37,6 +37,17 @@ export function GameSettingsButton({ renderSheet, onOpenChange, testId, children
     setOpen(next);
     onOpenChange?.(next);
   };
+  // 시트가 열린 채 이 버튼이 사라지면(일시정지 메뉴가 닫히는 등) 닫혔다고 알린다 — 게임이 "열림" 상태로 남지 않게
+  const openRef = useRef(open);
+  openRef.current = open;
+  const onOpenChangeRef = useRef(onOpenChange);
+  onOpenChangeRef.current = onOpenChange;
+  useEffect(
+    () => () => {
+      if (openRef.current) onOpenChangeRef.current?.(false);
+    },
+    [],
+  );
 
   return (
     <>

@@ -255,9 +255,17 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
 
   // "시작" 버튼은 세션을 받는 동안 비활성이라 autoFocus가 안 먹는다 — 활성화될 때 포커스를 준다
   const startEnabled = phase === "ready" && sessionState.status !== "loading" && sessionState.status !== "blocked";
+  // "시작"이 막 눌릴 수 있게 됐을 때 한 번 포커스 — 시트가 열린 사이면 닫힌 뒤에(시트를 그냥 열고 닫으면 연 버튼으로 돌아간다)
+  const prevStartEnabledRef = useRef(false);
+  const startFocusPendingRef = useRef(false);
   useEffect(() => {
-    // 시트가 열린 사이 세션이 오면 포커스를 시트 밖으로 빼앗지 않는다 — 닫힌 뒤에 옮긴다
-    if (startEnabled && !settingsOpen) startButtonRef.current?.focus();
+    if (startEnabled && !prevStartEnabledRef.current) startFocusPendingRef.current = true;
+    if (!startEnabled) startFocusPendingRef.current = false;
+    prevStartEnabledRef.current = startEnabled;
+    if (startFocusPendingRef.current && !settingsOpen) {
+      startFocusPendingRef.current = false;
+      startButtonRef.current?.focus();
+    }
   }, [startEnabled, settingsOpen]);
 
   const showControls = phase === "game" && play.status !== "over" && isCoarse;

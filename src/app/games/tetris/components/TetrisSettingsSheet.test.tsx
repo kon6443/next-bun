@@ -119,4 +119,12 @@ describe('테트리스 설정 시트 (D-001·D-006)', () => {
     expect(screen.getByRole('link', { name: /전체 스킨 보기/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: '카카오로 로그인' })).toBeTruthy();
   });
+
+  it('시트가 열린 채 버튼이 사라지면(메뉴가 닫힘) 닫혔다고 알린다 — 게임이 "열림"으로 남지 않게', () => {
+    const onOpenChange = vi.fn();
+    const { unmount } = render(<GameSettingsButton onOpenChange={onOpenChange} renderSheet={(close) => <TetrisSettingsSheet onClose={close} />} />);
+    fireEvent.click(screen.getByRole('button', { name: /^설정 \(소리/ }));
+    unmount();
+    expect(onOpenChange.mock.calls).toEqual([[true], [false]]);
+  });
 });

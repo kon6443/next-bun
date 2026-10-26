@@ -274,4 +274,20 @@ describe('TetrisPlay 설정 시트와 준비 화면 (리뷰)', () => {
     fireEvent.click(screen.getByTestId('settings-group-controls'));
     expect(screen.getByText('DAS·ARR은 다음 판부터 적용돼요.')).toBeTruthy();
   });
+
+  it('세션이 이미 준비된 채 시트를 열고 닫으면 연 버튼으로 돌아온다 — "시작"이 가져가지 않는다', async () => {
+    createGameSession.mockResolvedValue({ data: session(new Date(Date.now() + 2 * HOUR).toISOString()) });
+    render(<TetrisPlay />);
+    await act(async () => {});
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '시작' }));
+    const open = screen.getByRole('button', { name: '설정' });
+    open.focus();
+    await act(async () => {
+      fireEvent.click(open);
+    });
+    await act(async () => {
+      fireEvent.keyDown(document, { key: 'Escape' });
+    });
+    expect(document.activeElement).toBe(open);
+  });
 });
