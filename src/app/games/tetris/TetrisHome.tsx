@@ -120,149 +120,155 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
   };
 
   return (
-    <TeamsPageLayout>
-      {/* 헤더 */}
-      <section className={`${cardStyles.section} p-5`}>
-        <div className="flex items-center justify-between">
-          <SectionLabel spacing="wide">Tetris</SectionLabel>
-          <div className="flex items-center gap-2">
-            {/* 설정(소리·조작·연출·스킨)은 첫 화면에서 — 아래 섹션까지 내려가지 않아도 되게 (P8·D-001) */}
-            <GameSettingsButton testId="tetris-settings-open" renderSheet={(close) => <TetrisSettingsSheet onClose={close} />} />
-            <ButtonLink href="/games" variant="secondary" size="md">
-              ← 게임 목록
+    <TeamsPageLayout maxWidth="lg-wide">
+      {/* 데스크톱(lg 이상)은 2단 — 한 칸으로 길게 늘어진 홈(UX 점검). 모바일은 위에서 아래로 같은 순서 */}
+      <div className="flex flex-col gap-3 sm:gap-6 lg:grid lg:grid-cols-2 lg:items-start">
+        <div className="flex min-w-0 flex-col gap-3 sm:gap-6">
+          {/* 헤더 */}
+          <section className={`${cardStyles.section} p-5`}>
+            <div className="flex items-center justify-between">
+              <SectionLabel spacing="wide">Tetris</SectionLabel>
+              <div className="flex items-center gap-2">
+                {/* 설정(소리·조작·연출·스킨)은 첫 화면에서 — 아래 섹션까지 내려가지 않아도 되게 (P8·D-001) */}
+                <GameSettingsButton testId="tetris-settings-open" renderSheet={(close) => <TetrisSettingsSheet onClose={close} />} />
+                <ButtonLink href="/games" variant="secondary" size="md">
+                  ← 게임 목록
+                </ButtonLink>
+              </div>
+            </div>
+            <h1 className="mt-4 text-3xl font-bold text-white [text-shadow:0_0_14px_rgba(56,189,248,0.6)]">테트리스</h1>
+            <p className="mt-2 text-sm text-slate-400">
+              줄을 지우고 점수를 쌓으세요. 끝나면 이름을 적어 랭킹에 올릴 수 있어요. (로그인 없이도 가능)
+            </p>
+            <p className="mt-4 text-sm text-slate-300">
+              내 최고 점수 <strong className="ml-1 text-lg text-amber-300">{best > 0 ? formatScore(best) : "-"}</strong>
+            </p>
+            <ButtonLink href="/games/tetris/play" size="md" fullWidth className="mt-5 min-h-11">
+              게임 시작
             </ButtonLink>
+          </section>
+
+          {/* 오늘의 테트리스 — 데일리 보드가 있을 때만 (games-growth B1) */}
+          <DailyCard />
+
+          {/* 대전 입구는 여기 한 곳 — 첫 화면에 보이게 헤더 바로 아래 (games-polish P8) */}
+          <div className={`${cardStyles.section} p-4`}>
+            <BattleEntry />
           </div>
-        </div>
-        <h1 className="mt-4 text-3xl font-bold text-white [text-shadow:0_0_14px_rgba(56,189,248,0.6)]">테트리스</h1>
-        <p className="mt-2 text-sm text-slate-400">
-          줄을 지우고 점수를 쌓으세요. 끝나면 이름을 적어 랭킹에 올릴 수 있어요. (로그인 없이도 가능)
-        </p>
-        <p className="mt-4 text-sm text-slate-300">
-          내 최고 점수 <strong className="ml-1 text-lg text-amber-300">{best > 0 ? formatScore(best) : "-"}</strong>
-        </p>
-        <ButtonLink href="/games/tetris/play" size="md" fullWidth className="mt-5 min-h-11">
-          게임 시작
-        </ButtonLink>
-      </section>
 
-      {/* 오늘의 테트리스 — 데일리 보드가 있을 때만 (games-growth B1) */}
-      <DailyCard />
-
-      {/* 대전 입구는 여기 한 곳 — 첫 화면에 보이게 헤더 바로 아래 (games-polish P8) */}
-      <div className={`${cardStyles.section} p-4`}>
-        <BattleEntry />
-      </div>
-
-      {(pending || pendingMessage) && (
-        <section className={`${cardStyles.section} p-4`} role="status">
-          {pending && (
-            <>
-              <p className="text-sm text-slate-200">
-                등록하지 못한 기록이 있어요{pendingList.length > 1 ? ` (${pendingList.length}건)` : ""} —{" "}
-                <strong>{askName ? pendingName : pending.playerName}</strong> · {formatScore(pending.score)}점
-              </p>
-              {askName && (
-                <div className="mt-3">
-                  <label htmlFor="tetris-pending-name" className="mb-1 block text-xs text-slate-400">
-                    {pending.playerName === "" ? "등록할 이름 (1~12자)" : "다른 이름으로 등록 (1~12자)"}
-                  </label>
-                  <input
-                    id="tetris-pending-name"
-                    value={pendingName}
-                    onChange={(e) => setPendingName(e.target.value)}
-                    className="min-h-11 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 text-base text-white focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+          {(pending || pendingMessage) && (
+            <section className={`${cardStyles.section} p-4`} role="status">
+              {pending && (
+                <>
+                  <p className="text-sm text-slate-200">
+                    등록하지 못한 기록이 있어요{pendingList.length > 1 ? ` (${pendingList.length}건)` : ""} —{" "}
+                    <strong>{askName ? pendingName : pending.playerName}</strong> · {formatScore(pending.score)}점
+                  </p>
+                  {askName && (
+                    <div className="mt-3">
+                      <label htmlFor="tetris-pending-name" className="mb-1 block text-xs text-slate-400">
+                        {pending.playerName === "" ? "등록할 이름 (1~12자)" : "다른 이름으로 등록 (1~12자)"}
+                      </label>
+                      <input
+                        id="tetris-pending-name"
+                        value={pendingName}
+                        onChange={(e) => setPendingName(e.target.value)}
+                        className="min-h-11 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 text-base text-white focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                      />
+                    </div>
+                  )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="mt-3 min-h-11"
+                    onClick={retryPending}
+                    // 로그인 상태를 확인하는 동안에는 막는다 — 비로그인으로 잘못 등록되지 않게
+                    disabled={isRetrying || authStatus === "loading"}
+                    aria-busy={isRetrying}
+                  >
+                    {isRetrying ? "등록 중..." : "다시 등록하기"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="ml-2 mt-3 min-h-11"
+                    onClick={() => setConfirmDiscard(true)}
+                    disabled={isRetrying}
+                  >
+                    버리기
+                  </Button>
+                  <ConfirmModal
+                    isOpen={confirmDiscard}
+                    onClose={() => setConfirmDiscard(false)}
+                    onConfirm={() => {
+                      setConfirmDiscard(false);
+                      dropPending(pending.sessionId);
+                      setPendingMessage(null);
+                    }}
+                    title="이 기록을 버릴까요?"
+                    message="버리면 랭킹에 다시 등록할 수 없어요."
+                    confirmLabel="버리기"
+                    cancelLabel="취소"
+                    variant="danger"
                   />
-                </div>
+                </>
               )}
-              <Button
-                type="button"
-                size="sm"
-                className="mt-3 min-h-11"
-                onClick={retryPending}
-                // 로그인 상태를 확인하는 동안에는 막는다 — 비로그인으로 잘못 등록되지 않게
-                disabled={isRetrying || authStatus === "loading"}
-                aria-busy={isRetrying}
-              >
-                {isRetrying ? "등록 중..." : "다시 등록하기"}
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                className="ml-2 mt-3 min-h-11"
-                onClick={() => setConfirmDiscard(true)}
-                disabled={isRetrying}
-              >
-                버리기
-              </Button>
-              <ConfirmModal
-                isOpen={confirmDiscard}
-                onClose={() => setConfirmDiscard(false)}
-                onConfirm={() => {
-                  setConfirmDiscard(false);
-                  dropPending(pending.sessionId);
-                  setPendingMessage(null);
-                }}
-                title="이 기록을 버릴까요?"
-                message="버리면 랭킹에 다시 등록할 수 없어요."
-                confirmLabel="버리기"
-                cancelLabel="취소"
-                variant="danger"
-              />
-            </>
+              {pendingMessage && <p className="mt-2 text-sm text-slate-300">{pendingMessage}</p>}
+              {pendingNeedsLogin && <ReloginButton className="mt-2" />}
+            </section>
           )}
-          {pendingMessage && <p className="mt-2 text-sm text-slate-300">{pendingMessage}</p>}
-          {pendingNeedsLogin && <ReloginButton className="mt-2" />}
-        </section>
-      )}
 
-      {/* 오늘의 랭킹 미리보기 */}
-      <section className={`${cardStyles.section} p-4`}>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-white">오늘의 TOP {PREVIEW_LIMIT}</h2>
-          <ButtonLink href="/games/tetris/rankings" variant="secondary" size="md">
-            전체 랭킹
-          </ButtonLink>
+          {/* 오늘의 랭킹 미리보기 */}
+          <section className={`${cardStyles.section} p-4`}>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-white">오늘의 TOP {PREVIEW_LIMIT}</h2>
+              <ButtonLink href="/games/tetris/rankings" variant="secondary" size="md">
+                전체 랭킹
+              </ButtonLink>
+            </div>
+            {previewError ? (
+              <p className="text-sm text-red-300">{previewError}</p>
+            ) : preview === null ? (
+              <LoadingSpinnerSimple message="랭킹을 불러오는 중..." />
+            ) : preview.length === 0 ? (
+              <EmptyState message="오늘은 아직 기록이 없어요." description="첫 번째 주인공이 되어 보세요!" variant="minimal" />
+            ) : (
+              <RankingTable game={TETRIS_GAME} items={preview} myScoreIds={myScoreIds} compact />
+            )}
+          </section>
         </div>
-        {previewError ? (
-          <p className="text-sm text-red-300">{previewError}</p>
-        ) : preview === null ? (
-          <LoadingSpinnerSimple message="랭킹을 불러오는 중..." />
-        ) : preview.length === 0 ? (
-          <EmptyState message="오늘은 아직 기록이 없어요." description="첫 번째 주인공이 되어 보세요!" variant="minimal" />
-        ) : (
-          <RankingTable game={TETRIS_GAME} items={preview} myScoreIds={myScoreIds} compact />
-        )}
-      </section>
+        <div className="flex min-w-0 flex-col gap-3 sm:gap-6">
+          <PopularReplaysPreview game={TETRIS_GAME} myScoreIds={myScoreIds} />
 
-      <PopularReplaysPreview game={TETRIS_GAME} myScoreIds={myScoreIds} />
+          <RecentBattles />
 
-      <RecentBattles />
+          {/* 설정 — 조작 키 안내는 설정 시트의 조작 상세·플레이 준비 화면에 있다(D-005) */}
+          <section className={`${cardStyles.section} p-4`}>
+            <h2 className="text-base font-semibold text-white">설정</h2>
+            <div className="mt-2 space-y-2">
+              <GameSettingsButton
+                testId="tetris-settings-entry"
+                renderSheet={(close) => <TetrisSettingsSheet onClose={close} />}
+                className="flex min-h-12 w-full items-center gap-3 rounded-xl px-2 text-left hover:bg-white/5"
+              >
+                <span className="flex-1">
+                  <span className="block text-sm font-semibold text-slate-100">설정 열기</span>
+                  <span className="block text-xs text-slate-400">스킨 · 소리 · 조작 · 화면</span>
+                </span>
+                <span aria-hidden="true" className="text-slate-400">
+                  ›
+                </span>
+              </GameSettingsButton>
+              <ButtonLink href="/games/tetris/skins" variant="secondary" size="md" fullWidth className="min-h-11">
+                스킨 도감 — 모든 스킨과 얻는 방법
+              </ButtonLink>
+            </div>
+          </section>
 
-      {/* 설정 — 조작 키 안내는 설정 시트의 조작 상세·플레이 준비 화면에 있다(D-005) */}
-      <section className={`${cardStyles.section} p-4`}>
-        <h2 className="text-base font-semibold text-white">설정</h2>
-        <div className="mt-2 space-y-2">
-          <GameSettingsButton
-            testId="tetris-settings-entry"
-            renderSheet={(close) => <TetrisSettingsSheet onClose={close} />}
-            className="flex min-h-12 w-full items-center gap-3 rounded-xl px-2 text-left hover:bg-white/5"
-          >
-            <span className="flex-1">
-              <span className="block text-sm font-semibold text-slate-100">설정 열기</span>
-              <span className="block text-xs text-slate-400">스킨 · 소리 · 조작 · 화면</span>
-            </span>
-            <span aria-hidden="true" className="text-slate-400">
-              ›
-            </span>
-          </GameSettingsButton>
-          <ButtonLink href="/games/tetris/skins" variant="secondary" size="md" fullWidth className="min-h-11">
-            스킨 도감 — 모든 스킨과 얻는 방법
-          </ButtonLink>
+          {about}
         </div>
-      </section>
-
-      {about}
+      </div>
       {/* 하단 내비(떠 있는 카드형)에 마지막 항목이 가리지 않게 — 디펜스 허브와 같은 여백 */}
       <div aria-hidden="true" className="h-8" />
     </TeamsPageLayout>
