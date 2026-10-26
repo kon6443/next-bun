@@ -25,7 +25,8 @@ import { type GameResult, GameOverPanel } from "../../components/GameOverPanel";
 import { useTetrisPlay } from "../../hooks/useTetrisPlay";
 import { CONTROL_GUIDE } from "../../lib/controls";
 import { formatFrames, formatScore } from "@/app/games/_shared/lib/format";
-import { type TetrisSettings, DEFAULT_SETTINGS, loadLastName, loadSettings, recordBestScore } from "../../lib/storage";
+import { loadLastName, recordBestScore } from "../../lib/storage";
+import { useTetrisSettings } from "../../hooks/useTetrisSettings";
 import { isDailyBoardKey, recordDailyRun } from "../../lib/daily";
 import { challengeHeadline, challengeRootId } from "../../lib/challenge";
 
@@ -83,7 +84,8 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
   const mySkins = { block: equipped.block, effect: equipped.effect, board: equipped.board };
   const accessToken = authSession?.user?.accessToken ?? undefined;
 
-  const [settings, setSettings] = useState<TetrisSettings>(DEFAULT_SETTINGS);
+  // 조작 설정 — 진동은 바로 반영, DAS·ARR은 판을 시작할 때 엔진에 넘긴다(판 도중 바꾸면 다음 판부터)
+  const { settings } = useTetrisSettings();
   const isCoarse = useMediaQuery("(pointer: coarse)");
   const [sessionState, setSessionState] = useState<SessionState>({ status: "loading" });
   /** 판이 끝난 순간의 세션 — 데일리 보드면 오늘 첫 판을 남긴다 */
@@ -126,10 +128,6 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
   }, []);
 
   const play = useTetrisPlay({ vibration: settings.vibration, onGameOver });
-
-  useEffect(() => {
-    setSettings(loadSettings());
-  }, []);
 
   // "처음부터"를 연달아 눌러도 늦게 온 이전 세션 응답이 최신 상태를 덮지 않게 (FE-21)
   const beginSessionRequest = useLatestRequest();

@@ -10,14 +10,37 @@ vi.mock('@/services/gameService', () => ({ createGameSession: () => createGameSe
 vi.mock('next-auth/react', () => ({ useSession: () => ({ data: null, status: 'unauthenticated' }) }));
 // 판은 그리지 않는다 — 준비 화면·시작 흐름만 본다
 vi.mock('../../components/TetrisCanvas', () => ({ TetrisCanvas: () => null }));
+// 판 시작 인자(DAS·ARR)를 본다 — 실제 훅을 그대로 쓰고 start만 감싼다(같은 start면 같은 감싼 함수, 효과가 다시 돌지 않게)
+const startCalls: Array<{ das: number; arr: number }> = [];
+vi.mock('../../hooks/useTetrisPlay', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../hooks/useTetrisPlay')>();
+  const wrapped = new WeakMap<object, unknown>();
+  return {
+    ...actual,
+    useTetrisPlay: (...args: Parameters<typeof actual.useTetrisPlay>) => {
+      const play = actual.useTetrisPlay(...args);
+      if (!wrapped.has(play.start)) {
+        const start: typeof play.start = (seed, das, arr) => {
+          startCalls.push({ das, arr });
+          return play.start(seed, das, arr);
+        };
+        wrapped.set(play.start, start);
+      }
+      return { ...play, start: wrapped.get(play.start) as typeof play.start };
+    },
+  };
+});
 
 import TetrisPlay, { SLOW_SESSION_MS } from './TetrisPlay';
+import { tetrisSettingsStore } from '../../lib/storage';
 
 const HOUR = 60 * 60 * 1000;
 const session = (expiresAt: string): GameSession => ({ sessionId: 's1', seed: 7, engineVersion: ENGINE_VERSION, expiresAt });
 
 beforeEach(() => {
   createGameSession.mockReset();
+  startCalls.length = 0;
+  window.localStorage.clear();
   window.matchMedia ??= ((query: string) => ({
     matches: false,
     media: query,
@@ -108,5 +131,34 @@ describe('TetrisPlay 시작 (games-polish FE-12)', () => {
     fireEvent.keyDown(dialog, { code: 'Escape', key: 'Escape' });
     expect(screen.queryByRole('dialog', { name: '소리 설정' })).toBeNull();
     expect(screen.queryByRole('button', { name: '일시정지' })).toBeNull();
+  });
+
+  it('판 도중 바꾼 DAS·ARR은 진행 중인 판을 바꾸거나 다시 시작하지 않고, 다음 판부터 적용된다 (D-001)', async () => {
+    tetrisSettingsStore.save({ das: 15, arr: 4 });
+    createGameSession.mockResolvedValue({ data: session(new Date(Date.now() + 2 * HOUR).toISOString()) });
+    render(<TetrisPlay />);
+    await act(async () => {});
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '시작' }));
+    });
+    expect(startCalls).toEqual([{ das: 15, arr: 4 }]);
+    // 설정 시트(다른 화면)에서 바꾼 것과 같다 — 같은 스토어에 저장
+    act(() => {
+      tetrisSettingsStore.save({ das: 6, arr: 0 });
+    });
+    expect(startCalls).toHaveLength(1);
+    expect(screen.getByRole('button', { name: '일시정지' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '일시정지' }));
+    fireEvent.click(screen.getByRole('button', { name: '처음부터' }));
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '처음부터' }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '시작' }));
+    });
+    expect(startCalls).toEqual([
+      { das: 15, arr: 4 },
+      { das: 6, arr: 0 },
+    ]);
   });
 });

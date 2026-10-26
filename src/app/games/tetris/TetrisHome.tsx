@@ -26,17 +26,14 @@ import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib
 import { classifySubmitError } from "@/app/games/_shared/lib/submitError";
 import {
   type PendingSubmission,
-  type TetrisSettings,
-  DEFAULT_SETTINGS,
   addMyScoreId,
   loadBestScore,
   loadMyScoreIds,
   loadPendingSubmissions,
-  loadSettings,
   removePendingSubmission,
   saveLastName,
-  saveSettings,
 } from "./lib/storage";
+import { useTetrisSettings } from "./hooks/useTetrisSettings";
 
 const PREVIEW_LIMIT = 5;
 
@@ -48,7 +45,8 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
   const [pendingName, setPendingName] = useState("");
 
   const [best, setBest] = useState(0);
-  const [settings, setSettings] = useState<TetrisSettings>(DEFAULT_SETTINGS);
+  // 조작 설정 — 구독 스토어(플레이·설정 시트와 같은 값). 저장은 바꿀 때 한 번(StrictMode에도, games-polish FE-52)
+  const { settings, update: updateSettings } = useTetrisSettings();
   const [myScoreIds, setMyScoreIds] = useState<ReadonlySet<number>>(new Set());
   const [preview, setPreview] = useState<RankingItem[] | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -67,7 +65,6 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
   // 브라우저 저장소는 마운트 후에 읽는다 (서버 렌더와 어긋나지 않게)
   useEffect(() => {
     setBest(loadBestScore());
-    setSettings(loadSettings());
     setMyScoreIds(new Set(loadMyScoreIds()));
     setPendingList(loadPendingSubmissions());
   }, []);
@@ -84,13 +81,6 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
       .then(({ data }) => setPreview(data.items))
       .catch((err) => setPreviewError(extractErrorMessage(err, "랭킹을 불러오지 못했습니다.")));
   }, []);
-
-  // 저장은 핸들러에서 한 번 — 상태 업데이터는 순수해야 한다(StrictMode가 두 번 부른다, games-polish FE-52)
-  const updateSettings = (patch: Partial<TetrisSettings>) => {
-    const next = { ...settings, ...patch };
-    setSettings(next);
-    saveSettings(next);
-  };
 
   const retryPending = async () => {
     if (!pending || isRetrying) return;
