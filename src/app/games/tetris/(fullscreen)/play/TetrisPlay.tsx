@@ -253,7 +253,8 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
     <div className="relative flex h-full flex-col pt-[env(safe-area-inset-top)]">
       {/* 상단 — 나가기·점수판·일시정지 */}
       {/* 320px에서도 한 줄 — 휴대폰 폭(640px 미만)에서는 나가기를 화살표만, 여백·간격·라벨·숫자를 폭에 맞춰 줄인다(글자 꺾임·잘림 금지, 점수 9,999,999까지) */}
-      <header className="flex items-center gap-1.5 px-2 py-2 min-[360px]:gap-2 min-[360px]:px-3 sm:gap-3">
+      {/* 휴대폰은 위아래 여백 2px — 판 높이에 돌려준다(D-004 H1, 버튼 터치 영역 44px은 그대로) */}
+      <header className="flex items-center gap-1.5 px-2 py-0.5 sm:py-2 min-[360px]:gap-2 min-[360px]:px-3 sm:gap-3">
         <Link
           href="/games/tetris"
           aria-label="나가기"
