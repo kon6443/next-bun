@@ -14,6 +14,7 @@ import type { TetrisSkinCatalog, TetrisSkinCatalogItem, TetrisSkinSlot } from "@
 import { SkinPreview } from "../components/SkinPreview";
 import { useMySkins } from "../hooks/useMySkins";
 import { KNOWN_SKIN_IDS, SKIN_ITEM_LABELS, SKIN_SLOTS, SKIN_SLOT_LABELS } from "../lib/skins";
+import { nextTabByKey } from "../lib/tabKeys";
 
 /** 획득 방법 — 서버 unlock 값. 모르는 값(새 획득 방식이 먼저 나온 경우)은 안전한 폴백 */
 const UNLOCK_LABELS: Record<string, string> = {
@@ -72,15 +73,18 @@ export default function SkinsCatalogView() {
   }, [authStatus, accessToken, attempt]);
 
   const catalog = load.status === "ready" ? load.catalog : null;
-  const signedIn = Boolean(catalog?.signedIn) && !expired;
+  // 내 장착 조회가 만료로 실패해도 같은 안내 — 도감은 보유를 보여 줘도 장착은 다시 로그인한 뒤에
+  const authExpired = expired || mine.status === "expired";
+  const signedIn = Boolean(catalog?.signedIn) && !authExpired;
   const itemsOf = (s: TetrisSkinSlot): TetrisSkinCatalogItem[] => catalog?.slots.find((x) => x.slot === s)?.items ?? [];
   /** 장착은 저장소가 기준(장착하면 바로 바뀐다) — 저장소를 아직 못 불러왔으면 도감 응답 */
+  const canEquip = signedIn && mine.status === "ready";
   const isEquipped = (s: TetrisSkinSlot, item: TetrisSkinCatalogItem) =>
     signedIn ? (mine.status === "ready" ? mine.equipped[s] === item.id : item.equipped) : false;
   const visible = itemsOf(slot).filter((item) => (filter === "owned" ? item.owned : filter === "missing" ? !item.owned : true));
 
   const equip = async (item: TetrisSkinCatalogItem) => {
-    if (!signedIn || !item.owned || isEquipped(slot, item)) return;
+    if (!canEquip || !item.owned || isEquipped(slot, item)) return;
     try {
       await mine.equip(slot, item.id);
       toast.success(`${SKIN_SLOT_LABELS[slot]} 스킨: ${SKIN_ITEM_LABELS[item.id] ?? item.id} 장착`);
@@ -91,13 +95,7 @@ export default function SkinsCatalogView() {
 
   /** 탭 키보드 이동 — 왼쪽·오른쪽·Home·End (WAI-ARIA tabs) */
   const onTabKey = (e: React.KeyboardEvent) => {
-    const index = SKIN_SLOTS.indexOf(slot);
-    const next =
-      e.key === "ArrowRight" ? SKIN_SLOTS[(index + 1) % SKIN_SLOTS.length]
-      : e.key === "ArrowLeft" ? SKIN_SLOTS[(index - 1 + SKIN_SLOTS.length) % SKIN_SLOTS.length]
-      : e.key === "Home" ? SKIN_SLOTS[0]
-      : e.key === "End" ? SKIN_SLOTS[SKIN_SLOTS.length - 1]
-      : null;
+    const next = nextTabByKey(SKIN_SLOTS, slot, e.key);
     if (!next) return;
     e.preventDefault();
     setSlot(next);
@@ -116,9 +114,9 @@ export default function SkinsCatalogView() {
         <h1 className="mt-3 text-2xl font-bold text-white">스킨 도감</h1>
         <p className="mt-2 text-sm text-slate-400">모든 스킨과 얻는 방법이에요. 블록·연출·판 스킨은 내 판을 보는 모두에게, 배경은 나에게만 보여요.</p>
 
-        {(expired || (authStatus === "unauthenticated" && load.status !== "loading")) && (
+        {(authExpired || (authStatus === "unauthenticated" && load.status !== "loading")) && (
           <div className="mt-4 rounded-xl border border-white/10 bg-slate-800/50 p-3 text-sm text-slate-300">
-            <p>{expired ? "로그인이 만료됐어요. 다시 로그인하면 내 스킨이 보여요." : "로그인하면 보유한 스킨을 보고 바로 장착할 수 있어요."}</p>
+            <p>{authExpired ? "로그인이 만료됐어요. 다시 로그인하면 내 스킨이 보여요." : "로그인하면 보유한 스킨을 보고 바로 장착할 수 있어요."}</p>
             <button
               type="button"
               onClick={() => startLogin({ callbackUrl: "/games/tetris/skins" })}
@@ -228,7 +226,7 @@ export default function SkinsCatalogView() {
                       <button
                         type="button"
                         onClick={() => equip(item)}
-                        disabled={mine.status === "loading"}
+                        disabled={!canEquip}
                         className="min-h-11 w-full rounded-full border border-sky-400/40 text-sm text-sky-100 hover:bg-sky-500/10 disabled:opacity-50"
                       >
                         장착

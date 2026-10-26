@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmModal } from "@/app/components/ConfirmModal";
 import { Button } from "@/app/teams/components";
 import { type MatchResultEntry, type RoomPlayer, type RoomStatus, TetrisBattleErrorCodes } from "@/types/tetrisBattleSocket";
@@ -12,7 +12,7 @@ import { battleErrorMessage } from "../lib/battleErrors";
 import { BattleView } from "./BattleView";
 import { useReducedEffects } from "../../hooks/useReducedEffects";
 import { useMySkins } from "../../hooks/useMySkins";
-import { toBoardSkins } from "../../lib/skins";
+import { type BoardSkins, toBoardSkins } from "../../lib/skins";
 import fx from "./battleFx.module.css";
 import { getSoundPlayer } from "../../lib/sound/soundPlayer";
 import { MatchRecordLinks } from "./MatchRecordLinks";
@@ -74,11 +74,14 @@ export function MatchScreen({
   const target = targetId ?? (alive.length === 1 ? alive[0].playerId : null);
   // 미니보드 props — 채팅·이모트 등 다른 변경에는 같은 객체를 넘겨 memo된 판이 다시 그려지지 않게 (FE-19)
   // 방에 없으면(나갔거나 정리됨) 오프라인으로 보인다. 상대 판은 상대의 보드 스킨(players[].skins, 없으면 기본 — D-003)
+  // 방을 나간 상대(목록에서 정리됨)의 판도 경기 중에는 그 사람 스킨 그대로 — 마지막으로 본 값을 기억한다
+  const knownSkinsRef = useRef(new Map<string, BoardSkins>());
   const opponentViews = useMemo(() => {
     const byId = new Map(roomPlayers.map((p) => [p.playerId, p]));
+    for (const p of roomPlayers) if (p.skins) knownSkinsRef.current.set(p.playerId, toBoardSkins(p.skins));
     return opponents.map((o) => {
       const player = byId.get(o.playerId);
-      const skins = toBoardSkins(player?.skins);
+      const skins = knownSkinsRef.current.get(o.playerId) ?? toBoardSkins(player?.skins);
       return { ...o, isTarget: o.playerId === target, online: player?.connected ?? false, blockSkinId: skins.block, boardSkinId: skins.board };
     });
   }, [opponents, target, roomPlayers]);

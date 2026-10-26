@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { useBattlePlay } from '../hooks/useBattlePlay';
 // MiniBoard는 CSS 모듈을 써서 vitest(Tailwind PostCSS)로 읽지 못한다 — 기준점·크기만 남긴 대역
 vi.mock('./MiniBoard', () => ({
@@ -207,5 +207,35 @@ describe('BattleView 상대 판 자리 — 세로 화면 높이가 한계면 판
     renderOne();
     expect(screen.getByTestId('opponents-header')).toBeInTheDocument();
     spies.forEach((s) => s.mockRestore());
+  });
+
+  it('옆 줄에서 다시 잴 때도 같은 기준 — 같은 화면은 그대로 두고(진동 없음), 판 영역이 높아지면 헤더로 돌아간다', () => {
+    const callbacks: (() => void)[] = [];
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(cb: () => void) {
+          callbacks.push(cb);
+        }
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    const spies = [media(true), rowSize(375, 292)];
+    renderOne();
+    expect(screen.getByTestId('opponents-side')).toBeInTheDocument();
+    // 옆 줄이 되면 헤더 미니보드가 빠져 판 영역(옆 줄 포함)이 375×389로 잰다 — 헤더로 돌아가면 다시 12라 옆 줄 유지
+    spies[1].mockRestore();
+    spies[1] = rowSize(375, 389);
+    act(() => callbacks.forEach((cb) => cb()));
+    expect(screen.getByTestId('opponents-side')).toBeInTheDocument();
+    // 판 영역이 충분히 높아지면(390×560 — 헤더 배치면 20, 옆 줄이면 18) 헤더로
+    spies[1].mockRestore();
+    spies[1] = rowSize(390, 560);
+    act(() => callbacks.forEach((cb) => cb()));
+    expect(screen.getByTestId('opponents-header')).toBeInTheDocument();
+    spies.forEach((sp) => sp.mockRestore());
+    vi.unstubAllGlobals();
   });
 });

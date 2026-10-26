@@ -18,6 +18,7 @@ import { tetrisRankLabel } from "./lib/replayCard";
 import { PopularReplaysPreview } from "@/app/games/_shared/components/PopularReplaysPreview";
 import { SoundButton } from "@/app/games/_shared/components/SoundButton";
 import { SoundSettingsEntry } from "@/app/games/_shared/components/SoundSettingsEntry";
+import { ReloginButton } from "@/app/games/_shared/components/ReloginButton";
 import { SkinSettingsEntry } from "./components/SkinSettingsModal";
 import { CONTROL_GUIDE } from "./lib/controls";
 import { formatScore, framesToMs } from "@/app/games/_shared/lib/format";
@@ -59,6 +60,8 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
   /** 보관 기록 버리기 확인 — 게임 오버 순간 선보관(FE-05)이라 등록할 마음이 없는 기록도 남는다 (games-polish P5) */
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  /** 보관분 재등록이 로그인 만료(401)로 거절됐다 — 다시 로그인한 뒤 내 기록으로 등록한다 */
+  const [pendingNeedsLogin, setPendingNeedsLogin] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
 
   // 브라우저 저장소는 마운트 후에 읽는다 (서버 렌더와 어긋나지 않게)
@@ -102,6 +105,7 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
     }
     setIsRetrying(true);
     setPendingMessage(null);
+    setPendingNeedsLogin(false);
     try {
       const { data } = await submitGameScore(
         "tetris",
@@ -117,6 +121,7 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
     } catch (err) {
       // 보관된 기록은 앞서 한 번 실패한 제출의 재시도다
       const { kind, message } = classifySubmitError(err, true);
+      setPendingNeedsLogin(kind === "auth");
       if (kind === "final") {
         dropPending(pending.sessionId);
       } else if (kind === "name") {
@@ -223,6 +228,7 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
             </>
           )}
           {pendingMessage && <p className="mt-2 text-sm text-slate-300">{pendingMessage}</p>}
+          {pendingNeedsLogin && <ReloginButton className="mt-2" />}
         </section>
       )}
 

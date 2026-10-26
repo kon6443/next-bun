@@ -156,4 +156,29 @@ describe('MatchScreen 보드 스킨 (D-003)', () => {
     // 내 판은 내 장착 — 게스트면 기본
     expect(skins).toEqual({ block: 'default', effect: 'default', board: 'default' });
   });
+
+  it('경기 중 방을 나간 상대(목록에서 정리됨)의 판은 마지막으로 본 그 사람 스킨 그대로', () => {
+    const opponent = { playerId: 'p2', name: 'p2', cells: null, pending: 0, isTarget: false, place: null, kos: 0 };
+    const props = {
+      phase: { kind: 'playing', matchId: 'm1' } as const,
+      play: {} as ReturnType<typeof useBattlePlay>,
+      myPlayerId: 'p1',
+      isHost: false,
+      opponents: [opponent],
+      targetId: null,
+      myKos: 0,
+      replaySubmit: null,
+      trailsRootRef: { current: null },
+      roomStatus: 'PLAYING' as const,
+      connection: 'connected' as const,
+      onReconnect: vi.fn(),
+      onExit: vi.fn(),
+    };
+    const { rerender } = render(
+      <MatchScreen {...props} roomPlayers={[{ playerId: 'p2', name: 'p2', ready: true, connected: true, isGuest: false, skins: { block: 'neon', effect: 'neon', board: 'gameboy' } }]} />,
+    );
+    rerender(<MatchScreen {...props} roomPlayers={[]} />);
+    const { opponents } = battleViewProps.mock.lastCall![0] as { opponents: { blockSkinId: string; boardSkinId: string; online: boolean }[] };
+    expect(opponents[0]).toMatchObject({ blockSkinId: 'neon', boardSkinId: 'gameboy', online: false });
+  });
 });

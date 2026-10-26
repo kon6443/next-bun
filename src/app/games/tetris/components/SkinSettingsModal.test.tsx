@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const session = vi.hoisted(() => ({ value: { data: null as unknown, status: 'unauthenticated' } }));
@@ -98,5 +98,36 @@ describe('스킨 모달', () => {
     fireEvent.click(screen.getByRole('tab', { name: '배경' }));
     expect(screen.getByTestId('skin-item-background-neon')).toBeTruthy();
     expect(screen.queryByTestId('skin-item-block-neon')).toBeNull();
+  });
+
+  it('로그인 만료(내 장착 조회 401) — 다시 로그인 안내, 카드는 고를 수 없다(기본으로 보인다)', async () => {
+    login();
+    getMySkins.mockRejectedValue(new ApiError('AUTH_UNAUTHORIZED', '만료', 401));
+    render(<SkinSettingsModal onClose={() => {}} />);
+    expect(await screen.findByText(/로그인이 만료됐어요/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: '다시 로그인' })).toBeTruthy();
+    const neon = screen.getByTestId('skin-item-block-neon');
+    expect(neon.getAttribute('aria-disabled')).toBe('true');
+    fireEvent.click(neon);
+    expect(updateMySkins).not.toHaveBeenCalled();
+  });
+
+  it('불러오기 실패면 보유를 모르니 고를 수 없다 — 미보유를 골라 403을 보지 않게', async () => {
+    login();
+    getMySkins.mockRejectedValue(new Error('down'));
+    render(<SkinSettingsModal onClose={() => {}} />);
+    expect(await screen.findByText(/불러오지 못해 기본 스킨으로 보여요/)).toBeTruthy();
+    fireEvent.click(screen.getByTestId('skin-item-block-neon'));
+    expect(updateMySkins).not.toHaveBeenCalled();
+  });
+
+  it('장착 중은 글자로도 보인다(색만 아님), 슬롯 탭은 화살표로 옮긴다', async () => {
+    render(<SkinSettingsModal onClose={() => {}} />);
+    expect(within(screen.getByTestId('skin-item-block-default')).getByText('● 장착 중')).toBeTruthy();
+    const blockTab = screen.getByRole('tab', { name: '블록' });
+    blockTab.focus();
+    fireEvent.keyDown(blockTab, { key: 'ArrowLeft' });
+    expect(screen.getByRole('tab', { name: '배경' }).getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(screen.getByRole('tab', { name: '배경' }));
   });
 });

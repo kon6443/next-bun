@@ -7,6 +7,7 @@ vi.mock('@/services/userService', () => ({
   updateMySkins: (...args: unknown[]) => updateMySkins(...args),
 }));
 
+import { ApiError } from '@/types/api';
 import { __resetMySkinsForTests, equipMySkin, getMySkinsState, loadMySkins, resetMySkins } from './mySkins';
 
 const catalog = { block: [{ id: 'default', owned: true, unlock: 'default' }], effect: [], board: [], background: [] };
@@ -99,5 +100,61 @@ describe('내 스킨 장착 저장소', () => {
     get.resolve(ok({ block: 'neon', effect: 'neon', board: 'neon', background: 'neon' }));
     await pending;
     expect(getMySkinsState()).toMatchObject({ status: 'guest', equipped: { block: 'default' } });
+  });
+
+  it('불러오기 만료(401) — 기본으로 그리고(expired), 같은 토큰으로는 다시 부르지 않는다 · 다시 로그인(새 토큰)하면 불러온다', async () => {
+    getMySkins.mockRejectedValueOnce(new ApiError('AUTH_UNAUTHORIZED', '만료', 401));
+    await loadMySkins('old');
+    expect(getMySkinsState()).toMatchObject({ status: 'expired', equipped: { block: 'default' } });
+    await loadMySkins('old');
+    expect(getMySkins).toHaveBeenCalledTimes(1);
+    getMySkins.mockResolvedValueOnce(ok({ block: 'neon', effect: 'default', board: 'default', background: 'default' }));
+    await loadMySkins('new');
+    expect(getMySkinsState()).toMatchObject({ status: 'ready', equipped: { block: 'neon' } });
+  });
+
+  it('다른 토큰(계정 전환)으로 불러오는 동안 이전 계정의 장착을 그리지 않는다', async () => {
+    getMySkins.mockResolvedValueOnce(ok({ block: 'neon', effect: 'neon', board: 'neon', background: 'neon' }));
+    await loadMySkins('a');
+    getMySkins.mockReturnValueOnce(new Promise(() => {}));
+    void loadMySkins('b');
+    expect(getMySkinsState()).toMatchObject({ status: 'loading', equipped: { block: 'default', background: 'default' } });
+  });
+
+  it('장착 중 로그아웃 뒤 PUT이 실패해도 게스트 상태를 덮지 않는다 — 게스트는 늘 기본', async () => {
+    getMySkins.mockResolvedValue(ok({ block: 'neon', effect: 'default', board: 'default', background: 'default' }));
+    await loadMySkins('t1');
+    const put = deferred<unknown>();
+    updateMySkins.mockReturnValue(put.promise);
+    const pending = equipMySkin('block', 'default', 't1');
+    resetMySkins();
+    put.reject(new Error('net'));
+    await expect(pending).rejects.toThrow('net');
+    expect(getMySkinsState()).toMatchObject({ status: 'guest', equipped: { block: 'default' } });
+  });
+
+  it('다른 슬롯을 연달아 바꾸고 응답 순서가 바뀌어도 두 선택이 모두 남는다 — 응답은 그 슬롯에만 반영', async () => {
+    getMySkins.mockResolvedValue(ok({ block: 'default', effect: 'default', board: 'default', background: 'default' }));
+    await loadMySkins('t1');
+    const a = deferred<unknown>();
+    const b = deferred<unknown>();
+    updateMySkins.mockReturnValueOnce(a.promise).mockReturnValueOnce(b.promise);
+    const blockReq = equipMySkin('block', 'neon', 't1');
+    const effectReq = equipMySkin('effect', 'neon', 't1');
+    // 서버가 effect를 먼저 처리 — 그 응답의 block은 아직 이전 값
+    b.resolve(ok({ block: 'default', effect: 'neon', board: 'default', background: 'default' }));
+    await effectReq;
+    expect(getMySkinsState().equipped).toMatchObject({ block: 'neon', effect: 'neon' });
+    a.resolve(ok({ block: 'neon', effect: 'neon', board: 'default', background: 'default' }));
+    await blockReq;
+    expect(getMySkinsState().equipped).toMatchObject({ block: 'neon', effect: 'neon' });
+  });
+
+  it('장착이 만료(401)로 실패하면 되돌리고 expired로 — 다시 로그인하라고 안내하게', async () => {
+    getMySkins.mockResolvedValue(ok({ block: 'default', effect: 'default', board: 'default', background: 'default' }));
+    await loadMySkins('t1');
+    updateMySkins.mockRejectedValue(new ApiError('AUTH_UNAUTHORIZED', '만료', 401));
+    await expect(equipMySkin('board', 'neon', 't1')).rejects.toMatchObject({ status: 401 });
+    expect(getMySkinsState()).toMatchObject({ status: 'expired', equipped: { board: 'default' } });
   });
 });
