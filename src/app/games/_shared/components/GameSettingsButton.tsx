@@ -26,16 +26,28 @@ const SHAPES = {
 
 /**
  * 게임 설정 버튼(D-001) — 헤더·일시정지 메뉴 어디서든 같은 설정 시트를 연다. 시트 내용(섹션)은 게임이 정한다
- * 키보드로 연 시트가 닫히면 포커스는 이 버튼으로 돌아온다(useDialog)
+ * 시트가 닫히면 포커스는 이 버튼으로 돌아온다 — 키보드로 열면 useDialog가, 마우스·터치로 열면 close가
  * 톱니는 머리줄 소리 버튼 자리를 대신하므로 소리 상태를 잃지 않게 — 꺼져 있으면 모서리에 음소거 배지, 이름에도 상태
  */
 export function GameSettingsButton({ renderSheet, onOpenChange, testId, children, className = "", shape = "square", music = true }: Props) {
   const { settings: sound } = useSoundSettings();
   const soundOn = sound.sfx || (music && sound.music);
   const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const show = (next: boolean) => {
     setOpen(next);
     onOpenChange?.(next);
+  };
+  /**
+   * 닫기 — 마우스로 열면(아래에서 blur) 또는 터치(iOS는 탭해도 버튼에 포커스를 주지 않는다)로 열면 "열기 전 포커스"가 없어
+   * useDialog가 돌려줄 곳이 없다 → 닫힌 뒤 포커스가 어디에도 없으면 이 버튼으로. 다른 곳(일시정지의 "계속하기" 등)에 돌아갔으면 그대로
+   */
+  const close = () => {
+    show(false);
+    requestAnimationFrame(() => {
+      const active = document.activeElement;
+      if (!active || active === document.body) buttonRef.current?.focus();
+    });
   };
   // 시트가 열린 채 이 버튼이 사라지면(일시정지 메뉴가 닫히는 등) 닫혔다고 알린다 — 게임이 "열림" 상태로 남지 않게
   const openRef = useRef(open);
@@ -52,10 +64,11 @@ export function GameSettingsButton({ renderSheet, onOpenChange, testId, children
   return (
     <>
       <button
+        ref={buttonRef}
         type="button"
         onClick={(e) => {
           // 마우스로 누른 뒤 포커스가 남으면 게임의 Space가 이 버튼을 다시 누른다 — 포커스를 놓는다
-          // (그래서 마우스로 연 시트는 닫혀도 포커스를 돌려줄 곳이 없다. 키보드로 열면(detail 0) 놓지 않아 useDialog가 이 버튼으로 돌려준다)
+          // (판 도중이면 열 때 멈춰 일시정지 메뉴가 포커스를 받는다. 그 밖에서는 닫힐 때 close가 이 버튼으로 돌려준다)
           if (e.detail > 0) e.currentTarget.blur();
           // 이미 켜 둔 소리는 이 클릭(제스처)에서 깨운다 — 소리 버튼과 같게
           if (soundOn) unlockSounds();
@@ -86,7 +99,7 @@ export function GameSettingsButton({ renderSheet, onOpenChange, testId, children
           </span>
         )}
       </button>
-      {open && renderSheet(() => show(false))}
+      {open && renderSheet(close)}
     </>
   );
 }

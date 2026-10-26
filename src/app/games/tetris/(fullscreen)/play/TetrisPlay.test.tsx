@@ -290,4 +290,23 @@ describe('TetrisPlay 설정 시트와 준비 화면 (리뷰)', () => {
     });
     expect(document.activeElement).toBe(open);
   });
+
+  it('판 도중 HUD 톱니를 마우스로 열고 닫으면 포커스는 일시정지 메뉴에 — 톱니에 남아 Space가 시트를 다시 열지 않게', async () => {
+    createGameSession.mockResolvedValue({ data: session(new Date(Date.now() + 2 * HOUR).toISOString()) });
+    render(<TetrisPlay />);
+    await act(async () => {});
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '시작' }));
+    });
+    const gear = screen.getByRole('button', { name: /^설정 \(소리/ });
+    await act(async () => {
+      fireEvent.click(gear, { detail: 1 });
+    });
+    await act(async () => {
+      fireEvent.keyDown(document, { key: 'Escape' });
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+    });
+    expect(document.activeElement).not.toBe(gear);
+    expect(screen.getByRole('heading', { name: '일시정지' })).toBeTruthy();
+  });
 });

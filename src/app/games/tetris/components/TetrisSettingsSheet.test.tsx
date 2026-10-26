@@ -127,4 +127,19 @@ describe('테트리스 설정 시트 (D-001·D-006)', () => {
     unmount();
     expect(onOpenChange.mock.calls).toEqual([[true], [false]]);
   });
+
+  it('마우스·터치로 연 시트도 닫으면 연 버튼으로 포커스 — 클릭 때 포커스를 놓아 useDialog가 돌려줄 곳이 없어도 (통합 검증)', async () => {
+    render(<GameSettingsButton renderSheet={(close) => <TetrisSettingsSheet onClose={close} />} />);
+    const button = screen.getByRole('button', { name: /^설정 \(소리/ });
+    button.focus();
+    // 마우스 클릭(detail 1) — 버튼이 스스로 포커스를 놓는다
+    fireEvent.click(button, { detail: 1 });
+    expect(screen.getByRole('dialog', { name: '설정' })).toBeTruthy();
+    await act(async () => {
+      fireEvent.keyDown(document, { key: 'Escape' });
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(button);
+  });
 });
