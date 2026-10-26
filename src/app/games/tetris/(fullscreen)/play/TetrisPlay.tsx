@@ -23,7 +23,7 @@ import { TetrisSettingsSheet } from "../../components/TetrisSettingsSheet";
 import { GameSettingsButton } from "@/app/games/_shared/components/GameSettingsButton";
 import { type GameResult, GameOverPanel } from "../../components/GameOverPanel";
 import { useTetrisPlay } from "../../hooks/useTetrisPlay";
-import { CONTROL_GUIDE } from "../../lib/controls";
+import { CONTROL_GUIDE, PAD_GUIDE } from "../../lib/controls";
 import { formatFrames, formatScore } from "@/app/games/_shared/lib/format";
 import { loadLastName, recordBestScore } from "../../lib/storage";
 import { useTetrisSettings } from "../../hooks/useTetrisSettings";
@@ -354,7 +354,7 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
               <GameSettingsButton onOpenChange={pauseOnOpen} renderSheet={renderSettings} className={OVERLAY_SETTINGS_CLASS}>
                 설정
               </GameSettingsButton>
-              {!isCoarse && <ControlGuide />}
+              <ControlGuide items={isCoarse ? PAD_GUIDE : CONTROL_GUIDE} />
             </div>
           </Overlay>
         )}
@@ -374,7 +374,7 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
               <GameSettingsButton onOpenChange={pauseOnOpen} renderSheet={renderSettings} className={OVERLAY_SETTINGS_CLASS}>
                 설정
               </GameSettingsButton>
-              {!isCoarse && <ControlGuide />}
+              <ControlGuide items={isCoarse ? PAD_GUIDE : CONTROL_GUIDE} />
             </div>
           </Overlay>
         )}
@@ -430,10 +430,11 @@ function Overlay({ children }: { children: React.ReactNode }) {
   );
 }
 
-function ControlGuide() {
+/** 조작 안내 — 키보드 기기는 키 표, 터치 기기는 패드 버튼 표 */
+function ControlGuide({ items }: { items: readonly { keys: string; label: string }[] }) {
   return (
-    <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-left text-xs">
-      {CONTROL_GUIDE.map(({ keys, label }) => (
+    <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-left text-xs" data-testid="control-guide">
+      {items.map(({ keys, label }) => (
         <div key={keys} className="contents">
           <dt className="font-mono font-semibold text-sky-300">{keys}</dt>
           <dd className="text-slate-400">{label}</dd>

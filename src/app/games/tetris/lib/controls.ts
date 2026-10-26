@@ -42,6 +42,17 @@ export const CONTROL_GUIDE: readonly { keys: string; label: string; pause?: true
   { keys: 'Esc · P', label: '일시정지', pause: true },
 ];
 
+/** 터치 패드 안내 — 터치 기기의 준비·일시정지 화면(키보드 표 대신, UX 점검). 라벨은 패드 버튼 글자와 같다(tetrisPadLayout) */
+export const PAD_GUIDE: readonly { keys: string; label: string }[] = [
+  { keys: '◀ ▶', label: '이동 (누르고 있으면 연속)' },
+  { keys: '▼', label: '누르는 동안 소프트 드롭' },
+  { keys: '⤓ 드롭', label: '하드 드롭' },
+  { keys: 'A ↻', label: '시계 방향 회전' },
+  { keys: 'B ↺', label: '반시계 방향 회전' },
+  { keys: 'HOLD', label: '홀드' },
+  { keys: '❚❚', label: '일시정지 (오른쪽 위)' },
+];
+
 /** 대전 조작 안내 — 대전은 멈출 수 없다(useBattlePlay가 일시정지 키를 무시) (games-polish FE-32) */
 export const BATTLE_CONTROL_GUIDE = CONTROL_GUIDE.filter((item) => !item.pause);
 

@@ -162,3 +162,31 @@ describe('TetrisPlay 시작 (games-polish FE-12)', () => {
     ]);
   });
 });
+
+describe('TetrisPlay 조작 안내 (UX 점검)', () => {
+  const mockPointer = (coarse: boolean) =>
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({ matches: query === '(pointer: coarse)' ? coarse : false, media: query, addEventListener: () => {}, removeEventListener: () => {} }) as unknown as MediaQueryList,
+    );
+
+  it('터치 기기는 준비 화면에 패드 버튼 안내 — 키보드 표 대신', async () => {
+    const spy = mockPointer(true);
+    createGameSession.mockResolvedValue({ data: session(new Date(Date.now() + 2 * HOUR).toISOString()) });
+    render(<TetrisPlay />);
+    await act(async () => {});
+    const guide = screen.getByTestId('control-guide');
+    expect(guide.textContent).toContain('⤓ 드롭');
+    expect(guide.textContent).not.toContain('Space');
+    spy.mockRestore();
+  });
+
+  it('키보드 기기는 키 표', async () => {
+    const spy = mockPointer(false);
+    createGameSession.mockResolvedValue({ data: session(new Date(Date.now() + 2 * HOUR).toISOString()) });
+    render(<TetrisPlay />);
+    await act(async () => {});
+    expect(screen.getByTestId('control-guide').textContent).toContain('Space');
+    spy.mockRestore();
+  });
+});
