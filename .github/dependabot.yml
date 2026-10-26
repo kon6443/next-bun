@@ -15,3 +15,15 @@ updates:
         update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "chore(ci)"
+  # Dockerfile 베이스 이미지(node:24.x.y-bookworm-slim) 갱신 — 주 1회, 메이저 업데이트는 제외(Node 메이저는 사람이 직접 올린다)
+  # 두 FROM(base·production)이 같은 태그라 한 PR에서 같이 오른다
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    target-branch: develop
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    commit-message:
+      prefix: "chore(infra)"
