@@ -45,7 +45,15 @@ export function BattleLobby() {
   const [maxPlayers, setMaxPlayers] = useState(ROOM_MAX_PLAYERS);
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  /** 오류는 고칠 자리 옆에 — 아래 "방 만들기"를 누르고 위쪽 경고를 못 보는 일이 없게(UX 점검: 대전 입구 이름 오류) */
+  const [error, setError] = useState<LobbyError | null>(null);
+  /** 입력 오류 — 보이게 스크롤하고 그 칸으로 포커스 */
+  const fieldError = (place: LobbyError["place"], message: string, fieldId: string) => {
+    setError({ place, message });
+    const field = document.getElementById(fieldId);
+    field?.scrollIntoView?.({ block: "center" });
+    field?.focus();
+  };
   const [creating, setCreating] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
   /** 새로고침 응답 대기 — 연타로 한도(RATE_LIMITED)에 걸리지 않게 그동안 버튼을 잠근다 */
@@ -95,10 +103,12 @@ export function BattleLobby() {
   const submitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     const resolved = player.resolve();
-    if (resolved.error !== null) return setError(resolved.error);
+    if (resolved.error !== null) return fieldError("name", resolved.error, "battle-player-name");
     const finalRoomName = roomName.trim() ? roomName : `${resolved.name}의 방`;
-    const problem = validateRoomName(finalRoomName) ?? validateRoomPassword(password);
-    if (problem) return setError(problem);
+    const roomNameProblem = validateRoomName(finalRoomName);
+    if (roomNameProblem) return fieldError("create", roomNameProblem, "battle-room-name");
+    const passwordProblem = validateRoomPassword(password);
+    if (passwordProblem) return fieldError("create", passwordProblem, "battle-room-password");
     setError(null);
     setCreating(true);
     const result = await createRoom({
@@ -108,7 +118,7 @@ export function BattleLobby() {
       playerName: resolved.name,
     }, enterScope);
     setCreating(false);
-    if (!result.ok) return setError(battleErrorMessage(result.code));
+    if (!result.ok) return setError({ place: "create", message: battleErrorMessage(result.code) });
     player.remember(resolved.name);
     router.push(battleRoomPath(result.data.room.code));
   };
@@ -116,7 +126,7 @@ export function BattleLobby() {
   const submitCode = (e: React.FormEvent) => {
     e.preventDefault();
     const normalized = normalizeRoomCode(code);
-    if (!normalized) return setError("방 코드 6자리를 확인해 주세요.");
+    if (!normalized) return fieldError("code", "방 코드 6자리를 확인해 주세요.", "battle-room-code");
     setError(null);
     router.push(battleRoomPath(normalized));
   };
@@ -160,15 +170,12 @@ export function BattleLobby() {
             maxLength={PLAYER_NAME_MAX_LENGTH * 2}
             autoComplete="nickname"
             placeholder="대전에서 보일 이름"
+            aria-invalid={error?.place === "name"}
+            aria-describedby={error?.place === "name" ? "battle-lobby-error" : undefined}
             className={`${baseInputStyles} mt-2 min-h-11 px-4 py-2`}
           />
+          {error?.place === "name" && <LobbyAlert message={error.message} className="mt-3" />}
         </section>
-
-        {error && (
-          <p role="alert" className="rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-            {error}
-          </p>
-        )}
 
         <section className={cardStyles} aria-labelledby="battle-room-list">
           <div className="flex items-center justify-between">
@@ -237,6 +244,7 @@ export function BattleLobby() {
           <Button type="submit" size="md" fullWidth className="mt-4 min-h-11" disabled={creating || status !== "connected"}>
             {creating ? "만드는 중..." : "방 만들기"}
           </Button>
+          {error?.place === "create" && <LobbyAlert message={error.message} className="mt-3" />}
         </form>
 
         <form onSubmit={submitCode} className={cardStyles}>
@@ -258,9 +266,20 @@ export function BattleLobby() {
               입장
             </Button>
           </div>
+          {error?.place === "code" && <LobbyAlert message={error.message} className="mt-3" />}
         </form>
       </div>
     </div>
+  );
+}
+
+type LobbyError = { place: "name" | "create" | "code"; message: string };
+
+function LobbyAlert({ message, className = "" }: { message: string; className?: string }) {
+  return (
+    <p id="battle-lobby-error" role="alert" className={`rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200 ${className}`}>
+      {message}
+    </p>
   );
 }
 
