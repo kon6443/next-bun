@@ -232,3 +232,46 @@ describe('TetrisPlay 일시정지 스킨 진입 (D-003)', () => {
     expect(screen.getByRole('heading', { name: '일시정지' })).toBeTruthy();
   });
 });
+
+describe('TetrisPlay 설정 시트와 준비 화면 (리뷰)', () => {
+  it('준비 화면에서 시트를 연 사이 세션이 와도 "시작"이 포커스를 가져가지 않고, 닫은 뒤에 옮긴다', async () => {
+    let resolve: (v: { data: GameSession }) => void = () => {};
+    createGameSession.mockImplementation(() => new Promise((r) => (resolve = r)));
+    render(<TetrisPlay />);
+    await act(async () => {});
+    const open = screen.getByRole('button', { name: '설정' });
+    open.focus();
+    await act(async () => {
+      fireEvent.click(open);
+    });
+    const sheet = screen.getByRole('dialog', { name: '설정' });
+    // 준비 화면에서는 곧 시작할 판에 들어간다 — "다음 판부터"가 아니다
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('settings-group-controls'));
+    });
+    expect(screen.queryByText('DAS·ARR은 다음 판부터 적용돼요.')).toBeNull();
+    await act(async () => resolve({ data: session(new Date(Date.now() + 2 * HOUR).toISOString()) }));
+    expect(screen.getByRole('button', { name: '시작' })).toBeEnabled();
+    expect(sheet.contains(document.activeElement)).toBe(true);
+    await act(async () => {
+      fireEvent.keyDown(document, { key: 'Escape' });
+    });
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '시작' }));
+    expect(screen.getByText('준비됐나요?')).toBeTruthy();
+  });
+
+  it('일시정지의 "스킨 바꾸기"도 판 도중 규칙 — 조작은 "다음 판부터", 떠나는 링크 없음', async () => {
+    createGameSession.mockResolvedValue({ data: session(new Date(Date.now() + 2 * HOUR).toISOString()) });
+    render(<TetrisPlay />);
+    await act(async () => {});
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '시작' }));
+    });
+    fireEvent.click(screen.getByRole('button', { name: '일시정지' }));
+    fireEvent.click(screen.getByRole('button', { name: '스킨 바꾸기' }));
+    expect(screen.queryByRole('link', { name: /전체 스킨 보기/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '설정 목록으로' }));
+    fireEvent.click(screen.getByTestId('settings-group-controls'));
+    expect(screen.getByText('DAS·ARR은 다음 판부터 적용돼요.')).toBeTruthy();
+  });
+});

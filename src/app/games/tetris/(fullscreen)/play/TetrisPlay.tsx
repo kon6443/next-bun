@@ -184,10 +184,17 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
   }, [authStatus, requestSession]);
 
   const { start: startPlay, pause: pausePlay } = play;
-  const pauseOnOpen = useCallback((open: boolean) => {
+  /** 설정 시트가 열려 있는 동안 — 판을 멈추고, 뒤의 "시작"이 포커스·자동 시작으로 시트 뒤에서 판을 열지 않게 */
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const onSettingsOpenChange = useCallback((open: boolean) => {
+    setSettingsOpen(open);
     if (open) pausePlay();
   }, [pausePlay]);
-  const renderSettings = useCallback((close: () => void) => <TetrisSettingsSheet onClose={close} controls="next-game" />, []);
+  // 준비 화면에서 바꾼 DAS·ARR은 곧 시작할 판에 들어간다 — "다음 판부터"는 판 도중에만
+  const renderSettings = useCallback(
+    (close: () => void) => <TetrisSettingsSheet onClose={close} controls={phase === "ready" ? "edit" : "next-game"} />,
+    [phase],
+  );
   const beginGame = useCallback(
     (seed: number) => {
       setResult(null);
@@ -212,11 +219,12 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
   };
 
   useEffect(() => {
-    if (!startAfterSessionRef.current || sessionState.status === "loading") return;
+    // 시트가 열려 있으면 닫힌 뒤에 — 시트 뒤에서 판이 시작되지 않게
+    if (!startAfterSessionRef.current || sessionState.status === "loading" || settingsOpen) return;
     startAfterSessionRef.current = false;
     // 재발급에 실패하면 자동으로 시작하지 않는다 — 준비 화면에서 "등록 불가" 안내를 보고 시작하게
     if (sessionState.status === "ready") beginGame(sessionState.session.seed);
-  }, [beginGame, sessionState]);
+  }, [beginGame, sessionState, settingsOpen]);
 
   // 세션 응답이 늦으면 기다리지 않고 등록 없이 시작할 수 있게 한다 — 늦게 온 응답은 버린다(이 판은 로컬 seed)
   const [sessionSlow, setSessionSlow] = useState(false);
@@ -248,8 +256,9 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
   // "시작" 버튼은 세션을 받는 동안 비활성이라 autoFocus가 안 먹는다 — 활성화될 때 포커스를 준다
   const startEnabled = phase === "ready" && sessionState.status !== "loading" && sessionState.status !== "blocked";
   useEffect(() => {
-    if (startEnabled) startButtonRef.current?.focus();
-  }, [startEnabled]);
+    // 시트가 열린 사이 세션이 오면 포커스를 시트 밖으로 빼앗지 않는다 — 닫힌 뒤에 옮긴다
+    if (startEnabled && !settingsOpen) startButtonRef.current?.focus();
+  }, [startEnabled, settingsOpen]);
 
   const showControls = phase === "game" && play.status !== "over" && isCoarse;
   // 세션을 못 받아 로컬 seed로 하는 판(failed)은 같은 블록 순서가 아니다 — 데일리·도전장 문구를 거둔다(거절된 도전장은 무엇을 못 하는지 보이게 남긴다)
@@ -292,7 +301,7 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
           </div>
         </dl>
         {/* 설정 시트(소리·조작·연출·스킨)를 여는 동안 판을 멈춘다 — DAS·ARR은 다음 판부터 */}
-        <GameSettingsButton className="shrink-0" onOpenChange={pauseOnOpen} renderSheet={renderSettings} />
+        <GameSettingsButton className="shrink-0" onOpenChange={onSettingsOpenChange} renderSheet={renderSettings} />
         <button
           type="button"
           onClick={(e) => {
@@ -352,7 +361,7 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
                   등록 없이 시작
                 </Button>
               )}
-              <GameSettingsButton onOpenChange={pauseOnOpen} renderSheet={renderSettings} className={OVERLAY_SETTINGS_CLASS}>
+              <GameSettingsButton onOpenChange={onSettingsOpenChange} renderSheet={renderSettings} className={OVERLAY_SETTINGS_CLASS}>
                 설정
               </GameSettingsButton>
               <ControlGuide items={isCoarse ? PAD_GUIDE : CONTROL_GUIDE} />
@@ -372,10 +381,10 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
                   처음부터
                 </Button>
               </div>
-              <GameSettingsButton onOpenChange={pauseOnOpen} renderSheet={renderSettings} className={OVERLAY_SETTINGS_CLASS}>
+              <GameSettingsButton onOpenChange={onSettingsOpenChange} renderSheet={renderSettings} className={OVERLAY_SETTINGS_CLASS}>
                 설정
               </GameSettingsButton>
-              <SkinChangeButton onOpenChange={pauseOnOpen} className={OVERLAY_SETTINGS_CLASS}>
+              <SkinChangeButton onOpenChange={onSettingsOpenChange} className={OVERLAY_SETTINGS_CLASS} controls="next-game">
                 스킨 바꾸기
               </SkinChangeButton>
               {/* 터치 기기는 패드가 바로 아래 보이고 준비 화면에서 안내했다 — 메뉴가 화면을 넘지 않게 키보드 기기만 */}

@@ -7,7 +7,7 @@ import { ReloginButton } from "@/app/games/_shared/components/ReloginButton";
 import { useMySkins } from "../hooks/useMySkins";
 import { SKIN_ITEM_LABELS, SKIN_SLOTS, SKIN_SLOT_LABELS } from "../lib/skins";
 import { SkinPreview } from "./SkinPreview";
-import { TetrisSettingsSheet } from "./TetrisSettingsSheet";
+import { type ControlsMode, TetrisSettingsSheet } from "./TetrisSettingsSheet";
 
 /**
  * 테트리스 홈 상단 "내 스킨" 카드(D-003) — 지금 장착 미리보기 + 바꾸기(설정 시트의 스킨 상세)·도감
@@ -56,17 +56,20 @@ export function SkinChangeButton({
   children,
   className,
   onOpenChange,
+  controls = "edit",
 }: {
   children: ReactNode;
   className: string;
   onOpenChange?: (open: boolean) => void;
+  /** 판 도중이면 next-game — 조작 안내·이탈 링크 규칙이 같은 화면의 "설정"과 같게 */
+  controls?: ControlsMode;
 }) {
   return (
     <GameSettingsButton
       testId="skin-change"
       className={className}
       onOpenChange={onOpenChange}
-      renderSheet={(close) => <TetrisSettingsSheet onClose={close} initialGroup="skin" />}
+      renderSheet={(close) => <TetrisSettingsSheet onClose={close} initialGroup="skin" controls={controls} />}
     >
       {children}
     </GameSettingsButton>

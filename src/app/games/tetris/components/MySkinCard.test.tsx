@@ -53,4 +53,23 @@ describe('홈 "내 스킨" 카드 (D-003)', () => {
     fireEvent.click(screen.getByRole('button', { name: '설정 목록으로' }));
     expect(screen.getByRole('dialog', { name: '설정' })).toBeTruthy();
   });
+
+  it('스킨 상세로 바로 연 시트를 닫으면 연 버튼으로 포커스가 돌아온다(키보드)', async () => {
+    session.value = { data: { user: { accessToken: 'tok' } }, status: 'authenticated' };
+    getMySkins.mockResolvedValue({ code: 'SUCCESS', data: { equipped, catalog }, message: '' });
+    await act(async () => {
+      render(<MySkinCard />);
+    });
+    const change = screen.getByRole('button', { name: '바꾸기' });
+    change.focus();
+    await act(async () => {
+      fireEvent.click(change);
+    });
+    expect(screen.getByRole('dialog', { name: '스킨' }).contains(document.activeElement)).toBe(true);
+    await act(async () => {
+      fireEvent.keyDown(document, { key: 'Escape' });
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(change);
+  });
 });

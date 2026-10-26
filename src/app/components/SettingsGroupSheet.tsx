@@ -32,7 +32,15 @@ type Props = {
 export function SettingsGroupSheet({ title, groups, onClose, testId, initialGroup }: Props) {
   const [openId, setOpenId] = useState<string | null>(initialGroup ?? null);
   const rowRefs = useRef(new Map<string, HTMLButtonElement>());
+  const backRef = useRef<HTMLButtonElement>(null);
   const open = groups.find((group) => group.id === openId) ?? null;
+
+  // 줄을 누르면 그 줄이 사라지니 상세의 ←로 포커스. 처음부터 상세로 열 때(initialGroup)는 useDialog가 첫 컨트롤(←)로 옮긴다 —
+  // ←에 autoFocus를 두면 useDialog보다 먼저 포커스가 가서 ←를 "열기 전 포커스"로 기억해, 닫을 때 연 버튼으로 돌아가지 못한다
+  const openGroup = (id: string) => {
+    setOpenId(id);
+    requestAnimationFrame(() => backRef.current?.focus());
+  };
 
   const backToList = () => {
     const from = openId;
@@ -48,12 +56,11 @@ export function SettingsGroupSheet({ title, groups, onClose, testId, initialGrou
       onClose={onClose}
       headerStart={
         open && (
-          // 누른 줄이 사라지니 바뀐 화면의 첫 컨트롤로 포커스
           <button
+            ref={backRef}
             type="button"
             onClick={backToList}
             aria-label={`${title} 목록으로`}
-            autoFocus
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg text-slate-300 hover:text-white"
           >
             ←
@@ -75,7 +82,7 @@ export function SettingsGroupSheet({ title, groups, onClose, testId, initialGrou
                   }}
                   type="button"
                   data-testid={`settings-group-${group.id}`}
-                  onClick={() => setOpenId(group.id)}
+                  onClick={() => openGroup(group.id)}
                   className="flex min-h-14 w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5"
                 >
                   {group.preview && <span className="shrink-0">{group.preview}</span>}

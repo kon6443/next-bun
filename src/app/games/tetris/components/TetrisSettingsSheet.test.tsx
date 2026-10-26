@@ -35,7 +35,10 @@ describe('테트리스 설정 시트 (D-001·D-006)', () => {
 
   it('조작 상세 — 바꾸면 같은 스토어에 저장, ←로 목록에 돌아오면 요약도 바뀌고 누른 줄로 포커스', async () => {
     render(<TetrisSettingsSheet onClose={() => {}} />);
-    openGroup('controls');
+    await act(async () => {
+      openGroup('controls');
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+    });
     const sheet = screen.getByRole('dialog', { name: '조작' });
     expect(document.activeElement).toBe(screen.getByRole('button', { name: '설정 목록으로' }));
     fireEvent.change(within(sheet).getByRole('slider', { name: /DAS/ }), { target: { value: '15' } });
@@ -102,5 +105,18 @@ describe('테트리스 설정 시트 (D-001·D-006)', () => {
     fireEvent.click(within(screen.getByRole('dialog', { name: '소리' })).getByRole('checkbox', { name: '효과음' }));
     expect(screen.getByRole('button', { name: '설정 (소리 켜짐)' })).toBe(button);
     expect(within(button).queryByTestId('settings-sound-off')).toBeNull();
+  });
+
+  it('판 도중(다음 판·대전)의 스킨 상세에는 화면을 떠나는 링크·로그인 버튼이 없다 — 확인 없이 판·경기를 떠나지 않게', () => {
+    for (const controls of ['next-game', 'locked'] as const) {
+      const { unmount } = render(<TetrisSettingsSheet onClose={() => {}} controls={controls} initialGroup="skin" />);
+      expect(screen.queryByRole('link', { name: /전체 스킨 보기/ })).toBeNull();
+      expect(screen.queryByRole('button', { name: '카카오로 로그인' })).toBeNull();
+      expect(screen.getByText('판이 끝난 뒤 로그인할 수 있어요.')).toBeTruthy();
+      unmount();
+    }
+    render(<TetrisSettingsSheet onClose={() => {}} initialGroup="skin" />);
+    expect(screen.getByRole('link', { name: /전체 스킨 보기/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '카카오로 로그인' })).toBeTruthy();
   });
 });

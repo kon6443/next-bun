@@ -37,8 +37,11 @@ export function SkinSettingsModal({ onClose }: Props) {
   );
 }
 
-/** 스킨 장착 본문 — 모달·공통 설정 시트가 같이 쓴다 */
-export function SkinSettingsSection({ onNavigate }: { onNavigate?: () => void }) {
+/**
+ * 스킨 장착 본문 — 모달·공통 설정 시트가 같이 쓴다
+ * allowLeave=false: 판 도중(일시정지·대전) — 화면을 떠나는 도감 링크·로그인 버튼을 두지 않는다(확인 없이 판·경기를 떠나게 되므로)
+ */
+export function SkinSettingsSection({ onNavigate, allowLeave = true }: { onNavigate?: () => void; allowLeave?: boolean }) {
   const tabsId = useId();
   const { status, equipped, catalog, loggedIn, equip } = useMySkins();
   const [slot, setSlot] = useState<SkinSlot>("block");
@@ -73,19 +76,21 @@ export function SkinSettingsSection({ onNavigate }: { onNavigate?: () => void })
     {!loggedIn && (
       <div className="mb-3 rounded-xl border border-white/10 bg-slate-800/50 p-3 text-sm text-slate-300">
         <p>로그인하면 스킨을 고를 수 있어요. 지금은 기본 스킨으로 플레이해요.</p>
-        <ReloginButton className="mt-2" label="카카오로 로그인" />
+        {allowLeave ? <ReloginButton className="mt-2" label="카카오로 로그인" /> : <p className="mt-1 text-xs text-slate-400">판이 끝난 뒤 로그인할 수 있어요.</p>}
       </div>
     )}
     {loggedIn && status === "error" && <p className="mb-2 text-xs text-amber-300">스킨 정보를 불러오지 못해 기본 스킨으로 보여요.</p>}
     {loggedIn && status === "expired" && (
       <div className="mb-3 rounded-xl border border-white/10 bg-slate-800/50 p-3 text-sm text-slate-300">
         <p>로그인이 만료됐어요. 다시 로그인하면 내 스킨으로 바꿀 수 있어요.</p>
-        <ReloginButton className="mt-2" />
+        {allowLeave ? <ReloginButton className="mt-2" /> : <p className="mt-1 text-xs text-slate-400">판이 끝난 뒤 다시 로그인할 수 있어요.</p>}
       </div>
     )}
-    <Link href="/games/tetris/skins" onClick={onNavigate} className="mb-3 inline-flex min-h-11 items-center text-sm text-sky-300 hover:text-sky-200">
-      전체 스킨 보기(얻는 방법) ›
-    </Link>
+    {allowLeave && (
+      <Link href="/games/tetris/skins" onClick={onNavigate} className="mb-3 inline-flex min-h-11 items-center text-sm text-sky-300 hover:text-sky-200">
+        전체 스킨 보기(얻는 방법) ›
+      </Link>
+    )}
 
     <div role="tablist" aria-label="스킨 슬롯" className="mb-3 grid grid-cols-4 gap-1 rounded-xl bg-slate-800/60 p-1" onKeyDown={onTabKey}>
       {SKIN_SLOTS.map((s) => (

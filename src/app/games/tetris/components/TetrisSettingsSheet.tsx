@@ -45,7 +45,8 @@ export function TetrisSettingsSheet({ onClose, controls = "edit", initialGroup }
       // 게스트도 기본 스킨 미리보기 — 무엇을 바꿀 수 있는지 보이게
       preview: <SkinPreview slot="block" id={equipped.block} width={64} height={28} />,
       summary: loggedIn ? SKIN_SLOTS.map((slot) => SKIN_ITEM_LABELS[equipped[slot]] ?? equipped[slot]).join(" · ") : "로그인하고 스킨 꾸미기",
-      content: <SkinSettingsSection onNavigate={onClose} />,
+      // 판 도중(일시정지·대전)에는 화면을 떠나는 링크를 두지 않는다
+      content: <SkinSettingsSection onNavigate={onClose} allowLeave={controls === "edit"} />,
     },
     {
       id: "sound",
