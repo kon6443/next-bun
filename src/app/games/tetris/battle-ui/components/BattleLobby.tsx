@@ -49,7 +49,7 @@ export function BattleLobby() {
   const [error, setError] = useState<LobbyError | null>(null);
   /** 입력 오류 — 보이게 스크롤하고 그 칸으로 포커스 */
   const fieldError = (place: LobbyError["place"], message: string, fieldId: string) => {
-    setError({ place, message });
+    setError({ place, message, field: fieldId });
     const field = document.getElementById(fieldId);
     field?.scrollIntoView?.({ block: "center" });
     field?.focus();
@@ -170,8 +170,8 @@ export function BattleLobby() {
             maxLength={PLAYER_NAME_MAX_LENGTH * 2}
             autoComplete="nickname"
             placeholder="대전에서 보일 이름"
-            aria-invalid={error?.place === "name"}
-            aria-describedby={error?.place === "name" ? "battle-lobby-error" : undefined}
+            aria-invalid={error?.field === "battle-player-name"}
+            aria-describedby={error?.field === "battle-player-name" ? "battle-lobby-error" : undefined}
             className={`${baseInputStyles} mt-2 min-h-11 px-4 py-2`}
           />
           {error?.place === "name" && <LobbyAlert message={error.message} className="mt-3" />}
@@ -207,6 +207,8 @@ export function BattleLobby() {
           <input
             id="battle-room-name"
             value={roomName}
+            aria-invalid={error?.field === "battle-room-name"}
+            aria-describedby={error?.field === "battle-room-name" ? "battle-lobby-error" : undefined}
             onChange={(e) => setRoomName(e.target.value)}
             maxLength={ROOM_NAME_MAX_LENGTH * 2}
             className={`${baseInputStyles} mt-1 min-h-11 px-4 py-2`}
@@ -235,6 +237,8 @@ export function BattleLobby() {
           <input
             id="battle-room-password"
             type="password"
+            aria-invalid={error?.field === "battle-room-password"}
+            aria-describedby={error?.field === "battle-room-password" ? "battle-lobby-error" : undefined}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             maxLength={ROOM_PASSWORD_MAX_LENGTH}
@@ -255,6 +259,8 @@ export function BattleLobby() {
             <input
               id="battle-room-code"
               value={code}
+              aria-invalid={error?.field === "battle-room-code"}
+              aria-describedby={error?.field === "battle-room-code" ? "battle-lobby-error" : undefined}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               maxLength={6}
               autoComplete="off"
@@ -273,7 +279,8 @@ export function BattleLobby() {
   );
 }
 
-type LobbyError = { place: "name" | "create" | "code"; message: string };
+/** field: 입력 오류면 그 칸 id(aria-invalid·describedby 연결), 서버 오류면 없음 */
+type LobbyError = { place: "name" | "create" | "code"; message: string; field?: string };
 
 function LobbyAlert({ message, className = "" }: { message: string; className?: string }) {
   return (
