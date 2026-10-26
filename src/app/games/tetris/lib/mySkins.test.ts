@@ -129,7 +129,8 @@ describe('내 스킨 장착 저장소', () => {
     const pending = equipMySkin('block', 'default', 't1');
     resetMySkins();
     put.reject(new Error('net'));
-    await expect(pending).rejects.toThrow('net');
+    // 이미 로그아웃한 화면이라 실패를 알리지 않는다(토스트 없음)
+    await expect(pending).resolves.toBeUndefined();
     expect(getMySkinsState()).toMatchObject({ status: 'guest', equipped: { block: 'default' } });
   });
 
@@ -207,5 +208,61 @@ describe('내 스킨 장착 저장소', () => {
     await retryMySkins('t1');
     expect(getMySkinsState()).toMatchObject({ status: 'ready', equipped: { block: 'neon' } });
     expect(getMySkins).toHaveBeenCalledTimes(2);
+  });
+
+  it('같은 슬롯 두 요청이 모두 성공하고 응답이 역순으로 오면, 묶음이 끝난 뒤 GET으로 서버 값에 맞춘다', async () => {
+    getMySkins.mockResolvedValueOnce(ok({ block: 'default', effect: 'default', board: 'default', background: 'default' }));
+    await loadMySkins('t1');
+    const a = deferred<unknown>();
+    const b = deferred<unknown>();
+    updateMySkins.mockReturnValueOnce(a.promise).mockReturnValueOnce(b.promise);
+    const first = equipMySkin('block', 'neon', 't1');
+    const second = equipMySkin('block', 'gameboy', 't1');
+    // 서버는 neon → gameboy 순으로 저장(최종 gameboy), 응답은 gameboy가 먼저·neon이 나중
+    b.resolve(ok({ block: 'gameboy', effect: 'default', board: 'default', background: 'default' }));
+    await second;
+    getMySkins.mockResolvedValueOnce(ok({ block: 'gameboy', effect: 'default', board: 'default', background: 'default' }));
+    a.resolve(ok({ block: 'neon', effect: 'default', board: 'default', background: 'default' }));
+    await first;
+    await vi.waitFor(() => expect(getMySkinsState().equipped.block).toBe('gameboy'));
+    expect(getMySkins).toHaveBeenCalledTimes(2);
+  });
+
+  it('한 번만 바꾼 장착은 다시 조회하지 않는다', async () => {
+    getMySkins.mockResolvedValueOnce(ok({ block: 'default', effect: 'default', board: 'default', background: 'default' }));
+    await loadMySkins('t1');
+    updateMySkins.mockResolvedValue(ok({ block: 'neon', effect: 'default', board: 'default', background: 'default' }));
+    await equipMySkin('block', 'neon', 't1');
+    expect(getMySkins).toHaveBeenCalledTimes(1);
+  });
+
+  it('로그아웃 뒤 늦게 온 장착 성공도 게스트 상태를 바꾸지 않고, 다음 로그인의 같은 슬롯 장착 실패는 확정값으로 돌아간다', async () => {
+    getMySkins.mockResolvedValueOnce(ok({ block: 'default', effect: 'default', board: 'default', background: 'default' }));
+    await loadMySkins('t1');
+    const late = deferred<unknown>();
+    updateMySkins.mockReturnValueOnce(late.promise);
+    const pending = equipMySkin('block', 'neon', 't1');
+    resetMySkins();
+    late.resolve(ok({ block: 'neon', effect: 'default', board: 'default', background: 'default' }));
+    await pending;
+    expect(getMySkinsState()).toMatchObject({ status: 'guest', equipped: { block: 'default' }, catalog: null });
+    // 다시 로그인 — 이전 세대의 진행 중 요청 수가 남아 있으면 실패 뒤에도 낙관값이 남는다
+    getMySkins.mockResolvedValueOnce(ok({ block: 'gameboy', effect: 'default', board: 'default', background: 'default' }));
+    await loadMySkins('t2');
+    updateMySkins.mockRejectedValueOnce(new Error('net'));
+    await expect(equipMySkin('block', 'neon', 't2')).rejects.toThrow('net');
+    expect(getMySkinsState().equipped.block).toBe('gameboy');
+  });
+
+  it('장착 진행 중 다른 토큰으로 다시 불러오면 이전 요청 수를 지운다 — 새 세대의 같은 슬롯 실패가 확정값으로 돌아간다', async () => {
+    getMySkins.mockResolvedValueOnce(ok({ block: 'default', effect: 'default', board: 'default', background: 'default' }));
+    await loadMySkins('a');
+    updateMySkins.mockReturnValueOnce(new Promise(() => {}));
+    void equipMySkin('block', 'neon', 'a');
+    getMySkins.mockResolvedValueOnce(ok({ block: 'gameboy', effect: 'default', board: 'default', background: 'default' }));
+    await loadMySkins('b');
+    updateMySkins.mockRejectedValueOnce(new Error('net'));
+    await expect(equipMySkin('block', 'neon', 'b')).rejects.toThrow('net');
+    expect(getMySkinsState().equipped.block).toBe('gameboy');
   });
 });
