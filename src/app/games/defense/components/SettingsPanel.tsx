@@ -1,13 +1,12 @@
 "use client";
 
-import { useId, useState } from "react";
-import { useDialog } from "@/app/hooks/useDialog";
-import { SoundSettingsEntry } from "@/app/games/_shared/components/SoundSettingsEntry";
+import { SettingsSheet } from "@/app/components/SettingsSheet";
+import { SoundSettingsSection } from "@/app/games/_shared/components/SoundSettingsModal";
 import type { DefenseSettings } from "../lib/settings";
 
 /**
- * 설정 (defense DESIGN §F1 설정) — 소리(공통 모달)·진동·데미지 숫자·화면 흔들림·기본 배속. 바꾸는 즉시 저장(lib/settings)
- * 소리는 게임 공통 소리 설정 — 플레이 HUD 소리 버튼과 같은 모달
+ * 설정 (defense DESIGN §F1 설정) — 소리·진동·데미지 숫자·화면 흔들림·기본 배속. 바꾸는 즉시 저장(lib/settings)
+ * 공통 설정 시트(D-001)에 섹션으로 — 소리는 게임 공통 소리 설정을 시트 안에 바로 둔다(모달을 겹쳐 열지 않는다)
  */
 type Props = {
   open: boolean;
@@ -23,29 +22,15 @@ const TOGGLES: readonly { key: "vibration" | "damageNumbers" | "shake"; label: s
 ];
 
 export function SettingsPanel({ open, settings, onChange, onClose }: Props) {
-  const titleId = useId();
-  const [soundOpen, setSoundOpen] = useState(false);
-  // 소리 모달이 위에 열려 있는 동안은 이 대화상자의 키 처리(Esc·Tab 가두기)를 쉰다 — 둘 다 document에서 받아 Esc가 둘 다 닫지 않게
-  const dialogRef = useDialog<HTMLDivElement>(open && !soundOpen, onClose);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-        data-testid="defense-settings"
-        className="w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900 p-5 focus:outline-none"
-      >
-        <h2 id={titleId} className="text-lg font-bold text-white">
-          설정
-        </h2>
-        <div className="mt-3">
-          <SoundSettingsEntry music={false} onOpenChange={setSoundOpen} testId="defense-settings-sound" />
-        </div>
-        <ul className="mt-1 grid gap-1">
+    <SettingsSheet title="설정" testId="defense-settings" size="md" onClose={onClose}>
+      <div className="min-h-0 overflow-y-auto">
+        <section data-testid="defense-settings-sound">
+          <h3 className="mb-1 text-sm font-semibold text-slate-200">소리</h3>
+          <SoundSettingsSection music={false} />
+        </section>
+        <ul className="mt-3 grid gap-1 border-t border-white/10 pt-3">
           {TOGGLES.map((t) => (
             <li key={t.key}>
               <label className="flex min-h-12 items-center gap-3 rounded-xl px-2 hover:bg-white/5">
@@ -96,6 +81,6 @@ export function SettingsPanel({ open, settings, onChange, onClose }: Props) {
           닫기
         </button>
       </div>
-    </div>
+    </SettingsSheet>
   );
 }
