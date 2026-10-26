@@ -8,6 +8,7 @@ import {
   TEXT_LIFE_FRAMES,
   TRAIL_LIFE_FRAMES,
 } from './effects';
+import { NEON_ALPHA, NEON_LINE_WIDTH, drawNeonFrame } from './neonSprites';
 import { type BlockSkin, type BoardSkin, type EffectSkin, blockSkin, boardSkin, effectSkin } from './skins';
 
 /**
@@ -91,12 +92,16 @@ export function drawBoardFrame(
 ): void {
   const { boardX, boardY } = rect;
   const color = levelNeon(level, board);
+  const blur = reduced ? 4 : 14;
+  // 매 프레임 그리므로 shadowBlur 대신 구워 둔 스프라이트를 복사한다(neonSprites) — 스프라이트를 못 쓰면 직접
+  // 스프라이트는 투명도를 구워 두었다 — 호출 쪽 globalAlpha가 1·source-over라는 전제(drawGame). 페이드로 감싸면 두 경로가 달라진다
+  if (drawNeonFrame(ctx, boardX - 1, boardY - 1, boardWidth + 2, boardHeight + 2, color, blur)) return;
   ctx.save();
   ctx.strokeStyle = color;
-  ctx.globalAlpha = 0.85;
-  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = NEON_ALPHA;
+  ctx.lineWidth = NEON_LINE_WIDTH;
   ctx.shadowColor = color;
-  ctx.shadowBlur = reduced ? 4 : 14;
+  ctx.shadowBlur = blur;
   ctx.strokeRect(boardX - 1, boardY - 1, boardWidth + 2, boardHeight + 2);
   ctx.restore();
 }

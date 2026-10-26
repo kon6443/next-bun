@@ -10,6 +10,7 @@ import {
 } from '../engine';
 import { drawBlock, drawGlow } from './blockSprites';
 import { type EffectTracker, isBigClear } from './effects';
+import { NEON_ALPHA, NEON_LINE_WIDTH, drawNeonGhost } from './neonSprites';
 import {
   type EffectQuality,
   boardBackground,
@@ -105,6 +106,8 @@ export type DrawOptions = {
 /** 칸 발광 세기 — 고정된 칸은 은은하게, 조작 중인 블록은 밝게 */
 const GLOW_ALPHA_LOCKED = 0.22;
 const GLOW_ALPHA_ACTIVE = 0.55;
+/** 고스트 외곽선 발광 폭(shadowBlur) */
+const GHOST_GLOW_BLUR = 8;
 
 export type GarbageGauge = {
   /** 대기열 전체 줄 */
@@ -239,28 +242,38 @@ export function drawGame(ctx: CanvasRenderingContext2D, state: GameState, layout
     const cells = PIECE_CELLS[state.piece][state.rotation];
     const color = block.cells[state.piece + 1];
     if (options.showGhost !== false) {
-      // 고스트 — 옅은 면 + 네온 외곽선(발광은 한 번의 shadowBlur로)
+      // 고스트 — 옅은 면 + 네온 외곽선
       const ghostY = getDropY(state);
       ctx.save();
       ctx.strokeStyle = color;
       ctx.fillStyle = color;
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = NEON_LINE_WIDTH;
       ctx.globalAlpha = 0.1;
       for (let i = 0; i < 8; i += 2) {
         const row = ghostY + cells[i + 1];
         if (row < firstRow) continue;
         ctx.fillRect(boardX + (state.x + cells[i]) * cell + 1, rowToY(layout, row) + 1, cell - 2, cell - 2);
       }
-      ctx.globalAlpha = 0.85;
-      ctx.shadowColor = color;
-      ctx.shadowBlur = glow ? 8 : 0;
-      ctx.beginPath();
-      for (let i = 0; i < 8; i += 2) {
-        const row = ghostY + cells[i + 1];
-        if (row < firstRow) continue;
-        ctx.rect(boardX + (state.x + cells[i]) * cell + 1.5, rowToY(layout, row) + 1.5, cell - 3, cell - 3);
+      // 발광 외곽선은 구워 둔 스프라이트로(neonSprites — 매 프레임 shadowBlur 없이). 발광이 꺼졌거나 생성 줄 위로 잘리는 칸이 있으면 직접
+      let clipped = false;
+      for (let i = 1; i < 8; i += 2) if (ghostY + cells[i] < firstRow) clipped = true;
+      ctx.globalAlpha = 1;
+      const sprite =
+        glow &&
+        !clipped &&
+        drawNeonGhost(ctx, `${state.piece}|${state.rotation}`, cells, boardX + state.x * cell, rowToY(layout, ghostY), cell, color, GHOST_GLOW_BLUR);
+      if (!sprite) {
+        ctx.globalAlpha = NEON_ALPHA;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = glow ? GHOST_GLOW_BLUR : 0;
+        ctx.beginPath();
+        for (let i = 0; i < 8; i += 2) {
+          const row = ghostY + cells[i + 1];
+          if (row < firstRow) continue;
+          ctx.rect(boardX + (state.x + cells[i]) * cell + 1.5, rowToY(layout, row) + 1.5, cell - 3, cell - 3);
+        }
+        ctx.stroke();
       }
-      ctx.stroke();
       ctx.restore();
     }
     for (let i = 0; i < 8; i += 2) {
