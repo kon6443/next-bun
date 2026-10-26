@@ -3,7 +3,6 @@
 import { useId, useRef, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { SettingsSheet } from "@/app/components/SettingsSheet";
 import { ApiError } from "@/types/api";
 import type { SkinCatalogItem } from "@/services/userService";
 import { useMySkins } from "../hooks/useMySkins";
@@ -11,10 +10,6 @@ import { KNOWN_SKIN_IDS, SKIN_ITEM_LABELS, SKIN_SLOTS, SKIN_SLOT_LABELS, type Sk
 import { nextTabByKey } from "../lib/tabKeys";
 import { SkinPreview } from "./SkinPreview";
 import { ReloginButton } from "@/app/games/_shared/components/ReloginButton";
-
-type Props = {
-  onClose: () => void;
-};
 
 const SLOT_HINTS: Record<SkinSlot, string> = {
   block: "블록 7종·고스트·HOLD/NEXT",
@@ -24,21 +19,10 @@ const SLOT_HINTS: Record<SkinSlot, string> = {
 };
 
 /**
- * 테트리스 스킨 장착 모달(D-003) — 슬롯 탭(블록·연출·보드·배경) + 아이템 카드(미리보기·잠금 자리)
+ * 테트리스 스킨 장착(D-003) — 설정 시트의 스킨 상세. 슬롯 탭(블록·연출·보드·배경) + 아이템 카드(미리보기·잠금 자리)
  * 로그인 사용자만 바꿀 수 있다(계정 저장). 게스트는 미리보기만 보고 "로그인하면 스킨 선택"
  * 카탈로그는 서버 것을 그대로 보인다(보유·잠금). 불러오기 전·실패면 이 프론트가 아는 아이템을 잠금 없이 보인다
  * 보드 슬롯은 상대·리플레이 화면에서도 내 장착으로 보인다(보드 주인 규칙), 배경은 나에게만
- */
-export function SkinSettingsModal({ onClose }: Props) {
-  return (
-    <SettingsSheet title="스킨" testId="skin-settings" size="md" onClose={onClose}>
-      <SkinSettingsSection onNavigate={onClose} />
-    </SettingsSheet>
-  );
-}
-
-/**
- * 스킨 장착 본문 — 모달·공통 설정 시트가 같이 쓴다
  * allowLeave=false: 판 도중(일시정지·대전) — 화면을 떠나는 도감 링크·로그인 버튼을 두지 않는다(확인 없이 판·경기를 떠나게 되므로)
  */
 export function SkinSettingsSection({ onNavigate, allowLeave = true }: { onNavigate?: () => void; allowLeave?: boolean }) {

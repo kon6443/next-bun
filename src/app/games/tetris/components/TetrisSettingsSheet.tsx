@@ -11,7 +11,7 @@ import { CONTROL_GUIDE } from "../lib/controls";
 import { SKIN_ITEM_LABELS, SKIN_SLOTS } from "../lib/skins";
 import { EffectsToggle, useReducedEffectsSetting } from "./EffectsToggle";
 import { SkinPreview } from "./SkinPreview";
-import { SkinSettingsSection } from "./SkinSettingsModal";
+import { SkinSettingsSection } from "./SkinSettingsSection";
 
 /**
  * 조작(DAS·ARR) 변경 규칙 — 판을 시작할 때 엔진·리플레이 헤더에 들어가므로 진행 중인 판에는 반영하지 않는다
