@@ -15,6 +15,7 @@ import { extractErrorMessage } from "@/app/utils/errorUtils";
 import { ENGINE_VERSION, type GameState, MAX_FRAMES, MAX_INPUT_LENGTH } from "../../engine";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
 import { TetrisCanvas } from "../../components/TetrisCanvas";
+import { useMySkins } from "../../hooks/useMySkins";
 import { GamePad } from "@/app/games/_shared/components/GamePad";
 import { TETRIS_PAD_LAYOUT } from "../../lib/tetrisPadLayout";
 import { EffectsToggle } from "../../components/EffectsToggle";
@@ -74,6 +75,9 @@ function sessionErrorMessage(err: unknown, variant: "daily" | "challenge" | null
  */
 export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?: boolean; challengeScoreId?: number }) {
   const { data: authSession, status: authStatus } = useSession();
+  // 내 판은 내 보드 스킨(D-003) — 게스트·불러오기 전은 기본
+  const { equipped } = useMySkins();
+  const mySkins = { block: equipped.block, effect: equipped.effect, board: equipped.board };
   const accessToken = authSession?.user?.accessToken ?? undefined;
 
   const [settings, setSettings] = useState<TetrisSettings>(DEFAULT_SETTINGS);
@@ -298,7 +302,7 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
       {/* 판 */}
       {/* 루트 layout이 이미 <main>으로 감싼다 — 중첩하지 않는다 */}
       <div className="relative min-h-0 flex-1">
-        <TetrisCanvas stateRef={play.stateRef} drawRef={play.afterTickRef} effectsRef={play.effectsRef} />
+        <TetrisCanvas stateRef={play.stateRef} drawRef={play.afterTickRef} effectsRef={play.effectsRef} skins={mySkins} />
 
         {phase === "ready" && (
           <Overlay>

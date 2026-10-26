@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BOARD_COLS, BOARD_VISIBLE_ROWS } from "@/types/tetrisBattleSocket";
 import type { TetrisBattleEmoteId } from "@/types/tetrisBattleSocket";
 import { TetrisCanvas } from "../../components/TetrisCanvas";
+import type { BoardSkins } from "../../lib/skins";
 import { GamePad } from "@/app/games/_shared/components/GamePad";
 import { TETRIS_PAD_LAYOUT } from "../../lib/tetrisPadLayout";
 import { SoundButton } from "@/app/games/_shared/components/SoundButton";
@@ -22,6 +23,8 @@ type BattleViewProps = {
   /** 내 판의 공격 궤적 기준점 id (= 내 playerId) */
   meId: string;
   opponents: OpponentView[];
+  /** 내 판의 스킨(내 장착) — 없으면 기본 */
+  skins?: BoardSkins;
   emotes: Record<string, ReceivedEmote>;
   /** 공격 궤적 레이어 루트 — useAttackTrails의 rootRef */
   trailsRootRef: React.RefObject<HTMLDivElement | null>;
@@ -78,6 +81,7 @@ export function BattleView({
   play,
   meId,
   opponents,
+  skins,
   emotes,
   trailsRootRef,
   onEmote,
@@ -178,7 +182,7 @@ export function BattleView({
 
       {/* 루트 layout이 이미 <main>으로 감싼다 — 중첩하지 않는다 */}
       <div className="relative min-h-0 flex-1" data-attack-anchor={meId}>
-        <TetrisCanvas stateRef={play.gameRef} drawRef={play.afterTickRef} effectsRef={play.effectsRef} garbageRef={play.garbageRef} />
+        <TetrisCanvas stateRef={play.gameRef} drawRef={play.afterTickRef} effectsRef={play.effectsRef} garbageRef={play.garbageRef} skins={skins} />
         <div className="pointer-events-none absolute left-2 top-4 h-8 w-32">
           <EmoteBubble emote={emotes[meId]} />
         </div>

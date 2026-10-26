@@ -179,6 +179,8 @@ export type ReplayData = RankingItem & {
   arr: number;
   frames: number;
   inputs: number[];
+  /** 보드 스킨(D-003) — 기록 주인의 지금 장착(익명 default). 이전 서버면 없다 → default로 그린다 */
+  skins?: { block: string; effect: string; board: string };
 };
 
 /** 테트리스 밖 게임의 재생 데이터 — das·arr 대신 params, 보드 키 (defense DESIGN §B6) */
