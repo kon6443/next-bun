@@ -16,6 +16,14 @@ services:
       - target: 3000
         published: 23000
         mode: ingress
+    # 롤백 판정이 작동하려면 healthy 뒤 실패가 update_config.monitor(65s) 안에 관측돼야 한다. 값을 바꾸면 monitor도 같이 맞춘다.
+    # 근거(소스 원문): moby executor/container/controller.go — Start는 healthy까지 막혀 있고, 이후 unhealthy면 Shutdown이
+    # 서비스 바인딩 해제 뒤 gossip 수렴 대기(2s)를 거쳐 컨테이너를 stop한다(stop grace 기본 10s).
+    # swarmkit updater.go failureTriggersAction — RUNNING 전 실패는 언제든, RUNNING 뒤에는 그 시각부터 monitor 안의 종료를 센다.
+    # 최악 = retries × (interval + timeout) 45s + gossip 2s + stop grace 10s = 57s → 여유를 두고 65s
+    # 검사 대상 /api/health 는 고정 JSON 만 돌려준다(src/app/api/health/route.ts) — 백엔드·DB 를 부르지 않아 백엔드 배포 중에도 연쇄 롤백되지 않는다
+    # start_period 30s: 로컬 측정 기동(health 200까지) 448ms(docs/tasks/kakao-login-latency-front.md §6) — 운영 ARM 노드는 미측정이라 여유를 둔다
+    # timeout 5s: 같은 컨테이너 안 정적 응답이라 정상이면 수 ms
     healthcheck:
       # 런타임 이미지가 node 다 (Dockerfile 과 같은 커밋으로 바꿔야 롤링이 깨지지 않는다).
       # node -e 는 CommonJS 라 최상위 await 대신 then 으로 쓴다
@@ -24,10 +32,10 @@ services:
         - node
         - -e
         - "fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
-      interval: 30s
-      timeout: 10s
+      interval: 10s
+      timeout: 5s
       retries: 3
-      start_period: 60s
+      start_period: 30s
     deploy:
       replicas: 4
       placement:
@@ -37,7 +45,7 @@ services:
         parallelism: 1
         order: start-first
         failure_action: rollback
-        monitor: 60s
+        monitor: 65s   # healthy 뒤 실패 관측 최악(57s)보다 길게(위 healthcheck 주석) — 헬스체크 실패도 롤백으로 잡는다
         max_failure_ratio: 0
       rollback_config:
         parallelism: 1
@@ -46,7 +54,9 @@ services:
         monitor: 5s
         max_failure_ratio: 0
       restart_policy:
-        condition: on-failure
+        # any — unhealthy로 내려진 컨테이너는 graceful shutdown(SIGTERM → exit 0)으로 끝나면 Completed가 된다.
+        # on-failure는 Completed를 재시작하지 않아(swarmkit restart.go shouldRestart) 레플리카가 다음 배포까지 빠진 채 남는다
+        condition: any
         delay: 10s
 
 networks:

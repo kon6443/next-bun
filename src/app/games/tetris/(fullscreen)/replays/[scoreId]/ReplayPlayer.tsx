@@ -197,7 +197,7 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
       // 건너뛴 구간의 소리는 버린다 — 다음 재생 프레임에 한꺼번에 나지 않게
       if (effectsRef.current) drainCues(effectsRef.current);
       refreshPressed();
-      drawRef.current?.();
+      // 그리기는 재생 루프가 다음 화면 프레임에 한다(멈춘 동안에도 매 rAF) — 여기서 그리면 저사양 판정 표본(화면 프레임 간격)이 쪼개진다
       setPlayback((p) => ({ ...p, frame: stateRef.current?.frame ?? 0 }));
     },
     [advance, prepared, refreshPressed, totalFrames],

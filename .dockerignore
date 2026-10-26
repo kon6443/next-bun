@@ -12,6 +12,8 @@
 .claude
 docs
 coverage
+# 스택 YAML — CI 가 서버로 따로 보낸다(이미지에 필요 없음). 이것만 바뀐 커밋이 COPY . . 이후 캐시를 깨지 않게
+infra
 *.tsbuildinfo
 
 # pnpm 로컬 store (sandbox 실행 시 생성)

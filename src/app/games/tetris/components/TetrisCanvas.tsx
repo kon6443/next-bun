@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import type { GameState } from "../engine";
 import type { EffectTracker } from "../lib/effects";
 import { type GarbageGauge, computeLayout, drawGame } from "../lib/renderer";
-import type { EffectQuality } from "../lib/effectsRenderer";
+import { type QualityMonitor, createQualityMonitor, sampleDraw } from "../lib/renderQuality";
 import { type BoardSkins, DEFAULT_BOARD_SKINS } from "../lib/skins";
 import { useReducedEffects } from "../hooks/useReducedEffects";
 
@@ -25,15 +25,12 @@ type TetrisCanvasProps = {
   className?: string;
 };
 
-/** 저사양 감지 — 그리기 간격 평균이 이보다 길면(약 40fps 미만) 이 세션 동안 가벼운 품질로 그린다 */
-const SLOW_FRAME_MS = 25;
-const SAMPLE_DRAWS = 90;
-/** 한 번 느리다고 판단하면 화면을 옮겨도 유지 — 판마다 다시 재며 깜빡이지 않게 */
-let sessionQuality: EffectQuality = "full";
+/** 저사양 감지 — 화면 프레임 간격 이동 평균으로 계속 판단한다(lib/renderQuality). 화면을 옮겨도 이어서 — 판마다 처음부터 재며 깜빡이지 않게 */
+let qualityMonitor: QualityMonitor = createQualityMonitor();
 
 /** 테스트용 */
 export function __resetCanvasQualityForTests(): void {
-  sessionQuality = "full";
+  qualityMonitor = createQualityMonitor();
 }
 
 /**
@@ -48,6 +45,8 @@ export function TetrisCanvas({ stateRef, drawRef, effectsRef, garbageRef, skins 
   // 값이 같으면 같은 객체로 — 부모가 매 렌더 새 객체를 넘겨도 다시 그리지 않게
   const { block, effect, board } = skins;
   const skinsRef = useRef(skins);
+  /** 표본 없이 다시 그린다 — 스킨·연출 줄이기 변경처럼 화면 프레임이 아닌 그리기(저사양 판정 간격을 쪼개지 않게) */
+  const redrawRef = useRef<(() => void) | null>(null);
   if (skinsRef.current.block !== block || skinsRef.current.effect !== effect || skinsRef.current.board !== board) skinsRef.current = skins;
 
   useEffect(() => {
@@ -57,28 +56,11 @@ export function TetrisCanvas({ stateRef, drawRef, effectsRef, garbageRef, skins 
     if (!container || !canvas || !ctx) return;
 
     let layout = computeLayout(1, 1);
-    // 연속으로 그려지는 동안의 간격만 잰다 — 멈춘 화면(일시정지·탭 전환)의 긴 간격은 버린다
-    let last = 0;
-    let sum = 0;
-    let samples = 0;
-    const measure = () => {
-      if (sessionQuality === "lite") return;
-      const now = performance.now();
-      const gap = now - last;
-      last = now;
-      if (gap <= 0 || gap > 200) return;
-      sum += gap;
-      samples++;
-      if (samples >= SAMPLE_DRAWS) {
-        if (sum / samples > SLOW_FRAME_MS) sessionQuality = "lite";
-        sum = 0;
-        samples = 0;
-      }
-    };
     /** 마지막으로 그린 것 — 같으면 다시 그리지 않는다(준비·일시정지·게임오버·재생 정지 중 매 프레임 전체 그리기를 피한다, FE-11) */
     let drawn: { state: GameState | null; frame: number; over: boolean; reduced: boolean; skins: BoardSkins; layoutVersion: number } | null = null;
     let layoutVersion = 0;
-    const draw = () => {
+    /** frameGap·now: 화면 프레임에서 부를 때만(onAnimationFrame) — 저사양 판정 표본. resize 등 그 밖의 그리기는 표본이 아니다 */
+    const draw = (frameGap = 0, now = 0) => {
       const state = stateRef.current;
       const next = { state, frame: state?.frame ?? -1, over: state?.over ?? false, reduced: reducedRef.current, skins: skinsRef.current, layoutVersion };
       if (
@@ -94,12 +76,12 @@ export function TetrisCanvas({ stateRef, drawRef, effectsRef, garbageRef, skins 
       }
       drawn = next;
       if (state) {
-        if (!state.over && effectsRef) measure();
+        const quality = !state.over && effectsRef && frameGap > 0 ? sampleDraw(qualityMonitor, frameGap, now) : qualityMonitor.quality;
         drawGame(ctx, state, layout, {
           effects: effectsRef?.current,
           reduced: reducedRef.current,
           garbage: garbageRef?.current,
-          quality: sessionQuality,
+          quality,
           skins: skinsRef.current,
         });
       } else {
@@ -138,19 +120,30 @@ export function TetrisCanvas({ stateRef, drawRef, effectsRef, garbageRef, skins 
       watchDpr();
     };
     watchDpr();
-    drawRef.current = draw;
+    // 표본은 부모 루프가 매 화면 프레임(rAF) 부르는 이 함수의 호출 간격 — 실제로 그린 프레임에서만 쓴다
+    // (그린 간격을 재면 0.5배속 재생처럼 엔진 프레임이 드문 화면을 느린 기기로 오판한다. 멈춘 화면은 그리지 않아 표본이 없다)
+    let lastFrameAt = 0;
+    const onAnimationFrame = () => {
+      const now = performance.now();
+      const gap = lastFrameAt === 0 ? 0 : now - lastFrameAt;
+      lastFrameAt = now;
+      draw(gap, now);
+    };
+    drawRef.current = onAnimationFrame;
+    redrawRef.current = () => draw();
 
     return () => {
+      redrawRef.current = null;
       observer.disconnect();
       media?.removeEventListener("change", onDpr);
-      if (drawRef.current === draw) drawRef.current = null;
+      if (drawRef.current === onAnimationFrame) drawRef.current = null;
     };
   }, [stateRef, drawRef, effectsRef, garbageRef]);
 
   // 연출 줄이기·스킨을 바꾸면 멈춰 있는 화면(일시정지·준비)도 바로 다시 그린다
   useEffect(() => {
-    drawRef.current?.();
-  }, [reduced, block, effect, board, drawRef]);
+    redrawRef.current?.();
+  }, [reduced, block, effect, board]);
 
   return (
     <div ref={containerRef} className={`relative h-full w-full ${className}`}>
