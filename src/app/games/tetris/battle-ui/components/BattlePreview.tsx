@@ -6,6 +6,7 @@ import { Button } from "@/app/teams/components";
 import { pendingGarbageLines } from "../../battle-engine";
 import { DEFAULT_ARR, DEFAULT_DAS } from "../../engine";
 import { nextRandom } from "../../engine/random";
+import { useMySkins } from "../../hooks/useMySkins";
 import { useReducedEffects } from "../../hooks/useReducedEffects";
 import type { ReceivedEmote } from "../contexts/BattleSocketContext";
 import { useAttackTrails } from "../hooks/useAttackTrails";
@@ -27,6 +28,8 @@ type Phase = { status: "countdown"; endsAt: number } | { status: "playing" } | {
  * 같은 시드의 봇 1~3명과 대전 래퍼로 실제 공격·상쇄·가비지를 주고받는다
  */
 export function BattlePreview({ opponentCount, seed }: { opponentCount: number; seed: number }) {
+  // 내 판은 내 장착(실제 대전 MatchScreen과 같다) — 봇 상대 판은 기본 스킨
+  const { equipped } = useMySkins();
   const router = useRouter();
   const reduced = useReducedEffects();
   const { rootRef, fire } = useAttackTrails(reduced);
@@ -182,6 +185,7 @@ export function BattlePreview({ opponentCount, seed }: { opponentCount: number; 
       play={play}
       meId={ME}
       opponents={opponents}
+      skins={{ block: equipped.block, effect: equipped.effect, board: equipped.board }}
       emotes={emotes}
       trailsRootRef={rootRef}
       onEmote={(emoteId) => setEmotes((prev) => ({ ...prev, [ME]: { playerId: ME, emoteId, at: new Date().toISOString(), key: Date.now() } }))}
