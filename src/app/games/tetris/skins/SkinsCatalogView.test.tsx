@@ -70,6 +70,7 @@ describe('스킨 도감 (D-005)', () => {
     expect(within(neon).getByText('누구나 무료')).toBeTruthy();
     expect(within(neon).queryByText(/보유/)).toBeNull();
     expect(within(neon).queryByRole('button', { name: '장착' })).toBeNull();
+    window.history.pushState({}, '', '/games/tetris/skins');
     fireEvent.click(screen.getByRole('button', { name: '카카오로 로그인' }));
     expect(startLogin).toHaveBeenCalledWith({ callbackUrl: '/games/tetris/skins' });
   });
@@ -140,5 +141,31 @@ describe('스킨 도감 (D-005)', () => {
     expect(screen.getByRole('tab', { name: '배경' }).getAttribute('aria-selected')).toBe('true');
     fireEvent.keyDown(document.activeElement!, { key: 'ArrowRight' });
     expect(screen.getByRole('tab', { name: '블록' }).getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('내 장착 조회가 일시 실패면 장착 버튼을 잠그고 이유와 다시 불러오기를 보인다', async () => {
+    login();
+    getTetrisSkinCatalog.mockResolvedValue(catalog(true));
+    getMySkins.mockRejectedValueOnce(new Error('down')).mockResolvedValueOnce(mine());
+    render(<SkinsCatalogView />);
+    expect(await screen.findByText('내 장착 정보를 불러오지 못해 지금은 장착할 수 없어요.')).toBeTruthy();
+    const equip = within(screen.getByTestId('catalog-block-neon')).getByRole('button', { name: '장착' });
+    expect(equip).toBeDisabled();
+    fireEvent.click(equip);
+    expect(updateMySkins).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
+    });
+    expect(getMySkins).toHaveBeenCalledTimes(2);
+    expect(within(screen.getByTestId('catalog-block-neon')).getByRole('button', { name: '장착' })).toBeEnabled();
+  });
+
+  it('내 장착 조회가 만료(401)면 도감은 정상이어도 만료 안내 — 장착 버튼 없이', async () => {
+    login();
+    getTetrisSkinCatalog.mockResolvedValue(catalog(true));
+    getMySkins.mockRejectedValue(new ApiError('AUTH_UNAUTHORIZED', 'x', 401));
+    render(<SkinsCatalogView />);
+    expect(await screen.findByText('로그인이 만료됐어요. 다시 로그인하면 내 스킨이 보여요.')).toBeTruthy();
+    expect(within(screen.getByTestId('catalog-block-neon')).queryByRole('button', { name: '장착' })).toBeNull();
   });
 });

@@ -5,8 +5,8 @@ import toast from "react-hot-toast";
 import { useSession } from "next-auth/react";
 import { TeamsPageLayout, ButtonLink, SectionLabel, LoadingSpinnerSimple } from "@/app/teams/components";
 import { cardStyles } from "@/styles/teams";
-import { useKakaoLogin } from "@/app/auth/useKakaoLogin";
 import { isAuthExpired } from "@/app/games/_shared/lib/submitError";
+import { ReloginButton } from "@/app/games/_shared/components/ReloginButton";
 import { extractErrorMessage } from "@/app/utils/errorUtils";
 import { getTetrisSkinCatalog } from "@/services/gameService";
 import { ApiError } from "@/types/api";
@@ -49,7 +49,6 @@ export default function SkinsCatalogView() {
   const [slot, setSlot] = useState<TetrisSkinSlot>("block");
   const [filter, setFilter] = useState<Filter>("all");
   const [attempt, setAttempt] = useState(0);
-  const { start: startLogin, isStarting } = useKakaoLogin();
   const tabsId = useId();
   const tabRefs = useRef<Partial<Record<TetrisSkinSlot, HTMLButtonElement | null>>>({});
 
@@ -117,14 +116,14 @@ export default function SkinsCatalogView() {
         {(authExpired || (authStatus === "unauthenticated" && load.status !== "loading")) && (
           <div className="mt-4 rounded-xl border border-white/10 bg-slate-800/50 p-3 text-sm text-slate-300">
             <p>{authExpired ? "로그인이 만료됐어요. 다시 로그인하면 내 스킨이 보여요." : "로그인하면 보유한 스킨을 보고 바로 장착할 수 있어요."}</p>
-            <button
-              type="button"
-              onClick={() => startLogin({ callbackUrl: "/games/tetris/skins" })}
-              disabled={isStarting}
-              aria-busy={isStarting}
-              className="mt-2 inline-flex min-h-11 items-center justify-center rounded-full bg-[#FEE500] px-4 text-sm font-semibold text-[#181600] disabled:opacity-70"
-            >
-              {isStarting ? "카카오로 이동 중..." : "카카오로 로그인"}
+            <ReloginButton className="mt-2" label={authExpired ? "다시 로그인" : "카카오로 로그인"} />
+          </div>
+        )}
+        {signedIn && mine.status === "error" && (
+          <div role="status" className="mt-4 rounded-xl border border-amber-300/30 bg-slate-800/50 p-3 text-sm text-slate-300">
+            <p>내 장착 정보를 불러오지 못해 지금은 장착할 수 없어요.</p>
+            <button type="button" onClick={mine.retry} className="mt-2 min-h-11 rounded-full border border-white/20 px-4 text-slate-200">
+              다시 불러오기
             </button>
           </div>
         )}

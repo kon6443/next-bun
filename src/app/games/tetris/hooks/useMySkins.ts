@@ -10,6 +10,7 @@ import {
   getServerMySkinsState,
   loadMySkins,
   resetMySkins,
+  retryMySkins,
   subscribeMySkins,
 } from "../lib/mySkins";
 
@@ -21,6 +22,8 @@ export function useMySkins(): MySkinsState & {
   loggedIn: boolean;
   /** 장착 — 로그인 상태에서만. 실패하면 되돌리고 에러를 던진다 */
   equip: (slot: SkinSlotName, id: string) => Promise<void>;
+  /** 불러오기 일시 실패(error) 뒤 다시 불러오기 */
+  retry: () => void;
 } {
   const { data: session, status } = useSession();
   const accessToken = session?.user?.accessToken ?? null;
@@ -40,5 +43,9 @@ export function useMySkins(): MySkinsState & {
     [accessToken],
   );
 
-  return { ...skins, loggedIn: Boolean(accessToken), equip };
+  const retry = useCallback(() => {
+    if (accessToken) void retryMySkins(accessToken);
+  }, [accessToken]);
+
+  return { ...skins, loggedIn: Boolean(accessToken), equip, retry };
 }

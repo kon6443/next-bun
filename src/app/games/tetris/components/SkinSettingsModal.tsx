@@ -5,13 +5,13 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { useDialog } from "@/app/hooks";
-import { useKakaoLogin } from "@/app/auth/useKakaoLogin";
 import { ApiError } from "@/types/api";
 import type { SkinCatalogItem } from "@/services/userService";
 import { useMySkins } from "../hooks/useMySkins";
 import { KNOWN_SKIN_IDS, SKIN_ITEM_LABELS, SKIN_SLOTS, SKIN_SLOT_LABELS, type SkinSlot } from "../lib/skins";
 import { nextTabByKey } from "../lib/tabKeys";
 import { SkinPreview } from "./SkinPreview";
+import { ReloginButton } from "@/app/games/_shared/components/ReloginButton";
 
 type Props = {
   onClose: () => void;
@@ -38,8 +38,6 @@ export function SkinSettingsModal({ onClose }: Props) {
   const [slot, setSlot] = useState<SkinSlot>("block");
   const pressedBackdropRef = useRef(false);
   const tabRefs = useRef<Partial<Record<SkinSlot, HTMLButtonElement | null>>>({});
-  const { start: startLogin, isStarting } = useKakaoLogin();
-  const login = () => startLogin({ callbackUrl: `${window.location.pathname}${window.location.search}` });
 
   const items: SkinCatalogItem[] =
     catalog && catalog[slot].length > 0 ? catalog[slot] : KNOWN_SKIN_IDS[slot].map((id) => ({ id, owned: true, unlock: "free" }));
@@ -102,30 +100,14 @@ export function SkinSettingsModal({ onClose }: Props) {
         {!loggedIn && (
           <div className="mb-3 rounded-xl border border-white/10 bg-slate-800/50 p-3 text-sm text-slate-300">
             <p>로그인하면 스킨을 고를 수 있어요. 지금은 기본 스킨으로 플레이해요.</p>
-            <button
-              type="button"
-              onClick={login}
-              disabled={isStarting}
-              aria-busy={isStarting}
-              className="mt-2 inline-flex min-h-11 items-center justify-center rounded-full bg-[#FEE500] px-4 text-sm font-semibold text-[#181600] disabled:opacity-70"
-            >
-              {isStarting ? "카카오로 이동 중..." : "카카오로 로그인"}
-            </button>
+            <ReloginButton className="mt-2" label="카카오로 로그인" />
           </div>
         )}
         {loggedIn && status === "error" && <p className="mb-2 text-xs text-amber-300">스킨 정보를 불러오지 못해 기본 스킨으로 보여요.</p>}
         {loggedIn && status === "expired" && (
           <div className="mb-3 rounded-xl border border-white/10 bg-slate-800/50 p-3 text-sm text-slate-300">
-            <p>로그인이 만료됐어요. 다시 로그인하면 내 스킨으로 바꿀 수 있어요. 지금은 기본 스킨으로 보여요.</p>
-            <button
-              type="button"
-              onClick={login}
-              disabled={isStarting}
-              aria-busy={isStarting}
-              className="mt-2 inline-flex min-h-11 items-center justify-center rounded-full bg-[#FEE500] px-4 text-sm font-semibold text-[#181600] disabled:opacity-70"
-            >
-              {isStarting ? "카카오로 이동 중..." : "다시 로그인"}
-            </button>
+            <p>로그인이 만료됐어요. 다시 로그인하면 내 스킨으로 바꿀 수 있어요.</p>
+            <ReloginButton className="mt-2" />
           </div>
         )}
         <Link href="/games/tetris/skins" onClick={onClose} className="mb-3 inline-flex min-h-11 items-center text-sm text-sky-300 hover:text-sky-200">

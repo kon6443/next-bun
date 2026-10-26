@@ -74,14 +74,17 @@ export function MatchScreen({
   const target = targetId ?? (alive.length === 1 ? alive[0].playerId : null);
   // 미니보드 props — 채팅·이모트 등 다른 변경에는 같은 객체를 넘겨 memo된 판이 다시 그려지지 않게 (FE-19)
   // 방에 없으면(나갔거나 정리됨) 오프라인으로 보인다. 상대 판은 상대의 보드 스킨(players[].skins, 없으면 기본 — D-003)
-  // 방을 나간 상대(목록에서 정리됨)의 판도 경기 중에는 그 사람 스킨 그대로 — 마지막으로 본 값을 기억한다
+  // 방을 나간 상대(목록에서 정리됨)의 판도 경기 중에는 그 사람 스킨 그대로 — 마지막으로 본 값을 기억한다(렌더 뒤 effect에서 — 렌더는 순수하게)
   const knownSkinsRef = useRef(new Map<string, BoardSkins>());
+  useEffect(() => {
+    for (const p of roomPlayers) if (p.skins) knownSkinsRef.current.set(p.playerId, toBoardSkins(p.skins));
+  }, [roomPlayers]);
   const opponentViews = useMemo(() => {
     const byId = new Map(roomPlayers.map((p) => [p.playerId, p]));
-    for (const p of roomPlayers) if (p.skins) knownSkinsRef.current.set(p.playerId, toBoardSkins(p.skins));
     return opponents.map((o) => {
       const player = byId.get(o.playerId);
-      const skins = knownSkinsRef.current.get(o.playerId) ?? toBoardSkins(player?.skins);
+      // 방에 있으면 지금 값, 정리됐으면 기억한 값
+      const skins = player?.skins ? toBoardSkins(player.skins) : (knownSkinsRef.current.get(o.playerId) ?? toBoardSkins(undefined));
       return { ...o, isTarget: o.playerId === target, online: player?.connected ?? false, blockSkinId: skins.block, boardSkinId: skins.board };
     });
   }, [opponents, target, roomPlayers]);
