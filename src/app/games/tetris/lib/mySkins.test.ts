@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const getMySkins = vi.fn();
 const updateMySkins = vi.fn();
@@ -11,7 +11,9 @@ import { ApiError } from '@/types/api';
 import { __resetMySkinsForTests, equipMySkin, getMySkinsState, loadMySkins, resetMySkins, retryMySkins } from './mySkins';
 
 const catalog = { block: [{ id: 'default', owned: true, unlock: 'default' }], effect: [], board: [], background: [] };
-const ok = (equipped: Record<string, string>) => ({ code: 'SUCCESS', data: { equipped, catalog }, message: '' });
+const base = { block: 'default', effect: 'default', board: 'default', background: 'default' };
+const ok = (equipped: Record<string, string>) => ({ code: 'SUCCESS', data: { equipped: { ...base, ...equipped }, catalog }, message: '' });
+const expired = () => new ApiError('AUTH_UNAUTHORIZED', '만료', 401);
 
 function deferred<T>() {
   let resolve!: (v: T) => void;
@@ -22,247 +24,192 @@ function deferred<T>() {
   });
   return { promise, resolve, reject };
 }
+/** 마이크로태스크를 비운다 — 앞 요청이 끝난 뒤 기다리던 선택을 보내는 것까지 */
+const flush = () => new Promise((r) => setTimeout(r, 0));
 
 beforeEach(() => {
   __resetMySkinsForTests();
   getMySkins.mockReset();
   updateMySkins.mockReset();
 });
-afterEach(() => vi.restoreAllMocks());
 
-describe('내 스킨 장착 저장소', () => {
+async function loaded(equipped: Record<string, string> = {}, token = 't1') {
+  getMySkins.mockResolvedValueOnce(ok(equipped));
+  await loadMySkins(token);
+}
+
+describe('내 스킨 — 불러오기', () => {
   it('처음은 게스트 — 모든 슬롯 기본', () => {
-    expect(getMySkinsState()).toMatchObject({ status: 'guest', equipped: { block: 'default', effect: 'default', board: 'default', background: 'default' } });
+    expect(getMySkinsState()).toMatchObject({ status: 'guest', equipped: base });
   });
 
-  it('불러오기 — 서버 장착을 반영하고, 빠진 슬롯은 기본. 같은 토큰은 한 번만 부른다', async () => {
-    getMySkins.mockResolvedValue(ok({ block: 'neon', effect: 'gameboy', board: 'high-contrast' }));
+  it('서버 장착을 반영하고 빠진 슬롯은 기본, 같은 토큰은 한 번만 부른다', async () => {
+    getMySkins.mockResolvedValue({ code: 'SUCCESS', data: { equipped: { block: 'neon', effect: 'gameboy', board: 'high-contrast' }, catalog }, message: '' });
     await loadMySkins('t1');
     await loadMySkins('t1');
     expect(getMySkins).toHaveBeenCalledTimes(1);
-    expect(getMySkinsState()).toMatchObject({
-      status: 'ready',
-      equipped: { block: 'neon', effect: 'gameboy', board: 'high-contrast', background: 'default' },
-      catalog: { block: [{ id: 'default' }] },
-    });
+    expect(getMySkinsState()).toMatchObject({ status: 'ready', equipped: { block: 'neon', effect: 'gameboy', board: 'high-contrast', background: 'default' } });
   });
 
-  it('불러오기 실패 — 기본으로 그리고(error), 다음 진입 때 다시 부른다', async () => {
+  it('일시 실패 — 기본으로 그리고(error), retry는 같은 토큰이어도 다시 부른다', async () => {
     getMySkins.mockRejectedValueOnce(new Error('down'));
     await loadMySkins('t1');
     expect(getMySkinsState()).toMatchObject({ status: 'error', equipped: { block: 'default' } });
-    getMySkins.mockResolvedValueOnce(ok({ block: 'neon', effect: 'default', board: 'default', background: 'default' }));
-    await loadMySkins('t1');
-    expect(getMySkinsState().equipped.block).toBe('neon');
+    getMySkins.mockResolvedValueOnce(ok({ block: 'neon' }));
+    await retryMySkins('t1');
+    expect(getMySkinsState()).toMatchObject({ status: 'ready', equipped: { block: 'neon' } });
   });
 
-  it('장착 — 응답 전에 먼저 반영(낙관적), 성공하면 서버 값으로', async () => {
-    getMySkins.mockResolvedValue(ok({ block: 'default', effect: 'default', board: 'default', background: 'default' }));
-    await loadMySkins('t1');
-    const put = deferred<unknown>();
-    updateMySkins.mockReturnValue(put.promise);
-    const pending = equipMySkin('board', 'neon', 't1');
-    expect(getMySkinsState().equipped.board).toBe('neon');
-    expect(updateMySkins).toHaveBeenCalledWith({ board: 'neon' }, 't1');
-    put.resolve(ok({ block: 'default', effect: 'default', board: 'neon', background: 'default' }));
-    await pending;
-    expect(getMySkinsState()).toMatchObject({ status: 'ready', equipped: { board: 'neon' } });
-  });
-
-  it('장착 실패 — 그 슬롯만 이전 값으로 되돌리고 에러를 다시 던진다', async () => {
-    getMySkins.mockResolvedValue(ok({ block: 'gameboy', effect: 'default', board: 'default', background: 'default' }));
-    await loadMySkins('t1');
-    updateMySkins.mockRejectedValue(Object.assign(new Error('없는 스킨'), { code: 'USER_SKIN_UNKNOWN' }));
-    await expect(equipMySkin('block', 'neon', 't1')).rejects.toMatchObject({ code: 'USER_SKIN_UNKNOWN' });
-    expect(getMySkinsState().equipped.block).toBe('gameboy');
-  });
-
-  it('빠른 연속 변경 — 늦게 온 첫 응답이 두 번째 선택을 덮지 않고, 첫 요청 실패도 두 번째 선택을 되돌리지 않는다', async () => {
-    getMySkins.mockResolvedValue(ok({ block: 'default', effect: 'default', board: 'default', background: 'default' }));
-    await loadMySkins('t1');
-    const first = deferred<unknown>();
-    const second = deferred<unknown>();
-    updateMySkins.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
-    const a = equipMySkin('block', 'neon', 't1');
-    const b = equipMySkin('block', 'gameboy', 't1');
-    second.resolve(ok({ block: 'gameboy', effect: 'default', board: 'default', background: 'default' }));
-    await b;
-    first.reject(new Error('late fail'));
-    await expect(a).rejects.toThrow('late fail');
-    expect(getMySkinsState().equipped.block).toBe('gameboy');
-  });
-
-  it('로그아웃 — 게스트(기본)로 돌아가고 진행 중 응답은 무시한다', async () => {
-    const get = deferred<unknown>();
-    getMySkins.mockReturnValue(get.promise);
-    const pending = loadMySkins('t1');
-    resetMySkins();
-    get.resolve(ok({ block: 'neon', effect: 'neon', board: 'neon', background: 'neon' }));
-    await pending;
-    expect(getMySkinsState()).toMatchObject({ status: 'guest', equipped: { block: 'default' } });
-  });
-
-  it('불러오기 만료(401) — 기본으로 그리고(expired), 같은 토큰으로는 다시 부르지 않는다 · 다시 로그인(새 토큰)하면 불러온다', async () => {
-    getMySkins.mockRejectedValueOnce(new ApiError('AUTH_UNAUTHORIZED', '만료', 401));
+  it('만료(401) — 기본으로 그리고(expired), 같은 토큰은 다시 부르지 않는다 · 새 토큰이면 부른다', async () => {
+    getMySkins.mockRejectedValueOnce(expired());
     await loadMySkins('old');
-    expect(getMySkinsState()).toMatchObject({ status: 'expired', equipped: { block: 'default' } });
     await loadMySkins('old');
     expect(getMySkins).toHaveBeenCalledTimes(1);
-    getMySkins.mockResolvedValueOnce(ok({ block: 'neon', effect: 'default', board: 'default', background: 'default' }));
-    await loadMySkins('new');
+    expect(getMySkinsState()).toMatchObject({ status: 'expired', equipped: { block: 'default' } });
+    await loaded({ block: 'neon' }, 'new');
     expect(getMySkinsState()).toMatchObject({ status: 'ready', equipped: { block: 'neon' } });
   });
 
   it('다른 토큰(계정 전환)으로 불러오는 동안 이전 계정의 장착을 그리지 않는다', async () => {
-    getMySkins.mockResolvedValueOnce(ok({ block: 'neon', effect: 'neon', board: 'neon', background: 'neon' }));
-    await loadMySkins('a');
+    await loaded({ block: 'neon', background: 'neon' }, 'a');
     getMySkins.mockReturnValueOnce(new Promise(() => {}));
     void loadMySkins('b');
-    expect(getMySkinsState()).toMatchObject({ status: 'loading', equipped: { block: 'default', background: 'default' } });
+    expect(getMySkinsState()).toMatchObject({ status: 'loading', equipped: base });
   });
 
-  it('장착 중 로그아웃 뒤 PUT이 실패해도 게스트 상태를 덮지 않는다 — 게스트는 늘 기본', async () => {
-    getMySkins.mockResolvedValue(ok({ block: 'neon', effect: 'default', board: 'default', background: 'default' }));
-    await loadMySkins('t1');
-    const put = deferred<unknown>();
-    updateMySkins.mockReturnValue(put.promise);
-    const pending = equipMySkin('block', 'default', 't1');
+  it('불러오는 중 로그아웃하면 늦은 응답·실패를 반영하지 않는다', async () => {
+    const get = deferred<unknown>();
+    getMySkins.mockReturnValueOnce(get.promise);
+    const pending = loadMySkins('t1');
     resetMySkins();
-    put.reject(new Error('net'));
-    // 이미 로그아웃한 화면이라 실패를 알리지 않는다(토스트 없음)
-    await expect(pending).resolves.toBeUndefined();
-    expect(getMySkinsState()).toMatchObject({ status: 'guest', equipped: { block: 'default' } });
+    get.reject(new Error('down'));
+    await pending;
+    expect(getMySkinsState()).toMatchObject({ status: 'guest', equipped: base });
+  });
+});
+
+describe('내 스킨 — 장착', () => {
+  it('응답 전에 먼저 반영(낙관적), 바꾼 슬롯만 보내고 저장되면 true', async () => {
+    await loaded();
+    const put = deferred<unknown>();
+    updateMySkins.mockReturnValueOnce(put.promise);
+    const pending = equipMySkin('board', 'neon', 't1');
+    expect(getMySkinsState().equipped.board).toBe('neon');
+    expect(updateMySkins).toHaveBeenCalledWith({ board: 'neon' }, 't1');
+    put.resolve(ok({ board: 'neon' }));
+    await expect(pending).resolves.toBe(true);
+    expect(getMySkinsState()).toMatchObject({ status: 'ready', equipped: { board: 'neon' } });
   });
 
-  it('다른 슬롯을 연달아 바꾸고 응답 순서가 바뀌어도 두 선택이 모두 남는다 — 응답은 그 슬롯에만 반영', async () => {
-    getMySkins.mockResolvedValue(ok({ block: 'default', effect: 'default', board: 'default', background: 'default' }));
-    await loadMySkins('t1');
+  it('이미 장착 중이면 보내지 않고 false', async () => {
+    await loaded({ block: 'neon' });
+    await expect(equipMySkin('block', 'neon', 't1')).resolves.toBe(false);
+    expect(updateMySkins).not.toHaveBeenCalled();
+  });
+
+  it('실패 — 서버 확정값으로 되돌리고 에러를 다시 던진다(이 슬롯만)', async () => {
+    await loaded({ block: 'gameboy', effect: 'neon' });
+    updateMySkins.mockRejectedValueOnce(Object.assign(new Error('없는 스킨'), { code: 'USER_SKIN_UNKNOWN' }));
+    await expect(equipMySkin('block', 'neon', 't1')).rejects.toMatchObject({ code: 'USER_SKIN_UNKNOWN' });
+    expect(getMySkinsState().equipped).toMatchObject({ block: 'gameboy', effect: 'neon' });
+  });
+
+  it('다른 슬롯은 따로 — 응답 순서가 바뀌어도 두 선택이 모두 남는다', async () => {
+    await loaded();
     const a = deferred<unknown>();
     const b = deferred<unknown>();
     updateMySkins.mockReturnValueOnce(a.promise).mockReturnValueOnce(b.promise);
     const blockReq = equipMySkin('block', 'neon', 't1');
     const effectReq = equipMySkin('effect', 'neon', 't1');
-    // 서버가 effect를 먼저 처리 — 그 응답의 block은 아직 이전 값
-    b.resolve(ok({ block: 'default', effect: 'neon', board: 'default', background: 'default' }));
+    expect(updateMySkins).toHaveBeenCalledTimes(2);
+    b.resolve(ok({ effect: 'neon' }));
     await effectReq;
-    expect(getMySkinsState().equipped).toMatchObject({ block: 'neon', effect: 'neon' });
-    a.resolve(ok({ block: 'neon', effect: 'neon', board: 'default', background: 'default' }));
+    a.resolve(ok({ block: 'neon', effect: 'neon' }));
     await blockReq;
     expect(getMySkinsState().equipped).toMatchObject({ block: 'neon', effect: 'neon' });
   });
 
-  it('장착이 만료(401)로 실패하면 되돌리고 expired로 — 다시 로그인하라고 안내하게', async () => {
-    getMySkins.mockResolvedValue(ok({ block: 'default', effect: 'default', board: 'default', background: 'default' }));
-    await loadMySkins('t1');
-    updateMySkins.mockRejectedValue(new ApiError('AUTH_UNAUTHORIZED', '만료', 401));
-    await expect(equipMySkin('board', 'neon', 't1')).rejects.toMatchObject({ status: 401 });
-    expect(getMySkinsState()).toMatchObject({ status: 'expired', equipped: { board: 'default' } });
+  it('같은 슬롯은 하나씩 — 진행 중에 고른 것은 마지막 선택만 앞 요청이 끝난 뒤 보낸다(중간 선택은 보내지 않는다)', async () => {
+    await loaded();
+    const a = deferred<unknown>();
+    const c = deferred<unknown>();
+    updateMySkins.mockReturnValueOnce(a.promise).mockReturnValueOnce(c.promise);
+    const first = equipMySkin('block', 'neon', 't1');
+    const middle = equipMySkin('block', 'gameboy', 't1');
+    const last = equipMySkin('block', 'high-contrast', 't1');
+    expect(updateMySkins).toHaveBeenCalledTimes(1);
+    await expect(middle).resolves.toBe(false);
+    expect(getMySkinsState().equipped.block).toBe('high-contrast');
+    a.resolve(ok({ block: 'neon' }));
+    await expect(first).resolves.toBe(false);
+    await flush();
+    expect(updateMySkins).toHaveBeenCalledTimes(2);
+    expect(updateMySkins).toHaveBeenLastCalledWith({ block: 'high-contrast' }, 't1');
+    // 앞 요청 응답 사이에도 화면은 마지막 선택
+    expect(getMySkinsState().equipped.block).toBe('high-contrast');
+    c.resolve(ok({ block: 'high-contrast' }));
+    await expect(last).resolves.toBe(true);
+    expect(getMySkinsState().equipped.block).toBe('high-contrast');
   });
 
-  it('같은 슬롯을 연달아 바꾼 요청이 모두 실패하면 서버 확정값으로 — 저장된 적 없는 낙관값이 남지 않는다', async () => {
-    getMySkins.mockResolvedValue(ok({ block: 'default', effect: 'default', board: 'default', background: 'default' }));
-    await loadMySkins('t1');
+  it('같은 슬롯: 앞 요청 성공 · 마지막 선택 실패 — 앞 요청 값(서버 저장값)으로', async () => {
+    await loaded();
     const a = deferred<unknown>();
-    const b = deferred<unknown>();
-    updateMySkins.mockReturnValueOnce(a.promise).mockReturnValueOnce(b.promise);
+    updateMySkins.mockReturnValueOnce(a.promise).mockRejectedValueOnce(new Error('net'));
     const first = equipMySkin('block', 'neon', 't1');
     const second = equipMySkin('block', 'gameboy', 't1');
-    a.reject(new Error('net'));
-    await expect(first).rejects.toThrow('net');
-    // 아직 두 번째가 진행 중 — 마지막 선택을 그대로 둔다
-    expect(getMySkinsState().equipped.block).toBe('gameboy');
-    b.reject(new Error('net'));
+    a.resolve(ok({ block: 'neon' }));
+    await expect(first).resolves.toBe(false);
+    await expect(second).rejects.toThrow('net');
+    expect(getMySkinsState().equipped.block).toBe('neon');
+  });
+
+  it('같은 슬롯: 둘 다 실패 — 저장된 적 없는 값이 남지 않고 확정값으로', async () => {
+    await loaded();
+    updateMySkins.mockRejectedValueOnce(new Error('net')).mockRejectedValueOnce(new Error('net'));
+    const first = equipMySkin('block', 'neon', 't1');
+    const second = equipMySkin('block', 'gameboy', 't1');
+    await expect(first).resolves.toBe(false);
     await expect(second).rejects.toThrow('net');
     expect(getMySkinsState().equipped.block).toBe('default');
   });
 
-  it('같은 슬롯: 두 번째가 먼저 실패하고 첫 요청이 늦게 성공하면 그 값(서버 저장값)으로', async () => {
-    getMySkins.mockResolvedValue(ok({ block: 'default', effect: 'default', board: 'default', background: 'default' }));
-    await loadMySkins('t1');
-    const a = deferred<unknown>();
-    const b = deferred<unknown>();
-    updateMySkins.mockReturnValueOnce(a.promise).mockReturnValueOnce(b.promise);
-    const first = equipMySkin('block', 'neon', 't1');
-    const second = equipMySkin('block', 'gameboy', 't1');
-    b.reject(new Error('net'));
-    await expect(second).rejects.toThrow('net');
-    a.resolve(ok({ block: 'neon', effect: 'default', board: 'default', background: 'default' }));
-    await first;
-    expect(getMySkinsState().equipped.block).toBe('neon');
+  it('만료(401) — 확정값으로 되돌리고 expired, 기다리던 선택도 보내지 않고 실패로', async () => {
+    await loaded();
+    updateMySkins.mockRejectedValueOnce(expired());
+    const first = equipMySkin('board', 'neon', 't1');
+    const second = equipMySkin('board', 'gameboy', 't1');
+    await expect(first).rejects.toMatchObject({ status: 401 });
+    await expect(second).rejects.toMatchObject({ status: 401 });
+    expect(updateMySkins).toHaveBeenCalledTimes(1);
+    expect(getMySkinsState()).toMatchObject({ status: 'expired', equipped: { board: 'default' } });
   });
 
-  it('불러오기 중 로그아웃한 뒤 늦게 실패해도 게스트 상태 그대로', async () => {
-    const get = deferred<unknown>();
-    getMySkins.mockReturnValue(get.promise);
-    const pending = loadMySkins('t1');
+  it('장착 중 로그아웃 — 늦은 성공·실패 모두 게스트 상태를 바꾸지 않고 알리지 않는다(false)', async () => {
+    await loaded();
+    const s = deferred<unknown>();
+    const f = deferred<unknown>();
+    updateMySkins.mockReturnValueOnce(s.promise).mockReturnValueOnce(f.promise);
+    const success = equipMySkin('block', 'neon', 't1');
+    const failure = equipMySkin('effect', 'neon', 't1');
     resetMySkins();
-    get.reject(new Error('down'));
-    await pending;
-    expect(getMySkinsState()).toMatchObject({ status: 'guest', equipped: { block: 'default' } });
+    s.resolve(ok({ block: 'neon' }));
+    f.reject(new Error('net'));
+    await expect(success).resolves.toBe(false);
+    await expect(failure).resolves.toBe(false);
+    expect(getMySkinsState()).toMatchObject({ status: 'guest', equipped: base, catalog: null });
   });
 
-  it('일시 실패 뒤 다시 불러오기는 같은 토큰이어도 다시 부른다', async () => {
-    getMySkins.mockRejectedValueOnce(new Error('down')).mockResolvedValueOnce(ok({ block: 'neon', effect: 'default', board: 'default', background: 'default' }));
-    await loadMySkins('t1');
-    expect(getMySkinsState().status).toBe('error');
-    await retryMySkins('t1');
-    expect(getMySkinsState()).toMatchObject({ status: 'ready', equipped: { block: 'neon' } });
-    expect(getMySkins).toHaveBeenCalledTimes(2);
-  });
-
-  it('같은 슬롯 두 요청이 모두 성공하고 응답이 역순으로 오면, 묶음이 끝난 뒤 GET으로 서버 값에 맞춘다', async () => {
-    getMySkins.mockResolvedValueOnce(ok({ block: 'default', effect: 'default', board: 'default', background: 'default' }));
-    await loadMySkins('t1');
-    const a = deferred<unknown>();
-    const b = deferred<unknown>();
-    updateMySkins.mockReturnValueOnce(a.promise).mockReturnValueOnce(b.promise);
-    const first = equipMySkin('block', 'neon', 't1');
-    const second = equipMySkin('block', 'gameboy', 't1');
-    // 서버는 neon → gameboy 순으로 저장(최종 gameboy), 응답은 gameboy가 먼저·neon이 나중
-    b.resolve(ok({ block: 'gameboy', effect: 'default', board: 'default', background: 'default' }));
-    await second;
-    getMySkins.mockResolvedValueOnce(ok({ block: 'gameboy', effect: 'default', board: 'default', background: 'default' }));
-    a.resolve(ok({ block: 'neon', effect: 'default', board: 'default', background: 'default' }));
-    await first;
-    await vi.waitFor(() => expect(getMySkinsState().equipped.block).toBe('gameboy'));
-    expect(getMySkins).toHaveBeenCalledTimes(2);
-  });
-
-  it('한 번만 바꾼 장착은 다시 조회하지 않는다', async () => {
-    getMySkins.mockResolvedValueOnce(ok({ block: 'default', effect: 'default', board: 'default', background: 'default' }));
-    await loadMySkins('t1');
-    updateMySkins.mockResolvedValue(ok({ block: 'neon', effect: 'default', board: 'default', background: 'default' }));
-    await equipMySkin('block', 'neon', 't1');
-    expect(getMySkins).toHaveBeenCalledTimes(1);
-  });
-
-  it('로그아웃 뒤 늦게 온 장착 성공도 게스트 상태를 바꾸지 않고, 다음 로그인의 같은 슬롯 장착 실패는 확정값으로 돌아간다', async () => {
-    getMySkins.mockResolvedValueOnce(ok({ block: 'default', effect: 'default', board: 'default', background: 'default' }));
-    await loadMySkins('t1');
-    const late = deferred<unknown>();
-    updateMySkins.mockReturnValueOnce(late.promise);
-    const pending = equipMySkin('block', 'neon', 't1');
-    resetMySkins();
-    late.resolve(ok({ block: 'neon', effect: 'default', board: 'default', background: 'default' }));
-    await pending;
-    expect(getMySkinsState()).toMatchObject({ status: 'guest', equipped: { block: 'default' }, catalog: null });
-    // 다시 로그인 — 이전 세대의 진행 중 요청 수가 남아 있으면 실패 뒤에도 낙관값이 남는다
-    getMySkins.mockResolvedValueOnce(ok({ block: 'gameboy', effect: 'default', board: 'default', background: 'default' }));
-    await loadMySkins('t2');
-    updateMySkins.mockRejectedValueOnce(new Error('net'));
-    await expect(equipMySkin('block', 'neon', 't2')).rejects.toThrow('net');
-    expect(getMySkinsState().equipped.block).toBe('gameboy');
-  });
-
-  it('장착 진행 중 다른 토큰으로 다시 불러오면 이전 요청 수를 지운다 — 새 세대의 같은 슬롯 실패가 확정값으로 돌아간다', async () => {
-    getMySkins.mockResolvedValueOnce(ok({ block: 'default', effect: 'default', board: 'default', background: 'default' }));
-    await loadMySkins('a');
+  it('장착 진행 중 다른 토큰으로 다시 불러오면 이전 진행·대기를 지운다 — 새 세대는 바로 보내고 실패하면 새 확정값으로', async () => {
+    await loaded({}, 'a');
     updateMySkins.mockReturnValueOnce(new Promise(() => {}));
     void equipMySkin('block', 'neon', 'a');
-    getMySkins.mockResolvedValueOnce(ok({ block: 'gameboy', effect: 'default', board: 'default', background: 'default' }));
-    await loadMySkins('b');
+    const waiting = equipMySkin('block', 'gameboy', 'a');
+    await loaded({ block: 'high-contrast' }, 'b');
+    await expect(waiting).resolves.toBe(false);
     updateMySkins.mockRejectedValueOnce(new Error('net'));
     await expect(equipMySkin('block', 'neon', 'b')).rejects.toThrow('net');
-    expect(getMySkinsState().equipped.block).toBe('gameboy');
+    expect(updateMySkins).toHaveBeenLastCalledWith({ block: 'neon' }, 'b');
+    expect(getMySkinsState().equipped.block).toBe('high-contrast');
   });
 });

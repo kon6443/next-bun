@@ -85,7 +85,8 @@ export default function SkinsCatalogView() {
   const equip = async (item: TetrisSkinCatalogItem) => {
     if (!canEquip || !item.owned || isEquipped(slot, item)) return;
     try {
-      await mine.equip(slot, item.id);
+      // 더 새 선택에 밀렸거나 로그아웃 등으로 세대가 바뀌었으면 알리지 않는다
+      if (!(await mine.equip(slot, item.id))) return;
       toast.success(`${SKIN_SLOT_LABELS[slot]} 스킨: ${SKIN_ITEM_LABELS[item.id] ?? item.id} 장착`);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "스킨을 바꾸지 못했습니다. 잠시 후 다시 시도해 주세요.");

@@ -2,10 +2,10 @@
  * 내 스킨 장착 상태(D-003) — 계정에 저장된다. 게스트는 늘 기본, 로그인하면 GET /users/me/skins로 불러온다
  * 화면 여러 곳(설정 모달·도감·내 판·화면 바탕)이 같은 값을 보도록 모듈 저장소 + useSyncExternalStore(useMySkins)
  * 장착 변경은 낙관적으로 먼저 반영하고, 응답·실패는 그 슬롯에만 반영한다(다른 슬롯을 연달아 바꿔도 서로 덮지 않게)
- * 슬롯마다 서버가 확정한 값(confirmed)을 따로 둔다 — 그 슬롯의 요청이 모두 끝나면 확정값을 보인다
- *   (같은 슬롯을 연달아 바꾸다 실패해도 저장된 적 없는 낙관값이 남지 않게)
- *   같은 슬롯 요청이 둘 이상 성공하면 응답 도착 순서가 서버 저장 순서와 다를 수 있다 — 그 묶음이 끝나면 GET으로 한 번 서버 값에 맞춘다
- * 세대(generation) — 로그아웃·다른 토큰으로 다시 불러오면 바뀐다. 이전 세대의 응답·실패는 무시한다(게스트·다른 계정 상태를 덮지 않게)
+ * 같은 슬롯의 PUT은 한 번에 하나만 보낸다 — 진행 중에 또 고르면 마지막 선택만 기다렸다 보낸다(중간 선택은 보내지 않는다)
+ *   보낸 순서 = 서버 저장 순서 = 응답 순서라, 마지막 응답이 곧 서버 최종값이다(응답 순서가 뒤바뀌어 어긋나는 일이 없다)
+ * 슬롯마다 서버가 확정한 값(confirmed)을 따로 둔다 — 그 슬롯에 보낼 것이 없어지면 확정값을 보인다(실패하면 저장된 적 없는 값이 남지 않게)
+ * 세대(generation) — 로그아웃·다른 토큰으로 다시 불러오면 바뀐다. 이전 세대의 응답·실패는 반영하지도 알리지도 않는다
  */
 
 import { getMySkins, type SkinCatalogItem, type SkinSlotName, updateMySkins } from '@/services/userService';
@@ -26,36 +26,29 @@ export type MySkinsState = {
 
 export const GUEST_SKINS_STATE: MySkinsState = { status: 'guest', equipped: DEFAULT_EQUIPPED_SKINS, catalog: null };
 
+/** 장착 결과를 기다리는 호출부 — true: 이 선택이 저장됐다 · false: 더 새 선택에 밀렸거나 세대가 바뀌었다(알리지 않는다) · reject: 이 선택이 실패했다 */
+type Waiter = { resolve: (applied: boolean) => void; reject: (err: unknown) => void };
+type Queued = { id: string; accessToken: string; waiters: Waiter[] };
+
 let state: MySkinsState = GUEST_SKINS_STATE;
 /** 지금 상태가 어느 토큰으로 불러온 것인지 — 토큰이 바뀌면(다른 계정·재로그인) 다시 불러온다 */
 let loadedToken: string | null = null;
 let generation = 0;
 /** 슬롯별 서버 확정 장착 — 불러오기·장착 성공 때 갱신 */
 let confirmed: EquippedSkins = DEFAULT_EQUIPPED_SKINS;
-/** 슬롯별 진행 중 장착 요청 수 — 0이 되면 확정값을 보인다 */
-const pending: Record<SkinSlotName, number> = { block: 0, effect: 0, board: 0, background: 0 };
-/** 슬롯별 지금 묶음(진행 중 요청이 0이 될 때까지)의 성공 수 — 둘 이상이면 끝날 때 서버 값에 맞춘다 */
-const succeeded: Record<SkinSlotName, number> = { block: 0, effect: 0, board: 0, background: 0 };
-const clearPending = () => {
-  for (const key of Object.keys(pending) as SkinSlotName[]) {
-    pending[key] = 0;
-    succeeded[key] = 0;
-  }
-};
+/** 슬롯별 진행 중 PUT 여부와, 그 뒤에 보낼 마지막 선택 */
+const inflight: Record<SkinSlotName, boolean> = { block: false, effect: false, board: false, background: false };
+const queued: Record<SkinSlotName, Queued | null> = { block: null, effect: null, board: null, background: null };
+const listeners = new Set<() => void>();
 
-/** 같은 슬롯 요청 여러 건이 성공한 묶음 뒤 — 서버의 마지막 저장값으로 그 슬롯을 맞춘다(실패하면 지금 값 유지) */
-async function reconcileSlot(slot: SkinSlotName, accessToken: string, gen: number): Promise<void> {
-  try {
-    const { data } = await getMySkins(accessToken);
-    // 그 사이 세대가 바뀌었거나 같은 슬롯을 다시 바꾸는 중이면 그 요청이 맡는다
-    if (gen !== generation || pending[slot] > 0) return;
-    confirmed = { ...confirmed, [slot]: toEquippedSkins(data?.equipped)[slot] };
-    setState({ ...state, equipped: { ...state.equipped, [slot]: confirmed[slot] } });
-  } catch {
-    // 맞추지 못해도 화면은 마지막 응답 값 — 다음 불러오기 때 맞는다
+/** 세대가 바뀔 때 — 진행 중 표시를 지우고 기다리던 선택은 알리지 않고 끝낸다(이전 세대의 진행 중 PUT 결과는 send가 버린다) */
+function clearSlots(): void {
+  for (const slot of Object.keys(inflight) as SkinSlotName[]) {
+    inflight[slot] = false;
+    queued[slot]?.waiters.forEach((w) => w.resolve(false));
+    queued[slot] = null;
   }
 }
-const listeners = new Set<() => void>();
 
 function setState(next: MySkinsState): void {
   state = next;
@@ -87,7 +80,7 @@ export function resetMySkins(): void {
   generation++;
   loadedToken = null;
   confirmed = DEFAULT_EQUIPPED_SKINS;
-  clearPending();
+  clearSlots();
   if (state !== GUEST_SKINS_STATE) setState(GUEST_SKINS_STATE);
 }
 
@@ -97,7 +90,7 @@ export async function loadMySkins(accessToken: string): Promise<void> {
   loadedToken = accessToken;
   const mine = ++generation;
   confirmed = DEFAULT_EQUIPPED_SKINS;
-  clearPending();
+  clearSlots();
   // 다른 계정·새 토큰 — 이전 장착을 남기지 않고 기본으로 그리며 기다린다
   setState({ status: 'loading', equipped: DEFAULT_EQUIPPED_SKINS, catalog: null });
   try {
@@ -120,45 +113,62 @@ export function retryMySkins(accessToken: string): Promise<void> {
   return loadMySkins(accessToken);
 }
 
-/** 한 슬롯 장착 — 낙관적 반영 후 PUT. 실패하면(그 슬롯 요청이 다 끝났을 때) 서버 확정값으로 돌아가고 에러를 다시 던진다(호출부가 토스트) */
-export async function equipMySkin(slot: SkinSlotName, id: string, accessToken: string): Promise<void> {
-  if (state.equipped[slot] === id) return;
-  const gen = generation;
-  pending[slot]++;
-  setState({ ...state, equipped: { ...state.equipped, [slot]: id } });
-  /** 이 요청이 끝났다 — 그 슬롯의 요청이 모두 끝났으면 확정값을 보인다(진행 중이면 마지막 선택을 그대로 둔다) */
-  const settle = (extra: Partial<MySkinsState> = {}) => {
-    pending[slot]--;
-    const done = pending[slot] === 0;
-    const equipped = done ? { ...state.equipped, [slot]: confirmed[slot] } : state.equipped;
-    setState({ ...state, ...extra, equipped });
-    if (!done) return;
-    const reconcile = succeeded[slot] >= 2;
-    succeeded[slot] = 0;
-    if (reconcile) void reconcileSlot(slot, accessToken, gen);
-  };
+/** 한 슬롯 PUT — 끝나면 기다리던 다음 선택을 보내거나, 보낼 것이 없으면 확정값을 보인다 */
+async function send(slot: SkinSlotName, choice: Queued, gen: number): Promise<void> {
+  inflight[slot] = true;
+  let error: unknown = null;
   try {
-    const { data } = await updateMySkins({ [slot]: id }, accessToken);
-    if (gen !== generation) return;
-    // 이 슬롯만 확정 — 다른 슬롯은 그 슬롯의 요청이 맡는다(응답 순서가 바뀌어도 서로 덮지 않게)
+    const { data } = await updateMySkins({ [slot]: choice.id }, choice.accessToken);
+    if (gen !== generation) return choice.waiters.forEach((w) => w.resolve(false));
     confirmed = { ...confirmed, [slot]: toEquippedSkins(data?.equipped)[slot] };
-    succeeded[slot]++;
-    settle({ catalog: normalizeCatalog(data?.catalog) ?? state.catalog });
+    const catalog = normalizeCatalog(data?.catalog);
+    if (catalog) setState({ ...state, catalog });
   } catch (err) {
-    // 로그아웃·계정 전환 뒤의 실패는 알리지 않는다(이미 다른 화면 상태)
-    if (gen !== generation) return;
-    // 만료면 이후 장착도 같은 결과 — 다시 로그인하라고 안내하게 상태로 남긴다
-    settle(isAuthExpired(err) ? { status: 'expired' } : {});
-    throw err;
+    if (gen !== generation) return choice.waiters.forEach((w) => w.resolve(false));
+    error = err;
   }
+  inflight[slot] = false;
+  const expired = error !== null && isAuthExpired(error);
+  const after = queued[slot];
+  queued[slot] = null;
+  if (after && !expired) {
+    // 더 새 선택이 기다린다 — 이 선택은 밀렸다(성공·실패 모두 알리지 않는다), 화면은 그 선택 그대로
+    choice.waiters.forEach((w) => w.resolve(false));
+    void send(slot, after, gen);
+    return;
+  }
+  // 보낼 것이 없다(또는 만료라 보내도 같다) — 확정값을 보인다
+  setState({ ...state, ...(expired ? { status: 'expired' as const } : {}), equipped: { ...state.equipped, [slot]: confirmed[slot] } });
+  after?.waiters.forEach((w) => w.reject(error));
+  if (error !== null) choice.waiters.forEach((w) => w.reject(error));
+  else choice.waiters.forEach((w) => w.resolve(true));
+}
+
+/**
+ * 한 슬롯 장착 — 낙관적 반영 후 PUT(같은 슬롯은 하나씩). true면 이 선택이 저장됐다, false면 이미 장착 중이었거나 더 새 선택·세대 교체로 밀렸다(알리지 않는다)
+ * 이 선택이 실패하면 서버 확정값으로 돌아가고 에러를 다시 던진다(호출부가 토스트)
+ */
+export function equipMySkin(slot: SkinSlotName, id: string, accessToken: string): Promise<boolean> {
+  if (state.equipped[slot] === id) return Promise.resolve(false);
+  setState({ ...state, equipped: { ...state.equipped, [slot]: id } });
+  return new Promise<boolean>((resolve, reject) => {
+    const choice: Queued = { id, accessToken, waiters: [{ resolve, reject }] };
+    if (inflight[slot]) {
+      // 진행 중 — 기다리던 이전 선택은 보내지 않고 밀어낸다
+      queued[slot]?.waiters.forEach((w) => w.resolve(false));
+      queued[slot] = choice;
+      return;
+    }
+    void send(slot, choice, generation);
+  });
 }
 
 /** 테스트용 */
 export function __resetMySkinsForTests(): void {
-  generation = 0;
+  generation++;
   loadedToken = null;
   confirmed = DEFAULT_EQUIPPED_SKINS;
-  clearPending();
+  clearSlots();
   state = GUEST_SKINS_STATE;
   listeners.clear();
 }

@@ -20,8 +20,8 @@ import {
  */
 export function useMySkins(): MySkinsState & {
   loggedIn: boolean;
-  /** 장착 — 로그인 상태에서만. 실패하면 되돌리고 에러를 던진다 */
-  equip: (slot: SkinSlotName, id: string) => Promise<void>;
+  /** 장착 — 로그인 상태에서만. true면 저장됨, false면 밀림·세대 교체(알리지 않는다), 실패하면 되돌리고 에러를 던진다 */
+  equip: (slot: SkinSlotName, id: string) => Promise<boolean>;
   /** 불러오기 일시 실패(error) 뒤 다시 불러오기 */
   retry: () => void;
 } {
@@ -37,8 +37,8 @@ export function useMySkins(): MySkinsState & {
 
   const equip = useCallback(
     async (slot: SkinSlotName, id: string) => {
-      if (!accessToken) return;
-      await equipMySkin(slot, id, accessToken);
+      if (!accessToken) return false;
+      return equipMySkin(slot, id, accessToken);
     },
     [accessToken],
   );

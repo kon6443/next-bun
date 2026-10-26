@@ -166,6 +166,8 @@ describe('스킨 도감 (D-005)', () => {
     getMySkins.mockRejectedValue(new ApiError('AUTH_UNAUTHORIZED', 'x', 401));
     render(<SkinsCatalogView />);
     expect(await screen.findByText('로그인이 만료됐어요. 다시 로그인하면 내 스킨이 보여요.')).toBeTruthy();
-    expect(within(screen.getByTestId('catalog-block-neon')).queryByRole('button', { name: '장착' })).toBeNull();
+    // 만료 안내는 내 장착 조회만으로 먼저 뜰 수 있다 — 도감 목록이 그려진 뒤를 본다
+    const neon = await screen.findByTestId('catalog-block-neon');
+    expect(within(neon).queryByRole('button', { name: '장착' })).toBeNull();
   });
 });
