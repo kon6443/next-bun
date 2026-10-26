@@ -262,7 +262,7 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
           >
             <span className="flex-1">
               <span className="block text-sm font-semibold text-slate-100">설정 열기</span>
-              <span className="block text-xs text-slate-400">조작(DAS·ARR·진동) · 소리 · 연출 · 스킨</span>
+              <span className="block text-xs text-slate-400">스킨 · 소리 · 조작 · 화면</span>
             </span>
             <span aria-hidden="true" className="text-slate-400">
               ›

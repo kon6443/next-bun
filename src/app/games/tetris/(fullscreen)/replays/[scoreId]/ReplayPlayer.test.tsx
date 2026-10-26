@@ -127,7 +127,8 @@ describe('싱글 리플레이 재생기 (games-polish P4)', () => {
     fireEvent.click(screen.getByRole('button', { name: '일시정지' }));
     const before = slider.value;
     fireEvent.click(screen.getByRole('button', { name: /^설정 \(소리/ }));
-    const dialog = screen.getByRole('dialog', { name: '설정' });
+    fireEvent.click(screen.getByTestId('settings-group-sound'));
+    const dialog = screen.getByRole('dialog', { name: '소리' });
     const volume = within(dialog).getByRole('slider', { name: '효과음 음량' });
     fireEvent.keyDown(volume, { code: 'ArrowRight', key: 'ArrowRight' });
     fireEvent.keyDown(dialog, { code: 'Space', key: ' ' });

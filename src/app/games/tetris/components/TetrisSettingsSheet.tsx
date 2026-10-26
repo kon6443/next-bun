@@ -1,15 +1,16 @@
 "use client";
 
-import { type ReactNode, type Ref, useRef, useState } from "react";
-import { SettingsSheet } from "@/app/components/SettingsSheet";
+import { SettingsGroupSheet, type SettingsGroup } from "@/app/components/SettingsGroupSheet";
 import { SoundSettingsSection } from "@/app/games/_shared/components/SoundSettingsModal";
+import { useSoundSettings } from "@/app/games/_shared/hooks/useSoundSettings";
 import { framesToMs } from "@/app/games/_shared/lib/format";
 import { ARR_MAX, ARR_MIN, DAS_MAX, DAS_MIN } from "../engine";
 import { useMySkins } from "../hooks/useMySkins";
 import { useTetrisSettings } from "../hooks/useTetrisSettings";
 import { CONTROL_GUIDE } from "../lib/controls";
-import { SKIN_ITEM_LABELS, SKIN_SLOTS, SKIN_SLOT_LABELS } from "../lib/skins";
-import { EffectsToggle } from "./EffectsToggle";
+import { SKIN_ITEM_LABELS, SKIN_SLOTS } from "../lib/skins";
+import { EffectsToggle, useReducedEffectsSetting } from "./EffectsToggle";
+import { SkinPreview } from "./SkinPreview";
 import { SkinSettingsSection } from "./SkinSettingsModal";
 
 /**
@@ -18,74 +19,55 @@ import { SkinSettingsSection } from "./SkinSettingsModal";
  */
 export type ControlsMode = "edit" | "next-game" | "locked";
 
+export type TetrisSettingsGroup = "skin" | "sound" | "controls" | "display";
+
 type Props = {
   onClose: () => void;
   controls?: ControlsMode;
+  /** 처음부터 이 그룹 상세로(홈 "내 스킨" 카드 → 스킨) */
+  initialGroup?: TetrisSettingsGroup;
 };
 
 /**
- * 테트리스 설정 시트(D-001) — 소리·조작·연출·스킨을 한 곳에서. 홈·플레이 HUD·일시정지·리플레이·대전에서 같은 시트
- * 스킨은 카드가 많아 시트 안 두 번째 화면으로(제목 줄 ← 로 목록으로 돌아온다) — 모달을 겹쳐 열지 않는다
+ * 테트리스 설정 시트(D-001·D-006) — 첫 화면은 그룹 목록(스킨·소리·조작·화면, 지금 상태 한 줄), 누르면 상세
+ * 홈·플레이 HUD·일시정지·리플레이·대전에서 같은 시트. 스킨이 맨 위(눈에 띄게, D-003)
  */
-export function TetrisSettingsSheet({ onClose, controls = "edit" }: Props) {
-  const [view, setView] = useState<"main" | "skin">("main");
-  /** 스킨 화면에서 돌아오면 스킨 줄로 포커스 — 누른 자리로 돌아온다 */
-  const skinRowRef = useRef<HTMLButtonElement>(null);
-  const backToMain = () => {
-    setView("main");
-    requestAnimationFrame(() => skinRowRef.current?.focus());
-  };
+export function TetrisSettingsSheet({ onClose, controls = "edit", initialGroup }: Props) {
+  const { equipped, loggedIn } = useMySkins();
+  const { settings: sound } = useSoundSettings();
+  const { settings } = useTetrisSettings();
+  const effects = useReducedEffectsSetting();
 
-  return (
-    <SettingsSheet
-      title={view === "skin" ? "스킨" : "설정"}
-      testId="tetris-settings"
-      size="md"
-      onClose={onClose}
-      headerStart={
-        view === "skin" && (
-          // 바뀐 화면의 첫 컨트롤 — 누른 줄이 사라지니 포커스를 여기로
-          <button
-            type="button"
-            onClick={backToMain}
-            aria-label="설정 목록으로"
-            autoFocus
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg text-slate-300 hover:text-white"
-          >
-            ←
-          </button>
-        )
-      }
-    >
-      {view === "skin" ? (
-        <SkinSettingsSection onNavigate={onClose} />
-      ) : (
-        <div className="min-h-0 overflow-y-auto">
-          <Section title="소리">
-            <SoundSettingsSection />
-          </Section>
-          <Section title="조작">
-            <TetrisControlsSection mode={controls} />
-          </Section>
-          <Section title="연출">
-            <EffectsToggle />
-          </Section>
-          <Section title="스킨">
-            <SkinRow ref={skinRowRef} onOpen={() => setView("skin")} />
-          </Section>
-        </div>
-      )}
-    </SettingsSheet>
-  );
-}
+  const groups: SettingsGroup[] = [
+    {
+      id: "skin",
+      title: "스킨",
+      // 게스트도 기본 스킨 미리보기 — 무엇을 바꿀 수 있는지 보이게
+      preview: <SkinPreview slot="block" id={equipped.block} width={64} height={28} />,
+      summary: loggedIn ? SKIN_SLOTS.map((slot) => SKIN_ITEM_LABELS[equipped[slot]] ?? equipped[slot]).join(" · ") : "로그인하고 스킨 꾸미기",
+      content: <SkinSettingsSection onNavigate={onClose} />,
+    },
+    {
+      id: "sound",
+      title: "소리",
+      summary: `효과음 ${sound.sfx ? "켜짐" : "꺼짐"} · 배경음 ${sound.music ? "켜짐" : "꺼짐"}`,
+      content: <SoundSettingsSection />,
+    },
+    {
+      id: "controls",
+      title: "조작",
+      summary: `DAS ${framesToMs(settings.das)}ms · ARR ${settings.arr === 0 ? "즉시" : `${framesToMs(settings.arr)}ms`}${controls === "locked" ? " · 대전 중 바꿀 수 없음" : ""}`,
+      content: <TetrisControlsSection mode={controls} />,
+    },
+    {
+      id: "display",
+      title: "화면",
+      summary: effects.auto ? "연출 — 기기 설정을 따르는 중" : effects.reduced ? "연출 줄이기 켜짐" : "모든 연출 보기",
+      content: <EffectsToggle />,
+    },
+  ];
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="border-t border-white/10 py-3 first:border-t-0 first:pt-0">
-      <h3 className="mb-1 text-sm font-semibold text-slate-200">{title}</h3>
-      {children}
-    </section>
-  );
+  return <SettingsGroupSheet title="설정" testId="tetris-settings" groups={groups} onClose={onClose} initialGroup={initialGroup} />;
 }
 
 /** 조작 설정 — DAS·ARR·진동 + 키 안내 */
@@ -190,30 +172,5 @@ function RangeSetting({ id, label, hint, min, max, value, display, onChange }: R
         {hint}
       </p>
     </div>
-  );
-}
-
-/** 스킨 줄 — 지금 장착을 한 줄로, 누르면 시트 안 스킨 화면 */
-function SkinRow({ onOpen, ref }: { onOpen: () => void; ref: Ref<HTMLButtonElement> }) {
-  const { equipped, loggedIn } = useMySkins();
-  const summary = loggedIn
-    ? SKIN_SLOTS.map((s) => `${SKIN_SLOT_LABELS[s]} ${SKIN_ITEM_LABELS[equipped[s]] ?? equipped[s]}`).join(" · ")
-    : "로그인하면 스킨 선택";
-  return (
-    <button
-      ref={ref}
-      type="button"
-      data-testid="skin-settings-entry"
-      onClick={onOpen}
-      className="flex min-h-12 w-full items-center gap-3 rounded-xl px-2 text-left hover:bg-white/5"
-    >
-      <span className="flex-1">
-        <span className="block text-sm text-slate-100">스킨 바꾸기</span>
-        <span className="block text-xs text-slate-400">{summary}</span>
-      </span>
-      <span aria-hidden="true" className="text-slate-400">
-        ›
-      </span>
-    </button>
   );
 }

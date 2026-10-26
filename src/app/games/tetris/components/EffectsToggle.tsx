@@ -19,13 +19,17 @@ function getSnapshot(): ToggleSnapshot {
 
 const getServerSnapshot = (): ToggleSnapshot => "auto-off";
 
+/** 연출 줄이기 상태 — auto: 기기 설정을 따르는 중, reduced: 지금 줄이는 중 */
+export function useReducedEffectsSetting(): { auto: boolean; reduced: boolean } {
+  const snapshot = useSyncExternalStore(subscribeReducedEffects, getSnapshot, getServerSnapshot);
+  return { auto: snapshot === "auto-on" || snapshot === "auto-off", reduced: snapshot === "on" || snapshot === "auto-on" };
+}
+
 /**
  * "연출 줄이기" 체크박스 — 처음에는 기기 설정(동작 줄이기)을 따르고, 바꾸면 이 기기에 저장한다
  */
 export function EffectsToggle({ className = "" }: { className?: string }) {
-  const snapshot = useSyncExternalStore(subscribeReducedEffects, getSnapshot, getServerSnapshot);
-  const isAuto = snapshot === "auto-on" || snapshot === "auto-off";
-  const checked = snapshot === "on" || snapshot === "auto-on";
+  const { auto: isAuto, reduced: checked } = useReducedEffectsSetting();
 
   return (
     <div className={className}>

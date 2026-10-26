@@ -278,7 +278,8 @@ describe('대전 경기 페이지 (DESIGN §18)', () => {
     const seek = screen.getByRole('slider', { name: '재생 위치' }) as HTMLInputElement;
     const before = seek.value;
     fireEvent.click(screen.getByRole('button', { name: /^설정 \(소리/ }));
-    const dialog = screen.getByRole('dialog', { name: '설정' });
+    fireEvent.click(screen.getByTestId('settings-group-sound'));
+    const dialog = screen.getByRole('dialog', { name: '소리' });
     fireEvent.keyDown(within(dialog).getByRole('slider', { name: '효과음 음량' }), { code: 'ArrowRight', key: 'ArrowRight' });
     expect(seek.value).toBe(before);
   });

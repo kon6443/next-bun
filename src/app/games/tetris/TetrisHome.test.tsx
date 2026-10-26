@@ -30,7 +30,8 @@ describe('TetrisHome 설정 (games-polish FE-52)', () => {
     });
     // 조작 설정은 공통 설정 시트에 — 머리줄 톱니로 연다 (D-001)
     fireEvent.click(screen.getByRole('button', { name: /^설정 \(소리/ }));
-    const sheet = screen.getByRole('dialog', { name: '설정' });
+    fireEvent.click(screen.getByTestId('settings-group-controls'));
+    const sheet = screen.getByRole('dialog', { name: '조작' });
     const setItem = vi.spyOn(Storage.prototype, 'setItem');
     fireEvent.click(within(sheet).getByRole('checkbox', { name: /진동/ }));
     const writes = setItem.mock.calls.filter(([key]) => key === 'tetris:settings');
@@ -49,7 +50,7 @@ describe('TetrisHome 설정 (games-polish FE-52)', () => {
     entry.focus();
     fireEvent.click(entry);
     const sheet = screen.getByRole('dialog', { name: '설정' });
-    expect(within(sheet).getByRole('slider', { name: /DAS/ })).toBeTruthy();
+    expect(within(sheet).getByTestId('settings-group-controls')).toBeTruthy();
     fireEvent.click(within(sheet).getByRole('button', { name: '닫기' }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(entry);
