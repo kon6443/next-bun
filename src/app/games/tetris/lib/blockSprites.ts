@@ -5,19 +5,10 @@
  */
 
 import { GARBAGE_CELL } from './boardRules';
+import { BLOCK_SKIN_COUNT, DEFAULT_SKIN_ID, blockSkin, blockSkinIndex } from './skins';
 
-/** 칸 값(0 빈칸 · 1~7 블록 종류 + 1 · 8 가비지) → 색. 블록 색은 가이드라인 순서 I J L O S T Z */
-export const CELL_COLORS: readonly string[] = [
-  '#000000',
-  '#22d3ee',
-  '#3b82f6',
-  '#f97316',
-  '#facc15',
-  '#22c55e',
-  '#a855f7',
-  '#ef4444',
-  '#64748b',
-];
+/** 칸 값(0 빈칸 · 1~7 블록 종류 + 1 · 8 가비지) → 기본 블록 스킨 색. 블록 색은 가이드라인 순서 I J L O S T Z — 스킨별 색은 skins.ts */
+export const CELL_COLORS: readonly string[] = blockSkin(DEFAULT_SKIN_ID).cells;
 
 /** 대전 가비지 칸 값 — 블록 값 1~7과 구분 (대전 래퍼 값을 그대로 쓴다 — 두 곳에 따로 적어 어긋나지 않게) */
 export const GARBAGE_CELL_VALUE = GARBAGE_CELL;
@@ -25,10 +16,12 @@ export const GARBAGE_CELL_VALUE = GARBAGE_CELL;
 /** 크기가 바뀔 때마다 새로 만들므로 상한을 두고 넘으면 비운다 — 블록·발광은 따로 세어 서로 밀어내지 않게 */
 const CACHE_LIMIT = 96;
 /**
- * 키는 숫자(픽셀 크기 × 칸 종류 수 + 칸 값) — drawBlock은 프레임마다 수백 번 불려 문자열 키를 만들면 GC가 늘어난다 (games-polish FE-22)
- * 칸 값은 CELL_COLORS 범위(0~8)라 겹치지 않는다
+ * 키는 숫자((픽셀 크기 × 칸 종류 수 + 칸 값) × 블록 스킨 수 + 블록 스킨 번호) — drawBlock은 프레임마다 수백 번 불려 문자열 키를 만들면 GC가 늘어난다 (games-polish FE-22)
+ * 칸 값은 CELL_COLORS 범위(0~8), 스킨 번호는 블록 스킨 수 범위라 겹치지 않는다 — 블록 스킨이 다르면 다른 캔버스(판마다 주인 스킨이 섞여 그려진다)
+ * 모르는 블록 id는 default와 같은 그림이라 같은 번호(blockSkinIndex)
  */
 const KEY_STRIDE = CELL_COLORS.length;
+const spriteKey = (px: number, cell: number, skin: string) => (px * KEY_STRIDE + cell) * BLOCK_SKIN_COUNT + blockSkinIndex(skin);
 const blockCache = new Map<number, HTMLCanvasElement>();
 const glowCache = new Map<number, HTMLCanvasElement>();
 
@@ -47,8 +40,57 @@ function shade([r, g, b]: Rgb, t: number): string {
   return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
 }
 
-function drawSprite(ctx: CanvasRenderingContext2D, px: number, cell: number): void {
-  const rgb = parseHex(CELL_COLORS[cell]);
+/**
+ * 블록 무늬(고대비·게임보이) — 블록마다 다른 모양을 몸통 가운데에. 밝은 색 위엔 검정, 어두운 색 위엔 흰색
+ * I 가로줄 · J 점 · L 빈 네모 · O 꽉 찬 네모 · S 빗금(/) · T 세모 · Z 빗금(\)
+ */
+function drawPattern(ctx: CanvasRenderingContext2D, [r, g, b]: Rgb, cell: number, x0: number, size: number): void {
+  const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+  const ink = luminance > 140 ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.75)';
+  const c = x0 + size / 2;
+  const half = size * 0.22;
+  const line = Math.max(1, Math.round(size * 0.1));
+  ctx.fillStyle = ink;
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = line;
+  ctx.beginPath();
+  switch (cell) {
+    case 1:
+      ctx.fillRect(c - half, c - line / 2, half * 2, line);
+      return;
+    case 2:
+      ctx.arc(c, c, half * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    case 3:
+      ctx.strokeRect(c - half, c - half, half * 2, half * 2);
+      return;
+    case 4:
+      ctx.fillRect(c - half * 0.8, c - half * 0.8, half * 1.6, half * 1.6);
+      return;
+    case 5:
+      ctx.moveTo(c - half, c + half);
+      ctx.lineTo(c + half, c - half);
+      ctx.stroke();
+      return;
+    case 6:
+      ctx.moveTo(c, c - half);
+      ctx.lineTo(c + half, c + half);
+      ctx.lineTo(c - half, c + half);
+      ctx.closePath();
+      ctx.fill();
+      return;
+    case 7:
+      ctx.moveTo(c - half, c - half);
+      ctx.lineTo(c + half, c + half);
+      ctx.stroke();
+      return;
+  }
+}
+
+function drawSprite(ctx: CanvasRenderingContext2D, px: number, cell: number, skin: string): void {
+  const palette = blockSkin(skin);
+  const rgb = parseHex(palette.cells[cell]);
   const garbage = cell === GARBAGE_CELL_VALUE;
   const gap = Math.max(1, Math.round(px * 0.04));
   const x0 = gap;
@@ -88,15 +130,16 @@ function drawSprite(ctx: CanvasRenderingContext2D, px: number, cell: number): vo
   ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
   ctx.fillRect(x0 + bevel, x0 + bevel, Math.max(1, Math.round(size * 0.32)), Math.max(1, Math.round(size * 0.1)));
   ctx.fillRect(x0 + bevel, x0 + bevel, Math.max(1, Math.round(size * 0.1)), Math.max(1, Math.round(size * 0.22)));
+  if (palette.patterns) drawPattern(ctx, rgb, cell, x0, size);
 }
 
 /**
  * 칸 값·크기(CSS px)·DPR에 맞는 스프라이트. DOM이 없으면 null (호출 쪽이 단색으로 그린다)
  */
-export function getBlockSprite(cell: number, size: number, dpr: number): HTMLCanvasElement | null {
+export function getBlockSprite(cell: number, size: number, dpr: number, skin: string = DEFAULT_SKIN_ID): HTMLCanvasElement | null {
   if (typeof document === 'undefined') return null;
   const px = Math.max(2, Math.round(size * dpr));
-  const key = px * KEY_STRIDE + cell;
+  const key = spriteKey(px, cell, skin);
   const cached = blockCache.get(key);
   if (cached) return cached;
   const canvas = document.createElement('canvas');
@@ -104,7 +147,7 @@ export function getBlockSprite(cell: number, size: number, dpr: number): HTMLCan
   canvas.height = px;
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
-  drawSprite(ctx, px, cell);
+  drawSprite(ctx, px, cell, skin);
   if (blockCache.size >= CACHE_LIMIT) blockCache.clear();
   blockCache.set(key, canvas);
   return canvas;
@@ -113,11 +156,12 @@ export function getBlockSprite(cell: number, size: number, dpr: number): HTMLCan
 /** 발광 스프라이트 여백 — 칸 둘레로 번지는 폭(칸 크기 비율) */
 export const GLOW_SPREAD = 0.5;
 
-function drawGlowSprite(ctx: CanvasRenderingContext2D, px: number, cellPx: number, cell: number): void {
+function drawGlowSprite(ctx: CanvasRenderingContext2D, px: number, cellPx: number, cell: number, skin: string): void {
   const pad = (px - cellPx) / 2;
-  ctx.shadowColor = CELL_COLORS[cell];
+  const color = blockSkin(skin).cells[cell];
+  ctx.shadowColor = color;
   ctx.shadowBlur = pad;
-  ctx.fillStyle = CELL_COLORS[cell];
+  ctx.fillStyle = color;
   // 그림자만 남기려고 본체는 캔버스 밖에 그리고 그림자를 안쪽으로 옮긴다
   ctx.shadowOffsetX = px * 2;
   ctx.fillRect(pad - px * 2, pad, cellPx, cellPx);
@@ -127,11 +171,11 @@ function drawGlowSprite(ctx: CanvasRenderingContext2D, px: number, cellPx: numbe
  * 칸 발광 — 칸보다 GLOW_SPREAD만큼 넓은 부드러운 빛. 블록을 그리기 전에 'lighter'로 깔면 네온처럼 번진다
  * 가비지·DOM 없음은 null
  */
-export function getGlowSprite(cell: number, size: number, dpr: number): HTMLCanvasElement | null {
+export function getGlowSprite(cell: number, size: number, dpr: number, skin: string = DEFAULT_SKIN_ID): HTMLCanvasElement | null {
   if (typeof document === 'undefined' || cell === GARBAGE_CELL_VALUE || cell <= 0) return null;
   const cellPx = Math.max(2, Math.round(size * dpr));
   const px = Math.round(cellPx * (1 + GLOW_SPREAD * 2));
-  const key = cellPx * KEY_STRIDE + cell;
+  const key = spriteKey(cellPx, cell, skin);
   const cached = glowCache.get(key);
   if (cached) return cached;
   const canvas = document.createElement('canvas');
@@ -139,15 +183,23 @@ export function getGlowSprite(cell: number, size: number, dpr: number): HTMLCanv
   canvas.height = px;
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
-  drawGlowSprite(ctx, px, cellPx, cell);
+  drawGlowSprite(ctx, px, cellPx, cell, skin);
   if (glowCache.size >= CACHE_LIMIT) glowCache.clear();
   glowCache.set(key, canvas);
   return canvas;
 }
 
 /** 칸 발광을 깐다 — 호출 쪽이 globalCompositeOperation('lighter')·globalAlpha를 정한다 */
-export function drawGlow(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, cell: number, dpr: number): void {
-  const sprite = getGlowSprite(cell, size, dpr);
+export function drawGlow(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  cell: number,
+  dpr: number,
+  skin: string = DEFAULT_SKIN_ID,
+): void {
+  const sprite = getGlowSprite(cell, size, dpr, skin);
   if (!sprite) return;
   const spread = size * GLOW_SPREAD;
   ctx.drawImage(sprite, x - spread, y - spread, size + spread * 2, size + spread * 2);
@@ -162,13 +214,14 @@ export function drawBlock(
   cell: number,
   dpr: number,
   alpha = 1,
+  skin: string = DEFAULT_SKIN_ID,
 ): void {
   ctx.globalAlpha = alpha;
-  const sprite = getBlockSprite(cell, size, dpr);
+  const sprite = getBlockSprite(cell, size, dpr, skin);
   if (sprite) {
     ctx.drawImage(sprite, x, y, size, size);
   } else {
-    ctx.fillStyle = CELL_COLORS[cell];
+    ctx.fillStyle = blockSkin(skin).cells[cell];
     ctx.fillRect(x + 1, y + 1, size - 2, size - 2);
   }
   ctx.globalAlpha = 1;

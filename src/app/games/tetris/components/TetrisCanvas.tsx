@@ -5,6 +5,7 @@ import type { GameState } from "../engine";
 import type { EffectTracker } from "../lib/effects";
 import { type GarbageGauge, computeLayout, drawGame } from "../lib/renderer";
 import type { EffectQuality } from "../lib/effectsRenderer";
+import { type BoardSkins, DEFAULT_BOARD_SKINS } from "../lib/skins";
 import { useReducedEffects } from "../hooks/useReducedEffects";
 
 type TetrisCanvasProps = {
@@ -19,6 +20,8 @@ type TetrisCanvasProps = {
   effectsRef?: React.RefObject<EffectTracker | null>;
   /** 대전 가비지 게이지 — 없으면 그리지 않는다 */
   garbageRef?: React.RefObject<GarbageGauge | null>;
+  /** 판 주인의 스킨(보드 슬롯) — 내 판은 내 장착, 상대·리플레이는 그 기록 주인의 장착. 없으면 기본 */
+  skins?: BoardSkins;
   className?: string;
 };
 
@@ -36,12 +39,16 @@ export function __resetCanvasQualityForTests(): void {
 /**
  * 부모 크기에 맞춰 판을 그린다 (DPR 대응). 그리기만 하고 엔진을 진행하지 않는다
  */
-export function TetrisCanvas({ stateRef, drawRef, effectsRef, garbageRef, className = "" }: TetrisCanvasProps) {
+export function TetrisCanvas({ stateRef, drawRef, effectsRef, garbageRef, skins = DEFAULT_BOARD_SKINS, className = "" }: TetrisCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const reduced = useReducedEffects();
   const reducedRef = useRef(reduced);
   reducedRef.current = reduced;
+  // 값이 같으면 같은 객체로 — 부모가 매 렌더 새 객체를 넘겨도 다시 그리지 않게
+  const { block, effect, board } = skins;
+  const skinsRef = useRef(skins);
+  if (skinsRef.current.block !== block || skinsRef.current.effect !== effect || skinsRef.current.board !== board) skinsRef.current = skins;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -69,17 +76,18 @@ export function TetrisCanvas({ stateRef, drawRef, effectsRef, garbageRef, classN
       }
     };
     /** 마지막으로 그린 것 — 같으면 다시 그리지 않는다(준비·일시정지·게임오버·재생 정지 중 매 프레임 전체 그리기를 피한다, FE-11) */
-    let drawn: { state: GameState | null; frame: number; over: boolean; reduced: boolean; layoutVersion: number } | null = null;
+    let drawn: { state: GameState | null; frame: number; over: boolean; reduced: boolean; skins: BoardSkins; layoutVersion: number } | null = null;
     let layoutVersion = 0;
     const draw = () => {
       const state = stateRef.current;
-      const next = { state, frame: state?.frame ?? -1, over: state?.over ?? false, reduced: reducedRef.current, layoutVersion };
+      const next = { state, frame: state?.frame ?? -1, over: state?.over ?? false, reduced: reducedRef.current, skins: skinsRef.current, layoutVersion };
       if (
         drawn &&
         drawn.state === next.state &&
         drawn.frame === next.frame &&
         drawn.over === next.over &&
         drawn.reduced === next.reduced &&
+        drawn.skins === next.skins &&
         drawn.layoutVersion === next.layoutVersion
       ) {
         return;
@@ -92,6 +100,7 @@ export function TetrisCanvas({ stateRef, drawRef, effectsRef, garbageRef, classN
           reduced: reducedRef.current,
           garbage: garbageRef?.current,
           quality: sessionQuality,
+          skins: skinsRef.current,
         });
       } else {
         // 판이 없다(새 판 준비) — 이전 판이 남아 보이지 않게 비운다
@@ -138,10 +147,10 @@ export function TetrisCanvas({ stateRef, drawRef, effectsRef, garbageRef, classN
     };
   }, [stateRef, drawRef, effectsRef, garbageRef]);
 
-  // 연출 줄이기를 바꾸면 멈춰 있는 화면(일시정지·준비)도 바로 다시 그린다
+  // 연출 줄이기·스킨을 바꾸면 멈춰 있는 화면(일시정지·준비)도 바로 다시 그린다
   useEffect(() => {
     drawRef.current?.();
-  }, [reduced, drawRef]);
+  }, [reduced, block, effect, board, drawRef]);
 
   return (
     <div ref={containerRef} className={`relative h-full w-full ${className}`}>
