@@ -244,4 +244,26 @@ describe('내 스킨 — 장착', () => {
     await expect(equipMySkin('effect', 'neon', 't1')).resolves.toBe(false);
     expect(updateMySkins).toHaveBeenCalledTimes(1);
   });
+
+  it('다른 슬롯에서 만료(401)가 나면 진행 중이던 슬롯의 대기 선택은 보내지 않는다 — 앞 선택은 자기 결과대로, 대기는 조용히', async () => {
+    await loaded();
+    const blockPut = deferred<unknown>();
+    updateMySkins.mockReturnValueOnce(blockPut.promise).mockRejectedValueOnce(expired());
+    const b1 = equipMySkin('block', 'neon', 't1');
+    const b2 = equipMySkin('block', 'gameboy', 't1');
+    await expect(equipMySkin('board', 'neon', 't1')).rejects.toMatchObject({ status: 401 });
+    expect(getMySkinsState().status).toBe('expired');
+    blockPut.resolve(ok({ block: 'neon' }));
+    await expect(b1).resolves.toBe(true);
+    await expect(b2).resolves.toBe(false);
+    expect(updateMySkins.mock.calls.map(([body]) => body)).toEqual([{ block: 'neon' }, { board: 'neon' }]);
+    expect(getMySkinsState()).toMatchObject({ status: 'expired', equipped: { block: 'neon', board: 'default' } });
+  });
+
+  it('불러오기 실패(error)면 장착하지 않는다', async () => {
+    getMySkins.mockRejectedValueOnce(new Error('down'));
+    await loadMySkins('t1');
+    await expect(equipMySkin('block', 'neon', 't1')).resolves.toBe(false);
+    expect(updateMySkins).not.toHaveBeenCalled();
+  });
 });

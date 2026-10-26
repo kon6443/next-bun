@@ -20,7 +20,7 @@ import {
  */
 export function useMySkins(): MySkinsState & {
   loggedIn: boolean;
-  /** 장착 — 로그인 상태에서만. true면 저장됨, false면 밀림·세대 교체(알리지 않는다), 실패하면 되돌리고 에러를 던진다 */
+  /** 장착 — 로그인·불러온 뒤(ready)에만. true면 저장됨, false면 이미 장착·ready 아님·밀림·세대 교체(알리지 않는다), 실패하면 되돌리고 에러를 던진다 */
   equip: (slot: SkinSlotName, id: string) => Promise<boolean>;
   /** 불러오기 일시 실패(error) 뒤 다시 불러오기 */
   retry: () => void;

@@ -27,7 +27,7 @@ export type MySkinsState = {
 
 export const GUEST_SKINS_STATE: MySkinsState = { status: 'guest', equipped: DEFAULT_EQUIPPED_SKINS, catalog: null };
 
-/** 장착 결과를 기다리는 호출부 — true: 이 선택이 저장됐다 · false: 더 새 선택에 밀렸거나 세대가 바뀌었다(알리지 않는다) · reject: 이 선택이 실패했다 */
+/** 장착 결과를 기다리는 호출부 — true: 이 선택이 저장됐다 · false: 이미 장착·ready 아님(불러오는 중·실패·만료)·더 새 선택에 밀림·세대 교체(알리지 않는다) · reject: 이 선택이 실패했다 */
 type Waiter = { resolve: (applied: boolean) => void; reject: (err: unknown) => void };
 type Queued = { id: string; accessToken: string; waiters: Waiter[] };
 
@@ -130,9 +130,11 @@ async function send(slot: SkinSlotName, choice: Queued, gen: number): Promise<vo
   }
   inflight[slot] = false;
   const expired = error !== null && isAuthExpired(error);
+  // 다른 슬롯에서 이미 만료됐으면 같은 토큰으로 다시 보내도 401 — 기다리던 선택은 보내지 않는다
+  const stop = expired || state.status === 'expired';
   const after = queued[slot];
   queued[slot] = null;
-  if (after && !expired) {
+  if (after && !stop) {
     // 더 새 선택이 기다린다 — 이 선택은 밀렸다(성공·실패 모두 알리지 않는다), 화면은 그 선택 그대로
     choice.waiters.forEach((w) => w.resolve(false));
     void send(slot, after, gen);
@@ -140,16 +142,20 @@ async function send(slot: SkinSlotName, choice: Queued, gen: number): Promise<vo
   }
   // 보낼 것이 없다(또는 만료라 보내도 같다) — 확정값을 보인다
   setState({ ...state, ...(expired ? { status: 'expired' as const } : {}), equipped: { ...state.equipped, [slot]: confirmed[slot] } });
-  if (after) {
-    // 만료라 기다리던 선택을 보내지 않는다 — 실패는 마지막 선택 하나로만 알린다(토스트 한 번), 밀린 앞 선택은 조용히
+  if (after && expired) {
+    // 이 슬롯이 만료라 기다리던 선택을 보내지 않는다 — 실패는 마지막 선택 하나로만 알린다(토스트 한 번), 밀린 앞 선택은 조용히
     after.waiters.forEach((w) => w.reject(error));
     choice.waiters.forEach((w) => w.resolve(false));
-  } else if (error !== null) choice.waiters.forEach((w) => w.reject(error));
+    return;
+  }
+  // 다른 슬롯 만료로 보내지 않은 대기 선택은 조용히(만료 안내는 이미 그 슬롯에서) — 이 선택은 자기 결과대로
+  after?.waiters.forEach((w) => w.resolve(false));
+  if (error !== null) choice.waiters.forEach((w) => w.reject(error));
   else choice.waiters.forEach((w) => w.resolve(true));
 }
 
 /**
- * 한 슬롯 장착 — 낙관적 반영 후 PUT(같은 슬롯은 하나씩). true면 이 선택이 저장됐다, false면 이미 장착 중이었거나 더 새 선택·세대 교체로 밀렸다(알리지 않는다)
+ * 한 슬롯 장착 — 낙관적 반영 후 PUT(같은 슬롯은 하나씩). true면 이 선택이 저장됐다, false면 이미 장착·ready 아님·더 새 선택·세대 교체로 밀렸다(알리지 않는다)
  * 이 선택이 실패하면 서버 확정값으로 돌아가고 에러를 다시 던진다(호출부가 토스트)
  */
 export function equipMySkin(slot: SkinSlotName, id: string, accessToken: string): Promise<boolean> {
