@@ -12,6 +12,10 @@ vi.mock('@/services/gameService', () => ({
   submitGameScore: (...a: unknown[]) => submitGameScore(...a),
 }));
 
+// 등록하면 그 게임 랭킹 캐시를 버린다(리뷰: 캐시가 새 기록을 가림)
+const invalidateRankings = vi.hoisted(() => vi.fn());
+vi.mock('./RankingsView', () => ({ invalidateRankings }));
+
 const startLogin = vi.fn();
 vi.mock('@/app/auth/useKakaoLogin', () => ({ useKakaoLogin: () => ({ start: startLogin, isStarting: false }) }));
 
@@ -59,6 +63,7 @@ describe('ScoreSubmitPanel — 게임 사양·보드를 따른다', () => {
       fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
     });
     expect(submitGameScore).toHaveBeenCalledWith('defense', { sessionId: 'sess', playerName: '수비왕', replay }, undefined);
+    expect(invalidateRankings).toHaveBeenCalledWith('defense');
     expect(window.localStorage.getItem('defense:myScoreIds')).toBe('[9]');
     expect(window.localStorage.getItem('defense:lastName')).toBe('수비왕');
     expect(screen.getByRole('link', { name: /내 플레이 다시보기/ }).getAttribute('href')).toBe('/games/defense/replays/9');

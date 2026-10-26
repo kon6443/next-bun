@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
+import { StrictMode } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { RANKINGS_CACHE_MS, RANKINGS_DEBOUNCE_MS, RankingsView, resetRankingsCache } from './RankingsView';
+import { RANKINGS_CACHE_MS, RANKINGS_DEBOUNCE_MS, RankingsView, invalidateRankings, resetRankingsCache } from './RankingsView';
 import { TEST_GAME } from './testGame';
 
 const getGameRankings = vi.fn();
@@ -90,6 +91,8 @@ describe('RankingsView — 게임 사양을 따른다', () => {
     await act(async () => {
       render(<RankingsView game={TEST_GAME} highlightId={99} board="endless-s1" />);
     });
+    // 받아 둔 목록에 가리킨 기록이 없으면 다시 받는다(방금 등록한 기록일 수 있다) — 그래도 없으면 순위를 따로 받는다
+    await passDebounce();
     expect(getGameScore).toHaveBeenCalledWith('defense', 99);
     expect(screen.getByTestId('ranking-outside').textContent).toBe('가리킨 기록은 이 목록(상위 50위)에 없어요 · 전체 기간 137위');
   });
@@ -208,6 +211,51 @@ describe('RankingsView — 게임 사양을 따른다', () => {
       render(<RankingsView game={TEST_GAME} highlightId={null} board="endless-s1" />);
     });
     expect(getGameRankings).toHaveBeenCalledTimes(2);
+    expect(screen.getByText('수비왕')).toBeTruthy();
+  });
+
+  it('방금 등록한 기록을 가리키면 받아 둔 목록을 쓰지 않는다 — "상위 50위 밖" 오안내 없이 내 행 강조 (리뷰)', async () => {
+    const first = await act(async () => render(<RankingsView game={TEST_GAME} highlightId={null} board="endless-s1" />));
+    expect(getGameRankings).toHaveBeenCalledTimes(1);
+    first.unmount();
+    // 그사이 새 기록(9)이 1위로 등록됐다
+    getGameRankings.mockResolvedValue({ code: 'SUCCESS', message: 'ok', data: { items: [{ ...item, scoreId: 9 }, { ...item, scoreId: 5, rank: 2 }], periodStart: null } });
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + RANKINGS_DEBOUNCE_MS);
+    await act(async () => {
+      render(<RankingsView game={TEST_GAME} highlightId={9} board="endless-s1" />);
+    });
+    expect(getGameRankings).toHaveBeenCalledTimes(2);
+    expect(screen.queryByTestId('ranking-outside')).toBeNull();
+    expect(getGameScore).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
+  it('기록을 등록하면(invalidateRankings) 그 게임의 받아 둔 목록을 버린다 — 다른 게임 것은 그대로', async () => {
+    const first = await act(async () => render(<RankingsView game={TEST_GAME} highlightId={null} board="endless-s1" />));
+    first.unmount();
+    invalidateRankings('tetris');
+    await passDebounce();
+    const second = await act(async () => render(<RankingsView game={TEST_GAME} highlightId={null} board="endless-s1" />));
+    expect(getGameRankings).toHaveBeenCalledTimes(1);
+    second.unmount();
+    invalidateRankings('defense');
+    await act(async () => {
+      render(<RankingsView game={TEST_GAME} highlightId={null} board="endless-s1" />);
+    });
+    await passDebounce();
+    expect(getGameRankings).toHaveBeenCalledTimes(2);
+  });
+
+  it('StrictMode(effect 두 번)에서도 첫 목록은 한 번만 부른다', async () => {
+    await act(async () => {
+      render(
+        <StrictMode>
+          <RankingsView game={TEST_GAME} highlightId={null} board="endless-s1" />
+        </StrictMode>,
+      );
+    });
+    await passDebounce();
+    expect(getGameRankings).toHaveBeenCalledTimes(1);
     expect(screen.getByText('수비왕')).toBeTruthy();
   });
 });

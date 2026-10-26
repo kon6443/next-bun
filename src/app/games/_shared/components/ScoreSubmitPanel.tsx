@@ -8,6 +8,7 @@ import { Button, ButtonLink } from "@/app/teams/components";
 import { getGameRankings, submitGameScore } from "@/services/gameService";
 import type { GameType, RankingPeriod, ReplayPayloadByGame, ScoreDetailByGame, SubmitScoreResponse } from "@/types/game";
 import { estimateRank, formatScore } from "../lib/format";
+import { invalidateRankings } from "./RankingsView";
 import type { GameUiConfig } from "../lib/gameConfig";
 import { classifySubmitError } from "../lib/submitError";
 import { bragLabel } from "../lib/brag";
@@ -184,6 +185,7 @@ export function ScoreSubmitPanel<G extends GameType>({
     setSubmitError(null);
     try {
       const { data } = await submitGameScore(gameType, { sessionId, playerName, replay }, accessToken);
+      invalidateRankings(gameType);
       setRegistered(data);
       storage.addMyScoreId(data.scoreId);
       // 서버가 저장한 이름(정리값)을 다음 기본값으로 — 공유 카드·랭킹 이름과 같게 (games-polish P5, 없으면 보낸 이름)

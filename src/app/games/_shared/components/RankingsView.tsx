@@ -34,11 +34,19 @@ export const RANKINGS_DEBOUNCE_MS = 250;
  * 마지막 요청 시각 — 방금 다른 보드를 불렀으면 새 화면의 첫 요청도 잠깐 기다린다(보드 탭 연타)
  */
 const rankingsCache = new Map<string, { at: number; listing: unknown }>();
+/** 진행 중인 요청 — 같은 목록을 두 번 부르지 않는다(StrictMode가 effect를 다시 돌려도 1회) */
+const inflight = new Map<string, Promise<unknown>>();
 let lastRequestAt = -Infinity;
+
+/** 기록을 등록하면 그 게임의 받아 둔 목록을 버린다 — "랭킹 보기"로 오면 새 기록이 들어간 목록을 받게 */
+export function invalidateRankings(gameType: GameType) {
+  for (const key of rankingsCache.keys()) if (key.startsWith(`${gameType}:`)) rankingsCache.delete(key);
+}
 
 /** 테스트용 — 캐시·요청 시각을 비운다 */
 export function resetRankingsCache() {
   rankingsCache.clear();
+  inflight.clear();
   lastRequestAt = -Infinity;
 }
 
@@ -85,11 +93,21 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
 
   const load = useCallback(async (target: RankingPeriod, targetSort: SortKey, requestId: number) => {
     try {
-      const next: Listing<ScoreDetailByGame[G]> =
-        targetSort === "score"
-          ? { sort: "score", data: (await getGameRankings(game.gameType, target, LIMIT, board)).data }
-          : { sort: targetSort, data: (await getPopularReplays(game.gameType, { period: target, sort: targetSort, limit: LIMIT, board })).data };
-      rankingsCache.set(cacheKey(game.gameType, board, target, targetSort), { at: Date.now(), listing: next });
+      const key = cacheKey(game.gameType, board, target, targetSort);
+      let request = inflight.get(key) as Promise<Listing<ScoreDetailByGame[G]>> | undefined;
+      if (!request) {
+        request = (async (): Promise<Listing<ScoreDetailByGame[G]>> =>
+          targetSort === "score"
+            ? { sort: "score", data: (await getGameRankings(game.gameType, target, LIMIT, board)).data }
+            : { sort: targetSort, data: (await getPopularReplays(game.gameType, { period: target, sort: targetSort, limit: LIMIT, board })).data })();
+        inflight.set(key, request);
+        const settle = () => inflight.delete(key);
+        request.then((listing) => {
+          settle();
+          rankingsCache.set(key, { at: Date.now(), listing });
+        }, settle);
+      }
+      const next = await request;
       // 탭을 빠르게 바꾸면 늦게 온 이전 탭 응답은 버린다
       if (requestId === requestIdRef.current) setListing(next);
     } catch (err) {
@@ -123,9 +141,14 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
     const requestId = ++requestIdRef.current;
     setError(null);
     const now = Date.now();
-    const cached = rankingsCache.get(cacheKey(game.gameType, board, period, sort));
-    if (cached && now - cached.at < RANKINGS_CACHE_MS) {
-      setListing(cached.listing as Listing<ScoreDetailByGame[G]>);
+    const key = cacheKey(game.gameType, board, period, sort);
+    const cached = rankingsCache.get(key);
+    const cachedListing = cached && now - cached.at < RANKINGS_CACHE_MS ? (cached.listing as Listing<ScoreDetailByGame[G]>) : null;
+    // 가리킨 기록이 받아 둔 점수순 목록에 없으면 그사이 등록된 기록일 수 있다 — 다시 받는다("상위 50위 밖" 오안내 방지)
+    const staleForHighlight =
+      cachedListing?.sort === "score" && highlightId !== null && !cachedListing.data.items.some((item) => item.scoreId === highlightId);
+    if (cachedListing && !staleForHighlight) {
+      setListing(cachedListing);
       return;
     }
     setListing(null);
@@ -134,13 +157,14 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
       lastRequestAt = Date.now();
       void load(period, sort, requestId);
     };
-    if (now - lastRequestAt >= RANKINGS_DEBOUNCE_MS) {
+    // 같은 목록을 이미 부르는 중이면(StrictMode 재실행 등) 기다리지 않고 그 요청에 붙는다
+    if (inflight.has(key) || now - lastRequestAt >= RANKINGS_DEBOUNCE_MS) {
       start();
       return;
     }
     const timer = setTimeout(start, RANKINGS_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [load, period, sort, waiting, game.gameType, board]);
+  }, [load, period, sort, waiting, game.gameType, board, highlightId]);
 
   const retry = () => {
     const requestId = ++requestIdRef.current;

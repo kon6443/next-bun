@@ -9,6 +9,7 @@ import { getGameRankings, submitGameScore } from "@/services/gameService";
 import type { RankingItem } from "@/types/game";
 import { extractErrorMessage } from "@/app/utils/errorUtils";
 import { RankingTable } from "@/app/games/_shared/components/RankingTable";
+import { invalidateRankings } from "@/app/games/_shared/components/RankingsView";
 import { TETRIS_GAME } from "./lib/game";
 import { BattleEntry } from "./battle-ui/components/BattleEntry";
 import { RecentBattles } from "./battle-ui/components/RecentBattles";
@@ -97,6 +98,7 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
         { sessionId: pending.sessionId, playerName, replay: pending.replay },
         accessToken,
       );
+      invalidateRankings("tetris");
       addMyScoreId(data.scoreId);
       saveLastName(data.playerName ?? playerName);
       dropPending(pending.sessionId);
