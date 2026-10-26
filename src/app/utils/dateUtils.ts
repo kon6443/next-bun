@@ -223,3 +223,15 @@ export function isToday(date: Date): boolean {
     date.getDate() === now.getDate()
   );
 }
+
+/**
+ * 좁은 머리줄용 짧은 날짜·시각 (로컬) — 올해면 "10.21 14:30", 다른 해면 "2025.10.21 14:30"
+ * @param date 표시할 날짜(UTC 저장값)
+ * @param now 기준 시각(올해 판단) — 기본은 지금
+ */
+export function formatCompactDateTime(date: Date, now: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const day = `${date.getMonth() + 1}.${date.getDate()}`;
+  const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return date.getFullYear() === now.getFullYear() ? `${day} ${time}` : `${date.getFullYear()}.${day} ${time}`;
+}

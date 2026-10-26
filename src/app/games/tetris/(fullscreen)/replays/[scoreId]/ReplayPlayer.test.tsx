@@ -136,6 +136,15 @@ describe('싱글 리플레이 재생기 (games-polish P4)', () => {
     expect(screen.getByRole('button', { name: '재생' })).toBeTruthy();
   });
 
+  it('머리줄 — 제목 앞 ▶(누를 수 없는 장식) 없음, 입력 표시는 판 위가 아니라 판 아래 줄 (UX 점검·KeyOverlay)', async () => {
+    await ready();
+    const header = screen.getByRole('banner');
+    expect(header.textContent).not.toMatch(/▶\s*\S+ · /);
+    const overlay = screen.getByTestId('replay-key-overlay');
+    // 판(캔버스) 칸 안에 겹쳐 두지 않는다 — 머리줄과 같은 화면 열의 한 줄
+    expect(overlay.parentElement).toBe(header.parentElement);
+  });
+
   it('머리줄에 조회수 — 조회 기록 응답이 있으면 그 값, 없으면 재생 응답의 값, 그것도 없으면 0 (replay-views)', async () => {
     loadReplay.mockResolvedValue({ ...replayOf('back-to-back'), viewCount: 3 });
     const { unmount } = render(<ReplayPlayer scoreId={1} />);
