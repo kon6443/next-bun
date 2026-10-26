@@ -1,10 +1,12 @@
-# 운영 런타임은 Node 24 다 (백엔드와 같은 node:24-bookworm-slim).
+# 운영 런타임은 Node 24 다 (백엔드와 같은 node:24.22.1-bookworm-slim).
+# 버전은 패치까지 고정한다 — 떠다니는 태그(node:24-…)는 빌드 시점·캐시에 따라 다른 런타임이 들어가 보안 패치 적용 여부를 확인할 수 없다(2026-10 Node 보안 릴리스, 24.22.1).
+# 올릴 때는 아래 두 FROM(base·production)을 같이 올린다 — 빌드와 운영의 Node가 달라지지 않게. dependabot(docker)이 패치·마이너 PR을 연다
 # Bun 런타임은 연결 단계에서 http.request timeout 이 동작하지 않아(oven-sh/bun#41133) next-auth 의
 # 카카오 호출 10초 상한이 무력화되고, 조용히 끊긴 유휴 소켓을 재사용하면 멈춘다 — docs/tasks/kakao-login-latency-front.md
 # 패키지 매니저는 pnpm 이다(package.json packageManager 고정 버전, corepack 이 받는다).
 
 # 1. 의존성 설치
-FROM node:24-bookworm-slim AS base
+FROM node:24.22.1-bookworm-slim AS base
 # corepack 은 Node 24 까지 기본 포함이다 — Node 25+ 로 올리면 `npm i -g corepack` 이 먼저 필요하다
 # 비대화형 빌드에서 corepack 이 pnpm 다운로드 확인을 묻지 않게 한다
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
@@ -32,7 +34,8 @@ ENV NEXT_PUBLIC_KAKAO_JS_KEY=$NEXT_PUBLIC_KAKAO_JS_KEY
 RUN --mount=type=cache,target=/app/.next/cache node node_modules/next/dist/bin/next build
 
 # 3. 운영 이미지 — standalone 출력만 담는다 (pnpm 없음)
-FROM node:24-bookworm-slim AS production
+# base 와 같은 태그 — 같이 올린다(파일 머리 주석)
+FROM node:24.22.1-bookworm-slim AS production
 WORKDIR /app
 # root 가 아닌 이미지 기본 사용자(node)로 실행한다 — 런타임에 .next/cache 등을 쓸 수 있게 소유권을 넘긴다
 COPY --from=builder --chown=node:node /app/public ./public
