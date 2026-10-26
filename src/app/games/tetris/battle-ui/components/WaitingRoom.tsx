@@ -199,6 +199,13 @@ export function WaitingRoom({ room, connection, onReconnect, onExit, onCopyInvit
                 {error}
               </p>
             )}
+            {/* 경기 화면의 ▲ 범례 — 상대 판 이름 앞 표시의 뜻을 시작 전에 (UX 점검) */}
+            <p className="mt-3 text-xs text-slate-400" data-testid="battle-target-legend">
+              <span className="text-rose-300" aria-hidden="true">
+                ▲
+              </span>{" "}
+              경기 중 상대 이름 앞 ▲는 내가 줄을 지우면 방해 줄이 가는 상대예요.
+            </p>
             {/* 키보드 조작 — 데스크톱 대전에서 볼 곳이 없었다. 터치 기기는 버튼이라 숨긴다 (games-polish FE-32) */}
             <details className="mt-3 text-xs text-slate-400 [@media(pointer:coarse)]:hidden">
               <summary className="flex min-h-11 cursor-pointer items-center">키보드 조작</summary>

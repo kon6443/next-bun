@@ -119,3 +119,10 @@ describe('WaitingRoom 접속 표시·내보내기 (D-010·D-011)', () => {
   });
 });
 
+describe('WaitingRoom ▲ 범례 (UX 점검)', () => {
+  it('경기 화면의 ▲(공격 대상) 뜻을 대기실에서 알린다 — 터치 기기에서도 보인다', () => {
+    ctx.myPlayerId = 'p1';
+    renderRoom(room([player('p1', '나'), player('p2', '친구')]));
+    expect(screen.getByTestId('battle-target-legend').textContent).toContain('방해 줄이 가는 상대');
+  });
+});
