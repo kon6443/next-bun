@@ -309,4 +309,30 @@ describe('TetrisPlay 설정 시트와 준비 화면 (리뷰)', () => {
     expect(document.activeElement).not.toBe(gear);
     expect(screen.getByRole('heading', { name: '일시정지' })).toBeTruthy();
   });
+
+  it('일시정지 중 톱니를 마우스로 열고 닫아 포커스가 톱니에 남아도, 재개 뒤 Space keyup은 톱니를 누르지 않는다(기본 동작 막음, FE-36)', async () => {
+    createGameSession.mockResolvedValue({ data: session(new Date(Date.now() + 2 * HOUR).toISOString()) });
+    render(<TetrisPlay />);
+    await act(async () => {});
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '시작' }));
+    });
+    fireEvent.keyDown(window, { code: 'KeyP', key: 'p' });
+    expect(screen.getByRole('heading', { name: '일시정지' })).toBeTruthy();
+    const gear = screen.getByRole('button', { name: /^설정 \(소리/ });
+    // 마우스 누름(mousedown)이 톱니로 포커스를 옮긴 뒤 클릭 — 버튼이 스스로 포커스를 놓는다
+    gear.focus();
+    await act(async () => {
+      fireEvent.click(gear, { detail: 1 });
+    });
+    await act(async () => {
+      fireEvent.keyDown(document, { key: 'Escape' });
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+    });
+    expect(document.activeElement).toBe(gear);
+    fireEvent.keyDown(gear, { code: 'KeyP', key: 'p' });
+    expect(screen.queryByRole('heading', { name: '일시정지' })).toBeNull();
+    // fireEvent는 기본 동작이 막혔으면 false
+    expect(fireEvent.keyUp(gear, { code: 'Space', key: ' ' })).toBe(false);
+  });
 });

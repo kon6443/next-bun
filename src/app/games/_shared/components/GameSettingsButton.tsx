@@ -17,6 +17,11 @@ type Props = {
   shape?: "square" | "round";
   /** 배경음이 없는 게임은 false — 소리 켜짐 표시도 효과음만 본다 */
   music?: boolean;
+  /**
+   * 마우스·터치로 연 시트를 닫을 때 이 버튼으로 포커스를 돌려줄지(기본 true)
+   * 멈추지 않는 게임 화면(대전)은 false — 포커스가 남으면 카운트다운 중 Space가 이 버튼을 다시 누른다
+   */
+  restoreFocus?: boolean;
 };
 
 const SHAPES = {
@@ -29,7 +34,7 @@ const SHAPES = {
  * 시트가 닫히면 포커스는 이 버튼으로 돌아온다 — 키보드로 열면 useDialog가, 마우스·터치로 열면 close가
  * 톱니는 머리줄 소리 버튼 자리를 대신하므로 소리 상태를 잃지 않게 — 꺼져 있으면 모서리에 음소거 배지, 이름에도 상태
  */
-export function GameSettingsButton({ renderSheet, onOpenChange, testId, children, className = "", shape = "square", music = true }: Props) {
+export function GameSettingsButton({ renderSheet, onOpenChange, testId, children, className = "", shape = "square", music = true, restoreFocus = true }: Props) {
   const { settings: sound } = useSoundSettings();
   const soundOn = sound.sfx || (music && sound.music);
   const [open, setOpen] = useState(false);
@@ -44,6 +49,7 @@ export function GameSettingsButton({ renderSheet, onOpenChange, testId, children
    */
   const close = () => {
     show(false);
+    if (!restoreFocus) return;
     requestAnimationFrame(() => {
       const active = document.activeElement;
       if (!active || active === document.body) buttonRef.current?.focus();

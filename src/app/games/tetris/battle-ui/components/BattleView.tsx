@@ -207,7 +207,7 @@ export function BattleView({
           ←
         </button>
         {side ? <div className="min-w-0 flex-1" /> : opponentList("flex min-w-0 flex-1 justify-center gap-3")}
-        <GameSettingsButton className="shrink-0" renderSheet={(close) => <TetrisSettingsSheet onClose={close} controls="locked" />} />
+        <GameSettingsButton className="shrink-0" restoreFocus={false} renderSheet={(close) => <TetrisSettingsSheet onClose={close} controls="locked" />} />
         <button
           ref={emoteToggleRef}
           type="button"
