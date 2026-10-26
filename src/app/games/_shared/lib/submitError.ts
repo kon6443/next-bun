@@ -6,8 +6,18 @@ import { extractErrorMessage } from '@/app/utils/errorUtils';
  * - name: 이름만 바꿔 같은 세션으로 다시 낼 수 있다 (세션 유지)
  * - final: 다시 내도 소용없다 (세션 소모·만료·검증 실패·형식 위반·너무 큼) — 보관 기록을 지운다
  * - retry: 네트워크·429·5xx — 보관해 두고 다시 시도
+ * - auth: 로그인이 만료됐다(401) — 보관해 두고 다시 로그인한 뒤 등록(익명으로 내면 내 기록이 아니게 된다)
  */
-export type SubmitErrorKind = 'name' | 'final' | 'retry';
+export type SubmitErrorKind = 'name' | 'final' | 'retry' | 'auth';
+
+/** 로그인 만료 안내 — 제출(보관 후 재로그인) · 세션 발급(이번 판은 등록 없이) */
+export const AUTH_EXPIRED_MESSAGE = '로그인이 만료됐어요. 다시 로그인하면 등록됩니다.';
+export const SESSION_AUTH_EXPIRED_MESSAGE = '로그인이 만료됐어요. 다시 로그인하면 랭킹에 등록할 수 있어요. 이번 판은 등록 없이 플레이해요.';
+
+/** 로그인 사용자의 토큰이 거절됐다(만료·무효) — 비로그인은 토큰을 싣지 않아 401이 나지 않는다 */
+export function isAuthExpired(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 401;
+}
 
 /** 이름 오류는 이 두 code로만 판정한다 — 그 밖의 422 VALIDATION_ERROR는 리플레이·세션 형식 위반 */
 const NAME_ERROR_CODES = new Set(['GAME_PLAYER_NAME_INVALID', 'GAME_PLAYER_NAME_FORBIDDEN']);
@@ -30,6 +40,7 @@ export function classifySubmitError(err: unknown, isRetry: boolean): SubmitError
   if (!(err instanceof ApiError)) {
     return { kind: 'retry', message: extractErrorMessage(err, '기록을 등록하지 못했습니다.') };
   }
+  if (isAuthExpired(err)) return { kind: 'auth', message: AUTH_EXPIRED_MESSAGE };
   const message = err.message || err.getDefaultMessage();
   const reason = detailString(err.details, 'reason');
   if (NAME_ERROR_CODES.has(err.code)) return { kind: 'name', message };

@@ -74,8 +74,8 @@ async function handleApiError(response: Response, errorMessages: ErrorMessageMap
 
 const TOO_MANY = '요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.';
 
-/** 백엔드 short 스로틀 창(1000ms) + 경계 오차 여유 */
-const RETRY_AFTER_UNAUTHORIZED_MS = 1100;
+/** 백엔드 short 스로틀 창(1000ms) + 경계 오차 여유 — 같은 제출을 이보다 먼저 다시 내지 않는다 */
+const THROTTLE_WINDOW_MS = 1100;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -95,27 +95,22 @@ function timeoutSignal(ms: number): AbortSignal | undefined {
 }
 
 /**
- * 선택 인증 호출 — 만료·잘못된 토큰은 백엔드가 401로 막으므로(토큰이 없어야 비로그인 통과) 토큰 없이 1회 재시도한다
- * 제출도 가드가 먼저 막아 세션이 소모되지 않으니 재시도해도 안전하다
+ * 선택 인증 호출 — 토큰이 있으면 싣고, 없으면 비로그인으로 보낸다
+ * 토큰이 만료·무효라 401이면 토큰 없이 다시 보내지 않는다 — 로그인 사용자의 기록이 익명으로 남지 않게(USER_ID 누락)
+ * 호출부가 401(classifySubmitError 'auth')을 받아 기록을 보관하고 다시 로그인하게 안내한다. 세션 발급도 같다
+ * 게임 중 전역 로그아웃(로그인 화면 이동)으로 결과를 잃지 않게 401 이벤트는 끈다
  */
 async function fetchWithOptionalAuth(
   args: { method: 'POST'; endpoint: string; body?: unknown; timeoutMs: number },
   accessToken?: string,
-  /** 토큰이 401로 거절돼 토큰 없이 다시 냈다 — 같은 제출의 다음 시도는 토큰 없이 보내게 알린다 */
-  onTokenRejected?: () => void,
 ): Promise<Response> {
   const { timeoutMs, ...request } = args;
   // 재시도마다 새 상한 — 첫 요청의 시간을 이어 쓰지 않는다
-  const send = (auth: { accessToken?: string; notifyUnauthorized?: boolean }) =>
-    fetchServiceInstance.backendFetch({ ...request, ...auth, signal: timeoutSignal(timeoutMs) });
-  if (!accessToken) return send({});
-  // 게임 중 전역 로그아웃(로그인 화면 이동)으로 결과를 잃지 않게 401 이벤트를 끈다
-  const response = await send({ accessToken, notifyUnauthorized: false });
-  if (response.status !== 401) return response;
-  onTokenRejected?.();
-  // 401로 거절된 요청도 IP 스로틀(제출 초당 1)에 집계된다 — 같은 1초 창을 피해 재시도
-  await wait(RETRY_AFTER_UNAUTHORIZED_MS);
-  return send({});
+  return fetchServiceInstance.backendFetch({
+    ...request,
+    ...(accessToken ? { accessToken, notifyUnauthorized: false } : {}),
+    signal: timeoutSignal(timeoutMs),
+  });
 }
 
 // ==================== 제출 — 게임별 본문·검증 대기 재시도 ====================
@@ -159,7 +154,7 @@ async function isVerifyBusy(response: Response): Promise<boolean> {
 function verifyBusyWaitMs(response: Response): number | null {
   const raw = response.headers.get('Retry-After')?.trim() ?? '';
   if (!/^\d+$/.test(raw)) return VERIFY_BUSY_DEFAULT_WAIT_MS;
-  const ms = Math.max(RETRY_AFTER_UNAUTHORIZED_MS, Number(raw) * 1000);
+  const ms = Math.max(THROTTLE_WINDOW_MS, Number(raw) * 1000);
   return ms > VERIFY_BUSY_MAX_WAIT_MS ? null : ms;
 }
 
@@ -208,8 +203,6 @@ export async function submitGameScore<G extends GameType>(
   accessToken?: string,
 ): Promise<ApiResponse<SubmitScoreResponse<ScoreDetailByGame[G]>>> {
   const { sessionId, playerName, replay } = request;
-  // 한 번 401로 거절된 토큰은 자동 재시도에 다시 싣지 않는다 — 401·스로틀 대기가 겹쳐 쌓이지 않게(서버는 토큰 없는 제출을 익명으로 받는다, Q-S1)
-  let token = accessToken;
   const post = () =>
     fetchWithOptionalAuth(
       {
@@ -218,17 +211,14 @@ export async function submitGameScore<G extends GameType>(
         body: { sessionId, playerName, replay: buildReplayBody(gameType, replay) },
         timeoutMs: SUBMIT_TIMEOUT_MS,
       },
-      token,
-      () => {
-        token = undefined;
-      },
+      accessToken,
     );
 
   const startedAt = Date.now();
   let response = await post();
   if (await isVerifyBusy(response)) {
     const waitMs = verifyBusyWaitMs(response);
-    // 첫 시도가 이미 오래 걸렸으면(응답 지연·401 재시도) 자동 재시도하지 않고 호출부의 보관·다시 등록으로 — "등록 중"을 끝없이 끌지 않게 (games-polish FE-50)
+    // 첫 시도가 이미 오래 걸렸으면(응답 지연) 자동 재시도하지 않고 호출부의 보관·다시 등록으로 — "등록 중"을 끝없이 끌지 않게 (games-polish FE-50)
     if (waitMs !== null && Date.now() - startedAt + waitMs <= SUBMIT_TIMEOUT_MS) {
       await wait(waitMs);
       response = await post();

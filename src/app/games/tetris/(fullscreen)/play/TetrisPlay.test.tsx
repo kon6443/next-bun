@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import type { GameSession } from '@/types/game';
+import { ApiError } from '@/types/api';
 import { ENGINE_VERSION } from '../../engine';
 
 const createGameSession = vi.fn<() => Promise<{ data: GameSession }>>();
@@ -45,6 +46,15 @@ describe('TetrisPlay 시작 (games-polish FE-12)', () => {
     await act(async () => resolve({ data: session('2099-01-01T00:00:00Z') }));
     expect(screen.queryByText('준비됐나요?')).toBeNull();
     expect(createGameSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('로그인이 만료돼 세션 발급이 401이면 익명 세션으로 바꾸지 않고, 다시 로그인하라고 알린 뒤 등록 없이 플레이 (USER_ID 누락)', async () => {
+    createGameSession.mockRejectedValue(new ApiError('AUTH_UNAUTHORIZED', '인증 만료', 401));
+    await act(async () => {
+      render(<TetrisPlay />);
+    });
+    expect(createGameSession).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('로그인이 만료됐어요. 다시 로그인하면 랭킹에 등록할 수 있어요. 이번 판은 등록 없이 플레이해요.')).toBeTruthy();
   });
 
   it('남은 시간이 판 최대 길이보다 짧은 세션이면 시작할 때 새로 받은 뒤 시작한다', async () => {

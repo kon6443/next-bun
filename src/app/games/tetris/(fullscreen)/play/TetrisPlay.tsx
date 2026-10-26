@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { Button } from "@/app/teams/components";
 import { ConfirmModal } from "@/app/components/ConfirmModal";
 import { createGameSession, getGameScore } from "@/services/gameService";
+import { SESSION_AUTH_EXPIRED_MESSAGE, isAuthExpired } from "@/app/games/_shared/lib/submitError";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
 import { useMediaQuery } from "@/app/games/_shared/hooks/useMediaQuery";
 import { sessionTtlMs } from "@/app/games/_shared/lib/sessionTtl";
@@ -62,6 +63,8 @@ function challengeBlockMessage(err: unknown): string | null {
 
 /** 세션을 못 받았을 때 — 이번 판은 로컬 seed로 등록 없이. 오늘의 테트리스·도전장이면 같은 블록 순서가 아님을 밝힌다 */
 function sessionErrorMessage(err: unknown, variant: "daily" | "challenge" | null): string {
+  // 로그인 토큰이 거절됐다 — 익명 세션으로 바꿔 받지 않는다(기록이 내 것이 아니게 된다)
+  if (isAuthExpired(err)) return SESSION_AUTH_EXPIRED_MESSAGE;
   if (err instanceof ApiError && err.code === "GAME_SESSION_UNAVAILABLE") return err.getDefaultMessage();
   if (err instanceof ApiError && err.code === "GAME_DAILY_UNAVAILABLE") return "지금은 오늘의 테트리스를 열 수 없어요. 이번 판은 일반 판으로 등록 없이 플레이해요.";
   if (variant === "daily") return "오늘의 테트리스를 준비하지 못했어요. 이번 판은 일반 판으로 등록 없이 플레이해요.";

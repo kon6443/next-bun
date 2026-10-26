@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ConfirmModal } from "@/app/components/ConfirmModal";
+import { useKakaoLogin } from "@/app/auth/useKakaoLogin";
 import { Button, ButtonLink } from "@/app/teams/components";
 import { getGameRankings, submitGameScore } from "@/services/gameService";
 import type { GameType, RankingPeriod, ReplayPayloadByGame, ScoreDetailByGame, SubmitScoreResponse } from "@/types/game";
@@ -100,6 +101,9 @@ export function ScoreSubmitPanel<G extends GameType>({
   const [isFinalError, setIsFinalError] = useState(false);
   /** 배포 뒤 옛 화면으로 낸 기록이라 거절됐다 — 새로고침 버튼 (ENGINE_VERSION) */
   const [needsReload, setNeedsReload] = useState(false);
+  /** 로그인이 만료돼 거절됐다 — 기록을 보관하고 다시 로그인하게(재로그인 뒤 시작 화면의 보관분 등록으로 내 기록이 된다) */
+  const [needsLogin, setNeedsLogin] = useState(false);
+  const { start: startLogin, isStarting: loginStarting } = useKakaoLogin();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submittingRef = useRef(false);
   const [registered, setRegistered] = useState<SubmitScoreResponse<ScoreDetailByGame[G]> | null>(null);
@@ -189,10 +193,12 @@ export function ScoreSubmitPanel<G extends GameType>({
         setNeedsReload(reload === true);
         storage.removePendingSubmission(sessionId);
       } else {
-        // 네트워크·429·5xx — 결과를 보관하고 다시 시도할 수 있게. 보관하지 못했으면(저장소 차단·용량) 떠나면 사라진다고 알린다 (FE-46)
+        // 네트워크·429·5xx·로그인 만료 — 결과를 보관하고 다시 시도할 수 있게. 보관하지 못했으면(저장소 차단·용량) 떠나면 사라진다고 알린다 (FE-46)
         const kept = storage.savePendingSubmission({ sessionId, playerName, replay, score, savedAt: Date.now(), ...(board ? { board } : {}) });
         setSubmitError(kept ? text : `${text} 이 기기에 보관하지 못해 이 화면을 떠나면 기록이 사라져요.`);
         setCanRetry(true);
+        // 만료된 토큰으로 다시 내도 같다 — 다시 로그인하면 시작 화면에서 보관한 기록을 등록한다
+        if (kind === "auth") setNeedsLogin(true);
       }
     } finally {
       submittingRef.current = false;
@@ -275,9 +281,23 @@ export function ScoreSubmitPanel<G extends GameType>({
               {submitError}
             </p>
           )}
-          <Button type="submit" size="md" fullWidth className="mt-3 min-h-11" disabled={isSubmitting} aria-busy={isSubmitting}>
-            {isSubmitting ? "등록 중..." : canRetry ? "다시 등록하기" : "랭킹 등록"}
-          </Button>
+          {needsLogin ? (
+            <Button
+              type="button"
+              size="md"
+              fullWidth
+              className="mt-3 min-h-11"
+              disabled={loginStarting}
+              aria-busy={loginStarting}
+              onClick={() => startLogin({ callbackUrl: game.homePath })}
+            >
+              {loginStarting ? "카카오로 이동 중..." : "다시 로그인하고 등록하기"}
+            </Button>
+          ) : (
+            <Button type="submit" size="md" fullWidth className="mt-3 min-h-11" disabled={isSubmitting} aria-busy={isSubmitting}>
+              {isSubmitting ? "등록 중..." : canRetry ? "다시 등록하기" : "랭킹 등록"}
+            </Button>
+          )}
         </form>
       ) : (
         <div role="status" className="mt-5 rounded-xl border border-white/10 bg-slate-950/40 p-3 text-sm text-slate-300">
