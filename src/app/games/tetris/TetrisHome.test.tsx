@@ -45,6 +45,8 @@ describe('TetrisHome 설정 (games-polish FE-52)', () => {
       render(<TetrisHome />);
     });
     expect(screen.queryByRole('slider', { name: /DAS/ })).toBeNull();
+    // 키보드 조작 표는 홈에 두지 않는다 — 시트 조작 상세·플레이 준비 화면에 (D-005)
+    expect(screen.queryByText('Space')).toBeNull();
     const entry = screen.getByTestId('tetris-settings-entry');
     // 키보드로 누른 경우(포커스가 줄에 있다)
     entry.focus();

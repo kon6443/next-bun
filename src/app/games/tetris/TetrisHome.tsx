@@ -18,7 +18,6 @@ import { PopularReplaysPreview } from "@/app/games/_shared/components/PopularRep
 import { GameSettingsButton } from "@/app/games/_shared/components/GameSettingsButton";
 import { ReloginButton } from "@/app/games/_shared/components/ReloginButton";
 import { TetrisSettingsSheet } from "./components/TetrisSettingsSheet";
-import { CONTROL_GUIDE } from "./lib/controls";
 import { formatScore } from "@/app/games/_shared/lib/format";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
 import { classifySubmitError } from "@/app/games/_shared/lib/submitError";
@@ -240,20 +239,9 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
 
       <RecentBattles />
 
-      {/* 조작·설정 */}
+      {/* 설정 — 조작 키 안내는 설정 시트의 조작 상세·플레이 준비 화면에 있다(D-005) */}
       <section className={`${cardStyles.section} p-4`}>
-        <h2 className="text-base font-semibold text-white">조작</h2>
-        <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
-          {CONTROL_GUIDE.map(({ keys, label }) => (
-            <div key={keys} className="contents">
-              <dt className="font-mono font-semibold text-sky-300">{keys}</dt>
-              <dd className="text-slate-400">{label}</dd>
-            </div>
-          ))}
-        </dl>
-        <p className="mt-3 text-xs text-slate-500">모바일은 화면 아래 버튼으로 조작해요. 여러 버튼을 동시에 누를 수 있어요.</p>
-
-        <h2 className="mt-6 text-base font-semibold text-white">설정</h2>
+        <h2 className="text-base font-semibold text-white">설정</h2>
         <div className="mt-2 space-y-2">
           <GameSettingsButton
             testId="tetris-settings-entry"
