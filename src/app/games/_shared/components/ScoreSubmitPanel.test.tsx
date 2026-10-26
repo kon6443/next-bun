@@ -255,4 +255,27 @@ describe('ScoreSubmitPanel — 게임 사양·보드를 따른다', () => {
     });
     expect(TEST_GAME.storage.loadPendingSubmissions().at(-1)).toMatchObject({ board: 'challenge-7' });
   });
+
+  it('등록할 수 없는 판(세션 없음)은 예상 순위를 보이지도 부르지도 않는다 — 등록될 것처럼 읽히지 않게 (UX 점검)', async () => {
+    await act(async () => {
+      render(<ScoreSubmitPanel {...props} sessionId={null} sessionError="서버 응답이 늦어 이번 판은 랭킹 등록 없이 플레이해요." />);
+    });
+    expect(getGameRankings).not.toHaveBeenCalled();
+    expect(screen.queryByText('일간')).toBeNull();
+    expect(screen.queryByText(/예상|100위 밖/)).toBeNull();
+    expect(screen.getByRole('status').textContent).toContain('랭킹 등록 없이');
+  });
+
+  it('등록할 수 있는 동안 주버튼은 "랭킹 등록" — "다시 하기"는 보조, 등록할 수 없으면 "다시 하기"가 주버튼 (UX 점검)', async () => {
+    // 주버튼 = 그라데이션 채움(Button primary), 보조 = 테두리만(secondary)
+    const isPrimary = (el: HTMLElement) => el.className.includes('bg-gradient-to-r');
+    const { unmount } = await act(async () => render(<ScoreSubmitPanel {...props} />));
+    expect(isPrimary(screen.getByRole('button', { name: '랭킹 등록' }))).toBe(true);
+    expect(isPrimary(screen.getByRole('button', { name: '다시 하기' }))).toBe(false);
+    unmount();
+    await act(async () => {
+      render(<ScoreSubmitPanel {...props} sessionId={null} />);
+    });
+    expect(isPrimary(screen.getByRole('button', { name: '다시 하기' }))).toBe(true);
+  });
 });

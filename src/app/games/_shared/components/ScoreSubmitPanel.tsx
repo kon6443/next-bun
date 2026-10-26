@@ -129,6 +129,8 @@ export function ScoreSubmitPanel<G extends GameType>({
   /** 다시 하면 이 판 기록이 사라지는 경우 — 등록 가능한 판을 아직 등록하지 않았고, 다시 등록할 보관도 없다 (games-polish FE-27) */
   const [confirmRestart, setConfirmRestart] = useState(false);
   const wouldLoseRecord = !!sessionId && !registered && !isFinalError && !canRetry;
+  /** 이름 입력·"랭킹 등록"이 보이는 동안 */
+  const canRegister = !!sessionId && !registered && !isFinalError;
   const restart = () => {
     discardPresaved();
     onRestart();
@@ -142,9 +144,10 @@ export function ScoreSubmitPanel<G extends GameType>({
   // 등록 전 예상 순위 (상위 100개 기준) — 등록 후에는 서버가 준 순위를 쓴다
   // 패널(=게임 오버)당 정확히 기간별 1회: StrictMode·Fast Refresh가 effect를 다시 돌려도 ref 가드로 재요청하지 않는다
   // (요청을 취소하지 않으므로 첫 실행의 응답이 그대로 반영된다. 전역 스로틀(초당 5)에 걸리지 않게)
+  // 세션이 없는 판(등록 불가)은 순위를 보이지 않으니 부르지도 않는다
   const estimatesRequestedRef = useRef(false);
   useEffect(() => {
-    if (estimatesRequestedRef.current) return;
+    if (!sessionId || estimatesRequestedRef.current) return;
     estimatesRequestedRef.current = true;
     const myScore = score;
     for (const { key } of periods) {
@@ -161,7 +164,7 @@ export function ScoreSubmitPanel<G extends GameType>({
           setEstimates((prev) => ({ ...prev, [key]: "unavailable" }));
         });
     }
-  }, [gameType, board, score, periods]);
+  }, [sessionId, gameType, board, score, periods]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -218,15 +221,17 @@ export function ScoreSubmitPanel<G extends GameType>({
       {isNewBest && <p className="mt-1 text-sm font-semibold text-amber-300">개인 최고 기록!</p>}
       {stats}
 
-      {/* 순위 — 등록 전에는 예상, 등록 후에는 서버 순위 */}
-      <div className={`mt-4 grid gap-2 rounded-2xl border border-white/10 bg-slate-950/40 p-3 text-sm ${periods.length === 3 ? "grid-cols-3" : "grid-cols-1"}`}>
-        {periods.map(({ key, label }) => (
-          <div key={key}>
-            <p className="text-xs text-slate-500">{label}</p>
-            <p className="mt-0.5 font-semibold text-slate-100">{rankLabel(registered, estimates[key], key)}</p>
-          </div>
-        ))}
-      </div>
+      {/* 순위 — 등록 전에는 예상, 등록 후에는 서버 순위. 등록할 수 없는 판(세션 없음)은 등록될 것처럼 읽히지 않게 숨긴다(UX 점검) */}
+      {(sessionId || registered) && (
+        <div className={`mt-4 grid gap-2 rounded-2xl border border-white/10 bg-slate-950/40 p-3 text-sm ${periods.length === 3 ? "grid-cols-3" : "grid-cols-1"}`}>
+          {periods.map(({ key, label }) => (
+            <div key={key}>
+              <p className="text-xs text-slate-500">{label}</p>
+              <p className="mt-0.5 font-semibold text-slate-100">{rankLabel(registered, estimates[key], key)}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {registered ? (
         <div className="mt-5 flex flex-col gap-2">
@@ -311,8 +316,10 @@ export function ScoreSubmitPanel<G extends GameType>({
       )}
 
       <div className="mt-3 flex gap-2">
+        {/* 등록할 수 있는 동안은 "랭킹 등록"이 주버튼 — 다시 하기는 보조로(우선순위가 한눈에, UX 점검) */}
         <Button
           type="button"
+          variant={canRegister ? "secondary" : "primary"}
           size="md"
           className="min-h-11 flex-1"
           disabled={restarting}
