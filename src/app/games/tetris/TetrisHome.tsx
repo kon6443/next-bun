@@ -18,6 +18,7 @@ import { tetrisRankLabel } from "./lib/replayCard";
 import { PopularReplaysPreview } from "@/app/games/_shared/components/PopularReplaysPreview";
 import { SoundButton } from "@/app/games/_shared/components/SoundButton";
 import { SoundSettingsEntry } from "@/app/games/_shared/components/SoundSettingsEntry";
+import { SkinSettingsEntry } from "./components/SkinSettingsModal";
 import { CONTROL_GUIDE } from "./lib/controls";
 import { formatScore, framesToMs } from "@/app/games/_shared/lib/format";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
@@ -293,6 +294,7 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
             />
           </label>
           <SoundSettingsEntry />
+          <SkinSettingsEntry />
         </div>
       </section>
 

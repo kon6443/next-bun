@@ -70,3 +70,54 @@ export async function updateUserProfile(
   const data: UpdateUserResponse = await response.json();
   return data;
 }
+
+// ==================== 스킨 (테트리스 D-003) ====================
+
+/** 카탈로그 아이템 — 서버가 SSOT(id·획득 방식·보유). unlock은 'default'·'free' 외에 업적·출석 등이 늘어난다 */
+export type SkinCatalogItem = { id: string; owned: boolean; unlock: string };
+
+export type SkinSlotName = 'block' | 'effect' | 'board' | 'background';
+
+export type UserSkins = {
+  equipped: Record<SkinSlotName, string>;
+  catalog: Record<SkinSlotName, SkinCatalogItem[]>;
+};
+
+type UserSkinsResponse = {
+  code: 'SUCCESS';
+  data: UserSkins;
+  message: string;
+};
+
+/** 내 장착·카탈로그 */
+export async function getMySkins(accessToken: string): Promise<UserSkinsResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'GET',
+    endpoint: '/api/v1/users/me/skins',
+    accessToken,
+  });
+
+  if (!response.ok) {
+    await handleApiError(response, '스킨 정보를 불러오지 못했습니다.');
+  }
+
+  return response.json();
+}
+
+/**
+ * 장착 변경 — 바꿀 슬롯만 보낸다. 카탈로그 밖 422 USER_SKIN_UNKNOWN · 미보유 403 USER_SKIN_NOT_OWNED
+ */
+export async function updateMySkins(changes: Partial<Record<SkinSlotName, string>>, accessToken: string): Promise<UserSkinsResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'PUT',
+    endpoint: '/api/v1/users/me/skins',
+    body: changes,
+    accessToken,
+  });
+
+  if (!response.ok) {
+    await handleApiError(response, '스킨을 바꾸지 못했습니다.');
+  }
+
+  return response.json();
+}

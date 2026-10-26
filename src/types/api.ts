@@ -69,7 +69,10 @@ export type ErrorCode =
   | 'GAME_VERIFY_BUSY'
   | 'GAME_WEEKLY_UNAVAILABLE'
   | 'GAME_DAILY_UNAVAILABLE'
-  | 'GAME_CHALLENGE_EXPIRED';
+  | 'GAME_CHALLENGE_EXPIRED'
+  // User 에러 (스킨 — D-003)
+  | 'USER_SKIN_NOT_OWNED'
+  | 'USER_SKIN_UNKNOWN';
 
 // ==================== 에러 코드별 메시지 매핑 ====================
 
@@ -118,6 +121,9 @@ export const ERROR_CODE_MESSAGES: Record<ErrorCode, string> = {
   GAME_WEEKLY_UNAVAILABLE: '지금은 주간 도전을 열 수 없습니다. 무한 모드는 그대로 할 수 있어요.',
   GAME_DAILY_UNAVAILABLE: '지금은 오늘의 테트리스를 열 수 없습니다. 일반 판은 그대로 할 수 있어요.',
   GAME_CHALLENGE_EXPIRED: '지난 버전 게임의 기록이라 도전할 수 없습니다.',
+  // User 에러 (스킨)
+  USER_SKIN_NOT_OWNED: '아직 얻지 않은 스킨입니다.',
+  USER_SKIN_UNKNOWN: '없는 스킨입니다.',
 };
 
 // ==================== API 에러 클래스 ====================
