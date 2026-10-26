@@ -12,6 +12,9 @@ vi.mock('@/services/gameService', () => ({
   submitGameScore: (...a: unknown[]) => submitGameScore(...a),
 }));
 
+const startLogin = vi.fn();
+vi.mock('@/app/auth/useKakaoLogin', () => ({ useKakaoLogin: () => ({ start: startLogin, isStarting: false }) }));
+
 const replay = { engineVersion: 1, frames: 300, inputs: [0, 0] };
 const props = {
   game: TEST_GAME,
@@ -98,6 +101,26 @@ describe('ScoreSubmitPanel — 게임 사양·보드를 따른다', () => {
     });
     expect(TEST_GAME.storage.loadPendingSubmissions().map((p) => [p.sessionId, p.score])).toEqual([['sess', 3_000_000]]);
     expect(screen.getByRole('button', { name: '다시 등록하기' })).toBeTruthy();
+  });
+
+  it('로그인 만료(401)면 익명으로 내지 않고 보관하고 다시 로그인하게 — 재로그인 뒤 시작 화면에서 보관분을 내 기록으로 등록 (USER_ID 누락)', async () => {
+    submitGameScore.mockRejectedValue(new ApiError('AUTH_UNAUTHORIZED', '인증 만료', 401));
+    await act(async () => {
+      render(<ScoreSubmitPanel {...props} accessToken="expired" />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
+    });
+    expect(submitGameScore).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('alert').textContent).toBe('로그인이 만료됐어요. 다시 로그인하면 등록됩니다.');
+    expect(TEST_GAME.storage.loadPendingSubmissions().map((p) => p.sessionId)).toEqual(['sess']);
+    // 같은 만료 토큰으로 다시 내지 않는다 — 다시 등록 버튼 대신 로그인
+    expect(screen.queryByRole('button', { name: '다시 등록하기' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '다시 로그인하고 등록하기' }));
+    expect(startLogin).toHaveBeenCalledWith({ callbackUrl: '/games/defense' });
+    // 다시 하기를 눌러도 보관분은 남는다
+    fireEvent.click(screen.getByRole('button', { name: '다시 하기' }));
+    expect(TEST_GAME.storage.loadPendingSubmissions().map((p) => p.sessionId)).toEqual(['sess']);
   });
 
   it('게임 오버 순간 기록을 보관한다 — 등록 전에 새로고침·뒤로가기를 해도 남는다, 등록하면 지운다 (FE-05)', async () => {

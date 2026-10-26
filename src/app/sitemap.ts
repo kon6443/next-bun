@@ -51,6 +51,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.7,
     },
     {
+      url: `${SITE_CONFIG.url}/games/tetris/skins`,
+      lastModified: GAMES_UPDATED,
+      changeFrequency: 'monthly',
+      priority: 0.5,
+    },
+    {
       url: `${SITE_CONFIG.url}/games/defense`,
       lastModified: GAMES_UPDATED,
       changeFrequency: 'monthly',

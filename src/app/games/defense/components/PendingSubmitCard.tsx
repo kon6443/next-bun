@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
 import type { PendingSubmission } from "@/app/games/_shared/lib/storage";
 import { classifySubmitError } from "@/app/games/_shared/lib/submitError";
+import { ReloginButton } from "@/app/games/_shared/components/ReloginButton";
 import { submitGameScore } from "@/services/gameService";
 import { defenseStorage, formatDefenseScore } from "../lib/defenseGame";
 
@@ -20,6 +21,8 @@ export function PendingSubmitCard() {
   const [needsNewName, setNeedsNewName] = useState(false);
   const [name, setName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  /** 재등록이 로그인 만료(401)로 거절됐다 — 다시 로그인한 뒤 내 기록으로 등록한다 */
+  const [needsLogin, setNeedsLogin] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const pending = list[0] ?? null;
   // 게임 오버 순간 이름 없이 보관한 기록(기본 이름이 없었다)이면 이름부터 묻는다 (games-polish FE-05)
@@ -51,6 +54,7 @@ export function PendingSubmitCard() {
     retryingRef.current = true;
     setRetrying(true);
     setMessage(null);
+    setNeedsLogin(false);
     try {
       const { data } = await submitGameScore("defense", { sessionId: pending.sessionId, playerName, replay: pending.replay }, accessToken);
       defenseStorage.addMyScoreId(data.scoreId);
@@ -60,6 +64,7 @@ export function PendingSubmitCard() {
     } catch (err) {
       // 보관된 기록은 앞서 한 번 실패한 제출의 재시도다
       const { kind, message: text } = classifySubmitError(err, true);
+      setNeedsLogin(kind === "auth");
       if (kind === "final") drop(pending.sessionId);
       else if (kind === "name") {
         setNeedsNewName(true);
@@ -132,6 +137,7 @@ export function PendingSubmitCard() {
       <p role="status" className="mt-2 text-sm text-slate-300 empty:hidden">
         {message}
       </p>
+      {needsLogin && <ReloginButton className="mt-2" />}
     </section>
   );
 }

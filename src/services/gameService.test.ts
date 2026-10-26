@@ -97,21 +97,21 @@ describe('gameService', () => {
     expect((err as Error).name).toBe('NetworkError');
   });
 
-  it('세션: 만료 토큰이라 401이면 전역 로그아웃 없이, 스로틀 창(1.1초)을 피해 토큰 없이 1회 재시도', async () => {
-    vi.useFakeTimers();
-    fetchMock
-      .mockResolvedValueOnce(json({ code: 'AUTH_UNAUTHORIZED', message: 'x', timestamp: 't' }, 401))
-      .mockResolvedValueOnce(json({ code: 'SUCCESS', message: 'ok', data: { sessionId: 's' } }, 201));
-    const pending = createGameSession('tetris', 'expired');
-    await vi.advanceTimersByTimeAsync(1099);
+  it('세션: 만료 토큰이라 401이면 토큰 없이 다시 보내지 않고 401을 던진다 — 로그인 사용자 세션이 익명으로 발급되지 않게, 전역 로그아웃 없이', async () => {
+    fetchMock.mockResolvedValueOnce(json({ code: 'AUTH_UNAUTHORIZED', message: 'x', timestamp: 't' }, 401));
+    const err = await createGameSession('tetris', 'expired').catch((e) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err).toMatchObject({ code: 'AUTH_UNAUTHORIZED', status: 401 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(1);
-    const { data } = await pending;
-    vi.useRealTimers();
-    expect(data.sessionId).toBe('s');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer expired');
-    expect(fetchMock.mock.calls[1][1].headers.Authorization).toBeUndefined();
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it('제출: 만료 토큰이라 401이면 익명으로 다시 내지 않고 401을 던진다 — 호출부가 보관·재로그인 안내', async () => {
+    fetchMock.mockResolvedValueOnce(json({ code: 'AUTH_UNAUTHORIZED', message: 'x', timestamp: 't' }, 401));
+    const err = await submitGameScore('tetris', { sessionId: 's', playerName: 'n', replay }, 'expired').catch((e) => e);
+    expect(err).toMatchObject({ code: 'AUTH_UNAUTHORIZED', status: 401 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(onUnauthorized).not.toHaveBeenCalled();
   });
 
@@ -180,18 +180,14 @@ describe('gameService', () => {
       expect(err).toMatchObject({ code: 'GAME_VERIFY_BUSY', status: 503 });
     });
 
-    it('토큰이 401로 거절된 제출은 BUSY 자동 재시도에 토큰을 다시 싣지 않는다 — 401 대기가 겹치지 않게 (FE-50)', async () => {
-      fetchMock
-        .mockResolvedValueOnce(json({ code: 'AUTH_UNAUTHORIZED', message: 'x', timestamp: 't' }, 401))
-        .mockResolvedValueOnce(busy({ 'Retry-After': '2' }))
-        .mockResolvedValueOnce(json({ code: 'SUCCESS', message: 'ok', data: { scoreId: 9 } }, 201));
-      const pending = submitGameScore('tetris', { sessionId: 's', playerName: 'n', replay }, 'expired');
-      await vi.advanceTimersByTimeAsync(1100 + 2000);
+    it('토큰을 실은 제출은 BUSY 자동 재시도에도 같은 토큰을 싣는다', async () => {
+      fetchMock.mockResolvedValueOnce(busy({ 'Retry-After': '2' })).mockResolvedValueOnce(json({ code: 'SUCCESS', message: 'ok', data: { scoreId: 9 } }, 201));
+      const pending = submitGameScore('tetris', { sessionId: 's', playerName: 'n', replay }, 'tok');
+      await vi.advanceTimersByTimeAsync(2000);
       const { data } = await pending;
       expect(data.scoreId).toBe(9);
-      expect(fetchMock).toHaveBeenCalledTimes(3);
-      expect(fetchMock.mock.calls[0][1].headers.Authorization).toBeDefined();
-      expect(fetchMock.mock.calls[2][1].headers.Authorization).toBeUndefined();
+      expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer tok');
+      expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe('Bearer tok');
     });
 
     it('첫 시도가 이미 오래 걸렸으면 BUSY여도 자동 재시도하지 않는다 — 호출부가 보관·다시 등록으로 (FE-50)', async () => {

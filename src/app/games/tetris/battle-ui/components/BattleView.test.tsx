@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { useBattlePlay } from '../hooks/useBattlePlay';
 // MiniBoard는 CSS 모듈을 써서 vitest(Tailwind PostCSS)로 읽지 못한다 — 기준점·크기만 남긴 대역
 vi.mock('./MiniBoard', () => ({
@@ -148,3 +148,94 @@ describe('BattleView 이모트 창 (games-polish FE-31)', () => {
   });
 });
 
+
+describe('BattleView 미니보드 칸 — 가로 휴대폰 (보드 크기 A0)', () => {
+  /** 매체 질의 대역 — 넓음(폭 640 이상)만 맞고 높이는 낮은 화면(844×390 가로 휴대폰) */
+  const landscapePhone = () =>
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({
+          matches: query.includes('min-width: 640px') && !query.includes('min-height'),
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    );
+
+  it('폭만 넓고 높이가 낮으면 작은 칸 — 큰 미니보드가 헤더를 키워 판이 잘리지 않게', () => {
+    const spy = landscapePhone();
+    render(
+      <BattleView play={play} meId="p1" opponents={[opponent('p2', '친구')]} emotes={{}} trailsRootRef={{ current: null }} onEmote={vi.fn()} onExit={vi.fn()} />,
+    );
+    expect(screen.getByText('친구').getAttribute('data-cell')).toBe('6');
+    spy.mockRestore();
+  });
+});
+
+describe('BattleView 상대 판 자리 — 세로 화면 높이가 한계면 판 옆 줄 (보드 크기 A)', () => {
+  const media = (portrait: boolean) =>
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({ matches: query === '(orientation: portrait)' ? portrait : false, media: query, addEventListener: () => {}, removeEventListener: () => {} }) as unknown as MediaQueryList,
+    );
+  /** 판 영역(헤더·패드를 뺀 줄) 크기 — 모든 요소가 같은 크기를 돌려주지만 판정은 이 줄만 잰다 */
+  const rowSize = (width: number, height: number) =>
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width, height, top: 0, left: 0, right: width, bottom: height, x: 0, y: 0, toJSON: () => ({}) });
+  const renderOne = () =>
+    render(
+      <BattleView play={play} meId="p1" opponents={[opponent('p2', '친구')]} emotes={{}} trailsRootRef={{ current: null }} onEmote={vi.fn()} onExit={vi.fn()} />,
+    );
+
+  it('375×667 1명(판 영역 375×292, 높이가 한계) — 옆 줄로 옮긴다: 셀 12 → 17 계산, 미니보드는 공격 궤적 기준점 그대로', () => {
+    const spies = [media(true), rowSize(375, 292)];
+    renderOne();
+    expect(screen.getByTestId('opponents-side')).toBeInTheDocument();
+    expect(screen.queryByTestId('opponents-header')).toBeNull();
+    expect(screen.getByText('친구').closest('[data-attack-anchor]')?.getAttribute('data-attack-anchor')).toBe('p2');
+    spies.forEach((s) => s.mockRestore());
+  });
+
+  it('390×844 1명(판 영역 390×463, 폭이 한계) — 헤더 그대로: 옆 줄이면 셀이 20 → 18로 준다', () => {
+    const spies = [media(true), rowSize(390, 463)];
+    renderOne();
+    expect(screen.getByTestId('opponents-header')).toBeInTheDocument();
+    spies.forEach((s) => s.mockRestore());
+  });
+
+  it('가로 화면은 대상이 아니다 — 높이가 한계여도 헤더 그대로', () => {
+    const spies = [media(false), rowSize(844, 161)];
+    renderOne();
+    expect(screen.getByTestId('opponents-header')).toBeInTheDocument();
+    spies.forEach((s) => s.mockRestore());
+  });
+
+  it('옆 줄에서 다시 잴 때도 같은 기준 — 같은 화면은 그대로 두고(진동 없음), 판 영역이 높아지면 헤더로 돌아간다', () => {
+    const callbacks: (() => void)[] = [];
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(cb: () => void) {
+          callbacks.push(cb);
+        }
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    const spies = [media(true), rowSize(375, 292)];
+    renderOne();
+    expect(screen.getByTestId('opponents-side')).toBeInTheDocument();
+    // 옆 줄이 되면 헤더 미니보드가 빠져 판 영역(옆 줄 포함)이 375×389로 잰다 — 헤더로 돌아가면 다시 12라 옆 줄 유지
+    spies[1].mockRestore();
+    spies[1] = rowSize(375, 389);
+    act(() => callbacks.forEach((cb) => cb()));
+    expect(screen.getByTestId('opponents-side')).toBeInTheDocument();
+    // 판 영역이 충분히 높아지면(390×560 — 헤더 배치면 20, 옆 줄이면 18) 헤더로
+    spies[1].mockRestore();
+    spies[1] = rowSize(390, 560);
+    act(() => callbacks.forEach((cb) => cb()));
+    expect(screen.getByTestId('opponents-header')).toBeInTheDocument();
+    spies.forEach((sp) => sp.mockRestore());
+    vi.unstubAllGlobals();
+  });
+});

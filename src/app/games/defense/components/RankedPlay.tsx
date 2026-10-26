@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
 import { extractErrorMessage } from "@/app/utils/errorUtils";
 import { createGameSession } from "@/services/gameService";
+import { SESSION_AUTH_EXPIRED_MESSAGE, isAuthExpired } from "@/app/games/_shared/lib/submitError";
 import { ApiError } from "@/types/api";
 import { ENGINE_VERSION, MAX_INPUT_LENGTH, MAX_TICKS, resolveBoard, scoreOf } from "../engine";
 import { type PlayResult } from "../hooks/useDefensePlay";
@@ -45,6 +46,8 @@ const OTHER_SLOT_NOTICE = "웨이브를 시작하면 다른 판의 이어하기 
 const EXPIRED_MESSAGE = "세션 시간이 지나 이번 판은 랭킹에 등록할 수 없어요.";
 
 function sessionErrorMessage(err: unknown): string {
+  // 로그인 토큰이 거절됐다 — 익명 세션으로 바꿔 받지 않는다(기록이 내 것이 아니게 된다)
+  if (isAuthExpired(err)) return SESSION_AUTH_EXPIRED_MESSAGE;
   // 서버가 이유를 아는 503(세션 저장소·주간 비활성)은 그 문구 그대로 — 그 밖은 이유 + 등록 없이 플레이
   if (err instanceof ApiError && (err.code === "GAME_SESSION_UNAVAILABLE" || err.code === "GAME_WEEKLY_UNAVAILABLE")) return err.getDefaultMessage();
   return `${extractErrorMessage(err, "랭킹 등록을 준비하지 못했습니다.")} 이번 판은 등록 없이 플레이해요.`;

@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useRef } from "react";
 import { BOARD_COLS, BOARD_VISIBLE_ROWS } from "@/types/tetrisBattleSocket";
-import { CELL_COLORS } from "../../lib/blockSprites";
+import { blockSkin, boardSkin } from "../../lib/skins";
 import { useReducedEffects } from "../../hooks/useReducedEffects";
 import fx from "./battleFx.module.css";
 import { PresenceDot } from "./PresenceDot";
@@ -27,6 +27,9 @@ export type MiniBoardProps = {
   online?: boolean;
   /** 공격 궤적 도착점 — 크게 본 사본은 false(같은 playerId 기준점이 둘이 되지 않게) */
   anchor?: boolean;
+  /** 판 주인(상대)의 스킨 — 서버 players[].skins의 block·board. 없으면 기본 */
+  blockSkinId?: string;
+  boardSkinId?: string;
 };
 
 /**
@@ -45,6 +48,8 @@ export const MiniBoard = memo(function MiniBoard({
   cell,
   online = true,
   anchor = true,
+  blockSkinId,
+  boardSkinId,
 }: MiniBoardProps) {
   const reduced = useReducedEffects();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -65,18 +70,19 @@ export const MiniBoard = memo(function MiniBoard({
       canvas.height = h;
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = "rgba(15, 23, 42, 0.95)";
+    const colors = blockSkin(blockSkinId).cells;
+    ctx.fillStyle = boardSkin(boardSkinId).miniBoard;
     ctx.fillRect(0, 0, width, height);
     if (!cells) return;
     for (let row = 0; row < BOARD_VISIBLE_ROWS; row++) {
       for (let col = 0; col < BOARD_COLS; col++) {
         const value = cells[row * BOARD_COLS + col];
         if (value === 0) continue;
-        ctx.fillStyle = CELL_COLORS[value] ?? CELL_COLORS[8];
+        ctx.fillStyle = colors[value] ?? colors[8];
         ctx.fillRect(col * cell, row * cell, cell - (cell > 4 ? 1 : 0), cell - (cell > 4 ? 1 : 0));
       }
     }
-  }, [cells, cell, width, height]);
+  }, [cells, cell, width, height, blockSkinId, boardSkinId]);
 
   return (
     <figure className="flex min-w-0 flex-col items-center gap-1" data-attack-anchor={anchor ? playerId : undefined}>

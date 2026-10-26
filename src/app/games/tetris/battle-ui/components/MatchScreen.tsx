@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmModal } from "@/app/components/ConfirmModal";
 import { Button } from "@/app/teams/components";
 import { type MatchResultEntry, type RoomPlayer, type RoomStatus, TetrisBattleErrorCodes } from "@/types/tetrisBattleSocket";
@@ -11,6 +11,8 @@ import type { useBattlePlay } from "../hooks/useBattlePlay";
 import { battleErrorMessage } from "../lib/battleErrors";
 import { BattleView } from "./BattleView";
 import { useReducedEffects } from "../../hooks/useReducedEffects";
+import { useMySkins } from "../../hooks/useMySkins";
+import { type BoardSkins, toBoardSkins } from "../../lib/skins";
 import fx from "./battleFx.module.css";
 import { getSoundPlayer } from "../../lib/sound/soundPlayer";
 import { MatchRecordLinks } from "./MatchRecordLinks";
@@ -71,11 +73,23 @@ export function MatchScreen({
   const alive = opponents.filter((o) => o.place === null && !o.out);
   const target = targetId ?? (alive.length === 1 ? alive[0].playerId : null);
   // 미니보드 props — 채팅·이모트 등 다른 변경에는 같은 객체를 넘겨 memo된 판이 다시 그려지지 않게 (FE-19)
-  // 방에 없으면(나갔거나 정리됨) 오프라인으로 보인다
+  // 방에 없으면(나갔거나 정리됨) 오프라인으로 보인다. 상대 판은 상대의 보드 스킨(players[].skins, 없으면 기본 — D-003)
+  // 방을 나간 상대(목록에서 정리됨)의 판도 경기 중에는 그 사람 스킨 그대로 — 마지막으로 본 값을 기억한다(렌더 뒤 effect에서 — 렌더는 순수하게)
+  const knownSkinsRef = useRef(new Map<string, BoardSkins>());
+  useEffect(() => {
+    for (const p of roomPlayers) if (p.skins) knownSkinsRef.current.set(p.playerId, toBoardSkins(p.skins));
+  }, [roomPlayers]);
   const opponentViews = useMemo(() => {
-    const online = new Map(roomPlayers.map((p) => [p.playerId, p.connected]));
-    return opponents.map((o) => ({ ...o, isTarget: o.playerId === target, online: online.get(o.playerId) ?? false }));
+    const byId = new Map(roomPlayers.map((p) => [p.playerId, p]));
+    return opponents.map((o) => {
+      const player = byId.get(o.playerId);
+      // 방에 있으면 지금 값, 정리됐으면 기억한 값
+      const skins = player?.skins ? toBoardSkins(player.skins) : (knownSkinsRef.current.get(o.playerId) ?? toBoardSkins(undefined));
+      return { ...o, isTarget: o.playerId === target, online: player?.connected ?? false, blockSkinId: skins.block, boardSkinId: skins.board };
+    });
   }, [opponents, target, roomPlayers]);
+  const { equipped } = useMySkins();
+  const mySkins = useMemo(() => ({ block: equipped.block, effect: equipped.effect, board: equipped.board }), [equipped.block, equipped.effect, equipped.board]);
 
   const overlay =
     phase.kind === "countdown" ? (
@@ -118,6 +132,7 @@ export function MatchScreen({
       play={play}
       meId={myPlayerId}
       opponents={opponentViews}
+      skins={mySkins}
       emotes={emotes}
       trailsRootRef={trailsRootRef}
       onEmote={(id) => void sendEmote(id)}

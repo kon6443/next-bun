@@ -17,16 +17,22 @@ vi.mock('../contexts/BattleSocketContext', () => ({
     sendChat: (text: string) => sendChat(text),
   }),
 }));
-// 대전 화면은 덮개·아래 줄만 확인한다
+// 대전 화면은 덮개·아래 줄과 넘긴 props(보드 스킨)만 확인한다
+const battleViewProps = vi.hoisted(() => vi.fn());
 vi.mock('./BattleView', () => ({
-  BattleView: ({ overlay, footer }: { overlay?: ReactNode; footer?: ReactNode }) => (
-    <div>
-      <div data-testid="overlay">{overlay}</div>
-      {footer}
-    </div>
-  ),
+  BattleView: (props: { overlay?: ReactNode; footer?: ReactNode }) => {
+    battleViewProps(props);
+    return (
+      <div>
+        <div data-testid="overlay">{props.overlay}</div>
+        {props.footer}
+      </div>
+    );
+  },
 }));
 
+// 내 보드 스킨(useMySkins)은 세션을 본다 — 게스트로 둔다(기본 스킨)
+vi.mock('next-auth/react', () => ({ useSession: () => ({ data: null, status: 'unauthenticated' }) }));
 // 기록 링크는 공개 대기 폴링(fetch)을 한다 — 렌더 여부만 본다
 vi.mock('./MatchRecordLinks', () => ({
   MatchRecordLinks: ({ matchId }: { matchId: string }) => <a data-testid="record-links">{matchId}</a>,
@@ -111,5 +117,68 @@ describe('MatchScreen 결과 기록 링크 (games-polish FE-24)', () => {
   it('매치 id를 모르면(끊긴 사이 종료) 링크가 없다', () => {
     renderScreen({ kind: 'ended', matchId: null, results: [] });
     expect(screen.queryByTestId('record-links')).toBeNull();
+  });
+});
+
+describe('MatchScreen 보드 스킨 (D-003)', () => {
+  it('상대 판은 그 상대의 players[].skins(block·board), 정보가 없으면(이전 서버·방을 나감) 기본', () => {
+    const opponent = (playerId: string) => ({ playerId, name: playerId, cells: null, pending: 0, isTarget: false, place: null, kos: 0 });
+    render(
+      <MatchScreen
+        phase={{ kind: 'playing', matchId: 'm1' }}
+        play={{} as ReturnType<typeof useBattlePlay>}
+        myPlayerId="p1"
+        isHost={false}
+        opponents={[opponent('p2'), opponent('p3'), opponent('p4')]}
+        targetId={null}
+        myKos={0}
+        replaySubmit={null}
+        trailsRootRef={{ current: null }}
+        roomPlayers={[
+          { playerId: 'p2', name: 'p2', ready: true, connected: true, isGuest: false, skins: { block: 'neon', effect: 'neon', board: 'gameboy' } },
+          { playerId: 'p3', name: 'p3', ready: true, connected: true, isGuest: true },
+        ]}
+        roomStatus="PLAYING"
+        connection="connected"
+        onReconnect={vi.fn()}
+        onExit={vi.fn()}
+      />,
+    );
+    const { opponents, skins } = battleViewProps.mock.lastCall![0] as {
+      opponents: { playerId: string; blockSkinId: string; boardSkinId: string }[];
+      skins: { block: string };
+    };
+    expect(opponents.map((o) => [o.playerId, o.blockSkinId, o.boardSkinId])).toEqual([
+      ['p2', 'neon', 'gameboy'],
+      ['p3', 'default', 'default'],
+      ['p4', 'default', 'default'],
+    ]);
+    // 내 판은 내 장착 — 게스트면 기본
+    expect(skins).toEqual({ block: 'default', effect: 'default', board: 'default' });
+  });
+
+  it('경기 중 방을 나간 상대(목록에서 정리됨)의 판은 마지막으로 본 그 사람 스킨 그대로', () => {
+    const opponent = { playerId: 'p2', name: 'p2', cells: null, pending: 0, isTarget: false, place: null, kos: 0 };
+    const props = {
+      phase: { kind: 'playing', matchId: 'm1' } as const,
+      play: {} as ReturnType<typeof useBattlePlay>,
+      myPlayerId: 'p1',
+      isHost: false,
+      opponents: [opponent],
+      targetId: null,
+      myKos: 0,
+      replaySubmit: null,
+      trailsRootRef: { current: null },
+      roomStatus: 'PLAYING' as const,
+      connection: 'connected' as const,
+      onReconnect: vi.fn(),
+      onExit: vi.fn(),
+    };
+    const { rerender } = render(
+      <MatchScreen {...props} roomPlayers={[{ playerId: 'p2', name: 'p2', ready: true, connected: true, isGuest: false, skins: { block: 'neon', effect: 'neon', board: 'gameboy' } }]} />,
+    );
+    rerender(<MatchScreen {...props} roomPlayers={[]} />);
+    const { opponents } = battleViewProps.mock.lastCall![0] as { opponents: { blockSkinId: string; boardSkinId: string; online: boolean }[] };
+    expect(opponents[0]).toMatchObject({ blockSkinId: 'neon', boardSkinId: 'gameboy', online: false });
   });
 });
