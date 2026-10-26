@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createGameSession, getGameBoards, getHallOfFame, getGameRankings, getGameReplay, getGameScore, getPopularReplays, RANKING_TIMEOUT_MS, recordReplayView, reportReplayWatch, SESSION_TIMEOUT_MS, submitGameScore } from './gameService';
+import { createGameSession, getGameBoards, getHallOfFame, getGameRankings, getGameReplay, getGameScore, getMyBestScore, getPopularReplays, RANKING_TIMEOUT_MS, recordReplayView, reportReplayWatch, SESSION_TIMEOUT_MS, submitGameScore } from './gameService';
 import { ApiError } from '@/types/api';
 
 // 서비스 → FetchService → fetch 경로 전체를 실제로 타고, 네트워크만 stub 한다 (백엔드 API 준비 전 mock)
@@ -339,5 +339,54 @@ describe('gameService', () => {
     await getHallOfFame('tetris');
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/v1\/games\/tetris\/hall-of-fame$/);
     expect(fetchMock.mock.calls[0][1].signal).toBeDefined();
+  });
+
+  describe('선택 인증 조회 — 로그인이면 isMine을 받는다', () => {
+    const list = () => json({ code: 'SUCCESS', message: 'ok', data: { items: [], periodStart: null } });
+
+    it('토큰을 넘기면 Bearer로, 안 넘기면 Authorization 없이 — 랭킹·기록·인기 리플레이·명예의 전당', async () => {
+      fetchMock.mockImplementation(() => Promise.resolve(list()));
+      await getGameRankings('tetris', 'daily', 5, undefined, 'tok');
+      await getGameScore('tetris', 7, 'tok');
+      await getPopularReplays('tetris', { period: 'daily', sort: 'views', limit: 5 }, 'tok');
+      await getHallOfFame('tetris', 'tok');
+      for (const [, init] of fetchMock.mock.calls) expect(init.headers.Authorization).toBe('Bearer tok');
+      fetchMock.mockClear();
+      await getGameRankings('tetris', 'daily', 5);
+      expect(fetchMock.mock.calls[0][1].headers.Authorization).toBeUndefined();
+    });
+
+    it('토큰을 실은 조회가 401이면(배포 전 백엔드·회귀) 토큰 없이 한 번 더 부르고, 전역 로그아웃 알림은 내지 않는다', async () => {
+      fetchMock
+        .mockResolvedValueOnce(json({ code: 'UNAUTHORIZED', message: 'x', timestamp: 't' }, 401))
+        .mockResolvedValueOnce(list());
+      const { data } = await getGameRankings('tetris', 'daily', 5, undefined, 'expired');
+      expect(data.items).toEqual([]);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer expired');
+      expect(fetchMock.mock.calls[1][1].headers.Authorization).toBeUndefined();
+      expect(onUnauthorized).not.toHaveBeenCalled();
+    });
+
+    it('토큰 없는 조회의 401은 다시 부르지 않는다', async () => {
+      fetchMock.mockResolvedValue(json({ code: 'UNAUTHORIZED', message: 'x', timestamp: 't' }, 401));
+      await expect(getGameRankings('tetris', 'daily', 5)).rejects.toBeInstanceOf(ApiError);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('내 최고 점수: board를 주면 쿼리로, 생략하면 쿼리 없이 — 토큰을 싣고, 404(배포 전)는 throw · 401은 로그아웃 알림 없이 throw', async () => {
+      fetchMock.mockImplementation(() => Promise.resolve(json({ code: 'SUCCESS', message: 'ok', data: { score: 10, scoreId: 1, boardKey: 'default' } })));
+      await getMyBestScore('tetris', 'tok');
+      await getMyBestScore('tetris', 'tok', 'daily-2026-10-26');
+      expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/v1\/games\/tetris\/me\/best$/);
+      expect(fetchMock.mock.calls[1][0]).toMatch(/\/api\/v1\/games\/tetris\/me\/best\?board=daily-2026-10-26$/);
+      expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer tok');
+      fetchMock.mockReset();
+      fetchMock.mockResolvedValueOnce(json({ code: 'NOT_FOUND', message: 'x', timestamp: 't' }, 404));
+      await expect(getMyBestScore('tetris', 'tok')).rejects.toBeInstanceOf(ApiError);
+      fetchMock.mockResolvedValueOnce(json({ code: 'UNAUTHORIZED', message: 'x', timestamp: 't' }, 401));
+      await expect(getMyBestScore('tetris', 'tok')).rejects.toBeInstanceOf(ApiError);
+      expect(onUnauthorized).not.toHaveBeenCalled();
+    });
   });
 });

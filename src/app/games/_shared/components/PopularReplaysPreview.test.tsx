@@ -21,7 +21,7 @@ describe('PopularReplaysPreview — 홈 "오늘 많이 본 리플레이"', () =>
     await act(async () => {
       render(<PopularReplaysPreview game={TEST_GAME} myScoreIds={new Set()} />);
     });
-    expect(getPopularReplays).toHaveBeenCalledWith('defense', { period: 'daily', sort: 'views', limit: 5 });
+    expect(getPopularReplays).toHaveBeenCalledWith('defense', { period: 'daily', sort: 'views', limit: 5 }, undefined);
     expect(screen.getByText('· 조회 8')).toBeTruthy();
     expect(screen.getByRole('link', { name: /리플레이 보기/ }).getAttribute('href')).toBe('/games/defense/replays/5');
   });
