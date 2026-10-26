@@ -22,6 +22,19 @@ describe('블록 스프라이트 캐시 (games-polish FE-22 — 숫자 키)', ()
     expect(sprites[1]!.width).toBe(21);
   });
 
+  it('스킨이 다르면 다른 캔버스 — 같은 칸·크기여도 섞이지 않는다(판마다 주인 스킨)', () => {
+    const skins = ['default', 'gameboy', 'neon', 'high-contrast'] as const;
+    const blocks = skins.map((skin) => getBlockSprite(3, 20, 1, skin));
+    const glows = skins.map((skin) => getGlowSprite(3, 20, 1, skin));
+    expect(new Set(blocks).size).toBe(4);
+    expect(new Set(glows).size).toBe(4);
+    // 스킨을 생략하면 기본 스킨과 같은 것
+    expect(getBlockSprite(3, 20, 1)).toBe(blocks[0]);
+    expect(getGlowSprite(3, 20, 1)).toBe(glows[0]);
+    // 다른 스킨을 그린 뒤에도 같은 스킨은 같은 것을 다시 쓴다
+    expect(getBlockSprite(3, 20, 1, 'neon')).toBe(blocks[2]);
+  });
+
   it('발광 스프라이트는 블록과 따로 — 같은 칸·크기여도 다른 캔버스', () => {
     expect(getGlowSprite(3, 20, 1)).not.toBe(getBlockSprite(3, 20, 1));
     expect(getGlowSprite(3, 20, 1)).toBe(getGlowSprite(3, 20, 1));

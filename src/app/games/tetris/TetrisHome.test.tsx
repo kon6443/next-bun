@@ -15,6 +15,7 @@ vi.mock('./battle-ui/components/RecentBattles', () => ({ RecentBattles: () => nu
 vi.mock('@/app/games/_shared/components/PopularReplaysPreview', () => ({ PopularReplaysPreview: () => null }));
 vi.mock('./components/DailyCard', () => ({ DailyCard: () => null }));
 
+import { ApiError } from '@/types/api';
 import TetrisHome from './TetrisHome';
 import { tetrisStorage } from './lib/storage';
 
@@ -60,5 +61,20 @@ describe('TetrisHome 설정 (games-polish FE-52)', () => {
     // 제출 본문에는 보드를 싣지 않는다(DTO 밖 필드는 422)
     expect(submitGameScore).toHaveBeenCalledWith('tetris', { sessionId: 's2', playerName: '테스터', replay: expect.anything() }, undefined);
     expect(screen.getByText('등록했어요! 10/24 데일리 3위')).toBeTruthy();
+  });
+
+  it('보관분 재등록이 로그인 만료(401)면 보관을 지우지 않고 다시 로그인 버튼을 준다', async () => {
+    window.localStorage.clear();
+    tetrisStorage.savePendingSubmission({ sessionId: 's3', playerName: '테스터', replay: { frames: 1, inputs: [], das: 10, arr: 2, engineVersion: 1 } as never, score: 500, savedAt: 1 });
+    submitGameScore.mockRejectedValue(new ApiError('AUTH_UNAUTHORIZED', '만료', 401));
+    await act(async () => {
+      render(<TetrisHome />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '다시 등록하기' }));
+    });
+    expect(screen.getByText('로그인이 만료됐어요. 다시 로그인하면 등록됩니다.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '다시 로그인' })).toBeTruthy();
+    expect(tetrisStorage.loadPendingSubmissions().map((p) => p.sessionId)).toEqual(['s3']);
   });
 });

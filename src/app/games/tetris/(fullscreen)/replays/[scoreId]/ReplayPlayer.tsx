@@ -8,6 +8,7 @@ import { extractErrorMessage } from "@/app/utils/errorUtils";
 import { formatFullDateTime } from "@/app/utils/taskUtils";
 import { ACTION, ENGINE_VERSION, FRAMES_PER_SECOND, type GameState, createGame, stepFrame } from "../../../engine";
 import { TetrisCanvas } from "../../../components/TetrisCanvas";
+import { toBoardSkins } from "../../../lib/skins";
 import { ShareMenu } from "@/app/games/_shared/components/ShareMenu";
 import { useKakaoReady } from "@/app/games/_shared/hooks/useKakaoReady";
 import { buildShareContent } from "@/app/games/_shared/lib/shareSpec";
@@ -401,7 +402,8 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
 
       {/* 루트 layout이 이미 <main>으로 감싼다 — 중첩하지 않는다 */}
       <div className="relative min-h-0 flex-1">
-        <TetrisCanvas stateRef={stateRef} drawRef={drawRef} effectsRef={effectsRef} />
+        {/* 기록 주인의 보드 스킨(D-003) — 이전 서버·익명이면 기본 */}
+        <TetrisCanvas stateRef={stateRef} drawRef={drawRef} effectsRef={effectsRef} skins={toBoardSkins(loadedData?.skins)} />
         <KeyOverlay pressed={pressed} />
       </div>
 

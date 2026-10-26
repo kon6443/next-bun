@@ -26,11 +26,6 @@ const session = (mode: 'endless' | 'weekly', boardKey: string) => ({
 const linkAttrs = (rest: Record<string, unknown>) => Object.fromEntries(Object.entries(rest).filter(([key]) => key !== 'replace' && key !== 'scroll'));
 vi.mock('next/link', () => ({ default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...linkAttrs(rest)}>{children}</a> }));
 
-class FakeResizeObserver {
-  observe() {}
-  disconnect() {}
-}
-
 /** 무한 판을 첫 증강 대기까지 돌려 이어하기로 저장 */
 function saveEndlessAtAugment(): GameDriver {
   const driver = GameDriver.fromBoard('endless', 'endless-s1', 7);
@@ -83,12 +78,10 @@ describe('RankedPlay — 무한·주간 입구', () => {
     createGameSession.mockReset();
     submitGameScore.mockReset();
     getGameRankings.mockReset().mockResolvedValue({ code: 'SUCCESS', message: '', data: { boardKey: 'endless-s1', items: [], periodStart: null } });
-    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 360, height: 600, top: 0, left: 0, right: 360, bottom: 600, x: 0, y: 0, toJSON: () => ({}) });
   });
   afterEach(() => {
-    vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 

@@ -11,6 +11,7 @@ import { HighlightMarks, HighlightNav } from "@/app/games/_shared/components/Hig
 import type { HighlightKindSpec } from "@/app/games/_shared/lib/highlights";
 import { FRAMES_PER_SECOND } from "../../engine";
 import { TetrisCanvas } from "../../components/TetrisCanvas";
+import { toBoardSkins } from "../../lib/skins";
 import { SoundButton } from "@/app/games/_shared/components/SoundButton";
 import { useReducedEffects } from "../../hooks/useReducedEffects";
 import { getSoundPlayer } from "../../lib/sound/soundPlayer";
@@ -450,7 +451,7 @@ function ReplayBoard({
           boardProps.role ? "cursor-zoom-in focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400" : ""
         }`}
       >
-        {runner && <TetrisCanvas stateRef={track.stateRef} drawRef={track.drawRef} garbageRef={track.garbageRef} />}
+        {runner && <TetrisCanvas stateRef={track.stateRef} drawRef={track.drawRef} garbageRef={track.garbageRef} skins={toBoardSkins(player.skins)} />}
         {message && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-2 text-center text-sm text-slate-500">
             {message}

@@ -72,3 +72,19 @@ describe('TetrisCanvas DPR (games-polish FE-19)', () => {
   });
 });
 
+describe('TetrisCanvas 보드 스킨 (D-003)', () => {
+  it('판 주인 스킨을 drawGame에 넘기고, 스킨이 바뀌면 멈춘 화면도 다시 그린다 — 값이 같은 새 객체면 다시 그리지 않는다', () => {
+    const stateRef = { current: { frame: 3, over: false } as GameState };
+    const drawRef: { current: (() => void) | null } = { current: null };
+    const skins = { block: 'neon', effect: 'default', board: 'gameboy' };
+    const { rerender } = render(<TetrisCanvas stateRef={stateRef} drawRef={drawRef} skins={skins} />);
+    expect(drawGame.mock.lastCall?.[3]).toMatchObject({ skins });
+    const before = drawGame.mock.calls.length;
+    rerender(<TetrisCanvas stateRef={stateRef} drawRef={drawRef} skins={{ ...skins }} />);
+    drawRef.current?.();
+    expect(drawGame.mock.calls.length).toBe(before);
+    rerender(<TetrisCanvas stateRef={stateRef} drawRef={drawRef} skins={{ ...skins, board: 'high-contrast' }} />);
+    expect(drawGame.mock.calls.length).toBe(before + 1);
+    expect(drawGame.mock.lastCall?.[3]).toMatchObject({ skins: { board: 'high-contrast' } });
+  });
+});

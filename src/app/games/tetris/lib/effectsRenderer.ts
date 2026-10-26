@@ -1,5 +1,4 @@
 import { HIDDEN_ROWS, PIECE_CELLS, VISIBLE_ROWS } from '../engine';
-import { CELL_COLORS } from './blockSprites';
 import {
   type EffectTracker,
   LEVEL_FADE_FRAMES,
@@ -9,11 +8,13 @@ import {
   TEXT_LIFE_FRAMES,
   TRAIL_LIFE_FRAMES,
 } from './effects';
+import { type BlockSkin, type BoardSkin, type EffectSkin, blockSkin, boardSkin, effectSkin } from './skins';
 
 /**
  * 연출 그리기 — effects.ts가 기록한 이벤트를 지금 엔진 프레임 기준 나이로 그린다
  * 연출 줄이기(reduced)면 움직임(흔들림·파티클·잔상·확대·충격파·빛살)을 그리지 않고 문구·색 전환만 정적으로 보인다
  * 네온(2차, DESIGN §20): shadowBlur는 한 프레임에 몇 번(테두리·문구·충격파)만 — 칸마다 쓰는 발광은 blockSprites의 캐시 스프라이트
+ * 색은 판 주인의 스킨 슬롯(skins.ts — 판 색은 board, 연출 색은 effect, 잔상·조각은 그 블록 색이라 block) — 생략하면 기본. 가비지 경고(빨강)는 스킨과 무관
  */
 
 /** 그리기 품질 — lite는 저사양 감지·연출 줄이기 때 칸 발광을 끄고 별을 줄인다 */
@@ -25,39 +26,14 @@ type BoardRect = { cell: number; boardX: number; boardY: number };
 /** 파티클 중력 (칸/프레임²) */
 const PARTICLE_GRAVITY = 0.02;
 const TEXT_FADE_FRAMES = 15;
-/** 콤보 단계별 문구 색 — 0(기본) ~ 4(11콤보 이상) */
-const TIER_COLORS = ['#e2e8f0', '#7dd3fc', '#c4b5fd', '#fcd34d', '#fb7185'];
+const DEFAULT_BLOCK = blockSkin();
+const DEFAULT_EFFECT = effectSkin();
+const DEFAULT_BOARD = boardSkin();
 
-/** 레벨별 판 배경 — 10레벨 주기로 돈다 */
-const LEVEL_TINTS: readonly [number, number, number][] = [
-  [15, 23, 42],
-  [16, 30, 78],
-  [36, 22, 82],
-  [58, 18, 74],
-  [70, 16, 52],
-  [72, 22, 30],
-  [66, 38, 16],
-  [40, 52, 18],
-  [14, 56, 40],
-  [12, 48, 70],
-];
-
-/** 레벨별 네온 색 — 판 테두리·별·레벨업 빛살. LEVEL_TINTS와 같은 10레벨 주기 */
-const LEVEL_NEON: readonly string[] = [
-  '#38bdf8',
-  '#60a5fa',
-  '#a78bfa',
-  '#e879f9',
-  '#f472b6',
-  '#fb7185',
-  '#fb923c',
-  '#a3e635',
-  '#34d399',
-  '#22d3ee',
-];
-
-export function levelNeon(level: number): string {
-  return LEVEL_NEON[(Math.max(1, level) - 1) % LEVEL_NEON.length];
+/** 레벨별 네온 색 — 판 테두리·별·레벨업 빛살. 판 배경(levelTints)과 같은 10레벨 주기 */
+export function levelNeon(level: number, board: BoardSkin = DEFAULT_BOARD): string {
+  const neon = board.levelNeon;
+  return neon[(Math.max(1, level) - 1) % neon.length];
 }
 
 const rowToY = (rect: BoardRect, row: number) => rect.boardY + (row - HIDDEN_ROWS) * rect.cell;
@@ -83,10 +59,11 @@ export function drawStarfield(
   height: number,
   reduced: boolean,
   quality: EffectQuality,
+  board: BoardSkin = DEFAULT_BOARD,
 ): void {
   const count = Math.min(MAX_STARS, Math.round((width * height) / (quality === 'lite' || reduced ? 24000 : 9000)));
   if (count <= 0) return;
-  const color = levelNeon(level);
+  const color = levelNeon(level, board);
   ctx.save();
   ctx.fillStyle = color;
   for (let i = 0; i < count; i++) {
@@ -110,9 +87,10 @@ export function drawBoardFrame(
   boardHeight: number,
   level: number,
   reduced: boolean,
+  board: BoardSkin = DEFAULT_BOARD,
 ): void {
   const { boardX, boardY } = rect;
-  const color = levelNeon(level);
+  const color = levelNeon(level, board);
   ctx.save();
   ctx.strokeStyle = color;
   ctx.globalAlpha = 0.85;
@@ -159,7 +137,14 @@ export function drawRiseGlow(
 }
 
 /** 줄 삭제 충격파 — 지운 줄 가운데에서 타원 링이 퍼지며 옅어진다. 큰 삭제는 금빛·두 겹 */
-export function drawClearRing(ctx: CanvasRenderingContext2D, fx: EffectTracker | null, frame: number, rect: BoardRect, boardWidth: number): void {
+export function drawClearRing(
+  ctx: CanvasRenderingContext2D,
+  fx: EffectTracker | null,
+  frame: number,
+  rect: BoardRect,
+  boardWidth: number,
+  effect: EffectSkin = DEFAULT_EFFECT,
+): void {
   const ring = fx?.ring;
   if (!ring) return;
   const age = frame - ring.frame;
@@ -169,7 +154,7 @@ export function drawClearRing(ctx: CanvasRenderingContext2D, fx: EffectTracker |
   const ease = 1 - (1 - t) * (1 - t);
   const cx = boardX + boardWidth / 2;
   const cy = rowToY(rect, ring.row);
-  const color = ring.big ? '#fde68a' : '#a5f3fc';
+  const color = ring.big ? effect.ring.big : effect.ring.normal;
   ctx.save();
   // 판 둘레 1칸까지만 — 옆 패널(홀드·다음)을 가리지 않게 (조각과 같은 범위)
   ctx.beginPath();
@@ -190,18 +175,25 @@ export function drawClearRing(ctx: CanvasRenderingContext2D, fx: EffectTracker |
   ctx.restore();
 }
 
-function tintFor(level: number): [number, number, number] {
-  return LEVEL_TINTS[(level - 1) % LEVEL_TINTS.length];
+function tintFor(level: number, board: BoardSkin): readonly [number, number, number] {
+  const tints = board.levelTints;
+  return tints[(level - 1) % tints.length];
 }
 
 /** 판 배경색 — 레벨이 오르면 LEVEL_FADE_FRAMES 동안 새 색으로 넘어간다 */
-export function boardBackground(fx: EffectTracker | null, level: number, frame: number, reduced: boolean): string {
-  let [r, g, b] = tintFor(level);
+export function boardBackground(
+  fx: EffectTracker | null,
+  level: number,
+  frame: number,
+  reduced: boolean,
+  board: BoardSkin = DEFAULT_BOARD,
+): string {
+  let [r, g, b] = tintFor(level, board);
   const change = fx?.level;
   if (change && !reduced && change.to === level) {
     const age = frame - change.frame;
     if (age >= 0 && age < LEVEL_FADE_FRAMES) {
-      const from = tintFor(change.from);
+      const from = tintFor(change.from, board);
       const t = age / LEVEL_FADE_FRAMES;
       r = Math.round(from[0] + (r - from[0]) * t);
       g = Math.round(from[1] + (g - from[1]) * t);
@@ -219,13 +211,14 @@ export function drawLevelGlow(
   rect: BoardRect,
   boardWidth: number,
   boardHeight: number,
+  board: BoardSkin = DEFAULT_BOARD,
 ) {
   const change = fx?.level;
   if (!change) return;
   const age = frame - change.frame;
   if (age < 0 || age >= LEVEL_FADE_FRAMES) return;
   const { boardX, boardY } = rect;
-  const color = levelNeon(change.to);
+  const color = levelNeon(change.to, board);
   const t = age / LEVEL_FADE_FRAMES;
   ctx.save();
   ctx.globalAlpha = 1 - t;
@@ -265,7 +258,14 @@ export function shakeOffset(fx: EffectTracker | null, frame: number, reduced: bo
 }
 
 /** 하드 드롭 잔상 — 블록이 지나간 열을 따라 아래로 짙어지는 빛줄기 */
-export function drawTrail(ctx: CanvasRenderingContext2D, fx: EffectTracker | null, frame: number, rect: BoardRect, firstRow: number) {
+export function drawTrail(
+  ctx: CanvasRenderingContext2D,
+  fx: EffectTracker | null,
+  frame: number,
+  rect: BoardRect,
+  firstRow: number,
+  block: BlockSkin = DEFAULT_BLOCK,
+) {
   const trail = fx?.trail;
   if (!trail) return;
   const age = frame - trail.frame;
@@ -281,7 +281,7 @@ export function drawTrail(ctx: CanvasRenderingContext2D, fx: EffectTracker | nul
     columns.set(col, [top ? Math.min(top[0], row) : row]);
   }
   const alpha = 0.8 * (1 - age / TRAIL_LIFE_FRAMES);
-  const color = CELL_COLORS[trail.piece + 1];
+  const color = block.cells[trail.piece + 1];
   // 빛줄기 — 색 띠 위에 흰 심지, 'lighter'로 겹쳐 네온처럼
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
@@ -315,6 +315,7 @@ export function drawParticles(
   rect: BoardRect,
   boardWidth: number,
   boardHeight: number,
+  block: BlockSkin = DEFAULT_BLOCK,
 ) {
   if (!fx || fx.particles.length === 0) return;
   const { cell, boardX, boardY } = rect;
@@ -340,7 +341,7 @@ export function drawParticles(
     const py = rowToY(rect, y);
     // 빛나는 조각 — 옅은 큰 사각형(번짐) 위에 진한 작은 사각형
     ctx.globalAlpha = life * 0.35;
-    ctx.fillStyle = CELL_COLORS[p.cell];
+    ctx.fillStyle = block.cells[p.cell];
     ctx.fillRect(px - size, py - size, size * 2, size * 2);
     ctx.globalAlpha = life;
     ctx.fillRect(px - size / 2, py - size / 2, size, size);
@@ -358,14 +359,16 @@ export function drawClearFlash(
   rect: BoardRect,
   boardWidth: number,
   reduced: boolean,
+  effect: EffectSkin = DEFAULT_EFFECT,
 ) {
   const alpha = Math.max(0, Math.min(1, progress));
+  const [gr, gg, gb] = effect.flashGlow;
   const { cell, boardX } = rect;
   for (const row of rows) {
     const y = rowToY(rect, row);
     if (!reduced) {
       const spread = cell * (big ? 0.6 : 0.3) * (1 - alpha);
-      ctx.fillStyle = `rgba(186, 230, 253, ${0.35 * alpha})`;
+      ctx.fillStyle = `rgba(${gr}, ${gg}, ${gb}, ${0.35 * alpha})`;
       ctx.fillRect(boardX, y - spread, boardWidth, cell + spread * 2);
     }
     ctx.fillStyle = `rgba(255, 255, 255, ${0.85 * alpha})`;
@@ -381,6 +384,7 @@ export function drawEffectText(
   rect: BoardRect,
   boardWidth: number,
   reduced: boolean,
+  effect: EffectSkin = DEFAULT_EFFECT,
 ) {
   const burst = fx?.text;
   if (!burst) return;
@@ -403,7 +407,7 @@ export function drawEffectText(
   ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
   for (const line of burst.lines) {
-    const color = TIER_COLORS[Math.min(line.tier, TIER_COLORS.length - 1)];
+    const color = effect.tierColors[Math.min(line.tier, effect.tierColors.length - 1)];
     const fontSize = Math.round(cell * (0.7 + 0.12 * line.tier) * pop);
     ctx.font = `800 ${fontSize}px system-ui, sans-serif`;
     // 큰 이름(테트리스·T-스핀·퍼펙트·B2B)은 뒤에 빛나는 띠
@@ -438,6 +442,8 @@ export function drawComboMeter(
   cell: number,
   width: number,
   reduced: boolean,
+  effect: EffectSkin = DEFAULT_EFFECT,
+  board: BoardSkin = DEFAULT_BOARD,
 ): void {
   const meter = fx?.combo;
   if (!meter || meter.combo < 1) return;
@@ -446,13 +452,13 @@ export function drawComboMeter(
   const alpha = meter.ended ? Math.max(0, 1 - age / 30) : 1;
   if (alpha <= 0) return;
   const tier = Math.min(4, 1 + Math.floor(meter.combo / 3));
-  const color = TIER_COLORS[tier];
+  const color = effect.tierColors[tier];
   const pulse = reduced || meter.ended ? 1 : 1 + 0.25 * Math.max(0, 1 - age / 8);
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = 'rgba(148, 163, 184, 0.9)';
+  ctx.fillStyle = board.label;
   ctx.font = `600 ${Math.max(9, Math.floor(cell * 0.42))}px system-ui, sans-serif`;
   ctx.fillText('COMBO', centerX, top);
   ctx.fillStyle = color;

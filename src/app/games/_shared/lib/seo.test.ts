@@ -40,6 +40,7 @@ describe('게임 페이지 SEO 메타', () => {
       '/games': async () => (await import('@/app/games/page')).metadata,
       '/games/tetris': async () => (await import('@/app/games/tetris/page')).metadata,
       '/games/tetris/rankings': async () => (await import('@/app/games/tetris/rankings/page')).metadata,
+      '/games/tetris/skins': async () => (await import('@/app/games/tetris/skins/page')).metadata,
       '/games/defense': async () => (await import('@/app/games/defense/page')).metadata,
       '/games/defense/rankings': async () => (await import('@/app/games/defense/rankings/page')).metadata,
     };

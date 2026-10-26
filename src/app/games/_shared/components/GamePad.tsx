@@ -222,6 +222,23 @@ export function GamePad({ layout, onHoldStart, onHoldEnd, onInstant, active }: G
     );
   };
 
+  /**
+   * 십자 패드의 길게 누르기 제스처(iOS 선택·확대경·"복사하기" 콜아웃, Android 롱프레스)를 끈다 — iOS는 터치 롱프레스에 contextmenu를 보내지 않아
+   * CSS 힌트(user-select·-webkit-touch-callout)·onContextMenu로는 못 막는다. React onTouchStart는 passive라 직접 passive: false로 붙인다
+   * 십자 입력은 pointer 이벤트로 처리한다(touchstart를 취소해도 pointer는 그대로 온다)
+   * 범위는 십자만 — 길게 누르는 조작은 ←→↓(유지형)뿐이고, 오른쪽·어깨 버튼(즉시형 탭)은 터치 취소가 :active 눌림 표시를 끌 수 있어 두지 않는다
+   */
+  const dpadRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const root = dpadRef.current;
+    if (!root) return;
+    const block = (e: Event) => {
+      if (e.cancelable) e.preventDefault();
+    };
+    root.addEventListener("touchstart", block, { passive: false });
+    return () => root.removeEventListener("touchstart", block);
+  }, []);
+
   const shoulder = layout.buttons.filter((b) => b.slot === "shoulder");
   const right = layout.buttons.filter((b) => b.slot !== "shoulder");
   const hasTop = right.some((b) => b.slot === "top");
@@ -238,6 +255,7 @@ export function GamePad({ layout, onHoldStart, onHoldEnd, onInstant, active }: G
         {shoulder.length > 0 && <div className="relative h-12 w-full">{shoulder.map((spec) => button(spec))}</div>}
         {/* 십자 패드 — 판정은 이 영역 전체(팔 사이 모서리를 눌러도 가까운 방향으로) */}
         <div
+          ref={dpadRef}
           role="group"
           aria-label="방향"
           data-testid="game-pad-dpad"

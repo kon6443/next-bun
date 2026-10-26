@@ -60,3 +60,15 @@ describe('GameSurface — 꾹 눌러도 선택·복사 메뉴가 뜨지 않는 �
     expect(block('[data-game-surface] :is(img, canvas, a)')).toContain('-webkit-user-drag: none');
   });
 });
+
+describe('GameSurface 바탕 (테트리스 배경 스킨)', () => {
+  it('바탕을 주면 그 바탕, 없으면 기본(bg-slate-950)만 — 기본 화면은 그대로', () => {
+    const { container, rerender } = render(<GameSurface>x</GameSurface>);
+    const surface = container.firstElementChild as HTMLElement;
+    expect(surface.className).toContain('bg-slate-950');
+    expect(surface.style.background).toBe('');
+    rerender(<GameSurface background="#000000">x</GameSurface>);
+    expect((container.firstElementChild as HTMLElement).style.background).toBe('rgb(0, 0, 0)');
+    expect((container.firstElementChild as HTMLElement).style.touchAction).toBe('none');
+  });
+});

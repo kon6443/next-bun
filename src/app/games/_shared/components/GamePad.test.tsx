@@ -152,3 +152,39 @@ describe('공통 GamePad — 포인터 처리 (games-polish P9)', () => {
     expect(screen.getByRole('button', { name: '오른쪽' })).toHaveAttribute('data-pressed', 'true');
   });
 });
+
+describe('공통 GamePad — 길게 누르기 제스처 차단 (iOS 선택·확대경·콜아웃)', () => {
+  /** jsdom에 TouchEvent가 없을 수 있다 — 취소 가능한 touchstart를 직접 만든다 */
+  const touchStart = (target: Element) => {
+    const event = new Event('touchstart', { bubbles: true, cancelable: true });
+    target.dispatchEvent(event);
+    return event.defaultPrevented;
+  };
+
+  it('십자 패드에서 시작한 touchstart를 취소한다 — iOS는 터치 롱프레스에 contextmenu를 보내지 않아 CSS·contextmenu로는 못 막는다', () => {
+    const { pad } = setupPad(LAYOUT);
+    expect(touchStart(pad)).toBe(true);
+    expect(touchStart(pad.querySelector('[aria-label="왼쪽"]') ?? pad)).toBe(true);
+  });
+
+  it('탭으로 쓰는 버튼(A·어깨)은 취소하지 않는다 — 터치 :active 눌림 표시를 지킨다', () => {
+    setupPad(LAYOUT);
+    expect(touchStart(screen.getByRole('button', { name: 'A' }))).toBe(false);
+    expect(touchStart(screen.getByRole('button', { name: '어깨' }))).toBe(false);
+  });
+
+  it('취소할 수 있게 passive: false로 붙인다(React onTouchStart는 passive라 취소가 무시된다)', () => {
+    const add = vi.spyOn(HTMLElement.prototype, 'addEventListener');
+    setupPad(LAYOUT);
+    expect(add.mock.calls.some(([type, , options]) => type === 'touchstart' && typeof options === 'object' && options?.passive === false)).toBe(true);
+  });
+
+  it('터치를 취소해도 포인터 입력은 그대로 — 누르기·떼기가 동작한다', () => {
+    const { pad, down, up, onHoldStart, onHoldEnd } = setupPad(LAYOUT);
+    touchStart(pad);
+    down('left');
+    up();
+    expect(onHoldStart).toHaveBeenCalledWith(L.press, L.release);
+    expect(onHoldEnd).toHaveBeenCalledWith(L.press);
+  });
+});
