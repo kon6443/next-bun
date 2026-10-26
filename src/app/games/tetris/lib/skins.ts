@@ -173,8 +173,15 @@ const BACKGROUND_SKINS: Record<string, BackgroundSkin> = {
   /** Tailwind bg-slate-950과 같은 색 */
   default: { background: '#020617' },
   gameboy: { background: 'radial-gradient(circle at 50% 30%, #1d4a1d 0%, #0f380f 70%)' },
-  neon: { background: 'radial-gradient(circle at 50% 20%, #1a0b2e 0%, #05010d 70%)' },
-  'high-contrast': { background: '#000000' },
+  // 보라 중심 + 하단 시안 글로우 — 기본(#020617)과 나란히 놓아도 한눈에 구분되게
+  neon: {
+    background: 'radial-gradient(circle at 50% 110%, rgba(0, 240, 255, 0.22), transparent 55%), radial-gradient(circle at 50% 15%, #3b0a5c 0%, #12021f 55%, #05010d 100%)',
+  },
+  // 검은 바탕 + 아주 옅은 흰 격자 — 판 밖이 바뀐 것이 보이고, 판 안은 판 배경(레벨 색조 92% 불투명)이 덮어 가독성에 영향이 거의 없다
+  'high-contrast': {
+    background:
+      'linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px) 0 0 / 24px 24px, #000000',
+  },
 };
 
 // ==================== 조회 ====================

@@ -88,6 +88,15 @@ describe('테트리스 스킨 레지스트리', () => {
     }
   });
 
+  it('배경은 기본과 한눈에 구분된다 — 기본이 아닌 배경은 기본 단색이 아니고 서로도 다르다', () => {
+    const backgrounds = FIRST_ITEMS.map((id) => backgroundSkin(id).background);
+    expect(new Set(backgrounds).size).toBe(FIRST_ITEMS.length);
+    for (const id of FIRST_ITEMS.filter((x) => x !== 'default')) {
+      // 단색 한 가지(기본처럼)가 아니라 그라데이션·패턴이 있어야 바탕이 바뀐 것이 보인다
+      expect(backgroundSkin(id).background).toMatch(/gradient\(/);
+    }
+  });
+
   it('블록 무늬는 같은 톤이 겹치거나(게임보이) 색각 친화(고대비)일 때만', () => {
     expect(FIRST_ITEMS.filter((id) => blockSkin(id).patterns)).toEqual(['gameboy', 'high-contrast']);
   });
