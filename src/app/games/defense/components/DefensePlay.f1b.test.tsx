@@ -13,11 +13,6 @@ vi.mock('next/link', () => ({ default: ({ href, children, ...rest }: { href: str
 const toast = vi.hoisted(() => vi.fn());
 vi.mock('react-hot-toast', () => ({ default: toast }));
 
-class FakeResizeObserver {
-  observe() {}
-  disconnect() {}
-}
-
 describe('DefensePlay F1b — 학습·효과음·이어하기·나가기', () => {
   let audioContexts = 0;
   beforeEach(() => {
@@ -25,7 +20,6 @@ describe('DefensePlay F1b — 학습·효과음·이어하기·나가기', () =>
     __resetSoundSettingsForTests();
     replace.mockClear();
     audioContexts = 0;
-    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
     // AudioContext를 만들면 센다 — 효과음이 꺼진 동안 0이어야 한다
     vi.stubGlobal(
       'AudioContext',

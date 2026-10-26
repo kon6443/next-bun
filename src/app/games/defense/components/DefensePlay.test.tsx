@@ -7,21 +7,14 @@ import DefensePlay from './DefensePlay';
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
 vi.mock('next/link', () => ({ default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...rest}>{children}</a> }));
 
-class FakeResizeObserver {
-  observe() {}
-  disconnect() {}
-}
-
 describe('DefensePlay (플레이 화면 조작)', () => {
   beforeEach(() => {
     localStorage.clear();
-    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
     // jsdom은 캔버스 2D를 지원하지 않는다 — 그리기는 건너뛰고(컨텍스트 null) 조작만 본다
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 360, height: 600, top: 0, left: 0, right: 360, bottom: 600, x: 0, y: 0, toJSON: () => ({}) });
   });
   afterEach(() => {
-    vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 

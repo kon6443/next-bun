@@ -23,11 +23,6 @@ vi.mock('../hooks/useDefenseSfx', async (importActual) => ({
 }));
 vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }));
 
-class FakeResizeObserver {
-  observe() {}
-  disconnect() {}
-}
-
 function saveLocalWin() {
   const driver = GameDriver.fromBoard('campaign', 's1', 3);
   runGame(driver, greedyBot());
@@ -51,13 +46,11 @@ describe('디펜스 다시보기 소리 (games-polish P7)', () => {
     __resetSoundSettingsForTests();
     Object.values(sfx).forEach((fn) => fn.mockReset());
     useDefenseSfx.mockReset();
-    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 360, height: 600, top: 0, left: 0, right: 360, bottom: 600, x: 0, y: 0, toJSON: () => ({}) });
   });
   afterEach(() => {
     vi.useRealTimers();
-    vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 

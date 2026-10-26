@@ -18,19 +18,12 @@ vi.mock('@/app/games/_shared/components/ShareMenu', () => ({
 vi.mock('@/app/games/_shared/hooks/useKakaoReady', () => ({ useKakaoReady: () => ({ kakao: 'off', kakaoScript: null }) }));
 vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }));
 
-class FakeResizeObserver {
-  observe() {}
-  disconnect() {}
-}
-
 describe('서버 기록 재생 화면 — 공유', () => {
   beforeEach(() => {
-    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 360, height: 600, top: 0, left: 0, right: 360, bottom: 600, x: 0, y: 0, toJSON: () => ({}) });
   });
   afterEach(() => {
-    vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
