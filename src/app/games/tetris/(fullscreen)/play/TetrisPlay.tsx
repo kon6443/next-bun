@@ -12,7 +12,6 @@ import { useMediaQuery } from "@/app/games/_shared/hooks/useMediaQuery";
 import { sessionTtlMs } from "@/app/games/_shared/lib/sessionTtl";
 import { ApiError } from "@/types/api";
 import type { GameSession, ReplayPayload, ScoreSummary } from "@/types/game";
-import { extractErrorMessage } from "@/app/utils/errorUtils";
 import { ENGINE_VERSION, type GameState, MAX_FRAMES, MAX_INPUT_LENGTH } from "../../engine";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
 import { TetrisCanvas } from "../../components/TetrisCanvas";
@@ -73,7 +72,8 @@ function sessionErrorMessage(err: unknown, variant: "daily" | "challenge" | null
   if (err instanceof ApiError && err.code === "GAME_DAILY_UNAVAILABLE") return "지금은 오늘의 테트리스를 열 수 없어요. 이번 판은 일반 판으로 등록 없이 플레이해요.";
   if (variant === "daily") return "오늘의 테트리스를 준비하지 못했어요. 이번 판은 일반 판으로 등록 없이 플레이해요.";
   if (variant === "challenge") return "도전장을 준비하지 못했어요. 이번 판은 일반 판으로 등록 없이 플레이해요.";
-  return `${extractErrorMessage(err, "랭킹 등록을 준비하지 못했습니다.")} 이번 판은 등록 없이 플레이해요.`;
+  // 서버·망 원문은 붙이지 않는다 — 오늘의 테트리스·도전장과 같은 고정 문구(UX 점검: 세션 실패 문구 통일)
+  return "랭킹 등록을 준비하지 못했어요. 이번 판은 등록 없이 플레이해요.";
 }
 
 /**

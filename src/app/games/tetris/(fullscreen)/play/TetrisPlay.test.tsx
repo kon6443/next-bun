@@ -190,3 +190,14 @@ describe('TetrisPlay 조작 안내 (UX 점검)', () => {
     spy.mockRestore();
   });
 });
+
+describe('TetrisPlay 세션 실패 문구 (UX 점검)', () => {
+  it('일반 판도 고정 문구 — 서버·망 원문을 붙이지 않는다', async () => {
+    createGameSession.mockRejectedValue(new ApiError('INTERNAL_SERVER_ERROR', 'Internal server error: db timeout', 500));
+    await act(async () => {
+      render(<TetrisPlay />);
+    });
+    expect(screen.getByText('랭킹 등록을 준비하지 못했어요. 이번 판은 등록 없이 플레이해요.')).toBeTruthy();
+    expect(screen.queryByText(/db timeout/)).toBeNull();
+  });
+});
