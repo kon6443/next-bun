@@ -295,6 +295,9 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
           </label>
           <SoundSettingsEntry />
           <SkinSettingsEntry />
+          <ButtonLink href="/games/tetris/skins" variant="secondary" size="md" fullWidth className="min-h-11">
+            스킨 도감 — 모든 스킨과 얻는 방법
+          </ButtonLink>
         </div>
       </section>
 

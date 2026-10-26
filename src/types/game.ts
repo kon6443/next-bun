@@ -196,3 +196,16 @@ export type ReplayDataByGame = {
   tetris: ReplayData;
   defense: ParamsReplayData;
 };
+
+// ==================== 테트리스 스킨 도감 (D-005) ====================
+
+export type TetrisSkinSlot = 'block' | 'effect' | 'board' | 'background';
+
+/** 도감 아이템 — unlock은 'default'(기본 제공)·'free'(누구나 무료) 외에 업적·출석 등이 늘어난다. 게스트는 owned·equipped 모두 false */
+export type TetrisSkinCatalogItem = { id: string; unlock: string; owned: boolean; equipped: boolean };
+
+/** GET /games/tetris/skins — 누구나. Bearer가 있으면 보유·장착 표시 */
+export type TetrisSkinCatalog = {
+  signedIn: boolean;
+  slots: { slot: TetrisSkinSlot; items: TetrisSkinCatalogItem[] }[];
+};

@@ -2,6 +2,7 @@
 
 import { useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import toast from "react-hot-toast";
 import { useDialog } from "@/app/hooks";
 import { useKakaoLogin } from "@/app/auth/useKakaoLogin";
@@ -100,6 +101,9 @@ export function SkinSettingsModal({ onClose }: Props) {
           </div>
         )}
         {loggedIn && status === "error" && <p className="mb-2 text-xs text-amber-300">스킨 정보를 불러오지 못해 기본 스킨으로 보여요.</p>}
+        <Link href="/games/tetris/skins" onClick={onClose} className="mb-3 inline-flex min-h-11 items-center text-sm text-sky-300 hover:text-sky-200">
+          전체 스킨 보기(얻는 방법) ›
+        </Link>
 
         <div role="tablist" aria-label="스킨 슬롯" className="mb-3 grid grid-cols-4 gap-1 rounded-xl bg-slate-800/60 p-1">
           {SKIN_SLOTS.map((s) => (

@@ -18,6 +18,7 @@ import type {
   ScoreSummary,
   SubmitScoreRequest,
   SubmitScoreResponse,
+  TetrisSkinCatalog,
 } from '@/types/game';
 
 // ==================== 공통 에러 처리 ====================
@@ -233,6 +234,25 @@ export async function submitGameScore<G extends GameType>(
       429: TOO_MANY,
       default: '기록을 등록하지 못했습니다.',
     });
+  }
+
+  return response.json();
+}
+
+/**
+ * 테트리스 스킨 도감 (D-005) — 누구나. 토큰이 있으면 보유·장착을 표시한다
+ * 만료 토큰은 401(조회라 익명으로 바꿔 다시 받는 것은 호출부가 정한다 — 로그인 만료 안내와 함께)
+ */
+export async function getTetrisSkinCatalog(accessToken?: string): Promise<ApiResponse<TetrisSkinCatalog>> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'GET',
+    endpoint: '/api/v1/games/tetris/skins',
+    ...(accessToken ? { accessToken, notifyUnauthorized: false } : {}),
+    signal: timeoutSignal(RANKING_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    await handleApiError(response, { 429: TOO_MANY, default: '스킨 목록을 불러오지 못했습니다.' });
   }
 
   return response.json();
