@@ -378,7 +378,8 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
               <SkinChangeButton onOpenChange={pauseOnOpen} className={OVERLAY_SETTINGS_CLASS}>
                 스킨 바꾸기
               </SkinChangeButton>
-              <ControlGuide items={isCoarse ? PAD_GUIDE : CONTROL_GUIDE} />
+              {/* 터치 기기는 패드가 바로 아래 보이고 준비 화면에서 안내했다 — 메뉴가 화면을 넘지 않게 키보드 기기만 */}
+              {!isCoarse && <ControlGuide items={CONTROL_GUIDE} />}
             </div>
           </Overlay>
         )}
@@ -428,8 +429,9 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
 
 function Overlay({ children }: { children: React.ReactNode }) {
   return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center overflow-y-auto bg-slate-950/70 p-4" style={{ touchAction: "auto" }}>
-      {children}
+    // 가운데 정렬은 안쪽 m-auto로 — items-center면 내용이 화면보다 길 때 위쪽이 잘려 스크롤로도 못 본다
+    <div className="absolute inset-0 z-10 flex overflow-y-auto bg-slate-950/70 p-4" style={{ touchAction: "auto" }}>
+      <div className="m-auto flex w-full justify-center">{children}</div>
     </div>
   );
 }

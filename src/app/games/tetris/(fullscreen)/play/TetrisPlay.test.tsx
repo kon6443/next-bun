@@ -181,6 +181,20 @@ describe('TetrisPlay 조작 안내 (UX 점검)', () => {
     spy.mockRestore();
   });
 
+  it('터치 기기의 일시정지 메뉴에는 안내를 두지 않는다 — 패드가 바로 아래 보이고, 메뉴가 화면(375×667)을 넘지 않게', async () => {
+    const spy = mockPointer(true);
+    createGameSession.mockResolvedValue({ data: session(new Date(Date.now() + 2 * HOUR).toISOString()) });
+    render(<TetrisPlay />);
+    await act(async () => {});
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '시작' }));
+    });
+    fireEvent.click(screen.getByRole('button', { name: '일시정지' }));
+    expect(screen.getByRole('heading', { name: '일시정지' })).toBeTruthy();
+    expect(screen.queryByTestId('control-guide')).toBeNull();
+    spy.mockRestore();
+  });
+
   it('키보드 기기는 키 표', async () => {
     const spy = mockPointer(false);
     createGameSession.mockResolvedValue({ data: session(new Date(Date.now() + 2 * HOUR).toISOString()) });
