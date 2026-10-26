@@ -9,7 +9,7 @@ vi.mock('../lib/renderer', () => ({
   drawGame: (...a: unknown[]) => drawGame(...a),
 }));
 
-import { TetrisCanvas } from './TetrisCanvas';
+import { TetrisCanvas, __resetCanvasQualityForTests } from './TetrisCanvas';
 
 beforeAll(() => {
   // jsdom에는 캔버스 그리기·ResizeObserver가 없다 — 그리기 호출만 센다
@@ -69,6 +69,83 @@ describe('TetrisCanvas DPR (games-polish FE-19)', () => {
     expect(canvas.width).toBe(200);
     expect(matchMedia).toHaveBeenLastCalledWith('(resolution: 2dppx)');
     vi.unstubAllGlobals();
+  });
+});
+
+describe('TetrisCanvas 저사양 감지 (렌더 성능 a3)', () => {
+  it('판 도중 느려지면(약 45fps) 가벼운 품질로 그리고, 다시 빨라지면 유지 시간 뒤 원래 품질로 돌아온다', () => {
+    __resetCanvasQualityForTests();
+    let now = 1000;
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => now);
+    const state = { frame: 0, over: false } as GameState;
+    const drawRef: { current: (() => void) | null } = { current: null };
+    render(<TetrisCanvas stateRef={{ current: state }} drawRef={drawRef} effectsRef={{ current: null }} />);
+    const play = (gap: number, ms: number) => {
+      for (let t = 0; t < ms; t += gap) {
+        now += gap;
+        state.frame++;
+        drawRef.current?.();
+      }
+      return drawGame.mock.lastCall?.[3].quality;
+    };
+    try {
+      expect(play(1000 / 60, 60_000)).toBe('full');
+      expect(play(22, 5_000)).toBe('lite');
+      expect(play(1000 / 60, 5_000)).toBe('lite');
+      expect(play(1000 / 60, 10_000)).toBe('full');
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('0.5배속 재생(화면 프레임 2번에 엔진 프레임 1번)은 느린 기기가 아니다 — 그린 간격이 아니라 화면 프레임 간격을 잰다 (리뷰 S2·S3)', () => {
+    __resetCanvasQualityForTests();
+    let now = 1000;
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => now);
+    const state = { frame: 0, over: false } as GameState;
+    const drawRef: { current: (() => void) | null } = { current: null };
+    render(<TetrisCanvas stateRef={{ current: state }} drawRef={drawRef} effectsRef={{ current: null }} />);
+    try {
+      for (let i = 0; i < 60 * 30; i++) {
+        now += 1000 / 60;
+        if (i % 2 === 0) state.frame++;
+        drawRef.current?.();
+      }
+      expect(drawGame.mock.lastCall?.[3].quality).toBe('full');
+    } finally {
+      clock.mockRestore();
+    }
+  });
+});
+
+describe('TetrisCanvas 저사양 감지 — 화면 프레임이 아닌 그리기 (리뷰 2차)', () => {
+  it('스킨이 바뀌어 다시 그려도 표본이 아니다 — 느린 화면 프레임 간격(22ms)을 쪼개 판정을 흐리지 않는다', () => {
+    __resetCanvasQualityForTests();
+    let now = 1000;
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => now);
+    const state = { frame: 0, over: false } as GameState;
+    const stateRef = { current: state };
+    const drawRef: { current: (() => void) | null } = { current: null };
+    const effectsRef = { current: null };
+    const skins = [
+      { block: 'default', effect: 'default', board: 'default' },
+      { block: 'default', effect: 'default', board: 'neon' },
+    ];
+    const { rerender } = render(<TetrisCanvas stateRef={stateRef} drawRef={drawRef} effectsRef={effectsRef} skins={skins[0]} />);
+    try {
+      for (let i = 0; i < 300; i++) {
+        // 화면 프레임 사이 한가운데에서 스킨이 바뀌어 다시 그린다
+        now += 11;
+        state.frame++;
+        rerender(<TetrisCanvas stateRef={stateRef} drawRef={drawRef} effectsRef={effectsRef} skins={skins[(i + 1) % 2]} />);
+        now += 11;
+        state.frame++;
+        drawRef.current?.();
+      }
+      expect(drawGame.mock.lastCall?.[3].quality).toBe('lite');
+    } finally {
+      clock.mockRestore();
+    }
   });
 });
 
