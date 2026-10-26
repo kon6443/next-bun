@@ -223,7 +223,7 @@ describe('RankedPlay — 무한·주간 입구', () => {
     await screen.findByTestId('defense-ranked-result', {}, { timeout: 3000 });
     // 세션 있는 판 — 보드별 최고 기록을 한 번 남기고 결과에 "개인 최고"
     expect(JSON.parse(localStorage.getItem('defense:best')!).boards['endless-s1']).toBeGreaterThan(0);
-    expect(screen.getByText('개인 최고 기록!')).toBeTruthy();
+    expect(screen.getByText('이 기기 최고 기록!')).toBeTruthy();
     fireEvent.change(screen.getByLabelText('랭킹에 올릴 이름'), { target: { value: '수비왕' } });
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
@@ -274,7 +274,7 @@ describe('RankedPlay — 무한·주간 입구', () => {
     expect(screen.queryByRole('button', { name: '랭킹 등록' })).toBeNull();
     // 등록할 수 없는 판은 최고 기록도 남기지 않는다
     expect(localStorage.getItem('defense:best')).toBeNull();
-    expect(screen.queryByText('개인 최고 기록!')).toBeNull();
+    expect(screen.queryByText('이 기기 최고 기록!')).toBeNull();
   });
 
   it('다른 모드 저장본은 이어하기로 제시하지 않고(바뀐다고 안내), 깨진 같은 모드 저장본은 안내 후 새로 시작', async () => {
@@ -310,7 +310,7 @@ describe('RankedPlay — 무한·주간 입구', () => {
     fireEvent.click(await screen.findByTestId('defense-pause', {}, { timeout: 5000 }));
     await screen.findByTestId('defense-ranked-result', {}, { timeout: 3000 });
     expect(localStorage.getItem('defense:best')).toBeNull();
-    expect(screen.queryByText('개인 최고 기록!')).toBeNull();
+    expect(screen.queryByText('이 기기 최고 기록!')).toBeNull();
   });
 
   it('카드 고르는 중 나가기 확인을 열면 카드 대화상자를 내리고(숫자 키도 안 먹는다), 계속하기면 다시', async () => {

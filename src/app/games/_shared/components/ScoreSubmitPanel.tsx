@@ -223,7 +223,8 @@ export function ScoreSubmitPanel<G extends GameType>({
       <p className={`mt-3 font-bold text-white ${game.formatScore ? "text-2xl" : "text-4xl"}`} data-testid="score-submit-score">
         {(game.formatScore ?? formatScore)(registered?.score ?? score)}
       </p>
-      {isNewBest && <p className="mt-1 text-sm font-semibold text-amber-300">개인 최고 기록!</p>}
+      {/* 이 브라우저 최고점 기준(등록과 무관) — 홈의 "내 최고 점수"는 로그인이면 계정의 등록 기록 기준이라 "이 기기"로 구분한다 */}
+      {isNewBest && <p className="mt-1 text-sm font-semibold text-amber-300">이 기기 최고 기록!</p>}
       {stats}
 
       {/* 순위 — 등록 전에는 예상, 등록 후에는 서버 순위. 등록할 수 없는 판(세션 없음)은 등록될 것처럼 읽히지 않게 숨긴다(UX 점검) */}
