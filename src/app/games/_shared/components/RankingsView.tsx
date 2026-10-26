@@ -36,17 +36,22 @@ export const RANKINGS_DEBOUNCE_MS = 250;
 const rankingsCache = new Map<string, { at: number; listing: unknown }>();
 /** 진행 중인 요청 — 같은 목록을 두 번 부르지 않는다(StrictMode가 effect를 다시 돌려도 1회) */
 const inflight = new Map<string, Promise<unknown>>();
+/** 게임별 무효화 세대 — 무효화 전에 출발한 요청의 응답은 캐시에 넣지 않는다(등록 전 목록이 되살아나지 않게) */
+const generations = new Map<GameType, number>();
 let lastRequestAt = -Infinity;
 
 /** 기록을 등록하면 그 게임의 받아 둔 목록을 버린다 — "랭킹 보기"로 오면 새 기록이 들어간 목록을 받게 */
 export function invalidateRankings(gameType: GameType) {
+  generations.set(gameType, (generations.get(gameType) ?? 0) + 1);
   for (const key of rankingsCache.keys()) if (key.startsWith(`${gameType}:`)) rankingsCache.delete(key);
+  for (const key of inflight.keys()) if (key.startsWith(`${gameType}:`)) inflight.delete(key);
 }
 
 /** 테스트용 — 캐시·요청 시각을 비운다 */
 export function resetRankingsCache() {
   rankingsCache.clear();
   inflight.clear();
+  generations.clear();
   lastRequestAt = -Infinity;
 }
 
@@ -96,15 +101,18 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
       const key = cacheKey(game.gameType, board, target, targetSort);
       let request = inflight.get(key) as Promise<Listing<ScoreDetailByGame[G]>> | undefined;
       if (!request) {
+        const generation = generations.get(game.gameType) ?? 0;
         request = (async (): Promise<Listing<ScoreDetailByGame[G]>> =>
           targetSort === "score"
             ? { sort: "score", data: (await getGameRankings(game.gameType, target, LIMIT, board)).data }
             : { sort: targetSort, data: (await getPopularReplays(game.gameType, { period: target, sort: targetSort, limit: LIMIT, board })).data })();
         inflight.set(key, request);
-        const settle = () => inflight.delete(key);
+        const own = request;
+        // 무효화로 이미 빠졌거나 새 요청으로 바뀌었으면 남의 항목을 지우지 않는다
+        const settle = () => inflight.get(key) === own && inflight.delete(key);
         request.then((listing) => {
           settle();
-          rankingsCache.set(key, { at: Date.now(), listing });
+          if ((generations.get(game.gameType) ?? 0) === generation) rankingsCache.set(key, { at: Date.now(), listing });
         }, settle);
       }
       const next = await request;

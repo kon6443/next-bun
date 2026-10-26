@@ -258,4 +258,21 @@ describe('RankingsView — 게임 사양을 따른다', () => {
     expect(getGameRankings).toHaveBeenCalledTimes(1);
     expect(screen.getByText('수비왕')).toBeTruthy();
   });
+
+  it('무효화 전에 출발한 요청의 응답은 캐시에 넣지 않는다 — 등록 전 목록이 되살아나지 않게', async () => {
+    let resolveOld!: (value: unknown) => void;
+    getGameRankings.mockImplementationOnce(() => new Promise((resolve) => (resolveOld = resolve)));
+    const first = await act(async () => render(<RankingsView game={TEST_GAME} highlightId={null} board="endless-s1" />));
+    first.unmount();
+    invalidateRankings('defense');
+    await act(async () => {
+      resolveOld({ code: 'SUCCESS', message: 'ok', data: { items: [item], periodStart: null } });
+    });
+    await passDebounce();
+    await act(async () => {
+      render(<RankingsView game={TEST_GAME} highlightId={null} board="endless-s1" />);
+    });
+    await passDebounce();
+    expect(getGameRankings).toHaveBeenCalledTimes(2);
+  });
 });
