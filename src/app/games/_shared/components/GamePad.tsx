@@ -36,7 +36,10 @@ export type PadButtonSpec = {
  * 같은 코드를 두 곳(방향·버튼)에 두면 한쪽을 뗄 때 다른 쪽이 눌린 채여도 풀린다
  */
 export type GamePadLayout = {
-  /** 없는 방향은 무동작 — 누르거나 미끄러져 들어가도 입력 없음, 팔은 흐리게 */
+  /**
+   * 없는 방향은 무동작 — 누르거나 미끄러져 들어가도 입력 없음, 팔은 흐리게
+   * ↑이 없으면 위 팔 자리를 아예 두지 않는 T자(높이 2/3) — 판정은 위 1/3을 잘라 낸 정사각형 그대로(←→↓ 영역이 같다)
+   */
   dpad: Partial<Record<PadDirection, PadDirectionSpec>>;
   buttons: readonly PadButtonSpec[];
 };
@@ -73,10 +76,10 @@ const TONES = {
   accent: "border-rose-300/50 bg-rose-600/80 text-white",
 } as const;
 
-/** 슬롯 자리 — 오른쪽 묶음은 --d(원 지름) 기준: top 64px + 틈 16px 아래에 A(위·오른쪽), B는 A의 왼쪽 아래 25° */
+/** 슬롯 자리 — 오른쪽 묶음은 --d(원 지름) 기준: top 48px + 틈 12px 아래에 A(위·오른쪽), B는 A의 왼쪽 아래 25° */
 const SLOT_CLASS: Record<PadSlot, string> = {
-  top: "right-0 top-0 h-16 w-full rounded-2xl text-sm",
-  a: "right-0 top-20 h-[var(--d)] w-[var(--d)] rounded-full",
+  top: "right-0 top-0 h-12 w-full rounded-2xl text-sm",
+  a: "right-0 top-[60px] h-[var(--d)] w-[var(--d)] rounded-full",
   b: "bottom-0 left-0 h-[var(--d)] w-[var(--d)] rounded-full",
   shoulder: "left-1/2 top-0 h-12 w-[64%] -translate-x-1/2 rounded-full text-xs tracking-wide",
 };
@@ -89,6 +92,12 @@ const ARM_POSITION: Record<PadDirection, string> = {
   left: "left-0 top-1/3 h-1/3 w-1/3 rounded-l-xl",
   right: "right-0 top-1/3 h-1/3 w-1/3 rounded-r-xl",
   down: "bottom-0 left-1/3 h-1/3 w-1/3 rounded-b-xl",
+};
+/** T자(↑ 없음) — 높이가 폭의 2/3이라 한 줄 = 높이의 1/2 */
+const ARM_POSITION_TEE: Record<Exclude<PadDirection, "up">, string> = {
+  left: "left-0 top-0 h-1/2 w-1/3 rounded-l-xl",
+  right: "right-0 top-0 h-1/2 w-1/3 rounded-r-xl",
+  down: "bottom-0 left-1/3 h-1/2 w-1/3 rounded-b-xl",
 };
 const DIRECTIONS: readonly PadDirection[] = ["up", "left", "right", "down"];
 
@@ -127,9 +136,10 @@ export function GamePad({ layout, onHoldStart, onHoldEnd, onInstant, active }: G
   }, []);
 
   const directionAt = (e: React.PointerEvent<HTMLDivElement>) => {
+    // 중심·반지름은 폭으로 — 정사각형은 요소 중심, T자는 위 1/3이 잘린 정사각형의 중심(아래에서 폭의 절반)
     const rect = e.currentTarget.getBoundingClientRect();
-    const half = Math.min(rect.width, rect.height) / 2 || 1;
-    return padDirection((e.clientX - (rect.left + rect.width / 2)) / half, (e.clientY - (rect.top + rect.height / 2)) / half, dirRef.current);
+    const half = rect.width / 2 || 1;
+    return padDirection((e.clientX - (rect.left + half)) / half, (e.clientY - (rect.bottom - half)) / half, dirRef.current);
   };
 
   /** 십자 패드를 맡은 손가락이 떨어졌다(뗌·취소·캡처 잃음) */
@@ -242,6 +252,7 @@ export function GamePad({ layout, onHoldStart, onHoldEnd, onInstant, active }: G
   const shoulder = layout.buttons.filter((b) => b.slot === "shoulder");
   const right = layout.buttons.filter((b) => b.slot !== "shoulder");
   const hasTop = right.some((b) => b.slot === "top");
+  const tee = !layout.dpad.up;
 
   return (
     <div
@@ -259,7 +270,7 @@ export function GamePad({ layout, onHoldStart, onHoldEnd, onInstant, active }: G
           role="group"
           aria-label="방향"
           data-testid="game-pad-dpad"
-          className="pointer-events-auto relative aspect-square w-[clamp(132px,38vw,160px)] landscape:w-[clamp(112px,34vh,150px)]"
+          className={`pointer-events-auto relative w-[clamp(132px,38vw,160px)] landscape:w-[clamp(112px,34vh,150px)] ${tee ? "aspect-[3/2]" : "aspect-square"}`}
           onPointerDown={(e) => {
             if (pointerRef.current !== null) return; // 두 번째 손가락은 십자 패드를 맡지 않는다
             e.preventDefault();
@@ -279,11 +290,13 @@ export function GamePad({ layout, onHoldStart, onHoldEnd, onInstant, active }: G
           onPointerCancel={(e) => endDpad(e.pointerId)}
           onLostPointerCapture={(e) => endDpad(e.pointerId)}
         >
-          <span aria-hidden="true" className="absolute left-1/3 top-1/3 h-1/3 w-1/3 bg-slate-800/90" />
+          <span aria-hidden="true" className={`absolute left-1/3 w-1/3 bg-slate-800/90 ${tee ? "top-0 h-1/2" : "top-1/3 h-1/3"}`} />
           {DIRECTIONS.map((dir) => {
+            if (tee && dir === "up") return null;
+            const position = tee && dir !== "up" ? ARM_POSITION_TEE[dir] : ARM_POSITION[dir];
             const spec = layout.dpad[dir];
             // 무동작 방향 — 누르는 키가 아님이 보이게 흐린 팔만(버튼·라벨 없음)
-            if (!spec) return <span key={dir} aria-hidden="true" data-testid={`pad-arm-${dir}-off`} className={`absolute bg-slate-800/40 ${ARM_POSITION[dir]}`} />;
+            if (!spec) return <span key={dir} aria-hidden="true" data-testid={`pad-arm-${dir}-off`} className={`absolute bg-slate-800/40 ${position}`} />;
             return (
               <button
                 key={dir}
@@ -292,7 +305,7 @@ export function GamePad({ layout, onHoldStart, onHoldEnd, onInstant, active }: G
                 // 누른 방향 표시는 화면용 — 순간 동작이라 토글(aria-pressed)로 읽히지 않게
                 data-pressed={shown === dir}
                 onClick={keyboardPress(spec.action)}
-                className={`absolute flex items-center justify-center text-lg font-bold transition-colors ${ARM_POSITION[dir]} ${shown === dir ? "bg-sky-500/60 text-white" : "bg-slate-800/90 text-slate-200"}`}
+                className={`absolute flex items-center justify-center text-lg font-bold transition-colors ${position} ${shown === dir ? "bg-sky-500/60 text-white" : "bg-slate-800/90 text-slate-200"}`}
               >
                 <span aria-hidden="true">{spec.label}</span>
               </button>
@@ -301,12 +314,12 @@ export function GamePad({ layout, onHoldStart, onHoldEnd, onInstant, active }: G
         </div>
       </div>
 
-      {/* 오른쪽 — top(넓은 버튼, 있으면) 아래 A(위·오른쪽)·B(왼쪽 아래 25°). --d = 원 지름 */}
+      {/* 오른쪽 — top(넓은 버튼, 48px, 있으면) 아래 A(위·오른쪽)·B(왼쪽 아래 25°). --d = 원 지름 */}
       <div
         role="group"
         aria-label="버튼"
         className="pointer-events-auto relative shrink-0 [--d:clamp(56px,17vw,72px)] landscape:[--d:clamp(50px,15vh,68px)]"
-        style={{ width: "calc(var(--d) * 2.13)", height: hasTop ? "calc(var(--d) * 1.53 + 80px)" : "calc(var(--d) * 1.53)" }}
+        style={{ width: "calc(var(--d) * 2.13)", height: hasTop ? "calc(var(--d) * 1.53 + 60px)" : "calc(var(--d) * 1.53)" }}
       >
         {right.map((spec) => button(spec, spec.slot === "a" && !hasTop ? SLOT_A_WITHOUT_TOP : SLOT_CLASS[spec.slot]))}
       </div>

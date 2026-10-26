@@ -13,6 +13,7 @@ import {
   splitIntoWeeks,
   isWeekend,
   isToday,
+  formatCompactDateTime,
 } from './dateUtils';
 
 describe('isTaskRangeInverted', () => {
@@ -204,5 +205,13 @@ describe('isWeekend', () => {
     expect(isWeekend(new Date(2026, 9, 25))).toBe(true); // 일
     expect(isWeekend(new Date(2026, 9, 26))).toBe(false); // 월
     expect(isWeekend(new Date(2026, 9, 23))).toBe(false); // 금
+  });
+});
+
+describe('formatCompactDateTime', () => {
+  it('올해면 연도 없이 월.일 시:분(로컬), 다른 해면 연도를 붙인다', () => {
+    const now = new Date(2026, 9, 26, 12, 0);
+    expect(formatCompactDateTime(new Date(2026, 9, 21, 9, 5), now)).toBe('10.21 09:05');
+    expect(formatCompactDateTime(new Date(2025, 0, 3, 0, 30), now)).toBe('2025.1.3 00:30');
   });
 });

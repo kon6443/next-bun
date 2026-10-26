@@ -2,6 +2,7 @@
 import { act, render, screen } from '@testing-library/react';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { DefenseRankings } from './DefenseRankings';
+import { resetRankingsCache } from '@/app/games/_shared/components/RankingsView';
 import { weeklyBoardKeyAt } from '../lib/rankedBoards';
 import { RankedCards } from './RankedCards';
 
@@ -29,6 +30,7 @@ const item = { rank: 1, scoreId: 5, playerName: '수비왕', score: 24_500_000, 
 
 describe('디펜스 랭킹·허브 카드', () => {
   beforeEach(() => {
+    resetRankingsCache();
     localStorage.clear();
     getGameBoards.mockReset().mockResolvedValue(BOARDS);
     getGameRankings.mockReset().mockResolvedValue({ code: 'SUCCESS', message: '', data: { boardKey: 'x', items: [item], periodStart: null } });

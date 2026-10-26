@@ -8,7 +8,8 @@ import { computeLayout } from "../../lib/renderer";
 import type { BoardSkins } from "../../lib/skins";
 import { GamePad } from "@/app/games/_shared/components/GamePad";
 import { TETRIS_PAD_LAYOUT } from "../../lib/tetrisPadLayout";
-import { SoundButton } from "@/app/games/_shared/components/SoundButton";
+import { GameSettingsButton } from "@/app/games/_shared/components/GameSettingsButton";
+import { TetrisSettingsSheet } from "../../components/TetrisSettingsSheet";
 import type { ReceivedEmote } from "../contexts/BattleSocketContext";
 import type { useBattlePlay } from "../hooks/useBattlePlay";
 import { EmoteBar } from "./EmoteBar";
@@ -206,7 +207,7 @@ export function BattleView({
           ←
         </button>
         {side ? <div className="min-w-0 flex-1" /> : opponentList("flex min-w-0 flex-1 justify-center gap-3")}
-        <SoundButton className="shrink-0" />
+        <GameSettingsButton className="shrink-0" restoreFocus={false} renderSheet={(close) => <TetrisSettingsSheet onClose={close} controls="locked" />} />
         <button
           ref={emoteToggleRef}
           type="button"

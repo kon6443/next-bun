@@ -12,20 +12,21 @@ import { useMediaQuery } from "@/app/games/_shared/hooks/useMediaQuery";
 import { sessionTtlMs } from "@/app/games/_shared/lib/sessionTtl";
 import { ApiError } from "@/types/api";
 import type { GameSession, ReplayPayload, ScoreSummary } from "@/types/game";
-import { extractErrorMessage } from "@/app/utils/errorUtils";
 import { ENGINE_VERSION, type GameState, MAX_FRAMES, MAX_INPUT_LENGTH } from "../../engine";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
 import { TetrisCanvas } from "../../components/TetrisCanvas";
 import { useMySkins } from "../../hooks/useMySkins";
 import { GamePad } from "@/app/games/_shared/components/GamePad";
 import { TETRIS_PAD_LAYOUT } from "../../lib/tetrisPadLayout";
-import { EffectsToggle } from "../../components/EffectsToggle";
-import { SoundButton } from "@/app/games/_shared/components/SoundButton";
+import { TetrisSettingsSheet } from "../../components/TetrisSettingsSheet";
+import { SkinChangeButton } from "../../components/MySkinCard";
+import { GameSettingsButton } from "@/app/games/_shared/components/GameSettingsButton";
 import { type GameResult, GameOverPanel } from "../../components/GameOverPanel";
 import { useTetrisPlay } from "../../hooks/useTetrisPlay";
-import { CONTROL_GUIDE } from "../../lib/controls";
+import { CONTROL_GUIDE, PAD_GUIDE } from "../../lib/controls";
 import { formatFrames, formatScore } from "@/app/games/_shared/lib/format";
-import { type TetrisSettings, DEFAULT_SETTINGS, loadLastName, loadSettings, recordBestScore } from "../../lib/storage";
+import { loadLastName, recordBestScore } from "../../lib/storage";
+import { useTetrisSettings } from "../../hooks/useTetrisSettings";
 import { isDailyBoardKey, recordDailyRun } from "../../lib/daily";
 import { challengeHeadline, challengeRootId } from "../../lib/challenge";
 
@@ -47,6 +48,9 @@ const SESSION_TTL_FALLBACK_MS = 120 * 60 * 1000;
 const SESSION_PLAY_MARGIN_MS = 61 * 60 * 1000;
 /** 세션 응답이 이만큼 늦으면 "등록 없이 시작"을 보인다 — 발급 상한(10초)까지 시작을 막지 않게 (games-polish FE-12) */
 export const SLOW_SESSION_MS = 3000;
+/** 준비·일시정지 메뉴의 "설정" — 메뉴의 보조 버튼(secondary)과 같은 모양 */
+const OVERLAY_SETTINGS_CLASS =
+  "mt-2 min-h-11 w-full rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40";
 
 function randomSeed(): number {
   return crypto.getRandomValues(new Uint32Array(1))[0];
@@ -69,7 +73,8 @@ function sessionErrorMessage(err: unknown, variant: "daily" | "challenge" | null
   if (err instanceof ApiError && err.code === "GAME_DAILY_UNAVAILABLE") return "지금은 오늘의 테트리스를 열 수 없어요. 이번 판은 일반 판으로 등록 없이 플레이해요.";
   if (variant === "daily") return "오늘의 테트리스를 준비하지 못했어요. 이번 판은 일반 판으로 등록 없이 플레이해요.";
   if (variant === "challenge") return "도전장을 준비하지 못했어요. 이번 판은 일반 판으로 등록 없이 플레이해요.";
-  return `${extractErrorMessage(err, "랭킹 등록을 준비하지 못했습니다.")} 이번 판은 등록 없이 플레이해요.`;
+  // 서버·망 원문은 붙이지 않는다 — 오늘의 테트리스·도전장과 같은 고정 문구(UX 점검: 세션 실패 문구 통일)
+  return "랭킹 등록을 준비하지 못했어요. 이번 판은 등록 없이 플레이해요.";
 }
 
 /**
@@ -83,7 +88,8 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
   const mySkins = { block: equipped.block, effect: equipped.effect, board: equipped.board };
   const accessToken = authSession?.user?.accessToken ?? undefined;
 
-  const [settings, setSettings] = useState<TetrisSettings>(DEFAULT_SETTINGS);
+  // 조작 설정 — 진동은 바로 반영, DAS·ARR은 판을 시작할 때 엔진에 넘긴다(판 도중 바꾸면 다음 판부터)
+  const { settings } = useTetrisSettings();
   const isCoarse = useMediaQuery("(pointer: coarse)");
   const [sessionState, setSessionState] = useState<SessionState>({ status: "loading" });
   /** 판이 끝난 순간의 세션 — 데일리 보드면 오늘 첫 판을 남긴다 */
@@ -126,10 +132,6 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
   }, []);
 
   const play = useTetrisPlay({ vibration: settings.vibration, onGameOver });
-
-  useEffect(() => {
-    setSettings(loadSettings());
-  }, []);
 
   // "처음부터"를 연달아 눌러도 늦게 온 이전 세션 응답이 최신 상태를 덮지 않게 (FE-21)
   const beginSessionRequest = useLatestRequest();
@@ -181,7 +183,18 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
     requestSession();
   }, [authStatus, requestSession]);
 
-  const { start: startPlay } = play;
+  const { start: startPlay, pause: pausePlay } = play;
+  /** 설정 시트가 열려 있는 동안 — 판을 멈추고, 뒤의 "시작"이 포커스·자동 시작으로 시트 뒤에서 판을 열지 않게 */
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const onSettingsOpenChange = useCallback((open: boolean) => {
+    setSettingsOpen(open);
+    if (open) pausePlay();
+  }, [pausePlay]);
+  // 준비 화면에서 바꾼 DAS·ARR은 곧 시작할 판에 들어간다 — "다음 판부터"는 판 도중에만
+  const renderSettings = useCallback(
+    (close: () => void) => <TetrisSettingsSheet onClose={close} controls={phase === "ready" ? "edit" : "next-game"} />,
+    [phase],
+  );
   const beginGame = useCallback(
     (seed: number) => {
       setResult(null);
@@ -206,11 +219,12 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
   };
 
   useEffect(() => {
-    if (!startAfterSessionRef.current || sessionState.status === "loading") return;
+    // 시트가 열려 있으면 닫힌 뒤에 — 시트 뒤에서 판이 시작되지 않게
+    if (!startAfterSessionRef.current || sessionState.status === "loading" || settingsOpen) return;
     startAfterSessionRef.current = false;
     // 재발급에 실패하면 자동으로 시작하지 않는다 — 준비 화면에서 "등록 불가" 안내를 보고 시작하게
     if (sessionState.status === "ready") beginGame(sessionState.session.seed);
-  }, [beginGame, sessionState]);
+  }, [beginGame, sessionState, settingsOpen]);
 
   // 세션 응답이 늦으면 기다리지 않고 등록 없이 시작할 수 있게 한다 — 늦게 온 응답은 버린다(이 판은 로컬 seed)
   const [sessionSlow, setSessionSlow] = useState(false);
@@ -241,9 +255,18 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
 
   // "시작" 버튼은 세션을 받는 동안 비활성이라 autoFocus가 안 먹는다 — 활성화될 때 포커스를 준다
   const startEnabled = phase === "ready" && sessionState.status !== "loading" && sessionState.status !== "blocked";
+  // "시작"이 막 눌릴 수 있게 됐을 때 한 번 포커스 — 시트가 열린 사이면 닫힌 뒤에(시트를 그냥 열고 닫으면 연 버튼으로 돌아간다)
+  const prevStartEnabledRef = useRef(false);
+  const startFocusPendingRef = useRef(false);
   useEffect(() => {
-    if (startEnabled) startButtonRef.current?.focus();
-  }, [startEnabled]);
+    if (startEnabled && !prevStartEnabledRef.current) startFocusPendingRef.current = true;
+    if (!startEnabled) startFocusPendingRef.current = false;
+    prevStartEnabledRef.current = startEnabled;
+    if (startFocusPendingRef.current && !settingsOpen) {
+      startFocusPendingRef.current = false;
+      startButtonRef.current?.focus();
+    }
+  }, [startEnabled, settingsOpen]);
 
   const showControls = phase === "game" && play.status !== "over" && isCoarse;
   // 세션을 못 받아 로컬 seed로 하는 판(failed)은 같은 블록 순서가 아니다 — 데일리·도전장 문구를 거둔다(거절된 도전장은 무엇을 못 하는지 보이게 남긴다)
@@ -255,7 +278,8 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
     <div className="relative flex h-full flex-col pt-[env(safe-area-inset-top)]">
       {/* 상단 — 나가기·점수판·일시정지 */}
       {/* 320px에서도 한 줄 — 휴대폰 폭(640px 미만)에서는 나가기를 화살표만, 여백·간격·라벨·숫자를 폭에 맞춰 줄인다(글자 꺾임·잘림 금지, 점수 9,999,999까지) */}
-      <header className="flex items-center gap-1.5 px-2 py-2 min-[360px]:gap-2 min-[360px]:px-3 sm:gap-3">
+      {/* 휴대폰은 위아래 여백 2px — 판 높이에 돌려준다(D-004 H1, 버튼 터치 영역 44px은 그대로) */}
+      <header className="flex items-center gap-1.5 px-2 py-0.5 sm:py-2 min-[360px]:gap-2 min-[360px]:px-3 sm:gap-3">
         <Link
           href="/games/tetris"
           aria-label="나가기"
@@ -284,8 +308,8 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
             <dd className="text-[clamp(11px,3.4vw,14px)] font-bold tracking-tight text-white">{formatFrames(play.hud.frame)}</dd>
           </div>
         </dl>
-        {/* 소리 설정 모달을 여는 동안 판을 멈춘다 */}
-        <SoundButton className="shrink-0" onOpenChange={(open) => open && play.pause()} />
+        {/* 설정 시트(소리·조작·연출·스킨)를 여는 동안 판을 멈춘다 — DAS·ARR은 다음 판부터 */}
+        <GameSettingsButton className="shrink-0" onOpenChange={onSettingsOpenChange} renderSheet={renderSettings} />
         <button
           type="button"
           onClick={(e) => {
@@ -345,8 +369,10 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
                   등록 없이 시작
                 </Button>
               )}
-              <EffectsToggle className="mt-3" />
-              {!isCoarse && <ControlGuide />}
+              <GameSettingsButton onOpenChange={onSettingsOpenChange} renderSheet={renderSettings} className={OVERLAY_SETTINGS_CLASS}>
+                설정
+              </GameSettingsButton>
+              <ControlGuide items={isCoarse ? PAD_GUIDE : CONTROL_GUIDE} />
             </div>
           </Overlay>
         )}
@@ -363,8 +389,14 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
                   처음부터
                 </Button>
               </div>
-              <EffectsToggle className="mt-3" />
-              {!isCoarse && <ControlGuide />}
+              <GameSettingsButton onOpenChange={onSettingsOpenChange} renderSheet={renderSettings} className={OVERLAY_SETTINGS_CLASS}>
+                설정
+              </GameSettingsButton>
+              <SkinChangeButton onOpenChange={onSettingsOpenChange} className={OVERLAY_SETTINGS_CLASS} controls="next-game">
+                스킨 바꾸기
+              </SkinChangeButton>
+              {/* 터치 기기는 패드가 바로 아래 보이고 준비 화면에서 안내했다 — 메뉴가 화면을 넘지 않게 키보드 기기만 */}
+              {!isCoarse && <ControlGuide items={CONTROL_GUIDE} />}
             </div>
           </Overlay>
         )}
@@ -414,16 +446,18 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
 
 function Overlay({ children }: { children: React.ReactNode }) {
   return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center overflow-y-auto bg-slate-950/70 p-4" style={{ touchAction: "auto" }}>
-      {children}
+    // 가운데 정렬은 안쪽 m-auto로 — items-center면 내용이 화면보다 길 때 위쪽이 잘려 스크롤로도 못 본다
+    <div className="absolute inset-0 z-10 flex overflow-y-auto bg-slate-950/70 p-4" style={{ touchAction: "auto" }}>
+      <div className="m-auto flex w-full justify-center">{children}</div>
     </div>
   );
 }
 
-function ControlGuide() {
+/** 조작 안내 — 키보드 기기는 키 표, 터치 기기는 패드 버튼 표 */
+function ControlGuide({ items }: { items: readonly { keys: string; label: string }[] }) {
   return (
-    <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-left text-xs">
-      {CONTROL_GUIDE.map(({ keys, label }) => (
+    <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-left text-xs" data-testid="control-guide">
+      {items.map(({ keys, label }) => (
         <div key={keys} className="contents">
           <dt className="font-mono font-semibold text-sky-300">{keys}</dt>
           <dd className="text-slate-400">{label}</dd>

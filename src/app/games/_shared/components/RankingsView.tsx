@@ -24,6 +24,36 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: "watch", label: "시청순" },
 ];
 const LIMIT = 50;
+/** 탭 결과를 다시 쓰는 시간 — 탭을 오가도 같은 목록을 다시 부르지 않게(요청 한도 429, UX 점검) */
+export const RANKINGS_CACHE_MS = 60_000;
+/** 탭을 바꾼 뒤 이만큼 멈추면 부른다 — 빠르게 여러 탭을 지나가면 마지막 탭만 */
+export const RANKINGS_DEBOUNCE_MS = 250;
+
+/**
+ * 받은 목록 — 게임·보드·기간·정렬별. 화면 밖(모듈)에 둔다: 보드 탭을 바꾸면 화면을 새로 그리므로(key) 화면 안에 두면 오갈 때마다 다시 부른다
+ * 마지막 요청 시각 — 방금 다른 보드를 불렀으면 새 화면의 첫 요청도 잠깐 기다린다(보드 탭 연타)
+ */
+const rankingsCache = new Map<string, { at: number; listing: unknown }>();
+/** 진행 중인 요청 — 같은 목록을 두 번 부르지 않는다(StrictMode가 effect를 다시 돌려도 1회) */
+const inflight = new Map<string, Promise<unknown>>();
+/** 게임별 무효화 세대 — 무효화 전에 출발한 요청의 응답은 캐시에 넣지 않는다(등록 전 목록이 되살아나지 않게) */
+const generations = new Map<GameType, number>();
+let lastRequestAt = -Infinity;
+
+/** 기록을 등록하면 그 게임의 받아 둔 목록을 버린다 — "랭킹 보기"로 오면 새 기록이 들어간 목록을 받게 */
+export function invalidateRankings(gameType: GameType) {
+  generations.set(gameType, (generations.get(gameType) ?? 0) + 1);
+  for (const key of rankingsCache.keys()) if (key.startsWith(`${gameType}:`)) rankingsCache.delete(key);
+  for (const key of inflight.keys()) if (key.startsWith(`${gameType}:`)) inflight.delete(key);
+}
+
+/** 테스트용 — 캐시·요청 시각을 비운다 */
+export function resetRankingsCache() {
+  rankingsCache.clear();
+  inflight.clear();
+  generations.clear();
+  lastRequestAt = -Infinity;
+}
 
 /** 받은 목록과 그 정렬 — 정렬을 바꾼 직후 렌더에서 이전 목록에 새 정렬의 지표를 붙이지 않게 함께 둔다 */
 type Listing<D> = { sort: "score"; data: RankingList<D> } | { sort: PopularSort; data: PopularReplayList<D> };
@@ -48,6 +78,8 @@ type RankingsViewProps<G extends GameType> = {
   footer?: ReactNode;
 };
 
+const cacheKey = (gameType: GameType, board: string | undefined, period: RankingPeriod, sort: SortKey) => `${gameType}:${board ?? ""}:${period}:${sort}`;
+
 /** 게임 랭킹 화면 — 기간 탭 × 정렬(점수·조회·시청) + 상위 50개 (게임별 page는 클라이언트 래퍼에서 game 사양을 넘긴다) */
 export function RankingsView<G extends GameType>({ game, highlightId, board, showPeriods = true, header, replayUnavailable = null, playHref, waiting = false, footer }: RankingsViewProps<G>) {
   const [selectedPeriod, setPeriod] = useState<RankingPeriod>("daily");
@@ -64,16 +96,27 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
     setMyScoreIds(new Set(storage.loadMyScoreIds()));
   }, [storage]);
 
-  const load = useCallback(async (target: RankingPeriod, targetSort: SortKey) => {
-    // 탭을 빠르게 바꾸면 늦게 온 이전 탭 응답은 버린다
-    const requestId = ++requestIdRef.current;
-    setListing(null);
-    setError(null);
+  const load = useCallback(async (target: RankingPeriod, targetSort: SortKey, requestId: number) => {
     try {
-      const next: Listing<ScoreDetailByGame[G]> =
-        targetSort === "score"
-          ? { sort: "score", data: (await getGameRankings(game.gameType, target, LIMIT, board)).data }
-          : { sort: targetSort, data: (await getPopularReplays(game.gameType, { period: target, sort: targetSort, limit: LIMIT, board })).data };
+      const key = cacheKey(game.gameType, board, target, targetSort);
+      let request = inflight.get(key) as Promise<Listing<ScoreDetailByGame[G]>> | undefined;
+      if (!request) {
+        const generation = generations.get(game.gameType) ?? 0;
+        request = (async (): Promise<Listing<ScoreDetailByGame[G]>> =>
+          targetSort === "score"
+            ? { sort: "score", data: (await getGameRankings(game.gameType, target, LIMIT, board)).data }
+            : { sort: targetSort, data: (await getPopularReplays(game.gameType, { period: target, sort: targetSort, limit: LIMIT, board })).data })();
+        inflight.set(key, request);
+        const own = request;
+        // 무효화로 이미 빠졌거나 새 요청으로 바뀌었으면 남의 항목을 지우지 않는다
+        const settle = () => inflight.get(key) === own && inflight.delete(key);
+        request.then((listing) => {
+          settle();
+          if ((generations.get(game.gameType) ?? 0) === generation) rankingsCache.set(key, { at: Date.now(), listing });
+        }, settle);
+      }
+      const next = await request;
+      // 탭을 빠르게 바꾸면 늦게 온 이전 탭 응답은 버린다
       if (requestId === requestIdRef.current) setListing(next);
     } catch (err) {
       if (requestId === requestIdRef.current) setError(extractErrorMessage(err, "랭킹을 불러오지 못했습니다."));
@@ -103,8 +146,40 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
 
   useEffect(() => {
     if (waiting) return;
-    load(period, sort);
-  }, [load, period, sort, waiting]);
+    const requestId = ++requestIdRef.current;
+    setError(null);
+    const now = Date.now();
+    const key = cacheKey(game.gameType, board, period, sort);
+    const cached = rankingsCache.get(key);
+    const cachedListing = cached && now - cached.at < RANKINGS_CACHE_MS ? (cached.listing as Listing<ScoreDetailByGame[G]>) : null;
+    // 가리킨 기록이 받아 둔 점수순 목록에 없으면 그사이 등록된 기록일 수 있다 — 다시 받는다("상위 50위 밖" 오안내 방지)
+    const staleForHighlight =
+      cachedListing?.sort === "score" && highlightId !== null && !cachedListing.data.items.some((item) => item.scoreId === highlightId);
+    if (cachedListing && !staleForHighlight) {
+      setListing(cachedListing);
+      return;
+    }
+    setListing(null);
+    // 한동안 부르지 않았으면 바로, 방금 불렀으면(탭을 바꾸는 중) 잠깐 기다렸다가 — 그사이 또 바꾸면 이 요청은 취소
+    const start = () => {
+      lastRequestAt = Date.now();
+      void load(period, sort, requestId);
+    };
+    // 같은 목록을 이미 부르는 중이면(StrictMode 재실행 등) 기다리지 않고 그 요청에 붙는다
+    if (inflight.has(key) || now - lastRequestAt >= RANKINGS_DEBOUNCE_MS) {
+      start();
+      return;
+    }
+    const timer = setTimeout(start, RANKINGS_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [load, period, sort, waiting, game.gameType, board, highlightId]);
+
+  const retry = () => {
+    const requestId = ++requestIdRef.current;
+    setError(null);
+    lastRequestAt = Date.now();
+    void load(period, sort, requestId);
+  };
 
   return (
     <TeamsPageLayout>
@@ -165,7 +240,7 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
         {error ? (
           <div className={`${cardStyles.errorDashedContainer} px-6 py-10 text-center`} role="alert">
             <p className="text-sm font-semibold text-red-300">{error}</p>
-            <Button variant="secondary" size="sm" className="mt-4 min-h-11" onClick={() => load(period, sort)}>
+            <Button variant="secondary" size="sm" className="mt-4 min-h-11" onClick={retry}>
               다시 시도
             </Button>
           </div>

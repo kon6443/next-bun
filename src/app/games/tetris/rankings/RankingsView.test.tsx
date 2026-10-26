@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import TetrisRankingsView from './RankingsView';
+import { resetRankingsCache } from '@/app/games/_shared/components/RankingsView';
 import RankingsPage from './page';
 
 const getGameBoards = vi.fn();
@@ -26,6 +27,7 @@ const boards = [
 
 describe('테트리스 랭킹 — 오늘의 테트리스 보드 탭 (games-growth B1)', () => {
   beforeEach(() => {
+    resetRankingsCache();
     getGameBoards.mockReset().mockResolvedValue({ data: { items: boards } });
     getGameRankings.mockReset().mockResolvedValue({ data: { items: [item], periodStart: null } });
     getGameScore.mockReset();

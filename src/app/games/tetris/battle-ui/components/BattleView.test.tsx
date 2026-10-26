@@ -195,7 +195,7 @@ describe('BattleView 상대 판 자리 — 세로 화면 높이가 한계면 판
     spies.forEach((s) => s.mockRestore());
   });
 
-  it('390×844 1명(판 영역 390×463, 폭이 한계) — 헤더 그대로: 옆 줄이면 셀이 20 → 18로 준다', () => {
+  it('390×844 1명(판 영역 390×463, 폭이 한계) — 헤더 그대로: 옆 줄이면 셀이 20 → 19로 준다(옆 패널 2.5칸, D-004 S3)', () => {
     const spies = [media(true), rowSize(390, 463)];
     renderOne();
     expect(screen.getByTestId('opponents-header')).toBeInTheDocument();
@@ -230,7 +230,7 @@ describe('BattleView 상대 판 자리 — 세로 화면 높이가 한계면 판
     spies[1] = rowSize(375, 389);
     act(() => callbacks.forEach((cb) => cb()));
     expect(screen.getByTestId('opponents-side')).toBeInTheDocument();
-    // 판 영역이 충분히 높아지면(390×560 — 헤더 배치면 20, 옆 줄이면 18) 헤더로
+    // 판 영역이 충분히 높아지면(390×560 — 헤더 배치면 20, 옆 줄이면 19) 헤더로
     spies[1].mockRestore();
     spies[1] = rowSize(390, 560);
     act(() => callbacks.forEach((cb) => cb()));

@@ -12,6 +12,8 @@ vi.mock('@/services/gameService', () => ({
   submitGameScore: (...args: unknown[]) => submitGameScore(...args),
 }));
 
+vi.mock('next-auth/react', () => ({ useSession: () => ({ data: null, status: 'unauthenticated' }) }));
+
 const props = {
   result: { score: 500, lines: 5, level: 1, frames: 600, isNewBest: false },
   replay: { engineVersion: 1, das: 10, arr: 2, frames: 600, inputs: [0, 8] },
@@ -171,5 +173,20 @@ describe('GameOverPanel 예상 순위 요청', () => {
       fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
     });
     expect(screen.getByTestId('result-share').textContent).toBe('이 기록 공유하기');
+  });
+});
+
+describe('GameOverPanel 스킨 진입 (D-003)', () => {
+  beforeEach(() => {
+    getGameRankings.mockReset().mockResolvedValue(page([]));
+    window.localStorage.clear();
+  });
+
+  it('"내 스킨 바꾸기"는 설정 시트의 스킨 상세로 바로 연다', async () => {
+    await act(async () => {
+      render(<GameOverPanel {...props} />);
+    });
+    fireEvent.click(screen.getByRole('button', { name: '내 스킨 바꾸기 ›' }));
+    expect(screen.getByRole('dialog', { name: '스킨' })).toBeTruthy();
   });
 });

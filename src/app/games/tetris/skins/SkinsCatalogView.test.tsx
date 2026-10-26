@@ -71,6 +71,8 @@ describe('스킨 도감 (D-005)', () => {
     expect(within(neon).getByText('누구나 무료')).toBeTruthy();
     expect(within(neon).queryByText(/보유/)).toBeNull();
     expect(within(neon).queryByRole('button', { name: '장착' })).toBeNull();
+    // 보유 정보가 없으니 보유·미보유 필터도 없다 (UX 점검)
+    expect(screen.queryByRole('group', { name: '보기' })).toBeNull();
     window.history.pushState({}, '', '/games/tetris/skins');
     fireEvent.click(screen.getByRole('button', { name: '카카오로 로그인' }));
     expect(startLogin).toHaveBeenCalledWith({ callbackUrl: '/games/tetris/skins' });

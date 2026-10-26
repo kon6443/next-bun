@@ -28,12 +28,45 @@ describe('TetrisHome 설정 (games-polish FE-52)', () => {
         </StrictMode>,
       );
     });
+    // 조작 설정은 공통 설정 시트에 — 머리줄 톱니로 연다 (D-001)
+    fireEvent.click(screen.getByRole('button', { name: /^설정 \(소리/ }));
+    fireEvent.click(screen.getByTestId('settings-group-controls'));
+    const sheet = screen.getByRole('dialog', { name: '조작' });
     const setItem = vi.spyOn(Storage.prototype, 'setItem');
-    fireEvent.click(screen.getByRole('checkbox', { name: /진동/ }));
+    fireEvent.click(within(sheet).getByRole('checkbox', { name: /진동/ }));
     const writes = setItem.mock.calls.filter(([key]) => key === 'tetris:settings');
     expect(writes).toHaveLength(1);
     expect(JSON.parse(writes[0][1] as string).vibration).toBe(false); // 기본 켜짐 → 끔
     setItem.mockRestore();
+  });
+
+  it('게임 시작 바로 아래 "내 스킨" 카드 — 랭킹 미리보기보다 위 (D-003)', async () => {
+    await act(async () => {
+      render(<TetrisHome />);
+    });
+    const card = screen.getByTestId('my-skin-card');
+    const start = screen.getByRole('link', { name: '게임 시작' });
+    const ranking = screen.getByRole('heading', { name: /오늘의 TOP/ });
+    expect(start.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(card.compareDocumentPosition(ranking) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('아래 설정 섹션은 진입 줄 하나 — 같은 시트를 열고, 닫으면 그 줄로 포커스가 돌아온다 (D-001)', async () => {
+    await act(async () => {
+      render(<TetrisHome />);
+    });
+    expect(screen.queryByRole('slider', { name: /DAS/ })).toBeNull();
+    // 키보드 조작 표는 홈에 두지 않는다 — 시트 조작 상세·플레이 준비 화면에 (D-005)
+    expect(screen.queryByText('Space')).toBeNull();
+    const entry = screen.getByTestId('tetris-settings-entry');
+    // 키보드로 누른 경우(포커스가 줄에 있다)
+    entry.focus();
+    fireEvent.click(entry);
+    const sheet = screen.getByRole('dialog', { name: '설정' });
+    expect(within(sheet).getByTestId('settings-group-controls')).toBeTruthy();
+    fireEvent.click(within(sheet).getByRole('button', { name: '닫기' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(entry);
   });
 
   it('등록하지 못한 기록은 확인 뒤 버릴 수 있다 — 이름 없이 보관된 기록은 "등록할 이름"을 묻는다 (games-polish P5)', async () => {
