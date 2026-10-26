@@ -51,7 +51,7 @@ describe('RankingsView — 게임 사양을 따른다', () => {
     await act(async () => {
       render(<RankingsView game={TEST_GAME} highlightId={null} board="endless-s1" />);
     });
-    expect(getGameRankings).toHaveBeenCalledWith('defense', 'daily', 50, 'endless-s1');
+    expect(getGameRankings).toHaveBeenCalledWith('defense', 'daily', 50, 'endless-s1', undefined);
     expect(screen.getByRole('heading', { name: '타워 디펜스 랭킹' })).toBeTruthy();
     expect(screen.getByRole('link', { name: '← 타워 디펜스' }).getAttribute('href')).toBe('/games/defense');
     expect(screen.getByText(/^웨이브 3 · /)).toBeTruthy();
@@ -65,7 +65,7 @@ describe('RankingsView — 게임 사양을 따른다', () => {
     });
     expect(screen.queryByRole('group', { name: '랭킹 기간' })).toBeNull();
     expect(getGameRankings).toHaveBeenCalledTimes(1);
-    expect(getGameRankings).toHaveBeenCalledWith('defense', 'all', 50, 'weekly-2026-w43');
+    expect(getGameRankings).toHaveBeenCalledWith('defense', 'all', 50, 'weekly-2026-w43', undefined);
   });
 
   it('리플레이를 볼 수 없으면 행의 ▶는 이유를 단 비활성 버튼, 머리 영역·빈 목록 시작 링크는 넘긴 대로', async () => {
@@ -114,7 +114,7 @@ describe('RankingsView — 게임 사양을 따른다', () => {
     });
     await clickTab('주간');
     await clickTab('조회순');
-    expect(getPopularReplays).toHaveBeenLastCalledWith('defense', { period: 'weekly', sort: 'views', limit: 50, board: 'endless-s1' });
+    expect(getPopularReplays).toHaveBeenLastCalledWith('defense', { period: 'weekly', sort: 'views', limit: 50, board: 'endless-s1' }, undefined);
     expect(screen.getByText('· 조회 31')).toBeTruthy();
     // 인기 순서는 점수 순위가 아니다 — 읽는 이름도 "인기 N번째"
     expect(screen.getByRole('link', { name: '수비왕 인기 1번째 리플레이 보기' }).getAttribute('href')).toBe('/games/defense/replays/77');
@@ -125,7 +125,7 @@ describe('RankingsView — 게임 사양을 따른다', () => {
     expect(getGameScore).not.toHaveBeenCalled();
 
     await clickTab('시청순');
-    expect(getPopularReplays).toHaveBeenLastCalledWith('defense', { period: 'weekly', sort: 'watch', limit: 50, board: 'endless-s1' });
+    expect(getPopularReplays).toHaveBeenLastCalledWith('defense', { period: 'weekly', sort: 'watch', limit: 50, board: 'endless-s1' }, undefined);
     expect(screen.getByText('· 시청 12분')).toBeTruthy();
 
     getPopularReplays.mockResolvedValue({ code: 'SUCCESS', message: 'ok', data: { boardKey: 'endless-s1', period: 'all', sort: 'watch', periodStart: null, items: [] } });
@@ -205,7 +205,7 @@ describe('RankingsView — 게임 사양을 따른다', () => {
     const second = await act(async () => render(<RankingsView game={TEST_GAME} highlightId={null} board="weekly-2026-w43" showPeriods={false} />));
     expect(getGameRankings).toHaveBeenCalledTimes(1);
     await passDebounce();
-    expect(getGameRankings).toHaveBeenLastCalledWith('defense', 'all', 50, 'weekly-2026-w43');
+    expect(getGameRankings).toHaveBeenLastCalledWith('defense', 'all', 50, 'weekly-2026-w43', undefined);
     second.unmount();
     await act(async () => {
       render(<RankingsView game={TEST_GAME} highlightId={null} board="endless-s1" />);

@@ -11,6 +11,7 @@ const getGameRankings = vi.hoisted(() => vi.fn());
 // 명예의 전당은 HallOfFame 테스트 몫 — 여기서는 빈 목록(섹션 숨김)
 const getHallOfFame = vi.hoisted(() => vi.fn(() => Promise.resolve({ data: { periods: [] } })));
 vi.mock('@/services/gameService', () => ({ getGameBoards, getGameRankings, getHallOfFame }));
+vi.mock('next-auth/react', () => ({ useSession: () => ({ data: null, status: 'unauthenticated' }) }));
 // next/link 전용 속성(replace·scroll)은 <a>에 넘기지 않는다
 const linkAttrs = (rest: Record<string, unknown>) => Object.fromEntries(Object.entries(rest).filter(([key]) => key !== 'replace' && key !== 'scroll'));
 vi.mock('next/link', () => ({ default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...linkAttrs(rest)}>{children}</a> }));
@@ -40,7 +41,7 @@ describe('디펜스 랭킹·허브 카드', () => {
     await act(async () => {
       render(<DefenseRankings boardParam="weekly" highlightId={null} />);
     });
-    expect(getGameRankings).toHaveBeenCalledWith('defense', 'all', 50, 'weekly-2026-w43');
+    expect(getGameRankings).toHaveBeenCalledWith('defense', 'all', 50, 'weekly-2026-w43', undefined);
     expect(screen.getByTestId('defense-board-tab-weekly-2026-w43').getAttribute('aria-current')).toBe('page');
     expect(screen.queryByRole('group', { name: '랭킹 기간' })).toBeNull();
     expect(screen.getByRole('button', { name: /주가 끝나고 4시간 뒤 공개돼요/ })).toBeTruthy();
@@ -75,7 +76,7 @@ describe('디펜스 랭킹·허브 카드', () => {
     await act(async () => {
       render(<DefenseRankings boardParam={null} highlightId={null} />);
     });
-    expect(getGameRankings).toHaveBeenCalledWith('defense', 'daily', 50, 'endless-s1');
+    expect(getGameRankings).toHaveBeenCalledWith('defense', 'daily', 50, 'endless-s1', undefined);
     expect(screen.getByRole('group', { name: '랭킹 기간' })).toBeTruthy();
     expect(screen.getByRole('link', { name: /리플레이 보기/ }).getAttribute('href')).toBe('/games/defense/replays/5');
     expect(screen.getByText(/^처치 800 · 1:00 · /)).toBeTruthy();
@@ -90,7 +91,7 @@ describe('디펜스 랭킹·허브 카드', () => {
     await act(async () => {
       render(<DefenseRankings boardParam="weekly" highlightId={null} />);
     });
-    expect(getGameRankings).toHaveBeenCalledWith('defense', 'daily', 50, 'endless-s1');
+    expect(getGameRankings).toHaveBeenCalledWith('defense', 'daily', 50, 'endless-s1', undefined);
     expect(screen.getByText(/무한 모드 랭킹만/)).toBeTruthy();
   });
 

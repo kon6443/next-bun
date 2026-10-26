@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { useSession } from "next-auth/react";
 import { TeamsPageLayout, ButtonLink, Button, SectionLabel, EmptyState, TeamListSkeleton } from "@/app/teams/components";
 import { cardStyles } from "@/styles/teams";
 import { getGameRankings, getGameScore, getPopularReplays } from "@/services/gameService";
@@ -30,7 +31,7 @@ export const RANKINGS_CACHE_MS = 60_000;
 export const RANKINGS_DEBOUNCE_MS = 250;
 
 /**
- * 받은 목록 — 게임·보드·기간·정렬별. 화면 밖(모듈)에 둔다: 보드 탭을 바꾸면 화면을 새로 그리므로(key) 화면 안에 두면 오갈 때마다 다시 부른다
+ * 받은 목록 — 게임·보드·기간·정렬·보는 사람별(로그인이면 내 기록에 isMine이 붙어 응답이 사람마다 다르다). 화면 밖(모듈)에 둔다: 보드 탭을 바꾸면 화면을 새로 그리므로(key) 화면 안에 두면 오갈 때마다 다시 부른다
  * 마지막 요청 시각 — 방금 다른 보드를 불렀으면 새 화면의 첫 요청도 잠깐 기다린다(보드 탭 연타)
  */
 const rankingsCache = new Map<string, { at: number; listing: unknown }>();
@@ -78,7 +79,9 @@ type RankingsViewProps<G extends GameType> = {
   footer?: ReactNode;
 };
 
-const cacheKey = (gameType: GameType, board: string | undefined, period: RankingPeriod, sort: SortKey) => `${gameType}:${board ?? ""}:${period}:${sort}`;
+/** viewer: "user:{userId}" 또는 "guest" — 로그인·로그아웃·계정 전환 뒤 다른 사람의 isMine을 다시 쓰지 않게(토큰 원문은 키에 넣지 않는다) */
+const cacheKey = (gameType: GameType, board: string | undefined, period: RankingPeriod, sort: SortKey, viewer: string) =>
+  `${gameType}:${board ?? ""}:${period}:${sort}:${viewer}`;
 
 /** 게임 랭킹 화면 — 기간 탭 × 정렬(점수·조회·시청) + 상위 50개 (게임별 page는 클라이언트 래퍼에서 game 사양을 넘긴다) */
 export function RankingsView<G extends GameType>({ game, highlightId, board, showPeriods = true, header, replayUnavailable = null, playHref, waiting = false, footer }: RankingsViewProps<G>) {
@@ -91,6 +94,12 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
   const [myScoreIds, setMyScoreIds] = useState<ReadonlySet<number>>(new Set());
   const requestIdRef = useRef(0);
 
+  // 로그인이면 토큰을 실어 내 기록(isMine)을 받는다. 로그인 상태가 정해지기 전에는 부르지 않는다(익명으로 한 번, 토큰으로 또 한 번 부르지 않게)
+  const { data: session, status: authStatus } = useSession();
+  const accessToken = session?.user?.accessToken ?? undefined;
+  const viewer = accessToken ? `user:${session?.user?.userId ?? "?"}` : "guest";
+  const authPending = authStatus === "loading";
+
   const { storage } = game;
   useEffect(() => {
     setMyScoreIds(new Set(storage.loadMyScoreIds()));
@@ -98,14 +107,14 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
 
   const load = useCallback(async (target: RankingPeriod, targetSort: SortKey, requestId: number) => {
     try {
-      const key = cacheKey(game.gameType, board, target, targetSort);
+      const key = cacheKey(game.gameType, board, target, targetSort, viewer);
       let request = inflight.get(key) as Promise<Listing<ScoreDetailByGame[G]>> | undefined;
       if (!request) {
         const generation = generations.get(game.gameType) ?? 0;
         request = (async (): Promise<Listing<ScoreDetailByGame[G]>> =>
           targetSort === "score"
-            ? { sort: "score", data: (await getGameRankings(game.gameType, target, LIMIT, board)).data }
-            : { sort: targetSort, data: (await getPopularReplays(game.gameType, { period: target, sort: targetSort, limit: LIMIT, board })).data })();
+            ? { sort: "score", data: (await getGameRankings(game.gameType, target, LIMIT, board, accessToken)).data }
+            : { sort: targetSort, data: (await getPopularReplays(game.gameType, { period: target, sort: targetSort, limit: LIMIT, board }, accessToken)).data })();
         inflight.set(key, request);
         const own = request;
         // 무효화로 이미 빠졌거나 새 요청으로 바뀌었으면 남의 항목을 지우지 않는다
@@ -121,7 +130,7 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
     } catch (err) {
       if (requestId === requestIdRef.current) setError(extractErrorMessage(err, "랭킹을 불러오지 못했습니다."));
     }
-  }, [game.gameType, board]);
+  }, [game.gameType, board, viewer, accessToken]); // viewer는 계정, accessToken은 그 계정의 현재 토큰
 
   /**
    * 링크로 가리킨 기록이 이 목록(상위 50)에 없으면 그 기록의 전체 기간 순위를 한 번 받아 알린다 — 강조할 행이 없어 아무 표시가 없던 것 (games-polish FE-14)
@@ -145,11 +154,11 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
   }, [missing, highlightId, game.gameType]);
 
   useEffect(() => {
-    if (waiting) return;
+    if (waiting || authPending) return;
     const requestId = ++requestIdRef.current;
     setError(null);
     const now = Date.now();
-    const key = cacheKey(game.gameType, board, period, sort);
+    const key = cacheKey(game.gameType, board, period, sort, viewer);
     const cached = rankingsCache.get(key);
     const cachedListing = cached && now - cached.at < RANKINGS_CACHE_MS ? (cached.listing as Listing<ScoreDetailByGame[G]>) : null;
     // 가리킨 기록이 받아 둔 점수순 목록에 없으면 그사이 등록된 기록일 수 있다 — 다시 받는다("상위 50위 밖" 오안내 방지)
@@ -172,7 +181,7 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
     }
     const timer = setTimeout(start, RANKINGS_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [load, period, sort, waiting, game.gameType, board, highlightId]);
+  }, [load, period, sort, waiting, authPending, viewer, game.gameType, board, highlightId]);
 
   const retry = () => {
     const requestId = ++requestIdRef.current;
