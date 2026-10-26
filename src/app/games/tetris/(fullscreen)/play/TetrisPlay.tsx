@@ -19,6 +19,7 @@ import { useMySkins } from "../../hooks/useMySkins";
 import { GamePad } from "@/app/games/_shared/components/GamePad";
 import { TETRIS_PAD_LAYOUT } from "../../lib/tetrisPadLayout";
 import { TetrisSettingsSheet } from "../../components/TetrisSettingsSheet";
+import { SkinChangeButton } from "../../components/MySkinCard";
 import { GameSettingsButton } from "@/app/games/_shared/components/GameSettingsButton";
 import { type GameResult, GameOverPanel } from "../../components/GameOverPanel";
 import { useTetrisPlay } from "../../hooks/useTetrisPlay";
@@ -374,6 +375,9 @@ export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?
               <GameSettingsButton onOpenChange={pauseOnOpen} renderSheet={renderSettings} className={OVERLAY_SETTINGS_CLASS}>
                 설정
               </GameSettingsButton>
+              <SkinChangeButton onOpenChange={pauseOnOpen} className={OVERLAY_SETTINGS_CLASS}>
+                스킨 바꾸기
+              </SkinChangeButton>
               <ControlGuide items={isCoarse ? PAD_GUIDE : CONTROL_GUIDE} />
             </div>
           </Overlay>

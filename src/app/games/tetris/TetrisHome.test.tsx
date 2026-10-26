@@ -40,6 +40,17 @@ describe('TetrisHome 설정 (games-polish FE-52)', () => {
     setItem.mockRestore();
   });
 
+  it('게임 시작 바로 아래 "내 스킨" 카드 — 랭킹 미리보기보다 위 (D-003)', async () => {
+    await act(async () => {
+      render(<TetrisHome />);
+    });
+    const card = screen.getByTestId('my-skin-card');
+    const start = screen.getByRole('link', { name: '게임 시작' });
+    const ranking = screen.getByRole('heading', { name: /오늘의 TOP/ });
+    expect(start.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(card.compareDocumentPosition(ranking) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('아래 설정 섹션은 진입 줄 하나 — 같은 시트를 열고, 닫으면 그 줄로 포커스가 돌아온다 (D-001)', async () => {
     await act(async () => {
       render(<TetrisHome />);

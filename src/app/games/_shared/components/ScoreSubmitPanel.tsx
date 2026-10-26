@@ -29,6 +29,8 @@ type ScoreSubmitPanelProps<G extends GameType> = {
   showReplay?: boolean;
   /** 등록 뒤 링크 아래 게임별 동작(공유 등) — brag: 상위권·개인 최고면 자랑 문구(bragLabel), 아니면 null */
   registeredActions?: (registered: SubmitScoreResponse<ScoreDetailByGame[G]>, playerName: string, brag: string | null) => React.ReactNode;
+  /** 다시 하기·나가기 아래 게임별 보조 동작(테트리스 "내 스킨 바꾸기" 등) */
+  footer?: React.ReactNode;
   /** 세션이 없으면(발급 실패) 등록할 수 없다 */
   sessionId: string | null;
   sessionError: string | null;
@@ -79,6 +81,7 @@ export function ScoreSubmitPanel<G extends GameType>({
   periods = PERIODS,
   showReplay = true,
   registeredActions,
+  footer,
   sessionId,
   sessionError,
   accessToken,
@@ -336,6 +339,7 @@ export function ScoreSubmitPanel<G extends GameType>({
           나가기
         </Link>
       </div>
+      {footer}
       <ConfirmModal
         isOpen={confirmRestart}
         onClose={() => setConfirmRestart(false)}

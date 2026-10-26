@@ -18,6 +18,7 @@ import { PopularReplaysPreview } from "@/app/games/_shared/components/PopularRep
 import { GameSettingsButton } from "@/app/games/_shared/components/GameSettingsButton";
 import { ReloginButton } from "@/app/games/_shared/components/ReloginButton";
 import { TetrisSettingsSheet } from "./components/TetrisSettingsSheet";
+import { MySkinCard } from "./components/MySkinCard";
 import { formatScore } from "@/app/games/_shared/lib/format";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
 import { classifySubmitError } from "@/app/games/_shared/lib/submitError";
@@ -147,6 +148,9 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
               게임 시작
             </ButtonLink>
           </section>
+
+          {/* 내 스킨 — 게임 시작 바로 아래, 눈에 띄게 (D-003). 게스트는 로그인 유도 */}
+          <MySkinCard className={`${cardStyles.section} p-4`} />
 
           {/* 오늘의 테트리스 — 데일리 보드가 있을 때만 (games-growth B1) */}
           <DailyCard />

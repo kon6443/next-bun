@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import type { ReplayPayload, ScoreSummary, SubmitScoreResponse, TetrisScoreDetail } from "@/types/game";
 import { ScoreSubmitPanel } from "@/app/games/_shared/components/ScoreSubmitPanel";
+import { SkinChangeButton } from "./MySkinCard";
 import { ResultShareButton } from "@/app/games/_shared/components/ResultShareButton";
 import { formatFrames } from "@/app/games/_shared/lib/format";
 import { TETRIS_GAME } from "../lib/game";
@@ -73,6 +74,12 @@ export function GameOverPanel({ result, daily = null, challenge = null, ...rest 
           // 도전장 판인데 원본을 못 받았으면 일반 공유 — 도전장 보드 순위를 "전체 N위"로 자랑하지 않게 자랑 문구는 뺀다
           <ResultShareButton spec={TETRIS_SHARE} subject={{ scoreId: registered.scoreId, playerName, score: registered.score, detail: registered.detail }} brag={challenge ? null : brag} />
         )
+      }
+      // 판이 끝난 순간 스킨을 바꿔 보고 다음 판에 — 스킨 상세로 바로 (D-003)
+      footer={
+        <SkinChangeButton className="mt-2 inline-flex min-h-11 items-center px-2 text-sm text-sky-300 hover:text-sky-200">
+          내 스킨 바꾸기 ›
+        </SkinChangeButton>
       }
       {...rest}
     />

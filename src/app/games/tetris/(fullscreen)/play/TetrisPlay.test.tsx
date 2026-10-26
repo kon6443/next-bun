@@ -201,3 +201,20 @@ describe('TetrisPlay 세션 실패 문구 (UX 점검)', () => {
     expect(screen.queryByText(/db timeout/)).toBeNull();
   });
 });
+
+describe('TetrisPlay 일시정지 스킨 진입 (D-003)', () => {
+  it('일시정지 메뉴의 "스킨 바꾸기" — 스킨 상세로 바로, 닫아도 판은 멈춘 채', async () => {
+    createGameSession.mockResolvedValue({ data: session(new Date(Date.now() + 2 * HOUR).toISOString()) });
+    render(<TetrisPlay />);
+    await act(async () => {});
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '시작' }));
+    });
+    fireEvent.click(screen.getByRole('button', { name: '일시정지' }));
+    fireEvent.click(screen.getByRole('button', { name: '스킨 바꾸기' }));
+    expect(screen.getByRole('dialog', { name: '스킨' })).toBeTruthy();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: '스킨' })).toBeNull();
+    expect(screen.getByRole('heading', { name: '일시정지' })).toBeTruthy();
+  });
+});
