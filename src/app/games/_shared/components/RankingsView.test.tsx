@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { RankingsView } from './RankingsView';
+import { RANKINGS_CACHE_MS, RANKINGS_DEBOUNCE_MS, RankingsView, resetRankingsCache } from './RankingsView';
 import { TEST_GAME } from './testGame';
 
 const getGameRankings = vi.fn();
@@ -15,6 +15,14 @@ vi.mock('@/services/gameService', () => ({
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/games/defense/rankings' }));
 vi.mock('next-auth/react', () => ({ useSession: () => ({ data: null, status: 'unauthenticated' }) }));
 
+/** 탭을 누르고 디바운스가 지나 응답까지 받는다 */
+const clickTab = async (name: string) => {
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name }));
+    await new Promise((resolve) => setTimeout(resolve, RANKINGS_DEBOUNCE_MS + 10));
+  });
+};
+
 const item = { rank: 1, scoreId: 5, playerName: '수비왕', score: 3_500_000, detail: { wave: 3 }, durationMs: 60_000, createdAt: '2026-10-21T00:00:00Z' };
 
 describe('RankingsView — 게임 사양을 따른다', () => {
@@ -23,6 +31,7 @@ describe('RankingsView — 게임 사양을 따른다', () => {
     getGameScore.mockReset();
     getPopularReplays.mockReset();
     window.localStorage.clear();
+    resetRankingsCache();
   });
 
   it('제목·뒤로가기·행의 요약·리플레이 링크가 사양에서 온다, 보드를 넘긴다', async () => {
@@ -89,12 +98,8 @@ describe('RankingsView — 게임 사양을 따른다', () => {
     await act(async () => {
       render(<RankingsView game={TEST_GAME} highlightId={5} board="endless-s1" />);
     });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '주간' }));
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '조회순' }));
-    });
+    await clickTab('주간');
+    await clickTab('조회순');
     expect(getPopularReplays).toHaveBeenLastCalledWith('defense', { period: 'weekly', sort: 'views', limit: 50, board: 'endless-s1' });
     expect(screen.getByText('· 조회 31')).toBeTruthy();
     // 인기 순서는 점수 순위가 아니다 — 읽는 이름도 "인기 N번째"
@@ -105,16 +110,12 @@ describe('RankingsView — 게임 사양을 따른다', () => {
     expect(screen.queryByTestId('ranking-outside')).toBeNull();
     expect(getGameScore).not.toHaveBeenCalled();
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '시청순' }));
-    });
+    await clickTab('시청순');
     expect(getPopularReplays).toHaveBeenLastCalledWith('defense', { period: 'weekly', sort: 'watch', limit: 50, board: 'endless-s1' });
     expect(screen.getByText('· 시청 12분')).toBeTruthy();
 
-    getPopularReplays.mockResolvedValue({ code: 'SUCCESS', message: 'ok', data: { boardKey: 'endless-s1', period: 'weekly', sort: 'watch', periodStart: null, items: [] } });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '조회순' }));
-    });
+    getPopularReplays.mockResolvedValue({ code: 'SUCCESS', message: 'ok', data: { boardKey: 'endless-s1', period: 'all', sort: 'watch', periodStart: null, items: [] } });
+    await clickTab('전체');
     expect(screen.getByText('이 기간에 본 리플레이가 아직 없어요.')).toBeTruthy();
   });
 
@@ -139,12 +140,8 @@ describe('RankingsView — 게임 사양을 따른다', () => {
     await act(async () => {
       render(<RankingsView game={TEST_GAME} highlightId={null} board="endless-s1" />);
     });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '조회순' }));
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '시청순' }));
-    });
+    await clickTab('조회순');
+    await clickTab('시청순');
     expect(screen.getByText('· 시청 2분')).toBeTruthy();
     await act(async () => {
       resolveViews(popular('views', 0));
@@ -160,5 +157,48 @@ describe('RankingsView — 게임 사양을 따른다', () => {
     });
     expect(screen.getAllByTestId('trophy-badge')).toHaveLength(1);
     expect(screen.getByRole('img', { name: '명예의 전당 1위 2회·2위 1회' })).toBeTruthy();
+  });
+
+  it('탭 결과는 잠시 다시 쓴다 — 오간 탭은 다시 부르지 않고, 빠르게 지나간 탭은 부르지 않는다(요청 한도 429, UX 점검)', async () => {
+    let now = 1_000_000;
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
+    await act(async () => {
+      render(<RankingsView game={TEST_GAME} highlightId={null} board="endless-s1" />);
+    });
+    expect(getGameRankings).toHaveBeenCalledTimes(1);
+    // 주간 → 전체를 디바운스 안에 연달아 — 마지막(전체)만 부른다
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '주간' }));
+      fireEvent.click(screen.getByRole('button', { name: '전체' }));
+      await new Promise((resolve) => setTimeout(resolve, RANKINGS_DEBOUNCE_MS + 10));
+    });
+    expect(getGameRankings.mock.calls.map((call) => call[1])).toEqual(['daily', 'all']);
+    // 일간으로 돌아오면 받아 둔 목록 — 부르지 않고 바로 보인다
+    await clickTab('일간');
+    expect(getGameRankings).toHaveBeenCalledTimes(2);
+    expect(screen.getByText('수비왕')).toBeTruthy();
+    // 오래되면 다시 부른다
+    now += RANKINGS_CACHE_MS;
+    await clickTab('전체');
+    expect(getGameRankings).toHaveBeenCalledTimes(3);
+    clock.mockRestore();
+  });
+
+  it('보드 탭을 바꿔 화면을 새로 그려도 — 받아 둔 보드는 다시 부르지 않고, 연달아 바꾼 새 보드는 잠깐 기다렸다 부른다', async () => {
+    const first = await act(async () => render(<RankingsView game={TEST_GAME} highlightId={null} board="endless-s1" />));
+    expect(getGameRankings).toHaveBeenCalledTimes(1);
+    first.unmount();
+    const second = await act(async () => render(<RankingsView game={TEST_GAME} highlightId={null} board="weekly-2026-w43" showPeriods={false} />));
+    expect(getGameRankings).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, RANKINGS_DEBOUNCE_MS + 10));
+    });
+    expect(getGameRankings).toHaveBeenLastCalledWith('defense', 'all', 50, 'weekly-2026-w43');
+    second.unmount();
+    await act(async () => {
+      render(<RankingsView game={TEST_GAME} highlightId={null} board="endless-s1" />);
+    });
+    expect(getGameRankings).toHaveBeenCalledTimes(2);
+    expect(screen.getByText('수비왕')).toBeTruthy();
   });
 });

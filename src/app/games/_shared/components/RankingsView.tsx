@@ -24,6 +24,23 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: "watch", label: "시청순" },
 ];
 const LIMIT = 50;
+/** 탭 결과를 다시 쓰는 시간 — 탭을 오가도 같은 목록을 다시 부르지 않게(요청 한도 429, UX 점검) */
+export const RANKINGS_CACHE_MS = 60_000;
+/** 탭을 바꾼 뒤 이만큼 멈추면 부른다 — 빠르게 여러 탭을 지나가면 마지막 탭만 */
+export const RANKINGS_DEBOUNCE_MS = 250;
+
+/**
+ * 받은 목록 — 게임·보드·기간·정렬별. 화면 밖(모듈)에 둔다: 보드 탭을 바꾸면 화면을 새로 그리므로(key) 화면 안에 두면 오갈 때마다 다시 부른다
+ * 마지막 요청 시각 — 방금 다른 보드를 불렀으면 새 화면의 첫 요청도 잠깐 기다린다(보드 탭 연타)
+ */
+const rankingsCache = new Map<string, { at: number; listing: unknown }>();
+let lastRequestAt = -Infinity;
+
+/** 테스트용 — 캐시·요청 시각을 비운다 */
+export function resetRankingsCache() {
+  rankingsCache.clear();
+  lastRequestAt = -Infinity;
+}
 
 /** 받은 목록과 그 정렬 — 정렬을 바꾼 직후 렌더에서 이전 목록에 새 정렬의 지표를 붙이지 않게 함께 둔다 */
 type Listing<D> = { sort: "score"; data: RankingList<D> } | { sort: PopularSort; data: PopularReplayList<D> };
@@ -48,6 +65,8 @@ type RankingsViewProps<G extends GameType> = {
   footer?: ReactNode;
 };
 
+const cacheKey = (gameType: GameType, board: string | undefined, period: RankingPeriod, sort: SortKey) => `${gameType}:${board ?? ""}:${period}:${sort}`;
+
 /** 게임 랭킹 화면 — 기간 탭 × 정렬(점수·조회·시청) + 상위 50개 (게임별 page는 클라이언트 래퍼에서 game 사양을 넘긴다) */
 export function RankingsView<G extends GameType>({ game, highlightId, board, showPeriods = true, header, replayUnavailable = null, playHref, waiting = false, footer }: RankingsViewProps<G>) {
   const [selectedPeriod, setPeriod] = useState<RankingPeriod>("daily");
@@ -64,16 +83,14 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
     setMyScoreIds(new Set(storage.loadMyScoreIds()));
   }, [storage]);
 
-  const load = useCallback(async (target: RankingPeriod, targetSort: SortKey) => {
-    // 탭을 빠르게 바꾸면 늦게 온 이전 탭 응답은 버린다
-    const requestId = ++requestIdRef.current;
-    setListing(null);
-    setError(null);
+  const load = useCallback(async (target: RankingPeriod, targetSort: SortKey, requestId: number) => {
     try {
       const next: Listing<ScoreDetailByGame[G]> =
         targetSort === "score"
           ? { sort: "score", data: (await getGameRankings(game.gameType, target, LIMIT, board)).data }
           : { sort: targetSort, data: (await getPopularReplays(game.gameType, { period: target, sort: targetSort, limit: LIMIT, board })).data };
+      rankingsCache.set(cacheKey(game.gameType, board, target, targetSort), { at: Date.now(), listing: next });
+      // 탭을 빠르게 바꾸면 늦게 온 이전 탭 응답은 버린다
       if (requestId === requestIdRef.current) setListing(next);
     } catch (err) {
       if (requestId === requestIdRef.current) setError(extractErrorMessage(err, "랭킹을 불러오지 못했습니다."));
@@ -103,8 +120,34 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
 
   useEffect(() => {
     if (waiting) return;
-    load(period, sort);
-  }, [load, period, sort, waiting]);
+    const requestId = ++requestIdRef.current;
+    setError(null);
+    const now = Date.now();
+    const cached = rankingsCache.get(cacheKey(game.gameType, board, period, sort));
+    if (cached && now - cached.at < RANKINGS_CACHE_MS) {
+      setListing(cached.listing as Listing<ScoreDetailByGame[G]>);
+      return;
+    }
+    setListing(null);
+    // 한동안 부르지 않았으면 바로, 방금 불렀으면(탭을 바꾸는 중) 잠깐 기다렸다가 — 그사이 또 바꾸면 이 요청은 취소
+    const start = () => {
+      lastRequestAt = Date.now();
+      void load(period, sort, requestId);
+    };
+    if (now - lastRequestAt >= RANKINGS_DEBOUNCE_MS) {
+      start();
+      return;
+    }
+    const timer = setTimeout(start, RANKINGS_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [load, period, sort, waiting, game.gameType, board]);
+
+  const retry = () => {
+    const requestId = ++requestIdRef.current;
+    setError(null);
+    lastRequestAt = Date.now();
+    void load(period, sort, requestId);
+  };
 
   return (
     <TeamsPageLayout>
@@ -165,7 +208,7 @@ export function RankingsView<G extends GameType>({ game, highlightId, board, sho
         {error ? (
           <div className={`${cardStyles.errorDashedContainer} px-6 py-10 text-center`} role="alert">
             <p className="text-sm font-semibold text-red-300">{error}</p>
-            <Button variant="secondary" size="sm" className="mt-4 min-h-11" onClick={() => load(period, sort)}>
+            <Button variant="secondary" size="sm" className="mt-4 min-h-11" onClick={retry}>
               다시 시도
             </Button>
           </div>
