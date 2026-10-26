@@ -43,9 +43,13 @@ type BattleViewProps = {
   reserveControls?: boolean;
 };
 
-/** 상대 수·화면 폭 → 미니보드 칸 크기 (DESIGN §7: 2인전은 크게, 3~4인전은 작게) */
+/**
+ * 상대 수·화면 크기 → 미니보드 칸 크기 (DESIGN §7: 2인전은 크게, 3~4인전은 작게)
+ * 큰 칸은 넓고 높이도 넉넉한 화면만 — 가로 휴대폰(폭은 넓고 높이가 낮다)에서 큰 미니보드가 헤더를 키워 판이 잘리지 않게
+ */
+const WIDE_MINI_QUERY = "(min-width: 640px) and (min-height: 600px)";
 function useMiniCell(opponentCount: number): number {
-  const wide = useMediaQuery("(min-width: 640px)");
+  const wide = useMediaQuery(WIDE_MINI_QUERY);
   if (opponentCount <= 1) return wide ? 10 : 6;
   return wide ? 8 : 4;
 }

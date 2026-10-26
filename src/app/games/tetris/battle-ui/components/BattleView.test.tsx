@@ -148,3 +148,26 @@ describe('BattleView 이모트 창 (games-polish FE-31)', () => {
   });
 });
 
+
+describe('BattleView 미니보드 칸 — 가로 휴대폰 (보드 크기 A0)', () => {
+  /** 매체 질의 대역 — 넓음(폭 640 이상)만 맞고 높이는 낮은 화면(844×390 가로 휴대폰) */
+  const landscapePhone = () =>
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({
+          matches: query.includes('min-width: 640px') && !query.includes('min-height'),
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    );
+
+  it('폭만 넓고 높이가 낮으면 작은 칸 — 큰 미니보드가 헤더를 키워 판이 잘리지 않게', () => {
+    const spy = landscapePhone();
+    render(
+      <BattleView play={play} meId="p1" opponents={[opponent('p2', '친구')]} emotes={{}} trailsRootRef={{ current: null }} onEmote={vi.fn()} onExit={vi.fn()} />,
+    );
+    expect(screen.getByText('친구').getAttribute('data-cell')).toBe('6');
+    spy.mockRestore();
+  });
+});
