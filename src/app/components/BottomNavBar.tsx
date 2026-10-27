@@ -1,10 +1,12 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import styles from "./BottomNavBar.module.css";
 import { FEEDBACK_PATH, buildFeedbackHref, isFeedbackPath } from "@/app/utils/feedbackUtils";
 import { GAMES_PATH, isFullscreenGamePath, isGamesPath } from "@/app/games/gamesPaths";
+import { useNavAutoHide } from "./useNavAutoHide";
 
 type NavItem = {
   href: string;
@@ -95,12 +97,36 @@ const navItems: NavItem[] = [
 
 const BottomNavBar = () => {
   const pathname = usePathname() ?? '';
+  // 아래로 내리면 숨고 조금이라도 올리면 보인다(ui-bnb-autohide) — 경로가 바뀌면 다시 보인다
+  const scrolledAway = useNavAutoHide(pathname);
+  // 키보드로 내비 안에 있으면 숨기지 않는다(포커스가 화면 밖 요소에 머물지 않게)
+  // 마우스·터치로 누른 링크 포커스는 세지 않는다 — Chrome은 누른 링크에 포커스를 남기고, 내비는 경로가 바뀌어도 그대로라 자동 숨김이 꺼진 채가 된다
+  const [focusWithin, setFocusWithin] = useState(false);
+  const navRef = useRef<HTMLElement>(null);
+  // 경로가 바뀌면 지금 포커스로 다시 센다 — 마우스·터치로 누른 링크 포커스는 끄고, 키보드로 이동해 링크에 남은 포커스는 살린다
+  useEffect(() => {
+    const active = document.activeElement;
+    setFocusWithin(Boolean(active && navRef.current?.contains(active) && isKeyboardFocus(active)));
+  }, [pathname]);
+  const hidden = scrolledAway && !focusWithin;
 
   // 전체화면 게임(낚시·테트리스 플레이·리플레이)에서는 숨긴다
   if (isFullscreenGamePath(pathname)) return null;
 
   return (
-    <nav className={styles.nav} aria-label="주요 탐색" data-fixed-bottom-overlay>
+    <nav
+      ref={navRef}
+      className={`${styles.nav} ${hidden ? styles.hidden : ""}`}
+      aria-label="주요 탐색"
+      data-fixed-bottom-overlay
+      data-hidden={hidden ? "" : undefined}
+      onFocus={(e) => {
+        if (isKeyboardFocus(e.target)) setFocusWithin(true);
+      }}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocusWithin(false);
+      }}
+    >
       <ul className={styles.list}>
         {navItems.map(({ href, label, icon, match }) => {
           const isActive = match ? match(pathname) : pathname === href;
@@ -126,5 +152,14 @@ const BottomNavBar = () => {
     </nav>
   );
 };
+
+/** 키보드로 온 포커스인지 — :focus-visible을 모르는 환경이면 포커스로 본다(보이는 쪽이 안전하다) */
+function isKeyboardFocus(el: Element): boolean {
+  try {
+    return el.matches(":focus-visible");
+  } catch {
+    return true;
+  }
+}
 
 export default BottomNavBar;
