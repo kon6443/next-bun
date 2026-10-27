@@ -33,7 +33,7 @@ type Props = {
  * 홈·플레이 HUD·일시정지·리플레이·대전에서 같은 시트. 스킨이 맨 위(눈에 띄게, D-003)
  */
 export function TetrisSettingsSheet({ onClose, controls = "edit", initialGroup }: Props) {
-  const { equipped, loggedIn } = useMySkins();
+  const { equipped, levels, loggedIn } = useMySkins();
   const { settings: sound } = useSoundSettings();
   const { settings } = useTetrisSettings();
   const effects = useReducedEffectsSetting();
@@ -43,7 +43,7 @@ export function TetrisSettingsSheet({ onClose, controls = "edit", initialGroup }
       id: "skin",
       title: "스킨",
       // 게스트도 기본 스킨 미리보기 — 무엇을 바꿀 수 있는지 보이게
-      preview: <SkinPreview slot="block" id={equipped.block} width={64} height={28} />,
+      preview: <SkinPreview slot="block" id={equipped.block} level={levels.block} width={64} height={28} />,
       summary: loggedIn ? SKIN_SLOTS.map((slot) => SKIN_ITEM_LABELS[equipped[slot]] ?? equipped[slot]).join(" · ") : "로그인하고 스킨 꾸미기",
       // 판 도중(일시정지·대전)에는 화면을 떠나는 링크를 두지 않는다
       content: <SkinSettingsSection onNavigate={onClose} allowLeave={controls === "edit"} />,

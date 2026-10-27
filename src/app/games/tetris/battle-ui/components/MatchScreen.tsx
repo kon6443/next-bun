@@ -12,7 +12,7 @@ import { battleErrorMessage } from "../lib/battleErrors";
 import { BattleView } from "./BattleView";
 import { useReducedEffects } from "../../hooks/useReducedEffects";
 import { useMySkins } from "../../hooks/useMySkins";
-import { type BoardSkins, toBoardSkins } from "../../lib/skins";
+import { type BoardSkins, boardSkinsOf, toBoardSkins } from "../../lib/skins";
 import fx from "./battleFx.module.css";
 import { getSoundPlayer } from "../../lib/sound/soundPlayer";
 import { MatchRecordLinks } from "./MatchRecordLinks";
@@ -88,8 +88,9 @@ export function MatchScreen({
       return { ...o, isTarget: o.playerId === target, online: player?.connected ?? false, blockSkinId: skins.block, boardSkinId: skins.board };
     });
   }, [opponents, target, roomPlayers]);
-  const { equipped } = useMySkins();
-  const mySkins = useMemo(() => ({ block: equipped.block, effect: equipped.effect, board: equipped.board }), [equipped.block, equipped.effect, equipped.board]);
+  // 내 판은 내 장착·레벨(판 도중에는 강화를 숨겨 경기 시작 때 값과 같다)
+  const { equipped, levels } = useMySkins();
+  const mySkins = useMemo(() => boardSkinsOf(equipped, levels), [equipped, levels]);
 
   const overlay =
     phase.kind === "countdown" ? (

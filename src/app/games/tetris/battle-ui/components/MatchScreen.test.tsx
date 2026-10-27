@@ -154,7 +154,7 @@ describe('MatchScreen 보드 스킨 (D-003)', () => {
       ['p4', 'default', 'default'],
     ]);
     // 내 판은 내 장착 — 게스트면 기본
-    expect(skins).toEqual({ block: 'default', effect: 'default', board: 'default' });
+    expect(skins).toEqual({ block: 'default', effect: 'default', board: 'default', levels: { block: 1, effect: 1, board: 1 } });
   });
 
   it('경기 중 방을 나간 상대(목록에서 정리됨)의 판은 마지막으로 본 그 사람 스킨 그대로', () => {

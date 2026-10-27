@@ -8,6 +8,7 @@ import {
   TEXT_LIFE_FRAMES,
   TRAIL_LIFE_FRAMES,
 } from './effects';
+import { frameBlur } from './levelLayers';
 import { NEON_ALPHA, NEON_LINE_WIDTH, drawNeonFrame } from './neonSprites';
 import { type BlockSkin, type BoardSkin, type EffectSkin, blockSkin, boardSkin, effectSkin } from './skins';
 
@@ -16,6 +17,7 @@ import { type BlockSkin, type BoardSkin, type EffectSkin, blockSkin, boardSkin, 
  * 연출 줄이기(reduced)면 움직임(흔들림·파티클·잔상·확대·충격파·빛살)을 그리지 않고 문구·색 전환만 정적으로 보인다
  * 네온(2차, DESIGN §20): shadowBlur는 한 프레임에 몇 번(테두리·문구·충격파)만 — 칸마다 쓰는 발광은 blockSprites의 캐시 스프라이트
  * 색은 판 주인의 스킨 슬롯(skins.ts — 판 색은 board, 연출 색은 effect, 잔상·조각은 그 블록 색이라 block) — 생략하면 기본. 가비지 경고(빨강)는 스킨과 무관
+ * 스킨 레벨(skin-levels)이 있는 함수는 마지막 인자 level(생략하면 1 = 레벨 도입 전과 같다) — 연출 Lv2 겹 충격파 · Lv3 번쩍임·문구 발광 · Lv4 빛줄기·문구 그라데이션. Lv5 불꽃은 levelLayers
  */
 
 /** 그리기 품질 — lite는 저사양 감지·연출 줄이기 때 칸 발광을 끄고 별을 줄인다 */
@@ -61,8 +63,9 @@ export function drawStarfield(
   reduced: boolean,
   quality: EffectQuality,
   board: BoardSkin = DEFAULT_BOARD,
+  density = 1,
 ): void {
-  const count = Math.min(MAX_STARS, Math.round((width * height) / (quality === 'lite' || reduced ? 24000 : 9000)));
+  const count = Math.min(Math.round(MAX_STARS * density), Math.round(((width * height) / (quality === 'lite' || reduced ? 24000 : 9000)) * density));
   if (count <= 0) return;
   const color = levelNeon(level, board);
   ctx.save();
@@ -89,10 +92,11 @@ export function drawBoardFrame(
   level: number,
   reduced: boolean,
   board: BoardSkin = DEFAULT_BOARD,
+  boardLevel = 1,
 ): void {
   const { boardX, boardY } = rect;
   const color = levelNeon(level, board);
-  const blur = reduced ? 4 : 14;
+  const blur = frameBlur(boardLevel, reduced);
   // 매 프레임 그리므로 shadowBlur 대신 구워 둔 스프라이트를 복사한다(neonSprites) — 스프라이트를 못 쓰면 직접
   // 스프라이트는 투명도를 구워 두었다 — 호출 쪽 globalAlpha가 1·source-over라는 전제(drawGame). 페이드로 감싸면 두 경로가 달라진다
   if (drawNeonFrame(ctx, boardX - 1, boardY - 1, boardWidth + 2, boardHeight + 2, color, blur)) return;
@@ -149,6 +153,7 @@ export function drawClearRing(
   rect: BoardRect,
   boardWidth: number,
   effect: EffectSkin = DEFAULT_EFFECT,
+  level = 1,
 ): void {
   const ring = fx?.ring;
   if (!ring) return;
@@ -168,10 +173,12 @@ export function drawClearRing(
   ctx.strokeStyle = color;
   ctx.shadowColor = color;
   ctx.shadowBlur = 16;
-  for (let k = 0; k < (ring.big ? 2 : 1); k++) {
+  // Lv2부터 메아리 링 한 겹 더
+  const rings = (ring.big ? 2 : 1) + (level >= 2 ? 1 : 0);
+  for (let k = 0; k < rings; k++) {
     const e = Math.max(0, ease - k * 0.18);
     const rx = boardWidth * (0.15 + 0.85 * e);
-    ctx.globalAlpha = (1 - t) * (k === 0 ? 0.9 : 0.6);
+    ctx.globalAlpha = (1 - t) * (k === 0 ? 0.9 : k === 1 ? 0.6 : 0.35);
     ctx.lineWidth = Math.max(1, cell * 0.22 * (1 - t));
     ctx.beginPath();
     ctx.ellipse(cx, cy, rx, rx * 0.35, 0, 0, Math.PI * 2);
@@ -205,7 +212,7 @@ export function boardBackground(
       b = Math.round(from[2] + (b - from[2]) * t);
     }
   }
-  return `rgba(${r}, ${g}, ${b}, 0.92)`;
+  return `rgba(${r}, ${g}, ${b}, ${board.opacity ?? 0.92})`;
 }
 
 /** 레벨업 직후 판 테두리가 밝게 빛났다가 사라진다 */
@@ -365,19 +372,34 @@ export function drawClearFlash(
   boardWidth: number,
   reduced: boolean,
   effect: EffectSkin = DEFAULT_EFFECT,
+  level = 1,
+  /** 움직이는 레벨 강화(빛줄기)를 그릴지 — 고품질·게임 중(renderer의 animate) */
+  animate = true,
 ) {
   const alpha = Math.max(0, Math.min(1, progress));
   const [gr, gg, gb] = effect.flashGlow;
   const { cell, boardX } = rect;
+  // Lv3부터 번지는 빛이 넓고 진하다
+  const strong = level >= 3;
   for (const row of rows) {
     const y = rowToY(rect, row);
     if (!reduced) {
-      const spread = cell * (big ? 0.6 : 0.3) * (1 - alpha);
-      ctx.fillStyle = `rgba(${gr}, ${gg}, ${gb}, ${0.35 * alpha})`;
+      const spread = cell * (big ? 0.6 : 0.3) * (strong ? 1.5 : 1) * (1 - alpha);
+      ctx.fillStyle = `rgba(${gr}, ${gg}, ${gb}, ${(strong ? 0.5 : 0.35) * alpha})`;
       ctx.fillRect(boardX, y - spread, boardWidth, cell + spread * 2);
     }
     ctx.fillStyle = `rgba(255, 255, 255, ${0.85 * alpha})`;
     ctx.fillRect(boardX, y, boardWidth, cell);
+    if (animate && !reduced && level >= 4) {
+      // 빛줄기 — 지운 줄을 왼쪽에서 오른쪽으로 가로지른다
+      const head = boardX + boardWidth * (1 - alpha);
+      const tail = boardWidth * 0.35;
+      const streak = ctx.createLinearGradient(head - tail, 0, head, 0);
+      streak.addColorStop(0, `rgba(${gr}, ${gg}, ${gb}, 0)`);
+      streak.addColorStop(1, `rgba(255, 255, 255, ${0.9 * alpha})`);
+      ctx.fillStyle = streak;
+      ctx.fillRect(Math.max(boardX, head - tail), y - cell * 0.15, Math.min(tail, head - boardX), cell * 1.3);
+    }
   }
 }
 
@@ -390,6 +412,7 @@ export function drawEffectText(
   boardWidth: number,
   reduced: boolean,
   effect: EffectSkin = DEFAULT_EFFECT,
+  level = 1,
 ) {
   const burst = fx?.text;
   if (!burst) return;
@@ -429,8 +452,18 @@ export function drawEffectText(
     ctx.shadowBlur = 0;
     ctx.strokeText(line.text, centerX, y, boardWidth - cell);
     ctx.shadowColor = color;
-    ctx.shadowBlur = reduced ? 4 : 10 + line.tier * 4;
-    ctx.fillStyle = color;
+    // Lv3부터 문구 발광이 넓다 · Lv4부터 글자가 다음 단계 색으로 넘어가는 그라데이션
+    ctx.shadowBlur = reduced ? 4 : 10 + line.tier * 4 + (level >= 3 ? 6 : 0);
+    if (level >= 4) {
+      const next = effect.tierColors[Math.min(line.tier + 1, effect.tierColors.length - 1)];
+      const fill = ctx.createLinearGradient(0, y - fontSize / 2, 0, y + fontSize / 2);
+      fill.addColorStop(0, '#ffffff');
+      fill.addColorStop(0.45, color);
+      fill.addColorStop(1, next);
+      ctx.fillStyle = fill;
+    } else {
+      ctx.fillStyle = color;
+    }
     ctx.fillText(line.text, centerX, y, boardWidth - cell);
     y += fontSize * 1.15;
   }

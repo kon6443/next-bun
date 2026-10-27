@@ -11,6 +11,8 @@ vi.mock('../lib/renderer', () => ({
 
 import { TetrisCanvas, __resetCanvasQualityForTests } from './TetrisCanvas';
 
+const L1 = { block: 1, effect: 1, board: 1 };
+
 beforeAll(() => {
   // jsdom에는 캔버스 그리기·ResizeObserver가 없다 — 그리기 호출만 센다
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
@@ -128,8 +130,8 @@ describe('TetrisCanvas 저사양 감지 — 화면 프레임이 아닌 그리기
     const drawRef: { current: (() => void) | null } = { current: null };
     const effectsRef = { current: null };
     const skins = [
-      { block: 'default', effect: 'default', board: 'default' },
-      { block: 'default', effect: 'default', board: 'neon' },
+      { block: 'default', effect: 'default', board: 'default', levels: L1 },
+      { block: 'default', effect: 'default', board: 'neon', levels: L1 },
     ];
     const { rerender } = render(<TetrisCanvas stateRef={stateRef} drawRef={drawRef} effectsRef={effectsRef} skins={skins[0]} />);
     try {
@@ -153,7 +155,7 @@ describe('TetrisCanvas 보드 스킨 (D-003)', () => {
   it('판 주인 스킨을 drawGame에 넘기고, 스킨이 바뀌면 멈춘 화면도 다시 그린다 — 값이 같은 새 객체면 다시 그리지 않는다', () => {
     const stateRef = { current: { frame: 3, over: false } as GameState };
     const drawRef: { current: (() => void) | null } = { current: null };
-    const skins = { block: 'neon', effect: 'default', board: 'gameboy' };
+    const skins = { block: 'neon', effect: 'default', board: 'gameboy', levels: L1 };
     const { rerender } = render(<TetrisCanvas stateRef={stateRef} drawRef={drawRef} skins={skins} />);
     expect(drawGame.mock.lastCall?.[3]).toMatchObject({ skins });
     const before = drawGame.mock.calls.length;
@@ -163,5 +165,18 @@ describe('TetrisCanvas 보드 스킨 (D-003)', () => {
     rerender(<TetrisCanvas stateRef={stateRef} drawRef={drawRef} skins={{ ...skins, board: 'high-contrast' }} />);
     expect(drawGame.mock.calls.length).toBe(before + 1);
     expect(drawGame.mock.lastCall?.[3]).toMatchObject({ skins: { board: 'high-contrast' } });
+  });
+
+  it('레벨이 바뀌어도 다시 그린다(skin-levels) — 값이 같은 새 레벨 객체면 다시 그리지 않는다', () => {
+    const stateRef = { current: { frame: 3, over: false } as GameState };
+    const drawRef: { current: (() => void) | null } = { current: null };
+    const skins = { block: 'neon', effect: 'default', board: 'gameboy', levels: L1 };
+    const { rerender } = render(<TetrisCanvas stateRef={stateRef} drawRef={drawRef} skins={skins} />);
+    const before = drawGame.mock.calls.length;
+    rerender(<TetrisCanvas stateRef={stateRef} drawRef={drawRef} skins={{ ...skins, levels: { ...L1 } }} />);
+    expect(drawGame.mock.calls.length).toBe(before);
+    rerender(<TetrisCanvas stateRef={stateRef} drawRef={drawRef} skins={{ ...skins, levels: { ...L1, block: 4 } }} />);
+    expect(drawGame.mock.calls.length).toBe(before + 1);
+    expect(drawGame.mock.lastCall?.[3]).toMatchObject({ skins: { levels: { block: 4 } } });
   });
 });

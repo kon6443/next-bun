@@ -12,6 +12,8 @@ import {
   resetMySkins,
   retryMySkins,
   subscribeMySkins,
+  type UpgradeResult,
+  upgradeMySkin,
 } from "../lib/mySkins";
 
 /**
@@ -24,6 +26,8 @@ export function useMySkins(): MySkinsState & {
   equip: (slot: SkinSlotName, id: string) => Promise<boolean>;
   /** 불러오기 일시 실패(error) 뒤 다시 불러오기 */
   retry: () => void;
+  /** 다음 레벨로 강화(skin-levels) — 실패하면 에러를 던진다(호출부가 토스트) */
+  upgrade: (slot: SkinSlotName, id: string) => Promise<UpgradeResult>;
 } {
   const { data: session, status } = useSession();
   const accessToken = session?.user?.accessToken ?? null;
@@ -47,5 +51,13 @@ export function useMySkins(): MySkinsState & {
     if (accessToken) void retryMySkins(accessToken);
   }, [accessToken]);
 
-  return { ...skins, loggedIn: Boolean(accessToken), equip, retry };
+  const upgrade = useCallback(
+    async (slot: SkinSlotName, id: string): Promise<UpgradeResult> => {
+      if (!accessToken) return "skipped";
+      return upgradeMySkin(slot, id, accessToken);
+    },
+    [accessToken],
+  );
+
+  return { ...skins, loggedIn: Boolean(accessToken), equip, retry, upgrade };
 }

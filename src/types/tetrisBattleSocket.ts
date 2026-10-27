@@ -109,7 +109,7 @@ export interface RoomPlayer {
   connected: boolean;
   isGuest: boolean;
   /** 보드 스킨(D-003) — 입장 때 서버가 계정 장착을 붙인다(게스트 전부 default). 이전 서버면 없다 → default로 그린다 */
-  skins?: { block: string; effect: string; board: string };
+  skins?: { block: string; effect: string; board: string; levels?: { block: number; effect: number; board: number } };
 }
 
 /** players는 입장 순서 */
