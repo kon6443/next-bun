@@ -43,11 +43,21 @@ export function TetrisCanvas({ stateRef, drawRef, effectsRef, garbageRef, skins 
   const reducedRef = useRef(reduced);
   reducedRef.current = reduced;
   // 값이 같으면 같은 객체로 — 부모가 매 렌더 새 객체를 넘겨도 다시 그리지 않게
-  const { block, effect, board } = skins;
+  const { block, effect, board, levels } = skins;
   const skinsRef = useRef(skins);
   /** 표본 없이 다시 그린다 — 스킨·연출 줄이기 변경처럼 화면 프레임이 아닌 그리기(저사양 판정 간격을 쪼개지 않게) */
   const redrawRef = useRef<(() => void) | null>(null);
-  if (skinsRef.current.block !== block || skinsRef.current.effect !== effect || skinsRef.current.board !== board) skinsRef.current = skins;
+  const prev = skinsRef.current;
+  if (
+    prev.block !== block ||
+    prev.effect !== effect ||
+    prev.board !== board ||
+    prev.levels.block !== levels.block ||
+    prev.levels.effect !== levels.effect ||
+    prev.levels.board !== levels.board
+  ) {
+    skinsRef.current = skins;
+  }
 
   useEffect(() => {
     const container = containerRef.current;
@@ -140,10 +150,10 @@ export function TetrisCanvas({ stateRef, drawRef, effectsRef, garbageRef, skins 
     };
   }, [stateRef, drawRef, effectsRef, garbageRef]);
 
-  // 연출 줄이기·스킨을 바꾸면 멈춰 있는 화면(일시정지·준비)도 바로 다시 그린다
+  // 연출 줄이기·스킨·레벨을 바꾸면 멈춰 있는 화면(일시정지·준비)도 바로 다시 그린다
   useEffect(() => {
     redrawRef.current?.();
-  }, [reduced, block, effect, board]);
+  }, [reduced, block, effect, board, levels.block, levels.effect, levels.board]);
 
   return (
     <div ref={containerRef} className={`relative h-full w-full ${className}`}>

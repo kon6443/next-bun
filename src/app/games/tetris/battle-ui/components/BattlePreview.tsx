@@ -7,6 +7,7 @@ import { pendingGarbageLines } from "../../battle-engine";
 import { DEFAULT_ARR, DEFAULT_DAS } from "../../engine";
 import { nextRandom } from "../../engine/random";
 import { useMySkins } from "../../hooks/useMySkins";
+import { boardSkinsOf } from "../../lib/skins";
 import { useReducedEffects } from "../../hooks/useReducedEffects";
 import type { ReceivedEmote } from "../contexts/BattleSocketContext";
 import { useAttackTrails } from "../hooks/useAttackTrails";
@@ -29,7 +30,7 @@ type Phase = { status: "countdown"; endsAt: number } | { status: "playing" } | {
  */
 export function BattlePreview({ opponentCount, seed }: { opponentCount: number; seed: number }) {
   // 내 판은 내 장착(실제 대전 MatchScreen과 같다) — 봇 상대 판은 기본 스킨
-  const { equipped } = useMySkins();
+  const { equipped, levels } = useMySkins();
   const router = useRouter();
   const reduced = useReducedEffects();
   const { rootRef, fire } = useAttackTrails(reduced);
@@ -185,7 +186,7 @@ export function BattlePreview({ opponentCount, seed }: { opponentCount: number; 
       play={play}
       meId={ME}
       opponents={opponents}
-      skins={{ block: equipped.block, effect: equipped.effect, board: equipped.board }}
+      skins={boardSkinsOf(equipped, levels)}
       emotes={emotes}
       trailsRootRef={rootRef}
       onEmote={(emoteId) => setEmotes((prev) => ({ ...prev, [ME]: { playerId: ME, emoteId, at: new Date().toISOString(), key: Date.now() } }))}

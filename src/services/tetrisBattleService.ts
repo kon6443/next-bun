@@ -155,7 +155,7 @@ export type BattleMatchPlayer = {
    */
   verdict: 'VERIFIED' | 'MISSING' | 'INVALID';
   /** 보드 스킨(D-003) — 기록 주인의 지금 장착(게스트 default). 이전 서버면 없다 → default로 그린다 */
-  skins?: { block: string; effect: string; board: string };
+  skins?: { block: string; effect: string; board: string; levels?: { block: number; effect: number; board: number } };
 };
 
 /** 저장된 경기 — 백엔드 BattleMatchDto. 숨김·미저장 경기는 404 (DISPUTED도 200 — 검증 실패 참가자만 빠진다, D-008) */

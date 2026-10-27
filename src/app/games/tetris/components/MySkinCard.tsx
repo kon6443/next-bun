@@ -14,14 +14,17 @@ import { type ControlsMode, TetrisSettingsSheet } from "./TetrisSettingsSheet";
  * 게스트는 같은 자리에 "로그인하고 스킨 꾸미기" — 기본 스킨 미리보기로 무엇을 꾸밀 수 있는지 보인다
  */
 export function MySkinCard({ className = "" }: { className?: string }) {
-  const { equipped, loggedIn, status } = useMySkins();
-  const summary = SKIN_SLOTS.map((slot) => `${SKIN_SLOT_LABELS[slot]} ${SKIN_ITEM_LABELS[equipped[slot]] ?? equipped[slot]}`).join(" · ");
+  const { equipped, levels, loggedIn, status } = useMySkins();
+  // 레벨은 Lv2부터 붙인다 — 모두 Lv1이면 레벨 도입 전과 같은 요약
+  const summary = SKIN_SLOTS.map(
+    (slot) => `${SKIN_SLOT_LABELS[slot]} ${SKIN_ITEM_LABELS[equipped[slot]] ?? equipped[slot]}${levels[slot] >= 2 ? ` Lv${levels[slot]}` : ""}`,
+  ).join(" · ");
 
   return (
     <section className={className} aria-labelledby="my-skin-title" data-testid="my-skin-card">
       <div className="flex items-center gap-3">
         <span className="shrink-0 overflow-hidden rounded-xl border border-white/10">
-          <SkinPreview slot="block" id={equipped.block} width={96} height={40} />
+          <SkinPreview slot="block" id={equipped.block} level={levels.block} width={96} height={40} />
         </span>
         <div className="min-w-0 flex-1">
           <h2 id="my-skin-title" className="text-base font-semibold text-white">

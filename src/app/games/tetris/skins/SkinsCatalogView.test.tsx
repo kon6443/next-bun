@@ -191,4 +191,38 @@ describe('스킨 도감 (D-005)', () => {
     });
     expect(toastSuccess).not.toHaveBeenCalled();
   });
+
+  it('레벨·포인트(skin-levels) — 보유 포인트, 카드마다 내 레벨, [레벨·강화]로 그 아이템의 미리보기·강화', async () => {
+    login();
+    getTetrisSkinCatalog.mockResolvedValue({ ...catalog(true), data: { ...catalog(true).data, maxLevel: 5, levelCosts: [100_000, 200_000, 700_000, 2_000_000] } });
+    const level = (id: string, lv: number, nextCost: number | null) => ({ id, owned: true, unlock: 'free', level: lv, nextCost });
+    getMySkins.mockResolvedValue({
+      code: 'SUCCESS',
+      message: '',
+      data: {
+        equipped,
+        catalog: { block: [level('default', 1, 100_000), level('neon', 4, 2_000_000)], effect: [], board: [], background: [] },
+        points: { balance: 2_500_000, earned: 3_500_000, spent: 1_000_000 },
+      },
+    });
+    render(<SkinsCatalogView />);
+    expect(await screen.findByTestId('catalog-points')).toHaveTextContent('2,500,000 P');
+    expect(screen.getByTestId('catalog-block-neon')).toHaveTextContent('Lv4');
+    // 처음 패널은 이 슬롯의 장착 아이템
+    expect(screen.getByTestId('skin-upgrade-block-default')).toBeTruthy();
+    fireEvent.click(within(screen.getByTestId('catalog-block-neon')).getByRole('button', { name: '레벨·강화' }));
+    const panel = screen.getByTestId('skin-upgrade-block-neon');
+    expect(panel).toHaveTextContent('Lv4 → Lv5 · 2,000,000 P');
+    expect(within(panel).getByRole('button', { name: '강화' })).not.toBeDisabled();
+  });
+
+  it('게스트 도감 — 레벨 비용은 levelCosts로 안내, 강화 버튼 없음', async () => {
+    getTetrisSkinCatalog.mockResolvedValue({ ...catalog(false), data: { ...catalog(false).data, maxLevel: 5, levelCosts: [100_000, 200_000, 700_000, 2_000_000], points: null } });
+    render(<SkinsCatalogView />);
+    fireEvent.click(within(await screen.findByTestId('catalog-block-neon')).getByRole('button', { name: '레벨·강화' }));
+    const panel = screen.getByTestId('skin-upgrade-block-neon');
+    expect(panel).toHaveTextContent('Lv2까지 100,000 P');
+    expect(within(panel).queryByRole('button', { name: '강화' })).toBeNull();
+  });
 });
+

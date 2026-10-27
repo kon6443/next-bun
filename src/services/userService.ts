@@ -1,5 +1,6 @@
 import fetchServiceInstance from './FetchService';
 import { ApiError, type ApiErrorResponse, createApiError } from '@/types/api';
+import type { SkinPoints } from '@/types/game';
 
 type UpdateUserRequest = {
   userName: string;
@@ -74,13 +75,25 @@ export async function updateUserProfile(
 // ==================== 스킨 (테트리스 D-003) ====================
 
 /** 카탈로그 아이템 — 서버가 SSOT(id·획득 방식·보유). unlock은 'default'·'free' 외에 업적·출석 등이 늘어난다 */
-export type SkinCatalogItem = { id: string; owned: boolean; unlock: string };
+export type SkinCatalogItem = {
+  id: string;
+  owned: boolean;
+  unlock: string;
+  /** 내 레벨 1~5(skin-levels) — 이 필드 배포 전 응답에는 없다(1로 본다) */
+  level?: number;
+  /** 다음 레벨로 강화하는 비용 — 만렙이면 null */
+  nextCost?: number | null;
+};
 
 export type SkinSlotName = 'block' | 'effect' | 'board' | 'background';
 
+/** GET·PUT /users/me/skins·POST upgrade 응답 — 셋 다 같은 모양 */
 export type UserSkins = {
   equipped: Record<SkinSlotName, string>;
   catalog: Record<SkinSlotName, SkinCatalogItem[]>;
+  /** 장착 아이템의 레벨(skin-levels) */
+  equippedLevels?: Record<SkinSlotName, number>;
+  points?: SkinPoints;
 };
 
 type UserSkinsResponse = {
@@ -123,6 +136,30 @@ export async function updateMySkins(changes: Partial<Record<SkinSlotName, string
 
   if (!response.ok) {
     await handleApiError(response, '스킨을 바꾸지 못했습니다.');
+  }
+
+  return response.json();
+}
+
+/**
+ * 강화(skin-levels) — level은 목표 레벨(지금 + 1). 이미 그 레벨 이상이면 차감 없이 200(중복 클릭 안전). 응답은 GET과 같은 모양
+ * 에러: 모르는 아이템 422 USER_SKIN_UNKNOWN · 미보유 403 USER_SKIN_NOT_OWNED · 단계 건너뜀 409 USER_SKIN_LEVEL_MISMATCH(details { slot, id, level })
+ *   · 포인트 부족 409 USER_POINTS_INSUFFICIENT(details { balance, cost }) · 범위 밖 422 VALIDATION_ERROR · 전역 스로틀 429 TOO_MANY_REQUESTS
+ */
+export async function upgradeMySkin(
+  request: { slot: SkinSlotName; skinId: string; level: number },
+  accessToken: string,
+): Promise<UserSkinsResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'POST',
+    endpoint: '/api/v1/users/me/skins/upgrade',
+    body: request,
+    accessToken,
+    notifyUnauthorized: false,
+  });
+
+  if (!response.ok) {
+    await handleApiError(response, '스킨을 강화하지 못했습니다.');
   }
 
   return response.json();
