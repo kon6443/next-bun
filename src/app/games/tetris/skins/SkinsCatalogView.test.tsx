@@ -207,6 +207,7 @@ describe('스킨 도감 (D-005)', () => {
     });
     render(<SkinsCatalogView />);
     expect(await screen.findByTestId('catalog-points')).toHaveTextContent('2,500,000 P');
+    expect(within(screen.getByTestId('catalog-points')).getByRole('link', { name: '포인트 내역' }).getAttribute('href')).toBe('/games/tetris/points');
     expect(screen.getByTestId('catalog-block-neon')).toHaveTextContent('Lv4');
     // 처음 패널은 이 슬롯의 장착 아이템
     expect(screen.getByTestId('skin-upgrade-block-default')).toBeTruthy();

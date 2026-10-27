@@ -47,7 +47,7 @@ describe('대전 입구 (DESIGN §19)', () => {
       </StrictMode>,
     );
     expect(screen.getByRole('region', { name: '친구와 대전' })).toHaveAttribute('id', 'battle');
-    expect(screen.getByRole('link', { name: '전체 보기' })).toHaveAttribute('href', '/games/tetris/battle');
+    expect(screen.getByRole('link', { name: '대전 전체 보기' })).toHaveAttribute('href', '/games/tetris/battle');
     expect(await screen.findByText('지금 열린 방 2개')).toBeInTheDocument();
     expect(getBattleLobbyStats).toHaveBeenCalledTimes(1);
   });
@@ -134,7 +134,7 @@ describe('대전 입구 (DESIGN §19)', () => {
     getBattleLobbyStats.mockRejectedValue(new ApiError('TOO_MANY_REQUESTS', 'x', 429));
     render(<BattleEntry />);
     await waitFor(() => expect(getBattleLobbyStats).toHaveBeenCalled());
-    expect(screen.getByRole('link', { name: '전체 보기' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '대전 전체 보기' })).toBeInTheDocument();
     expect(screen.queryByText(/열린 방|방을 만들어/)).toBeNull();
   });
 
