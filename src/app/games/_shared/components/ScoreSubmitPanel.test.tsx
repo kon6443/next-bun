@@ -287,11 +287,12 @@ describe('ScoreSubmitPanel — 게임 사양·보드를 따른다', () => {
   it('스킨 포인트(skin-levels) — 응답에 points가 있으면 "+N P · 보유", 등록 직후 onRegistered로 넘긴다 · 없으면(비로그인·다른 게임) 숨김', async () => {
     submitGameScore.mockResolvedValue({ data: { scoreId: 7, score: 1, detail: {}, ranks: null, points: { earned: 123456, balance: 1234567 } } });
     const onRegistered = vi.fn();
-    const { unmount } = await act(async () => render(<ScoreSubmitPanel {...props} onRegistered={onRegistered} />));
+    const { unmount } = await act(async () => render(<ScoreSubmitPanel {...props} onRegistered={onRegistered} pointsHref="/games/tetris/points" />));
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: '랭킹 등록' }));
     });
     expect(screen.getByTestId('score-submit-points')).toHaveTextContent('+123,456 P· 보유 1,234,567 P');
+    expect(screen.getByRole('link', { name: '포인트 내역' }).getAttribute('href')).toBe('/games/tetris/points');
     expect(onRegistered).toHaveBeenCalledTimes(1);
     expect(onRegistered).toHaveBeenCalledWith(expect.objectContaining({ points: { earned: 123456, balance: 1234567 } }));
     unmount();

@@ -1,8 +1,9 @@
 "use client";
 
 import { type ReactNode, useEffect, useState } from "react";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { TeamsPageLayout, ButtonLink, Button, SectionLabel, EmptyState, LoadingSpinnerSimple } from "@/app/teams/components";
+import { TeamsPageLayout, ButtonLink, Button, EmptyState, LoadingSpinnerSimple } from "@/app/teams/components";
 import { cardStyles } from "@/styles/teams";
 import { ConfirmModal } from "@/app/components/ConfirmModal";
 import { getGameRankings, getMyBestScore, submitGameScore } from "@/services/gameService";
@@ -12,14 +13,13 @@ import { RankingTable } from "@/app/games/_shared/components/RankingTable";
 import { invalidateRankings } from "@/app/games/_shared/components/RankingsView";
 import { TETRIS_GAME } from "./lib/game";
 import { BattleEntry } from "./battle-ui/components/BattleEntry";
-import { RecentBattles } from "./battle-ui/components/RecentBattles";
 import { DailyCard } from "./components/DailyCard";
 import { tetrisRankLabel } from "./lib/replayCard";
-import { PopularReplaysPreview } from "@/app/games/_shared/components/PopularReplaysPreview";
 import { GameSettingsButton } from "@/app/games/_shared/components/GameSettingsButton";
 import { ReloginButton } from "@/app/games/_shared/components/ReloginButton";
 import { TetrisSettingsSheet } from "./components/TetrisSettingsSheet";
 import { MySkinCard } from "./components/MySkinCard";
+import { TetrisRecordsCard } from "./components/TetrisRecordsCard";
 import { formatScore } from "@/app/games/_shared/lib/format";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
 import { classifySubmitError } from "@/app/games/_shared/lib/submitError";
@@ -154,45 +154,52 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
     }
   };
 
+  const rankingPreview = previewError ? (
+    <p className="text-sm text-red-300">{previewError}</p>
+  ) : preview === null ? (
+    <LoadingSpinnerSimple message="랭킹을 불러오는 중..." />
+  ) : preview.length === 0 ? (
+    <EmptyState message="오늘은 아직 기록이 없어요." description="첫 번째 주인공이 되어 보세요!" variant="minimal" />
+  ) : (
+    <RankingTable game={TETRIS_GAME} items={preview} myScoreIds={myScoreIds} compact />
+  );
+
   return (
     <TeamsPageLayout maxWidth="lg-wide">
-      {/* 데스크톱(lg 이상)은 2단 — 한 칸으로 길게 늘어진 홈(UX 점검). 모바일은 위에서 아래로 같은 순서 */}
-      <div className="flex flex-col gap-3 sm:gap-6 lg:grid lg:grid-cols-2 lg:items-start">
-        <div className="flex min-w-0 flex-col gap-3 sm:gap-6">
-          {/* 헤더 */}
-          <section className={`${cardStyles.section} p-5`}>
-            <div className="flex items-center justify-between">
-              <SectionLabel spacing="wide">Tetris</SectionLabel>
-              <div className="flex items-center gap-2">
-                {/* 설정(소리·조작·연출·스킨)은 첫 화면에서 — 아래 섹션까지 내려가지 않아도 되게 (P8·D-001) */}
-                <GameSettingsButton testId="tetris-settings-open" renderSheet={(close) => <TetrisSettingsSheet onClose={close} />} />
-                <ButtonLink href="/games" variant="secondary" size="md">
-                  ← 게임 목록
-                </ButtonLink>
-              </div>
-            </div>
-            <h1 className="mt-4 text-3xl font-bold text-white [text-shadow:0_0_14px_rgba(56,189,248,0.6)]">테트리스</h1>
-            <p className="mt-2 text-sm text-slate-400">
-              줄을 지우고 점수를 쌓으세요. 끝나면 이름을 적어 랭킹에 올릴 수 있어요. (로그인 없이도 가능)
-            </p>
-            <p className="mt-4 text-sm text-slate-300">
+      {/*
+        위계(tetris-home): 상단 바 → 플레이(게임 시작 + 오늘의 테트리스) → 친구와 대전 → 내 스킨 한 줄 → 기록 탭 → 링크 줄·소개(접기)
+        채움 버튼은 "게임 시작" 하나 — 나머지는 테두리·줄·글자 링크. 데스크톱(lg)은 왼쪽 플레이 쪽·오른쪽 기록 쪽 2단
+      */}
+      <header className="flex items-center gap-1">
+        <Link
+          href="/games"
+          aria-label="게임 목록"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-2xl text-slate-300 hover:bg-white/5 hover:text-white"
+        >
+          <span aria-hidden="true">‹</span>
+        </Link>
+        <h1 className="flex-1 text-2xl font-bold text-white [text-shadow:0_0_14px_rgba(56,189,248,0.6)]">테트리스</h1>
+        {/* 설정(소리·조작·화면·스킨)은 첫 화면 오른쪽 위 한 곳 (P8·D-001) */}
+        <GameSettingsButton testId="tetris-settings-open" renderSheet={(close) => <TetrisSettingsSheet onClose={close} />} />
+      </header>
+      <div className="flex flex-col gap-3 sm:gap-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6">
+        <div className="flex min-w-0 flex-col gap-3 sm:gap-4">
+          <section className={`${cardStyles.section} p-4`} aria-label="플레이" data-testid="tetris-play">
+            <p className="text-sm text-slate-300">
               내 최고 점수 <strong className="ml-1 text-lg text-amber-300">{best === null ? "…" : best > 0 ? formatScore(best) : "-"}</strong>
             </p>
-            <ButtonLink href="/games/tetris/play" size="md" fullWidth className="mt-5 min-h-11">
+            <ButtonLink href="/games/tetris/play" size="md" fullWidth className="mt-3 min-h-12 text-base">
               게임 시작
             </ButtonLink>
+            {/* 오늘의 테트리스 — 데일리 보드가 있을 때만 (games-growth B1). 시작과 같은 카드의 보조 줄 */}
+            <DailyCard className="mt-3" />
           </section>
 
-          {/* 내 스킨 — 게임 시작 바로 아래, 눈에 띄게 (D-003). 게스트는 로그인 유도 */}
-          <MySkinCard className={`${cardStyles.section} p-4`} />
+          {/* 대전 — 게임 시작 다음, 첫 화면 안에 색 테두리로 (games-polish P8·tetris-home) */}
+          <BattleEntry />
 
-          {/* 오늘의 테트리스 — 데일리 보드가 있을 때만 (games-growth B1) */}
-          <DailyCard />
-
-          {/* 대전 입구는 여기 한 곳 — 첫 화면에 보이게 헤더 바로 아래 (games-polish P8) */}
-          <div className={`${cardStyles.section} p-4`}>
-            <BattleEntry />
-          </div>
+          {/* 내 스킨 — 한 줄(레벨·포인트), 누르면 스킨 상세 (D-003) */}
+          <MySkinCard className={`${cardStyles.section} p-1`} />
 
           {(pending || pendingMessage) && (
             <section className={`${cardStyles.section} p-4`} role="status">
@@ -257,54 +264,23 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
             </section>
           )}
 
-          {/* 오늘의 랭킹 미리보기 */}
-          <section className={`${cardStyles.section} p-4`}>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-white">오늘의 TOP {PREVIEW_LIMIT}</h2>
-              <ButtonLink href="/games/tetris/rankings" variant="secondary" size="md">
-                전체 랭킹
-              </ButtonLink>
-            </div>
-            {previewError ? (
-              <p className="text-sm text-red-300">{previewError}</p>
-            ) : preview === null ? (
-              <LoadingSpinnerSimple message="랭킹을 불러오는 중..." />
-            ) : preview.length === 0 ? (
-              <EmptyState message="오늘은 아직 기록이 없어요." description="첫 번째 주인공이 되어 보세요!" variant="minimal" />
-            ) : (
-              <RankingTable game={TETRIS_GAME} items={preview} myScoreIds={myScoreIds} compact />
-            )}
-          </section>
         </div>
-        <div className="flex min-w-0 flex-col gap-3 sm:gap-6">
-          <PopularReplaysPreview game={TETRIS_GAME} myScoreIds={myScoreIds} accessToken={accessToken} ready={authStatus !== "loading"} />
+        <div className="flex min-w-0 flex-col gap-3 sm:gap-4">
+          <TetrisRecordsCard ranking={rankingPreview} myScoreIds={myScoreIds} accessToken={accessToken} authReady={authStatus !== "loading"} />
 
-          <RecentBattles />
-
-          {/* 설정 — 조작 키 안내는 설정 시트의 조작 상세·플레이 준비 화면에 있다(D-005) */}
-          <section className={`${cardStyles.section} p-4`}>
-            <h2 className="text-base font-semibold text-white">설정</h2>
-            <div className="mt-2 space-y-2">
-              <GameSettingsButton
-                testId="tetris-settings-entry"
-                renderSheet={(close) => <TetrisSettingsSheet onClose={close} />}
-                className="flex min-h-12 w-full items-center gap-3 rounded-xl px-2 text-left hover:bg-white/5"
-              >
-                <span className="flex-1">
-                  <span className="block text-sm font-semibold text-slate-100">설정 열기</span>
-                  <span className="block text-xs text-slate-400">스킨 · 소리 · 조작 · 화면</span>
-                </span>
-                <span aria-hidden="true" className="text-slate-400">
-                  ›
-                </span>
-              </GameSettingsButton>
-              <ButtonLink href="/games/tetris/skins" variant="secondary" size="md" fullWidth className="min-h-11">
-                스킨 도감 — 모든 스킨과 얻는 방법
-              </ButtonLink>
-            </div>
-          </section>
-
-          {about}
+          <div>
+            <nav aria-label="테트리스 더 보기" className="flex flex-wrap items-center gap-x-5 px-1">
+              <Link href="/games/tetris/skins" className={FOOTER_LINK}>
+                스킨 도감
+              </Link>
+              {accessToken && (
+                <Link href="/games/tetris/points" className={FOOTER_LINK}>
+                  포인트 내역
+                </Link>
+              )}
+            </nav>
+            {about}
+          </div>
         </div>
       </div>
       {/* 하단 내비(떠 있는 카드형)에 마지막 항목이 가리지 않게 — 디펜스 허브와 같은 여백 */}
@@ -312,3 +288,5 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
     </TeamsPageLayout>
   );
 }
+
+const FOOTER_LINK = "flex min-h-11 items-center text-sm text-slate-300 hover:text-white";

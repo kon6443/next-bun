@@ -30,7 +30,8 @@ describe('테트리스 홈 "오늘의 테트리스" 카드 (games-growth B1)', (
     getGameBoards.mockResolvedValue({ data: { items: [today] } });
     const { unmount } = await act(async () => render(<DailyCard />));
     expect(screen.getByRole('link', { name: '도전하기' }).getAttribute('href')).toBe('/games/tetris/play/daily');
-    expect(screen.getByRole('link', { name: '오늘 순위' }).getAttribute('href')).toBe('/games/tetris/rankings?board=daily-2026-10-24');
+    // 첫 판 전에는 순위 링크가 없다 — 값 없는 "오늘 순위"가 빈 라벨로 읽히지 않게
+    expect(screen.queryByRole('link', { name: '오늘 순위' })).toBeNull();
     unmount();
 
     window.localStorage.setItem('tetris:daily:first', JSON.stringify({ boardKey: 'daily-2026-10-24', score: 12340, lines: 40, level: 5, rank: 3 }));
@@ -38,7 +39,11 @@ describe('테트리스 홈 "오늘의 테트리스" 카드 (games-growth B1)', (
       render(<DailyCard />);
     });
     expect(screen.getByTestId('tetris-daily-first').textContent).toBe('오늘 첫 판 12,340점 · 3위');
-    expect(screen.getByTestId('daily-share')).toBeTruthy();
+    // 홈 플레이 카드 안의 좁은 칸 — 짧은 문구·테두리 버튼(채움 버튼은 게임 시작 하나), 이름은 그대로
+    const share = screen.getByRole('button', { name: '오늘 결과 공유하기' });
+    expect(share.textContent).toBe('🟩 공유');
+    expect(share.className).not.toContain('bg-gradient');
     expect(screen.getByRole('link', { name: '다시 도전' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: '오늘 순위' }).getAttribute('href')).toBe('/games/tetris/rankings?board=daily-2026-10-24');
   });
 });

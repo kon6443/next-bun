@@ -164,3 +164,63 @@ export async function upgradeMySkin(
 
   return response.json();
 }
+
+// ==================== 포인트 내역 (tetris-home D-005) ====================
+
+/** 내역 줄의 사유 — 서버가 늘린다(출석·보상 등). 모르는 값은 memo로 보인다 */
+export type PointReason = 'TETRIS_SCORE' | 'SKIN_UPGRADE' | (string & {});
+
+export type PointHistoryItem = {
+  id: number;
+  /** 적립·보상 +, 사용 − */
+  amount: number;
+  reason: PointReason;
+  refKey: string | null;
+  /** TETRIS_SCORE → { scoreId } · SKIN_UPGRADE → { slot, skinId, level } · 그 밖·형식이 다르면 null */
+  meta: Record<string, unknown> | null;
+  memo: string | null;
+  /** UTC ISO — 소급 줄은 원래 기록 시각 */
+  createdAt: string;
+};
+
+export type PointHistoryPage = {
+  /** 매 페이지에 온다 */
+  points: SkinPoints;
+  /** 시각 내림차순 → id 내림차순 */
+  items: PointHistoryItem[];
+  /** 다음 페이지 beforeId — 끝이면 null */
+  nextCursor: number | null;
+};
+
+type PointHistoryResponse = {
+  code: 'SUCCESS';
+  data: PointHistoryPage;
+  message: string;
+};
+
+/**
+ * 내 포인트 내역 — 최신순 커서 페이지(beforeId = 이전 응답의 nextCursor). type: earn(+)·spend(−)만, 생략하면 전부
+ * limit 기본 20·최대 50. 정의 밖 type은 422. 401(만료)은 전역 로그아웃 없이 던진다 — 화면이 다시 로그인 안내
+ */
+export async function getPointHistory(
+  query: { beforeId?: number | null; limit?: number; type?: 'earn' | 'spend' },
+  accessToken: string,
+): Promise<PointHistoryResponse> {
+  const params = new URLSearchParams();
+  if (query.beforeId != null) params.set('beforeId', String(query.beforeId));
+  if (query.limit != null) params.set('limit', String(query.limit));
+  if (query.type) params.set('type', query.type);
+  const search = params.toString();
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'GET',
+    endpoint: `/api/v1/users/me/points/history${search ? `?${search}` : ''}`,
+    accessToken,
+    notifyUnauthorized: false,
+  });
+
+  if (!response.ok) {
+    await handleApiError(response, '포인트 내역을 불러오지 못했습니다.');
+  }
+
+  return response.json();
+}

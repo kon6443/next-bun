@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import toast from "react-hot-toast";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { TeamsPageLayout, ButtonLink, SectionLabel, LoadingSpinnerSimple } from "@/app/teams/components";
 import { cardStyles } from "@/styles/teams";
@@ -12,7 +13,8 @@ import { getTetrisSkinCatalog } from "@/services/gameService";
 import { ApiError } from "@/types/api";
 import type { TetrisSkinCatalog, TetrisSkinCatalogItem, TetrisSkinSlot } from "@/types/game";
 import { SkinPreview } from "../components/SkinPreview";
-import { SkinUpgradePanel, formatPoints } from "../components/SkinUpgradePanel";
+import { SkinUpgradePanel } from "../components/SkinUpgradePanel";
+import { formatPoints } from "../lib/points";
 import { itemLevel } from "../lib/mySkins";
 import { useMySkins } from "../hooks/useMySkins";
 import { KNOWN_SKIN_IDS, SKIN_ITEM_LABELS, SKIN_SLOTS, SKIN_SLOT_LABELS, toSkinLevel } from "../lib/skins";
@@ -153,6 +155,9 @@ export default function SkinsCatalogView() {
           <p className="mt-4 text-sm text-slate-300" data-testid="catalog-points">
             보유 포인트 <span className="font-semibold text-amber-200">{formatPoints(mine.points.balance)}</span>
             <span className="ml-1 text-xs text-slate-500">· 로그인하고 남긴 테트리스 점수만큼 쌓여요</span>
+            <Link href="/games/tetris/points" aria-label="포인트 내역" className="ml-2 inline-flex min-h-11 items-center text-sky-300 hover:text-sky-200">
+              내역<span aria-hidden="true">&nbsp;›</span>
+            </Link>
           </p>
         )}
         {catalog && signedIn && (

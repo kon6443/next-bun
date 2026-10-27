@@ -137,7 +137,7 @@ export function SkinSettingsSection({ onNavigate, allowLeave = true }: { onNavig
         })}
       </div>
       <div className="mt-3">
-        <SkinUpgradePanel key={`${slot}:${equipped[slot]}`} mine={mine} slot={slot} id={equipped[slot]} allowUpgrade={allowLeave} />
+        <SkinUpgradePanel key={`${slot}:${equipped[slot]}`} mine={mine} slot={slot} id={equipped[slot]} allowUpgrade={allowLeave} onNavigate={onNavigate} />
       </div>
     </div>
     </>

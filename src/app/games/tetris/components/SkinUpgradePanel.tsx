@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import toast from "react-hot-toast";
 import { ApiError } from "@/types/api";
 import type { useMySkins } from "../hooks/useMySkins";
 import { itemLevel } from "../lib/mySkins";
+import { formatPoints } from "../lib/points";
 import { MAX_SKIN_LEVEL, SKIN_ITEM_LABELS, SKIN_LEVEL_FEATURES, SKIN_SLOT_LABELS, type SkinSlot, toSkinLevel } from "../lib/skins";
 import { SkinPreview } from "./SkinPreview";
-
-export const formatPoints = (points: number) => `${Math.max(0, Math.floor(points)).toLocaleString("ko-KR")} P`;
 
 type Props = {
   /** 부모의 useMySkins() — 여기서 따로 부르지 않는다(훅이 새로 붙을 때마다 불러오기 실패 뒤 다시 불러오기를 일으키지 않게) */
@@ -19,6 +19,8 @@ type Props = {
   allowUpgrade?: boolean;
   /** 강화 비용 [Lv2로, …, Lv5로] — 내 카탈로그(nextCost)가 없을 때(게스트 도감) 비용 안내에 쓴다 */
   levelCosts?: readonly number[];
+  /** 포인트 내역 링크로 화면을 떠날 때(설정 시트를 닫는다 — 시트의 도감 링크와 같게) */
+  onNavigate?: () => void;
 };
 
 /**
@@ -27,7 +29,7 @@ type Props = {
  * 확인은 모달을 겹치지 않고 같은 자리에서 — 설정 시트(대화상자) 안에서도 쓰기 때문(D-006과 같은 이유)
  * 강화는 계정 전체에서 한 번에 하나(upgrading) — 진행 중이면 모든 강화 버튼이 막힌다
  */
-export function SkinUpgradePanel({ mine, slot, id, allowUpgrade = true, levelCosts }: Props) {
+export function SkinUpgradePanel({ mine, slot, id, allowUpgrade = true, levelCosts, onNavigate }: Props) {
   const { status, loggedIn, catalog, points, upgrading, upgrade } = mine;
   const item = catalog?.[slot].find((x) => x.id === id) ?? null;
   const level = itemLevel(catalog, slot, id);
@@ -113,7 +115,17 @@ export function SkinUpgradePanel({ mine, slot, id, allowUpgrade = true, levelCos
         <h3 className="text-sm font-semibold text-white">
           {SKIN_SLOT_LABELS[slot]} {name} <span className="text-amber-200">Lv{level}</span>
         </h3>
-        {ready && points && <span className="text-xs text-slate-400">보유 {formatPoints(balance)}</span>}
+        {ready &&
+          points &&
+          // 판 도중에는 화면을 떠나는 링크를 두지 않는다(설정 시트 allowLeave 규칙) — 글만
+          (allowUpgrade ? (
+            <Link href="/games/tetris/points" onClick={onNavigate} aria-label={`보유 ${formatPoints(balance)} · 포인트 내역`} className="inline-flex min-h-11 items-center text-xs text-slate-400 hover:text-slate-200">
+              보유 {formatPoints(balance)}
+              <span aria-hidden="true">&nbsp;›</span>
+            </Link>
+          ) : (
+            <span className="text-xs text-slate-400">보유 {formatPoints(balance)}</span>
+          ))}
       </div>
 
       <div className="mt-2 flex justify-center">
