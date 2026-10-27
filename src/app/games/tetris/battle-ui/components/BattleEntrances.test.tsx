@@ -52,7 +52,7 @@ describe('대전 입구 (DESIGN §19)', () => {
     expect(getBattleLobbyStats).toHaveBeenCalledTimes(1);
   });
 
-  it('미리보기 방 — 이름·인원·🔒와 들어가기, 빠른 참가는 첫 열린 방, 방 만들기는 로비의 만들기 카드 (P7)', async () => {
+  it('방 목록 없이 빠른 참가·방 만들기만(tetris-home D-003) — 빠른 참가는 잠기지 않은 첫 열린 방, 방 만들기는 로비의 만들기 카드', async () => {
     getBattleLobbyStats.mockResolvedValue({
       data: {
         waitingRooms: 3,
@@ -65,19 +65,17 @@ describe('대전 입구 (DESIGN §19)', () => {
       },
     });
     render(<BattleEntry />);
-    const list = await screen.findByRole('list', { name: '열린 방' });
-    expect(within(list).getAllByRole('listitem')).toHaveLength(3);
-    expect(within(list).getByRole('img', { name: '비밀번호 방' })).toBeInTheDocument();
-    expect(within(list).getByText('3/4명')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '비밀 방 들어가기' })).toHaveAttribute('href', '/games/tetris/battle/LOCK23?locked=1');
+    expect(await screen.findByText('지금 열린 방 3개')).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: '열린 방' })).toBeNull();
+    expect(screen.queryByRole('link', { name: '비밀 방 들어가기' })).toBeNull();
     expect(screen.getByRole('link', { name: '빠른 참가' })).toHaveAttribute('href', '/games/tetris/battle/OPEN23');
     expect(screen.getByRole('link', { name: '방 만들기' })).toHaveAttribute('href', '/games/tetris/battle#battle-create');
   });
 
-  it('방이 없으면 빈 상태와 방 만들기 — 목록 자리는 늘 보인다 (P8)', async () => {
+  it('방이 없으면 방 만들기만 — 빠른 참가 없음', async () => {
     getBattleLobbyStats.mockResolvedValue({ data: { waitingRooms: 0, playingRooms: 0, rooms: [] } });
     render(<BattleEntry />);
-    expect(await screen.findByText('지금 열린 방이 없어요')).toBeInTheDocument();
+    expect(await screen.findByText('방을 만들어 보세요')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '방 만들기' })).toHaveAttribute('href', '/games/tetris/battle#battle-create');
     expect(screen.queryByRole('link', { name: '빠른 참가' })).toBeNull();
   });
@@ -221,10 +219,10 @@ describe('대전 입구 (DESIGN §19)', () => {
     expect(getBattleMatchList.mock.calls.map(([p]) => p.cursor)).toEqual([null, 'bad', null, null]);
   });
 
-  it('받는 중에도 목록 자리와 방 만들기는 보인다 (P8)', async () => {
+  it('받는 중에도 방 만들기는 쓸 수 있다 (P8)', async () => {
     getBattleLobbyStats.mockReturnValue(new Promise(() => {}));
     render(<BattleEntry />);
-    expect(screen.getByRole('status')).toHaveTextContent('방 목록을 불러오는 중');
     expect(screen.getByRole('link', { name: '방 만들기' })).toHaveAttribute('href', '/games/tetris/battle#battle-create');
+    expect(screen.queryByRole('link', { name: '빠른 참가' })).toBeNull();
   });
 });

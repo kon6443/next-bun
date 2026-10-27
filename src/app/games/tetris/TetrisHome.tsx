@@ -1,9 +1,9 @@
 "use client";
 
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { TeamsPageLayout, ButtonLink, Button, EmptyState, LoadingSpinnerSimple } from "@/app/teams/components";
+import { TeamsPageLayout, Button, EmptyState, LoadingSpinnerSimple } from "@/app/teams/components";
 import { cardStyles } from "@/styles/teams";
 import { ConfirmModal } from "@/app/components/ConfirmModal";
 import { getGameRankings, getMyBestScore, submitGameScore } from "@/services/gameService";
@@ -19,7 +19,7 @@ import { GameSettingsButton } from "@/app/games/_shared/components/GameSettingsB
 import { ReloginButton } from "@/app/games/_shared/components/ReloginButton";
 import { TetrisSettingsSheet } from "./components/TetrisSettingsSheet";
 import { MySkinCard } from "./components/MySkinCard";
-import { TetrisRecordsCard } from "./components/TetrisRecordsCard";
+import { RECORDS_LIMIT, TetrisRecordsCard } from "./components/TetrisRecordsCard";
 import { formatScore } from "@/app/games/_shared/lib/format";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
 import { classifySubmitError } from "@/app/games/_shared/lib/submitError";
@@ -33,8 +33,6 @@ import {
   saveLastName,
 } from "./lib/storage";
 import { syncPointsAfterScore } from "./lib/mySkins";
-
-const PREVIEW_LIMIT = 5;
 
 /** about: 서버가 그린 소개·특징(검색엔진이 읽을 글) — 화면 맨 아래 */
 export default function TetrisHome({ about }: { about?: ReactNode }) {
@@ -61,6 +59,13 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
   /** 보관분 재등록이 로그인 만료(401)로 거절됐다 — 다시 로그인한 뒤 내 기록으로 등록한다 */
   const [pendingNeedsLogin, setPendingNeedsLogin] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+  /** 이름 문제로 펼친 폼이 그려지면 이름 칸으로 포커스(한 줄 배너의 등록 버튼이 사라져 키보드·스크린리더가 자리를 잃지 않게) */
+  const focusNameRef = useRef(false);
+  useEffect(() => {
+    if (!askName || !focusNameRef.current) return;
+    focusNameRef.current = false;
+    document.getElementById("tetris-pending-name")?.focus();
+  }, [askName]);
 
   // 브라우저 저장소는 마운트 후에 읽는다 (서버 렌더와 어긋나지 않게)
   useEffect(() => {
@@ -99,7 +104,7 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
   useEffect(() => {
     if (authStatus === "loading") return;
     let cancelled = false;
-    getGameRankings("tetris", "daily", PREVIEW_LIMIT, undefined, accessToken)
+    getGameRankings("tetris", "daily", RECORDS_LIMIT, undefined, accessToken)
       .then(({ data }) => !cancelled && setPreview(data.items))
       .catch((err) => !cancelled && setPreviewError(extractErrorMessage(err, "랭킹을 불러오지 못했습니다.")));
     return () => {
@@ -144,9 +149,11 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
       if (kind === "final") {
         dropPending(pending.sessionId);
       } else if (kind === "name") {
-        // 세션은 그대로 — 이름만 바꿔 다시 낸다
+        // 세션은 그대로 — 이름만 바꿔 다시 낸다. 한 줄 배너가 펼친 폼으로 바뀌며 누른 버튼이 사라지니 이름 칸으로 포커스(아래 effect — 그려진 뒤)
         setNeedsNewName(true);
         setPendingName(playerName);
+        // 한 줄 배너에서 거절됐을 때만(이미 펼친 폼이면 버튼·이름 칸이 그대로라 옮기지 않는다 — 플래그가 남아 나중에 포커스를 빼앗지 않게)
+        focusNameRef.current = !askName;
       }
       setPendingMessage(message);
     } finally {
@@ -167,8 +174,8 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
   return (
     <TeamsPageLayout maxWidth="lg-wide">
       {/*
-        위계(tetris-home): 상단 바 → 플레이(게임 시작 + 오늘의 테트리스) → 친구와 대전 → 내 스킨 한 줄 → 기록 탭 → 링크 줄·소개(접기)
-        채움 버튼은 "게임 시작" 하나 — 나머지는 테두리·줄·글자 링크. 데스크톱(lg)은 왼쪽 플레이 쪽·오른쪽 기록 쪽 2단
+        위계(tetris-home): 상단 바 → 플레이(게임 시작 타일 + 오늘의 테트리스 타일) → 친구와 대전 → 내 스킨 한 줄 → (등록 못 한 기록 한 줄) → 기록 탭(3줄) → 링크 줄·소개(접기)
+        채움은 "게임 시작" 하나 — 나머지는 테두리·줄·글자 링크. 375 첫 화면에 기록 탭 머리까지(D-003). 데스크톱(lg)은 왼쪽 플레이 쪽·오른쪽 기록 쪽 2단
       */}
       <header className="flex items-center gap-1">
         <Link
@@ -184,15 +191,21 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
       </header>
       <div className="flex flex-col gap-3 sm:gap-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6">
         <div className="flex min-w-0 flex-col gap-3 sm:gap-4">
-          <section className={`${cardStyles.section} p-4`} aria-label="플레이" data-testid="tetris-play">
-            <p className="text-sm text-slate-300">
-              내 최고 점수 <strong className="ml-1 text-lg text-amber-300">{best === null ? "…" : best > 0 ? formatScore(best) : "-"}</strong>
-            </p>
-            <ButtonLink href="/games/tetris/play" size="md" fullWidth className="mt-3 min-h-12 text-base">
-              게임 시작
-            </ButtonLink>
-            {/* 오늘의 테트리스 — 데일리 보드가 있을 때만 (games-growth B1). 시작과 같은 카드의 보조 줄 */}
-            <DailyCard className="mt-3" />
+          {/*
+            플레이 — 게임 시작(채움, 주 행동)과 오늘의 테트리스(테두리 보조 타일)를 나란히(tetris-home D-003)
+            최고 점수는 시작 타일 안 둘째 줄. 데일리 보드가 없으면 시작이 줄을 다 쓴다
+          */}
+          <section className="flex gap-2" aria-label="플레이" data-testid="tetris-play">
+            <Link
+              href="/games/tetris/play"
+              className="flex min-h-20 flex-[1.15] flex-col justify-center rounded-3xl bg-gradient-to-br from-indigo-500 via-sky-500 to-cyan-400 px-4 py-3 leading-tight text-white shadow-lg shadow-sky-500/40 hover:brightness-110"
+            >
+              <span className="text-lg font-bold">
+                <span aria-hidden="true">▶ </span>게임 시작
+              </span>
+              <span className="mt-1 text-xs text-white/85">최고 {best === null ? "…" : best > 0 ? formatScore(best) : "-"}</span>
+            </Link>
+            <DailyCard className="flex-1" />
           </section>
 
           {/* 대전 — 게임 시작 다음, 첫 화면 안에 색 테두리로 (games-polish P8·tetris-home) */}
@@ -201,7 +214,48 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
           {/* 내 스킨 — 한 줄(레벨·포인트), 누르면 스킨 상세 (D-003) */}
           <MySkinCard className={`${cardStyles.section} p-1`} />
 
-          {(pending || pendingMessage) && (
+          {/* 등록 못 한 기록 — 이름이 있으면 한 줄(등록·버리기), 이름부터 물어야 하면 펼친다 */}
+          {pending && !askName ? (
+            <section className={`${cardStyles.section} p-2 pl-4`} role="status" data-testid="tetris-pending">
+              <div className="flex items-center gap-2">
+                <p className="min-w-0 flex-1 truncate text-sm text-slate-200">
+                  등록 못 한 기록{pendingList.length > 1 ? ` ${pendingList.length}건` : ""} <strong>{formatScore(pending.score)}점</strong>
+                </p>
+                {/* 테두리형 — 채움은 게임 시작 하나 */}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="min-h-11 shrink-0 border-sky-400/50 text-sky-100"
+                  onClick={retryPending}
+                  disabled={isRetrying || authStatus === "loading"}
+                  aria-busy={isRetrying}
+                  aria-label={`${pending.playerName} ${formatScore(pending.score)}점 다시 등록하기`}
+                >
+                  {isRetrying ? "등록 중..." : "등록"}
+                </Button>
+                <Button type="button" variant="secondary" size="sm" className="min-h-11 shrink-0" onClick={() => setConfirmDiscard(true)} disabled={isRetrying}>
+                  버리기
+                </Button>
+              </div>
+              {pendingMessage && <p className="mt-1 pr-2 text-sm text-slate-300">{pendingMessage}</p>}
+              {pendingNeedsLogin && <ReloginButton className="mt-1" />}
+              <ConfirmModal
+                isOpen={confirmDiscard}
+                onClose={() => setConfirmDiscard(false)}
+                onConfirm={() => {
+                  setConfirmDiscard(false);
+                  dropPending(pending.sessionId);
+                  setPendingMessage(null);
+                }}
+                title="이 기록을 버릴까요?"
+                message="버리면 랭킹에 다시 등록할 수 없어요."
+                confirmLabel="버리기"
+                cancelLabel="취소"
+                variant="danger"
+              />
+            </section>
+          ) : (pending || pendingMessage) && (
             <section className={`${cardStyles.section} p-4`} role="status">
               {pending && (
                 <>
