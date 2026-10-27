@@ -238,8 +238,8 @@ describe('drawGame — 매 프레임 shadowBlur (a1·a2)', () => {
     const layout = computeLayout(400, 800);
     const ghostColors = () =>
       bakedWith(8).map((l) => l.find((e) => e.name === 'strokeStyle')?.args[0]);
-    drawGame(recordingCtx(2).ctx, state, layout, { quality: 'full', skins: { block: 'default', effect: 'default', board: 'default' } });
-    drawGame(recordingCtx(2).ctx, state, layout, { quality: 'full', skins: { block: 'neon', effect: 'default', board: 'default' } });
+    drawGame(recordingCtx(2).ctx, state, layout, { quality: 'full', skins: { block: 'default', effect: 'default', board: 'default', levels: { block: 1, effect: 1, board: 1 } } });
+    drawGame(recordingCtx(2).ctx, state, layout, { quality: 'full', skins: { block: 'neon', effect: 'default', board: 'default', levels: { block: 1, effect: 1, board: 1 } } });
     expect(ghostColors()).toEqual([blockSkin('default').cells[state.piece + 1], blockSkin('neon').cells[state.piece + 1]]);
   });
 

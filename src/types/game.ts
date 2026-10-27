@@ -98,6 +98,8 @@ export type SubmitScoreResponse<D = TetrisScoreDetail> = {
   ranks: Record<RankingPeriod, number> | null;
   /** 서버가 저장한 이름(앞뒤 공백·연속 공백 정리값) — 공유 카드·결과·최근 이름은 이 값. 이 필드 배포 전 응답에는 없다(보낸 이름으로 폴백) */
   playerName?: string;
+  /** 스킨 포인트(skin-levels) — 기록 주인이 있는 테트리스만(로그인 세션·토큰). 비로그인·다른 게임·이 필드 배포 전은 null·없음 */
+  points?: { earned: number; balance: number } | null;
 };
 
 export type RankingItem<D = TetrisScoreDetail> = {
@@ -189,7 +191,7 @@ export type ReplayData = RankingItem & {
   frames: number;
   inputs: number[];
   /** 보드 스킨(D-003) — 기록 주인의 지금 장착(익명 default). 이전 서버면 없다 → default로 그린다 */
-  skins?: { block: string; effect: string; board: string };
+  skins?: { block: string; effect: string; board: string; levels?: { block: number; effect: number; board: number } };
 };
 
 /** 테트리스 밖 게임의 재생 데이터 — das·arr 대신 params, 보드 키 (defense DESIGN §B6) */
@@ -211,10 +213,26 @@ export type ReplayDataByGame = {
 export type TetrisSkinSlot = 'block' | 'effect' | 'board' | 'background';
 
 /** 도감 아이템 — unlock은 'default'(기본 제공)·'free'(누구나 무료) 외에 업적·출석 등이 늘어난다. 게스트는 owned·equipped 모두 false */
-export type TetrisSkinCatalogItem = { id: string; unlock: string; owned: boolean; equipped: boolean };
+export type TetrisSkinCatalogItem = {
+  id: string;
+  unlock: string;
+  owned: boolean;
+  equipped: boolean;
+  /** 내 레벨 1~5(skin-levels) — 게스트·미보유는 1. 이 필드 배포 전 응답에는 없다 */
+  level?: number;
+};
 
-/** GET /games/tetris/skins — 누구나. Bearer가 있으면 보유·장착 표시 */
+/** 스킨 포인트 — balance = max(0, earned − spent) */
+export type SkinPoints = { balance: number; earned: number; spent: number };
+
+/** GET /games/tetris/skins — 누구나. Bearer가 있으면 보유·장착·레벨·포인트 표시 */
 export type TetrisSkinCatalog = {
   signedIn: boolean;
   slots: { slot: TetrisSkinSlot; items: TetrisSkinCatalogItem[] }[];
+  /** 최고 레벨(5) */
+  maxLevel?: number;
+  /** 강화 비용 — [Lv2로, Lv3로, Lv4로, Lv5로] */
+  levelCosts?: number[];
+  /** 로그인이면 내 포인트, 게스트는 null */
+  points?: SkinPoints | null;
 };

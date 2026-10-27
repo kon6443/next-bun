@@ -12,8 +12,10 @@ import { getTetrisSkinCatalog } from "@/services/gameService";
 import { ApiError } from "@/types/api";
 import type { TetrisSkinCatalog, TetrisSkinCatalogItem, TetrisSkinSlot } from "@/types/game";
 import { SkinPreview } from "../components/SkinPreview";
+import { SkinUpgradePanel, formatPoints } from "../components/SkinUpgradePanel";
+import { itemLevel } from "../lib/mySkins";
 import { useMySkins } from "../hooks/useMySkins";
-import { KNOWN_SKIN_IDS, SKIN_ITEM_LABELS, SKIN_SLOTS, SKIN_SLOT_LABELS } from "../lib/skins";
+import { KNOWN_SKIN_IDS, SKIN_ITEM_LABELS, SKIN_SLOTS, SKIN_SLOT_LABELS, toSkinLevel } from "../lib/skins";
 import { nextTabByKey } from "../lib/tabKeys";
 
 /** 획득 방법 — 서버 unlock 값. 모르는 값(새 획득 방식이 먼저 나온 경우)은 안전한 폴백 */
@@ -39,6 +41,7 @@ type Load = { status: "loading" } | { status: "ready"; catalog: TetrisSkinCatalo
  * 카탈로그(목록·획득 방식·보유)는 서버 GET /games/tetris/skins. 장착은 장착 모달과 같은 저장소(useMySkins — 낙관적 반영·실패 롤백)
  * 로그인이 만료됐으면(401) 게스트 도감으로 다시 받고 다시 로그인하라고 알린다(조회라 익명 조회는 괜찮다 — 401 정책과 같은 안내)
  * 모르는 id(서버가 먼저 아이템을 늘림)는 기본 미리보기 + id로 보인다
+ * 레벨·강화(skin-levels) — 카드마다 내 레벨, [레벨·강화]로 고른 아이템의 미리보기·강화(SkinUpgradePanel)를 목록 아래에. 레벨·포인트는 내 스킨 저장소가 기준(강화하면 바로 바뀐다)
  */
 export default function SkinsCatalogView() {
   const { data: session, status: authStatus } = useSession();
@@ -49,6 +52,9 @@ export default function SkinsCatalogView() {
   const [slot, setSlot] = useState<TetrisSkinSlot>("block");
   const [filter, setFilter] = useState<Filter>("all");
   const [attempt, setAttempt] = useState(0);
+  /** 레벨·강화를 볼 아이템 — 없으면 이 슬롯의 장착(로그인)·첫 아이템 */
+  const [focused, setFocused] = useState<{ slot: TetrisSkinSlot; id: string } | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const tabsId = useId();
   const tabRefs = useRef<Partial<Record<TetrisSkinSlot, HTMLButtonElement | null>>>({});
 
@@ -83,6 +89,18 @@ export default function SkinsCatalogView() {
   // 게스트는 보유 정보가 없다 — 보유 필터를 숨기고 전부(UX 점검: "미보유"를 고르면 전부 나왔다)
   const activeFilter: Filter = signedIn ? filter : "all";
   const visible = itemsOf(slot).filter((item) => (activeFilter === "owned" ? item.owned : activeFilter === "missing" ? !item.owned : true));
+  /** 카드의 레벨 — 저장소를 불러왔으면 저장소(강화하면 바로 바뀐다), 아니면 도감 응답(게스트 1) */
+  const levelOf = (s: TetrisSkinSlot, item: TetrisSkinCatalogItem) =>
+    signedIn && mine.status === "ready" ? itemLevel(mine.catalog, s, item.id) : toSkinLevel(item.level);
+  const panelId =
+    (focused?.slot === slot ? focused.id : null) ??
+    (signedIn && mine.status === "ready" ? mine.equipped[slot] : null) ??
+    itemsOf(slot).find((item) => KNOWN_SKIN_IDS[slot].includes(item.id))?.id ??
+    null;
+  const showLevel = (item: TetrisSkinCatalogItem) => {
+    setFocused({ slot, id: item.id });
+    requestAnimationFrame(() => panelRef.current?.focus());
+  };
 
   const equip = async (item: TetrisSkinCatalogItem) => {
     if (!canEquip || !item.owned || isEquipped(slot, item)) return;
@@ -131,6 +149,12 @@ export default function SkinsCatalogView() {
           </div>
         )}
 
+        {catalog && signedIn && mine.status === "ready" && mine.points && (
+          <p className="mt-4 text-sm text-slate-300" data-testid="catalog-points">
+            보유 포인트 <span className="font-semibold text-amber-200">{formatPoints(mine.points.balance)}</span>
+            <span className="ml-1 text-xs text-slate-500">· 로그인하고 남긴 테트리스 점수만큼 쌓여요</span>
+          </p>
+        )}
         {catalog && signedIn && (
           <dl className="mt-4 grid grid-cols-4 gap-2 rounded-2xl border border-white/10 bg-slate-950/40 p-3 text-center text-sm" aria-label="슬롯별 보유">
             {SKIN_SLOTS.map((s) => {
@@ -211,7 +235,7 @@ export default function SkinsCatalogView() {
                     className={`flex flex-col items-center gap-2 rounded-xl border p-3 ${equipped ? "border-sky-400 bg-sky-500/10" : "border-slate-700/50 bg-slate-800/50"}`}
                   >
                     <span className={signedIn && !item.owned ? "opacity-50" : ""}>
-                      <SkinPreview slot={slot} id={known ? item.id : "default"} />
+                      <SkinPreview slot={slot} id={known ? item.id : "default"} level={levelOf(slot, item)} />
                     </span>
                     <span className="text-sm font-semibold text-white">{name}</span>
                     {!known && <span className="text-[11px] text-slate-500">미리보기 준비 중 · {item.id}</span>}
@@ -224,7 +248,18 @@ export default function SkinsCatalogView() {
                           <span className="rounded-full bg-slate-700/60 px-2 py-0.5 text-slate-300">🔒 미보유</span>
                         )}
                         {equipped && <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-sky-200">● 장착 중</span>}
+                        {item.owned && <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-amber-200">Lv{levelOf(slot, item)}</span>}
                       </span>
+                    )}
+                    {known && (
+                      <button
+                        type="button"
+                        onClick={() => showLevel(item)}
+                        aria-pressed={panelId === item.id}
+                        className="min-h-11 w-full rounded-full border border-amber-300/30 text-sm text-amber-100 hover:bg-amber-400/10"
+                      >
+                        레벨·강화
+                      </button>
                     )}
                     {signedIn && item.owned && !equipped && (
                       <button
@@ -240,6 +275,11 @@ export default function SkinsCatalogView() {
                 );
               })}
             </ul>
+          )}
+          {catalog && panelId && KNOWN_SKIN_IDS[slot].includes(panelId) && (
+            <div ref={panelRef} tabIndex={-1} className="mt-5 outline-none">
+              <SkinUpgradePanel key={`${slot}:${panelId}`} mine={mine} slot={slot} id={panelId} levelCosts={catalog.levelCosts} />
+            </div>
           )}
         </div>
       </section>

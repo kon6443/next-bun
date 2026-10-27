@@ -35,6 +35,16 @@ body {
   }
 }
 
+/* 테트리스 배경 스킨 Lv5 — 강조색 빛이 천천히 떠다닌다(transform만 — 합성 레이어) */
+@keyframes skinDrift {
+  from {
+    transform: translate3d(-8%, -5%, 0);
+  }
+  to {
+    transform: translate3d(8%, 5%, 0);
+  }
+}
+
 /* 바텀시트 슬라이드업 애니메이션 */
 @keyframes slideUp {
   from {

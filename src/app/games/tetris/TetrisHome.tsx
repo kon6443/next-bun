@@ -32,6 +32,7 @@ import {
   removePendingSubmission,
   saveLastName,
 } from "./lib/storage";
+import { syncPointsAfterScore } from "./lib/mySkins";
 
 const PREVIEW_LIMIT = 5;
 
@@ -132,8 +133,10 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
       dropPending(pending.sessionId);
       setMyScoreIds(new Set(loadMyScoreIds()));
       setBestVersion((v) => v + 1);
-      // 데일리·도전장 판이면 그 보드 순위로 읽히게(결과 화면의 "오늘의 순위"·"도전장 순위"와 같은 값)
-      setPendingMessage(data.ranks ? `등록했어요! ${tetrisRankLabel(pending.board, data.ranks.all)}` : "등록했어요! 순위는 랭킹에서 확인해 주세요.");
+      syncPointsAfterScore(data.points);
+      // 데일리·도전장 판이면 그 보드 순위로 읽히게(결과 화면의 "오늘의 순위"·"도전장 순위"와 같은 값). 로그인 기록이면 쌓인 스킨 포인트도
+      const earned = data.points ? ` +${Math.max(0, data.points.earned).toLocaleString("ko-KR")} P` : "";
+      setPendingMessage(data.ranks ? `등록했어요! ${tetrisRankLabel(pending.board, data.ranks.all)}${earned}` : `등록했어요! 순위는 랭킹에서 확인해 주세요.${earned}`);
     } catch (err) {
       // 보관된 기록은 앞서 한 번 실패한 제출의 재시도다
       const { kind, message } = classifySubmitError(err, true);

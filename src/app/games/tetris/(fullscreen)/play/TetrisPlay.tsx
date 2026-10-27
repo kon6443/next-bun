@@ -16,6 +16,7 @@ import { ENGINE_VERSION, type GameState, MAX_FRAMES, MAX_INPUT_LENGTH } from "..
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
 import { TetrisCanvas } from "../../components/TetrisCanvas";
 import { useMySkins } from "../../hooks/useMySkins";
+import { boardSkinsOf } from "../../lib/skins";
 import { GamePad } from "@/app/games/_shared/components/GamePad";
 import { TETRIS_PAD_LAYOUT } from "../../lib/tetrisPadLayout";
 import { TetrisSettingsSheet } from "../../components/TetrisSettingsSheet";
@@ -84,8 +85,8 @@ function sessionErrorMessage(err: unknown, variant: "daily" | "challenge" | null
 export default function TetrisPlay({ daily = false, challengeScoreId }: { daily?: boolean; challengeScoreId?: number }) {
   const { data: authSession, status: authStatus } = useSession();
   // 내 판은 내 보드 스킨(D-003) — 게스트·불러오기 전은 기본
-  const { equipped } = useMySkins();
-  const mySkins = { block: equipped.block, effect: equipped.effect, board: equipped.board };
+  const { equipped, levels: myLevels } = useMySkins();
+  const mySkins = boardSkinsOf(equipped, myLevels);
   const accessToken = authSession?.user?.accessToken ?? undefined;
 
   // 조작 설정 — 진동은 바로 반영, DAS·ARR은 판을 시작할 때 엔진에 넘긴다(판 도중 바꾸면 다음 판부터)

@@ -40,3 +40,19 @@ describe('블록 스프라이트 캐시 (games-polish FE-22 — 숫자 키)', ()
     expect(getGlowSprite(3, 20, 1)).toBe(getGlowSprite(3, 20, 1));
   });
 });
+
+describe('블록 스프라이트 — 스킨 레벨 (skin-levels)', () => {
+  it('레벨이 다르면 다른 캔버스, 같으면 같은 것 — 생략·범위 밖은 Lv1(레벨 도입 전 그림)과 같다', () => {
+    const levels = [1, 2, 3, 4, 5].map((level) => getBlockSprite(3, 20, 1, 'neon', level));
+    expect(new Set(levels).size).toBe(5);
+    expect(getBlockSprite(3, 20, 1, 'neon', 4)).toBe(levels[3]);
+    expect(getBlockSprite(3, 20, 1, 'neon')).toBe(levels[0]);
+    expect(getBlockSprite(3, 20, 1, 'neon', 0)).toBe(levels[0]);
+    expect(getBlockSprite(3, 20, 1, 'neon', 9)).toBe(levels[0]);
+  });
+
+  it('새 아이템(투명·초콜릿)도 레벨마다 따로 굽는다 — 다른 스킨·레벨과 키가 겹치지 않는다', () => {
+    const sprites = ['default', 'clear', 'chocolate'].flatMap((skin) => [1, 5].map((level) => getBlockSprite(3, 24, 2, skin, level)));
+    expect(new Set(sprites).size).toBe(6);
+  });
+});

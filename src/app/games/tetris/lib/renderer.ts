@@ -24,15 +24,18 @@ import {
   drawRiseGlow,
   drawStarfield,
   drawTrail,
+  levelNeon,
   riseOffset,
   shakeOffset,
 } from './effectsRenderer';
+import { drawBlockShine, drawBlockTwinkles, drawBoardLevelLayer, drawClearSparks, glowBoost, starDensity } from './levelLayers';
 import { type BoardSkin, type BoardSkins, DEFAULT_BOARD_SKINS, blockSkin, boardSkin, effectSkin } from './skins';
 
 /**
  * 테트리스 캔버스 렌더러 — 엔진 상태를 읽기만 한다(연출은 엔진 프레임 안에서만)
  * 레이아웃: [홀드] [판 10×20 + 위쪽 생성 줄 2] [다음 5개]
  * 칸 값 0 빈칸 · 1~7 블록 · 8 가비지(대전) — 색은 판 주인의 스킨 슬롯(skins.ts, DrawOptions.skins)
+ * 스킨 레벨(DrawOptions.skins.levels)은 판 주인의 레벨 — 멈춘 강화는 늘, 움직이는 강화(levelLayers)는 발광을 그릴 때(full·연출 줄이기 아님·게임 중)만
  */
 
 /** 판 위에 보여 줄 숨은 줄 수 (생성 위치) */
@@ -73,6 +76,7 @@ function drawMiniPiece(
   dpr: number,
   alpha: number,
   blockId: string,
+  blockLevel: number,
 ) {
   const cells = PIECE_CELLS[piece][0];
   let minX = 4, maxX = 0, minY = 4, maxY = 0;
@@ -85,7 +89,7 @@ function drawMiniPiece(
   const offsetX = Math.round(cx - ((maxX - minX + 1) * size) / 2);
   const offsetY = Math.round(cy - ((maxY - minY + 1) * size) / 2);
   for (let i = 0; i < 8; i += 2) {
-    drawBlock(ctx, offsetX + (cells[i] - minX) * size, offsetY + (cells[i + 1] - minY) * size, size, piece + 1, dpr, alpha, blockId);
+    drawBlock(ctx, offsetX + (cells[i] - minX) * size, offsetY + (cells[i + 1] - minY) * size, size, piece + 1, dpr, alpha, blockId, blockLevel);
   }
 }
 
@@ -99,7 +103,7 @@ export type DrawOptions = {
   garbage?: GarbageGauge | null;
   /** lite = 저사양 감지 — 칸 발광을 끄고 별을 줄인다 (연출 줄이기도 lite로 그린다) */
   quality?: EffectQuality;
-  /** 판 주인의 스킨(보드 슬롯 block·effect·board) — 없으면 기본 */
+  /** 판 주인의 스킨(보드 슬롯 block·effect·board)과 레벨 — 없으면 기본 Lv1 */
   skins?: BoardSkins;
 };
 
@@ -160,10 +164,13 @@ export function drawGame(ctx: CanvasRenderingContext2D, state: GameState, layout
   const block = blockSkin(skins.block);
   const fxSkin = effectSkin(skins.effect);
   const board = boardSkin(skins.board);
+  const levels = skins.levels ?? DEFAULT_BOARD_SKINS.levels;
+  // 움직이는 레벨 강화 — 발광을 그리는 품질에서 게임 중일 때만
+  const animate = glow && !still;
 
   ctx.clearRect(0, 0, width, height);
   // 배경 별 — 판 뒤 전체, 레벨 색조
-  drawStarfield(ctx, frame, state.level, width, height, still, glow ? 'full' : 'lite', board);
+  drawStarfield(ctx, frame, state.level, width, height, still, glow ? 'full' : 'lite', board, starDensity(levels.board));
 
   // 판은 흔들림만큼 옮겨 그린다 (옆 패널·문구는 고정)
   const [shakeX, shakeY] = shakeOffset(effects, frame, still);
@@ -186,7 +193,8 @@ export function drawGame(ctx: CanvasRenderingContext2D, state: GameState, layout
   }
   ctx.stroke();
   // 매 프레임 그리는 테두리 — 저사양(lite)에서도 번짐을 줄인다
-  drawBoardFrame(ctx, layout, boardWidth, boardHeight, state.level, !glow, board);
+  drawBoardFrame(ctx, layout, boardWidth, boardHeight, state.level, !glow, board, levels.board);
+  drawBoardLevelLayer(ctx, layout, boardWidth, boardHeight, levelNeon(state.level, board), levels.board, frame, animate);
   if (!still) drawLevelGlow(ctx, effects, frame, layout, boardWidth, boardHeight, board);
 
   // 가비지 상승 — 판 내용이 아래에서 밀려 올라온다(판 안으로 자른다)
@@ -203,7 +211,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, state: GameState, layout
   if (glow) {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = GLOW_ALPHA_LOCKED;
+    ctx.globalAlpha = GLOW_ALPHA_LOCKED * glowBoost(levels.block);
     for (let row = HIDDEN_ROWS; row < HIDDEN_ROWS + VISIBLE_ROWS; row++) {
       for (let col = 0; col < BOARD_WIDTH; col++) {
         const value = state.board[row * BOARD_WIDTH + col];
@@ -212,7 +220,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, state: GameState, layout
     }
     if (state.active) {
       const cells = PIECE_CELLS[state.piece][state.rotation];
-      ctx.globalAlpha = GLOW_ALPHA_ACTIVE;
+      ctx.globalAlpha = Math.min(1, GLOW_ALPHA_ACTIVE * glowBoost(levels.block));
       for (let i = 0; i < 8; i += 2) {
         const row = state.y + cells[i + 1];
         if (row < firstRow) continue;
@@ -226,14 +234,15 @@ export function drawGame(ctx: CanvasRenderingContext2D, state: GameState, layout
   for (let row = firstRow; row < HIDDEN_ROWS + VISIBLE_ROWS; row++) {
     for (let col = 0; col < BOARD_WIDTH; col++) {
       const value = state.board[row * BOARD_WIDTH + col];
-      if (value !== 0) drawBlock(ctx, boardX + col * cell, rowToY(layout, row), cell, value, dpr, row < HIDDEN_ROWS ? 0.6 : 1, skin);
+      if (value !== 0) drawBlock(ctx, boardX + col * cell, rowToY(layout, row), cell, value, dpr, row < HIDDEN_ROWS ? 0.6 : 1, skin, levels.block);
     }
   }
+  if (animate && levels.block >= 5) drawBlockTwinkles(ctx, state.board, layout, frame, block.highlight);
 
   // 줄 삭제 연출 — 지연 프레임 동안 흰빛이 사라진다
   if (state.clearingRows.length > 0 && !state.active) {
     const big = state.lastLock !== null && isBigClear(state.lastLock);
-    drawClearFlash(ctx, state.clearingRows, state.delay / LINE_CLEAR_DELAY_FRAMES, big, layout, boardWidth, reduced, fxSkin);
+    drawClearFlash(ctx, state.clearingRows, state.delay / LINE_CLEAR_DELAY_FRAMES, big, layout, boardWidth, reduced, fxSkin, levels.effect, animate);
   }
 
   if (!still) drawTrail(ctx, effects, frame, layout, firstRow, block);
@@ -279,13 +288,15 @@ export function drawGame(ctx: CanvasRenderingContext2D, state: GameState, layout
     for (let i = 0; i < 8; i += 2) {
       const row = state.y + cells[i + 1];
       if (row < firstRow) continue;
-      drawBlock(ctx, boardX + (state.x + cells[i]) * cell, rowToY(layout, row), cell, state.piece + 1, dpr, 1, skin);
+      drawBlock(ctx, boardX + (state.x + cells[i]) * cell, rowToY(layout, row), cell, state.piece + 1, dpr, 1, skin, levels.block);
     }
+    if (animate && levels.block >= 4) drawBlockShine(ctx, cells, boardX + state.x * cell, rowToY(layout, state.y), firstRow - state.y, cell, frame, block.highlight);
   }
 
   if (rise > 0) ctx.restore();
   if (!still) drawRiseGlow(ctx, effects, frame, layout, boardWidth, boardHeight);
-  if (!still) drawClearRing(ctx, effects, frame, layout, boardWidth, fxSkin);
+  if (!still) drawClearRing(ctx, effects, frame, layout, boardWidth, fxSkin, levels.effect);
+  if (animate && levels.effect >= 5) drawClearSparks(ctx, effects, frame, layout, boardWidth, boardHeight, fxSkin);
   if (!still) drawParticles(ctx, effects, frame, layout, boardWidth, boardHeight, block);
   ctx.restore();
 
@@ -301,12 +312,12 @@ export function drawGame(ctx: CanvasRenderingContext2D, state: GameState, layout
   const nextCenterX = boardX + boardWidth + cell / 2 + sideWidth / 2;
   ctx.fillText('HOLD', holdCenterX, boardY + cell * 0.6);
   ctx.fillText('NEXT', nextCenterX, boardY + cell * 0.6);
-  if (state.hold !== -1) drawMiniPiece(ctx, state.hold, holdCenterX, boardY + cell * 2, mini, dpr, state.holdUsed ? 0.35 : 1, skin);
+  if (state.hold !== -1) drawMiniPiece(ctx, state.hold, holdCenterX, boardY + cell * 2, mini, dpr, state.holdUsed ? 0.35 : 1, skin, levels.block);
   for (let i = 0; i < PREVIEW_COUNT && i < state.queue.length; i++) {
-    drawMiniPiece(ctx, state.queue[i], nextCenterX, boardY + cell * 2 + i * mini * 3, mini, dpr, i === 0 ? 1 : 0.8, skin);
+    drawMiniPiece(ctx, state.queue[i], nextCenterX, boardY + cell * 2 + i * mini * 3, mini, dpr, i === 0 ? 1 : 0.8, skin, levels.block);
   }
   // 콤보 미터 — 홀드 아래
   drawComboMeter(ctx, effects, frame, holdCenterX, boardY + cell * 4.6, cell, sideWidth, reduced, fxSkin, board);
 
-  drawEffectText(ctx, effects, frame, layout, boardWidth, reduced, fxSkin);
+  drawEffectText(ctx, effects, frame, layout, boardWidth, reduced, fxSkin, levels.effect);
 }

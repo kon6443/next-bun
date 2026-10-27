@@ -6,9 +6,10 @@ import toast from "react-hot-toast";
 import { ApiError } from "@/types/api";
 import type { SkinCatalogItem } from "@/services/userService";
 import { useMySkins } from "../hooks/useMySkins";
-import { KNOWN_SKIN_IDS, SKIN_ITEM_LABELS, SKIN_SLOTS, SKIN_SLOT_LABELS, type SkinSlot } from "../lib/skins";
+import { KNOWN_SKIN_IDS, SKIN_ITEM_LABELS, SKIN_SLOTS, SKIN_SLOT_LABELS, type SkinSlot, toSkinLevel } from "../lib/skins";
 import { nextTabByKey } from "../lib/tabKeys";
 import { SkinPreview } from "./SkinPreview";
+import { SkinUpgradePanel } from "./SkinUpgradePanel";
 import { ReloginButton } from "@/app/games/_shared/components/ReloginButton";
 
 const SLOT_HINTS: Record<SkinSlot, string> = {
@@ -24,10 +25,13 @@ const SLOT_HINTS: Record<SkinSlot, string> = {
  * 카탈로그는 서버 것을 그대로 보인다(보유·잠금). 불러오기 전·실패면 이 프론트가 아는 아이템을 잠금 없이 보인다
  * 보드 슬롯은 상대·리플레이 화면에서도 내 장착으로 보인다(보드 주인 규칙), 배경은 나에게만
  * allowLeave=false: 판 도중(일시정지·대전) — 화면을 떠나는 도감 링크·로그인 버튼을 두지 않는다(확인 없이 판·경기를 떠나게 되므로)
+ *   강화도 숨기고 레벨만 보인다(skin-levels — 판 시작 때 레벨로 고정되는 리플레이와 내 화면이 어긋나지 않게)
+ * 카드마다 레벨, 아래에 지금 장착한 아이템의 레벨·강화(SkinUpgradePanel) — 다른 아이템을 강화하려면 먼저 장착한다(장착은 무료·즉시)
  */
 export function SkinSettingsSection({ onNavigate, allowLeave = true }: { onNavigate?: () => void; allowLeave?: boolean }) {
   const tabsId = useId();
-  const { status, equipped, catalog, loggedIn, equip } = useMySkins();
+  const mine = useMySkins();
+  const { status, equipped, catalog, loggedIn, equip } = mine;
   const [slot, setSlot] = useState<SkinSlot>("block");
   const tabRefs = useRef<Partial<Record<SkinSlot, HTMLButtonElement | null>>>({});
 
@@ -118,7 +122,7 @@ export function SkinSettingsSection({ onNavigate, allowLeave = true }: { onNavig
               } ${!canEquip || locked ? "cursor-not-allowed" : "hover:border-slate-500"}`}
             >
               <span className={`relative ${locked ? "opacity-40" : ""}`}>
-                <SkinPreview slot={slot} id={item.id} />
+                <SkinPreview slot={slot} id={item.id} level={toSkinLevel(item.level)} />
               </span>
               <span className="flex items-center gap-1">
                 {locked && <span aria-hidden="true">🔒</span>}
@@ -127,9 +131,13 @@ export function SkinSettingsSection({ onNavigate, allowLeave = true }: { onNavig
               </span>
               {/* 색(테두리)만으로 구분하지 않게 글자로도 */}
               {selected && <span className="text-[11px] text-sky-200">● 장착 중</span>}
+              {loggedIn && item.owned && <span className="text-[11px] text-amber-200">Lv{toSkinLevel(item.level)}</span>}
             </button>
           );
         })}
+      </div>
+      <div className="mt-3">
+        <SkinUpgradePanel key={`${slot}:${equipped[slot]}`} mine={mine} slot={slot} id={equipped[slot]} allowUpgrade={allowLeave} />
       </div>
     </div>
     </>
