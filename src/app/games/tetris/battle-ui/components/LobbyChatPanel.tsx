@@ -18,6 +18,8 @@ const oneLine = (text: string) => text.replace(/[\r\n\t]+/g, " ");
 const STICK_SLACK = 24;
 
 type Props = {
+  /** 로비 이름 칸의 지금 이름(정규화) — 내 키를 가진 게스트 글 중 이름이 같은 것만 "내 글" 색으로 칠한다(보이기·숨기기와 무관) */
+  guestName: string;
   /** 게스트가 보낼 이름 — 로비 위쪽 이름 칸의 값. 문제가 있으면 그 칸에 오류를 보이고 null */
   resolveGuestName: () => string | null;
   /** 서버가 게스트 이름을 거절했다(NAME_INVALID·NAME_FORBIDDEN) — 로비 이름 칸에 보인다 */
@@ -29,10 +31,12 @@ type Props = {
  * - 게스트 글에는 늘 "게스트" 표시 — 서버는 게스트 이름이 회원 이름과 같아도 막지 않는다(운영자 사칭만 막음). 구분 수단은 isGuest뿐
  * - 이름·글은 글자로만 그린다(서버가 HTML 이스케이프를 하지 않는다 — dangerouslySetInnerHTML 금지)
  * - 다른 사람 글을 누르면 "이 사람 숨기기" — 이 브라우저에만(senderKey). 숨긴 사람은 "모두 보이기"로 되돌린다
- * - 내 글(이 화면에서 보낸 글 id)은 숨긴 키와 같아도 늘 보인다 — 게스트 senderKey는 IP 기준이라 남과 겹칠 수 있다
+ * - senderKey가 me.senderKey와 같은 글(과 이 화면에서 보낸 글)은 숨길 수 없다 — 숨기면 내 글도 함께 가려진다.
+ *   게스트 키는 IP 기준이라 같은 공유기의 다른 게스트도 여기에 든다(서버 한계)
+ * - "내 글" 색은 그중 회원 글, 또는 이름이 지금 이름 칸과 같은 게스트 글 — 색만 바뀌고 보이기·숨기기에는 쓰지 않는다
  * - 목록은 role=log(새 글을 읽어 준다). 맨 아래에 있을 때만 새 글을 따라 내려간다(위 글을 읽는 중이면 그대로)
  */
-export function LobbyChatPanel({ resolveGuestName, onGuestNameError }: Props) {
+export function LobbyChatPanel({ guestName, resolveGuestName, onGuestNameError }: Props) {
   const chat = useLobbyChat();
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -47,8 +51,12 @@ export function LobbyChatPanel({ resolveGuestName, onGuestNameError }: Props) {
     setHidden(loadHiddenSenders());
   }, []);
 
-  const isMine = (m: LobbyChatMessage) => chat.myMessageIds.has(String(m.id));
-  const isHidden = (m: LobbyChatMessage) => !isMine(m) && hidden.includes(m.senderKey);
+  const myKey = chat.me?.senderKey ?? null;
+  const sentByMe = (m: LobbyChatMessage) => chat.myMessageIds.has(String(m.id));
+  const hasMyKey = (m: LobbyChatMessage) => myKey !== null && m.senderKey === myKey;
+  const canHide = (m: LobbyChatMessage) => !sentByMe(m) && !hasMyKey(m);
+  const isMine = (m: LobbyChatMessage) => sentByMe(m) || (hasMyKey(m) && (!m.isGuest || m.name === guestName));
+  const isHidden = (m: LobbyChatMessage) => canHide(m) && hidden.includes(m.senderKey);
   const visible = chat.messages.filter((m) => !isHidden(m));
   const hiddenCount = new Set(chat.messages.filter(isHidden).map((m) => m.senderKey)).size;
   /** 글 수는 상한(100)에 닿으면 그대로라 마지막 글로 새 글을 안다 */
@@ -90,18 +98,18 @@ export function LobbyChatPanel({ resolveGuestName, onGuestNameError }: Props) {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSend) return;
-    let guestName: string | undefined;
+    let sendName: string | undefined;
     if (chat.me?.isGuest) {
       const name = resolveGuestName();
       if (!name) return;
-      guestName = name;
+      sendName = name;
     }
     // 보내면 바로 비운다 — 기다리는 동안 이어 친 글에 보낸 글이 섞이지 않게. 실패하면 칸이 비어 있을 때만 되돌린다
     const submitted = text;
     setText("");
     setSending(true);
     setError(null);
-    const result = await chat.send(submitted.trim(), guestName);
+    const result = await chat.send(submitted.trim(), sendName);
     setSending(false);
     if (!result.ok) setText((current) => (current === "" ? submitted : current));
     if (result.ok) {
@@ -114,7 +122,13 @@ export function LobbyChatPanel({ resolveGuestName, onGuestNameError }: Props) {
       onGuestNameError(battleErrorMessage(result.code));
       return;
     }
-    setError(result.code === TetrisBattleErrorCodes.RATE_LIMITED ? "너무 빨리 보내고 있어요. 잠시 후 다시 보내 주세요." : battleErrorMessage(result.code));
+    setError(
+      result.code === TetrisBattleErrorCodes.RATE_LIMITED
+        ? "너무 빨리 보내고 있어요. 잠시 후 다시 보내 주세요."
+        : result.code === TetrisBattleErrorCodes.INVALID_PAYLOAD
+          ? `글은 1~${CHAT_TEXT_MAX_LENGTH}자로 보내 주세요.`
+          : battleErrorMessage(result.code),
+    );
   };
 
   return (
@@ -154,6 +168,7 @@ export function LobbyChatPanel({ resolveGuestName, onGuestNameError }: Props) {
             key={m.id}
             message={m}
             mine={isMine(m)}
+            hideable={canHide(m)}
             selected={selected === m.id}
             onSelect={() => setSelected((s) => (s === m.id ? null : m.id))}
             onHide={() => hide(m.senderKey)}
@@ -207,10 +222,10 @@ export function LobbyChatPanel({ resolveGuestName, onGuestNameError }: Props) {
   );
 }
 
-type RowProps = { message: LobbyChatMessage; mine: boolean; selected: boolean; onSelect: () => void; onHide: () => void };
+type RowProps = { message: LobbyChatMessage; mine: boolean; hideable: boolean; selected: boolean; onSelect: () => void; onHide: () => void };
 
-/** 글 한 줄 — 이름(게스트 표시)·시각·내용은 모두 글자로. 남의 글은 눌러 숨기기 메뉴를 연다 */
-function ChatRow({ message, mine, selected, onSelect, onHide }: RowProps) {
+/** 글 한 줄 — 이름(게스트 표시)·시각·내용은 모두 글자로. 숨길 수 있는 글은 눌러 숨기기 메뉴를 연다 */
+function ChatRow({ message, mine, hideable, selected, onSelect, onHide }: RowProps) {
   const rowButtonRef = useRef<HTMLButtonElement>(null);
   const body = (
     <>
@@ -224,7 +239,7 @@ function ChatRow({ message, mine, selected, onSelect, onHide }: RowProps) {
       <span className="block break-words text-slate-100">{message.text}</span>
     </>
   );
-  if (mine) {
+  if (!hideable) {
     return (
       <li className="rounded-xl px-2 py-1.5 text-sm" data-testid={`lobby-chat-message-${message.id}`}>
         {body}

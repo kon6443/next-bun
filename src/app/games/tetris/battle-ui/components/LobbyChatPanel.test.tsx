@@ -48,14 +48,14 @@ const msg = (id: string, over: Partial<LobbyChatMessage> = {}): LobbyChatMessage
   at: new Date(Date.UTC(2026, 9, 27, 1, Number(id))).toISOString(),
   ...over,
 });
-const joinOk = (messages: LobbyChatMessage[], isGuest = true) => () => ({ ok: true, data: { messages, me: { isGuest, name: isGuest ? null : '나' }, onlineCount: 7 } });
+const joinOk = (messages: LobbyChatMessage[], isGuest = true) => () => ({ ok: true, data: { messages, me: { isGuest, name: isGuest ? null : '나', senderKey: 'k-me' }, onlineCount: 7 } });
 
 let io: ReturnType<typeof fakeSocket>;
 const resolveGuestName = vi.fn(() => '게스트이름');
 const onGuestNameError = vi.fn();
 
 async function renderPanel() {
-  const view = await act(async () => render(<LobbyChatPanel resolveGuestName={resolveGuestName} onGuestNameError={onGuestNameError} />));
+  const view = await act(async () => render(<LobbyChatPanel guestName="게스트이름" resolveGuestName={resolveGuestName} onGuestNameError={onGuestNameError} />));
   return view;
 }
 const typeAndSend = async (text: string) => {
@@ -159,14 +159,14 @@ describe('로비 채팅 (tetris-chat)', () => {
     // 끊긴 소켓에는 나가기를 보내지 않는다
     io.socket.connected = false;
     ctx.value = { socket: io.socket, status: 'disconnected' };
-    view.rerender(<LobbyChatPanel resolveGuestName={resolveGuestName} onGuestNameError={onGuestNameError} />);
+    view.rerender(<LobbyChatPanel guestName="게스트이름" resolveGuestName={resolveGuestName} onGuestNameError={onGuestNameError} />);
     expect(screen.getByText('연결되면 채팅을 다시 불러와요.')).toBeTruthy();
     expect(leaves()).toBe(0);
     io.acks.joinLobbyChat = joinOk([msg('2'), msg('3')]);
     io.socket.connected = true;
     ctx.value = { socket: io.socket, status: 'connected' };
     await act(async () => {
-      view.rerender(<LobbyChatPanel resolveGuestName={resolveGuestName} onGuestNameError={onGuestNameError} />);
+      view.rerender(<LobbyChatPanel guestName="게스트이름" resolveGuestName={resolveGuestName} onGuestNameError={onGuestNameError} />);
     });
     expect(joins()).toBe(2);
     expect(screen.getAllByTestId(/^lobby-chat-message-/).map((li) => li.dataset.testid)).toEqual([
@@ -198,7 +198,7 @@ describe('로비 채팅 (tetris-chat)', () => {
     expect(scrollTop).not.toHaveBeenCalled();
   });
 
-  it('숨긴 사람과 senderKey가 같아도(같은 공유기 게스트) 내가 보낸 글은 보이고 숨기기 메뉴가 없다', async () => {
+  it('me를 받기 전 키와 달라도 이번에 보낸 글은 숨긴 키와 같아도 보이고 숨기기 메뉴가 없다', async () => {
     io.acks.joinLobbyChat = joinOk([msg('1', { senderKey: 'same-ip' })]);
     io.acks.lobbyChat = () => ({ ok: true, data: { message: msg('2', { senderKey: 'same-ip', text: '내 글' }) } });
     await renderPanel();
@@ -209,6 +209,44 @@ describe('로비 채팅 (tetris-chat)', () => {
     await typeAndSend('내 글');
     const mine = screen.getByTestId('lobby-chat-message-2');
     expect(within(mine).queryByRole('button')).toBeNull();
+  });
+
+  it('me.senderKey와 같은 글은 숨길 수 없다(숨기면 내 글도 가려진다) — 같은 공유기 게스트도, 이름 칸을 바꿔도', async () => {
+    window.localStorage.setItem('tetris:lobbyChatHidden', JSON.stringify(['k-me']));
+    io.acks.joinLobbyChat = joinOk([
+      msg('1', { senderKey: 'k-me', isGuest: true, name: '게스트이름' }),
+      msg('2', { senderKey: 'k-me', isGuest: true, name: '옆자리' }),
+      msg('3', { senderKey: 'k-other', isGuest: true, name: '게스트이름' }),
+    ]);
+    const view = await renderPanel();
+    // 내 키가 숨김 목록에 있어도 보인다, 메뉴도 없다
+    for (const id of ['1', '2']) expect(within(screen.getByTestId(`lobby-chat-message-${id}`)).queryByRole('button')).toBeNull();
+    expect(screen.queryByRole('button', { name: '모두 보이기' })).toBeNull();
+    // 이름만 같은 다른 키는 남의 글
+    expect(within(screen.getByTestId('lobby-chat-message-3')).getByRole('button')).toBeTruthy();
+    // 이름 칸을 바꿔도 보이기는 그대로 — 색만 바뀐다
+    const name = () => within(screen.getByTestId('lobby-chat-message-1')).getByText('게스트이름');
+    expect(name().className).toContain('text-sky-300');
+    view.rerender(<LobbyChatPanel guestName="새이름" resolveGuestName={resolveGuestName} onGuestNameError={onGuestNameError} />);
+    expect(screen.getByTestId('lobby-chat-message-1')).toBeTruthy();
+    expect(within(screen.getByTestId('lobby-chat-message-1')).queryByRole('button')).toBeNull();
+    expect(name().className).not.toContain('text-sky-300');
+  });
+
+  it('로그인 사용자는 senderKey만으로 내 글(이름과 무관)', async () => {
+    io.acks.joinLobbyChat = joinOk([msg('1', { senderKey: 'k-me', name: '다른이름' }), msg('2', { senderKey: 'k-other' })], false);
+    await renderPanel();
+    expect(within(screen.getByTestId('lobby-chat-message-1')).queryByRole('button')).toBeNull();
+    expect(within(screen.getByTestId('lobby-chat-message-1')).getByText('다른이름').className).toContain('text-sky-300');
+    expect(within(screen.getByTestId('lobby-chat-message-2')).getByRole('button')).toBeTruthy();
+  });
+
+  it('형식 오류(INVALID_PAYLOAD)는 글 길이 안내', async () => {
+    io.acks.joinLobbyChat = joinOk([]);
+    io.acks.lobbyChat = () => ({ ok: false, code: 'INVALID_PAYLOAD', message: 'x' });
+    await renderPanel();
+    await typeAndSend('글');
+    expect(screen.getByRole('alert').textContent).toBe('글은 1~100자로 보내 주세요.');
   });
 
   it('닫기를 누르면 연 글로 포커스가 돌아간다', async () => {

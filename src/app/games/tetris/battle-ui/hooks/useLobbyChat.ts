@@ -45,8 +45,8 @@ export function useLobbyChat() {
   const [me, setMe] = useState<JoinLobbyChatAckData["me"] | null>(null);
   const [onlineCount, setOnlineCount] = useState<number | null>(null);
   /**
-   * 이 화면에서 내가 보낸 글의 id — 보내기 ack로 안다. 내 글 표시·숨기기 제외는 senderKey가 아니라 이것으로 한다
-   * (게스트 senderKey는 IP 기준이라 같은 공유기의 다른 게스트와 같을 수 있다)
+   * 이 화면에서 내가 보낸 글의 id — 보내기 ack로 안다. me.senderKey와 함께 내 글 표시·숨기기 제외에 쓴다
+   * (me를 받기 전이나 이름을 바꾼 뒤에도 이번에 보낸 글은 내 글)
    */
   const [myMessageIds, setMyMessageIds] = useState<ReadonlySet<string>>(() => new Set());
   /** 다시 들어가기 — 바뀌면 join을 다시 보낸다 */

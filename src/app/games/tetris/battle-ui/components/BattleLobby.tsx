@@ -14,7 +14,7 @@ import {
   type RoomSummary,
   TetrisBattleErrorCodes,
 } from "@/types/tetrisBattleSocket";
-import { PLAYER_NAME_MAX_LENGTH } from "@/app/games/_shared/lib/playerName";
+import { normalizePlayerName, PLAYER_NAME_MAX_LENGTH } from "@/app/games/_shared/lib/playerName";
 import { type ConnectionStatus, useBattleSocket, useEnterScope } from "../contexts/BattleSocketContext";
 import { usePlayerName } from "../hooks/usePlayerName";
 import { battleErrorMessage } from "../lib/battleErrors";
@@ -201,6 +201,7 @@ export function BattleLobby() {
 
         {/* 로비 전체 채팅(tetris-chat) — 게스트는 위 "내 이름"으로 보낸다 */}
         <LobbyChatPanel
+          guestName={normalizePlayerName(player.name)}
           resolveGuestName={() => {
             const resolved = player.resolve();
             if (resolved.error !== null) {

@@ -267,8 +267,11 @@ export interface LobbyChatMessage {
 export interface JoinLobbyChatAckData {
   /** 오래된 것 → 최신, ≤50, 30분 이내 */
   messages: LobbyChatMessage[];
-  /** 게스트면 name null — 보낼 때 이름을 함께 보낸다 */
-  me: { isGuest: boolean; name: string | null };
+  /**
+   * 게스트면 name null — 보낼 때 이름을 함께 보낸다. senderKey는 내 글의 senderKey와 같다
+   * (게스트는 IP 기준이라 같은 공유기의 다른 게스트와 같을 수 있다)
+   */
+  me: { isGuest: boolean; name: string | null; senderKey: string };
   /** 그 시점 로비 채팅 참여 소켓 수(전 서버 합) */
   onlineCount: number;
 }
