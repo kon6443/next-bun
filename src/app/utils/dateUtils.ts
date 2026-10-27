@@ -235,3 +235,24 @@ export function formatCompactDateTime(date: Date, now: Date = new Date()): strin
   const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
   return date.getFullYear() === now.getFullYear() ? `${day} ${time}` : `${date.getFullYear()}.${day} ${time}`;
 }
+
+/**
+ * 목록 날짜 묶음 제목 (로컬) — "오늘" · "어제" · 올해면 "10월 25일 (토)" · 다른 해면 "2025년 10월 25일 (토)"
+ * @param date 표시할 날짜(UTC 저장값)
+ * @param now 기준 시각 — 기본은 지금
+ */
+export function formatDayGroupLabel(date: Date, now: Date = new Date()): string {
+  const day = normalizeDate(date).getTime();
+  const today = normalizeDate(now).getTime();
+  const diff = Math.round((today - day) / 86_400_000);
+  // 기기 시계가 서버보다 늦어 자정을 넘긴 기록이 미래로 보여도 오늘로
+  if (diff <= 0) return '오늘';
+  if (diff === 1) return '어제';
+  const label = `${date.getMonth() + 1}월 ${date.getDate()}일 (${WEEKDAYS_KO[date.getDay()]})`;
+  return date.getFullYear() === now.getFullYear() ? label : `${date.getFullYear()}년 ${label}`;
+}
+
+/** 시:분 (로컬, 24시간) — "14:05" */
+export function formatTimeOfDay(date: Date): string {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}

@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
+  formatDayGroupLabel,
+  formatTimeOfDay,
   isTaskRangeInverted,
   daysBetween,
   generateDateRange,
@@ -213,5 +215,20 @@ describe('formatCompactDateTime', () => {
     const now = new Date(2026, 9, 26, 12, 0);
     expect(formatCompactDateTime(new Date(2026, 9, 21, 9, 5), now)).toBe('10.21 09:05');
     expect(formatCompactDateTime(new Date(2025, 0, 3, 0, 30), now)).toBe('2025.1.3 00:30');
+  });
+});
+
+describe('formatDayGroupLabel·formatTimeOfDay (포인트 내역 날짜 묶음)', () => {
+  const now = new Date(2026, 9, 27, 15, 0);
+  it('오늘·어제·올해 날짜(요일)·다른 해', () => {
+    expect(formatDayGroupLabel(new Date(2026, 9, 27, 0, 1), now)).toBe('오늘');
+    // 기기 시계가 늦어 미래로 보이는 기록도 오늘
+    expect(formatDayGroupLabel(new Date(2026, 9, 28, 0, 1), now)).toBe('오늘');
+    expect(formatDayGroupLabel(new Date(2026, 9, 26, 23, 59), now)).toBe('어제');
+    expect(formatDayGroupLabel(new Date(2026, 9, 25, 9, 0), now)).toBe('10월 25일 (일)');
+    expect(formatDayGroupLabel(new Date(2025, 11, 31, 9, 0), now)).toBe('2025년 12월 31일 (수)');
+  });
+  it('시:분 24시간', () => {
+    expect(formatTimeOfDay(new Date(2026, 9, 27, 9, 5))).toBe('09:05');
   });
 });

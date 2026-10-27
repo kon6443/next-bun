@@ -65,6 +65,8 @@ describe('스킨 강화 (skin-levels) — 설정 시트의 스킨 상세', () =>
     expect(panel.textContent).toContain('Lv2');
     expect(panel.textContent).toContain('Lv2 → Lv3 · 200,000 P');
     expect(panel.textContent).toContain('보유 250,000 P');
+    // 판 밖이면 보유 포인트가 내역 링크
+    expect(within(panel).getByRole('link', { name: '보유 250,000 P · 포인트 내역' }).getAttribute('href')).toBe('/games/tetris/points');
     fireEvent.click(within(panel).getByRole('button', { name: '강화' }));
     // 확인 단계 — 바로 보내지 않는다, 대화상자를 겹치지 않는다
     expect(upgradeMySkin).not.toHaveBeenCalled();
@@ -112,6 +114,8 @@ describe('스킨 강화 (skin-levels) — 설정 시트의 스킨 상세', () =>
     expect(panel.textContent).toContain('Lv2');
     expect(within(panel).queryByRole('button', { name: '강화' })).toBeNull();
     expect(panel.textContent).toContain('판이 끝난 뒤 강화할 수 있어요.');
+    // 판 도중에는 화면을 떠나는 링크가 없다
+    expect(within(panel).queryByRole('link')).toBeNull();
   });
 
   it('서버 409 포인트 부족 — 안내 토스트, 확인 단계를 닫는다', async () => {

@@ -26,6 +26,7 @@ export default function TetrisPage() {
             "PC 키보드와 모바일 터치 패드 모두 지원",
           ]}
           jsonLd={videoGameJsonLd({ name: "테트리스", description: DESCRIPTION, path: "/games/tetris", genre: ["퍼즐", "테트리스"] })}
+          collapsible
         />
       }
     />

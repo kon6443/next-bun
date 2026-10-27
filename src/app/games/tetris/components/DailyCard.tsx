@@ -1,18 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ButtonLink } from "@/app/teams/components";
-import { cardStyles } from "@/styles/teams";
+import Link from "next/link";
 import { getGameBoards } from "@/services/gameService";
 import { formatScore } from "@/app/games/_shared/lib/format";
 import { DAILY_PLAY_PATH, type DailyFirstRun, dailyBoards, dailyDateLabel, loadDailyFirstRun } from "../lib/daily";
 import { DailyShareButton } from "./DailyShareButton";
 
 /**
- * 테트리스 홈 맨 위 "오늘의 테트리스" (games-growth B1) — 오늘 데일리 보드가 있을 때만(서버 비밀값이 없으면 숨김)
- * 오늘 이미 했으면 첫 판 기록·공유·다시 도전, 아니면 도전하기
+ * "오늘의 테트리스" (games-growth B1) — 테트리스 홈 플레이 카드 안, 게임 시작 아래의 보조 줄(tetris-home: 시작과 합침)
+ * 오늘 데일리 보드가 있을 때만(서버 비밀값이 없으면 숨김). 오늘 이미 했으면 첫 판 기록·공유·다시 도전, 아니면 도전하기
  */
-export function DailyCard() {
+export function DailyCard({ className = "" }: { className?: string }) {
   const [boardKey, setBoardKey] = useState<string | null>(null);
   const [first, setFirst] = useState<DailyFirstRun | null>(null);
   useEffect(() => {
@@ -33,41 +32,55 @@ export function DailyCard() {
   }, []);
 
   if (!boardKey) return null;
+  const rankingHref = `/games/tetris/rankings?board=${boardKey}`;
   return (
-    <section className={`${cardStyles.section} border-emerald-400/30 p-5`} aria-labelledby="tetris-daily-title" data-testid="tetris-daily">
-      <p className="text-xs font-semibold tracking-[0.3em] text-emerald-300">DAILY · {dailyDateLabel(boardKey)}</p>
-      <h2 id="tetris-daily-title" className="mt-1 text-xl font-bold text-white">
-        오늘의 테트리스
-      </h2>
-      <p className="mt-1 text-sm text-slate-400">오늘은 모두 같은 블록 순서예요. 같은 판으로 겨루고 결과를 공유해 보세요.</p>
-      {first ? (
-        <>
-          <p className="mt-3 text-sm text-slate-200" data-testid="tetris-daily-first">
-            오늘 첫 판 <span className="font-bold text-white">{formatScore(first.score)}점</span>
-            {first.rank ? ` · ${first.rank}위` : ""}
+    <section className={`rounded-2xl border border-emerald-400/30 bg-emerald-500/5 p-3 ${className}`} aria-labelledby="tetris-daily-title" data-testid="tetris-daily">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 id="tetris-daily-title" className="whitespace-nowrap text-sm font-semibold text-white">
+            오늘의 테트리스
+          </h2>
+          {/* 날짜는 둘째 줄 앞 — 375에서 제목이 두 줄로 꺾이지 않게 */}
+          <p className="truncate text-xs text-slate-400">
+            <span className="font-semibold text-emerald-300">{dailyDateLabel(boardKey)}</span>
+            {" · "}
+            {first ? (
+              <span className="text-slate-300" data-testid="tetris-daily-first">
+                오늘 첫 판 <span className="font-bold text-white">{formatScore(first.score)}점</span>
+                {first.rank ? ` · ${first.rank}위` : ""}
+              </span>
+            ) : (
+              "같은 블록 순서로 겨뤄요"
+            )}
           </p>
-          <div className="mt-3 grid gap-2">
-            <DailyShareButton boardKey={boardKey} />
-            <div className="grid grid-cols-2 gap-2">
-              <ButtonLink href={DAILY_PLAY_PATH} variant="secondary" size="md" fullWidth>
-                다시 도전
-              </ButtonLink>
-              <ButtonLink href={`/games/tetris/rankings?board=${boardKey}`} variant="secondary" size="md" fullWidth>
-                오늘 순위
-              </ButtonLink>
-            </div>
+        </div>
+        {!first && (
+          <div className="flex shrink-0 items-center gap-1">
+            <Link href={rankingHref} className="flex min-h-11 items-center px-2 text-xs text-emerald-200 hover:text-emerald-100">
+              오늘 순위
+            </Link>
+            <Link
+              href={DAILY_PLAY_PATH}
+              className="flex min-h-11 items-center rounded-full border border-emerald-300/50 px-4 text-sm font-semibold text-emerald-100 hover:bg-emerald-400/10"
+            >
+              도전하기
+            </Link>
           </div>
-        </>
-      ) : (
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <ButtonLink href={DAILY_PLAY_PATH} size="md" fullWidth>
-            도전하기
-          </ButtonLink>
-          <ButtonLink href={`/games/tetris/rankings?board=${boardKey}`} variant="secondary" size="md" fullWidth>
+        )}
+      </div>
+      {first && (
+        <div className="mt-2 grid grid-cols-3 gap-2">
+          <DailyShareButton boardKey={boardKey} compact />
+          <Link href={DAILY_PLAY_PATH} className={DAILY_LINK}>
+            다시 도전
+          </Link>
+          <Link href={rankingHref} className={DAILY_LINK}>
             오늘 순위
-          </ButtonLink>
+          </Link>
         </div>
       )}
     </section>
   );
 }
+
+const DAILY_LINK = "flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-white/20 text-sm font-semibold text-slate-200 hover:border-white/40";

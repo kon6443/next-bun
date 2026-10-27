@@ -30,6 +30,8 @@ type ScoreSubmitPanelProps<G extends GameType> = {
   showReplay?: boolean;
   /** 등록 뒤 링크 아래 게임별 동작(공유 등) — brag: 상위권·개인 최고면 자랑 문구(bragLabel), 아니면 null */
   registeredActions?: (registered: SubmitScoreResponse<ScoreDetailByGame[G]>, playerName: string, brag: string | null) => React.ReactNode;
+  /** 등록 뒤 "+N P" 옆 포인트 내역 링크(테트리스) — 없으면 글만 */
+  pointsHref?: string;
   /** 등록 성공 직후 한 번 — 게임별 후속 처리(테트리스: 응답 포인트로 내 스킨 잔액 갱신) */
   onRegistered?: (registered: SubmitScoreResponse<ScoreDetailByGame[G]>) => void;
   /** 다시 하기·나가기 아래 게임별 보조 동작(테트리스 "내 스킨 바꾸기" 등) */
@@ -86,6 +88,7 @@ export function ScoreSubmitPanel<G extends GameType>({
   registeredActions,
   footer,
   onRegistered,
+  pointsHref,
   sessionId,
   sessionError,
   accessToken,
@@ -251,6 +254,11 @@ export function ScoreSubmitPanel<G extends GameType>({
             <p className="text-sm text-amber-200" data-testid="score-submit-points">
               +{Math.max(0, registered.points.earned).toLocaleString("ko-KR")} P
               <span className="ml-1 text-xs text-slate-400">· 보유 {Math.max(0, registered.points.balance).toLocaleString("ko-KR")} P</span>
+              {pointsHref && (
+                <Link href={pointsHref} aria-label="포인트 내역" className="ml-2 inline-flex min-h-11 items-center text-xs text-sky-300 hover:text-sky-200">
+                  내역<span aria-hidden="true">&nbsp;›</span>
+                </Link>
+              )}
             </p>
           )}
           {showReplay && (

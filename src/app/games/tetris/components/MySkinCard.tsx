@@ -1,55 +1,61 @@
 "use client";
 
 import type { ReactNode } from "react";
-import Link from "next/link";
 import { GameSettingsButton } from "@/app/games/_shared/components/GameSettingsButton";
 import { ReloginButton } from "@/app/games/_shared/components/ReloginButton";
 import { useMySkins } from "../hooks/useMySkins";
 import { SKIN_ITEM_LABELS, SKIN_SLOTS, SKIN_SLOT_LABELS } from "../lib/skins";
 import { SkinPreview } from "./SkinPreview";
+import { formatPoints } from "../lib/points";
 import { type ControlsMode, TetrisSettingsSheet } from "./TetrisSettingsSheet";
 
 /**
- * 테트리스 홈 상단 "내 스킨" 카드(D-003) — 지금 장착 미리보기 + 바꾸기(설정 시트의 스킨 상세)·도감
- * 게스트는 같은 자리에 "로그인하고 스킨 꾸미기" — 기본 스킨 미리보기로 무엇을 꾸밀 수 있는지 보인다
+ * 테트리스 홈 "내 스킨" 한 줄(D-003·tetris-home) — 지금 장착 미리보기·요약·보유 포인트, 누르면 설정 시트의 스킨 상세(레벨·강화)
+ * 게스트·로그인 만료는 같은 자리에 로그인 버튼 — 기본 스킨 미리보기로 무엇을 꾸밀 수 있는지 보인다. 도감은 홈 아래 링크 줄
  */
 export function MySkinCard({ className = "" }: { className?: string }) {
-  const { equipped, levels, loggedIn, status } = useMySkins();
+  const { equipped, levels, loggedIn, status, points } = useMySkins();
   // 레벨은 Lv2부터 붙인다 — 모두 Lv1이면 레벨 도입 전과 같은 요약
   const summary = SKIN_SLOTS.map(
     (slot) => `${SKIN_SLOT_LABELS[slot]} ${SKIN_ITEM_LABELS[equipped[slot]] ?? equipped[slot]}${levels[slot] >= 2 ? ` Lv${levels[slot]}` : ""}`,
   ).join(" · ");
+  const preview = (
+    <span className="shrink-0 overflow-hidden rounded-lg border border-white/10">
+      <SkinPreview slot="block" id={equipped.block} level={levels.block} width={64} height={28} />
+    </span>
+  );
+  const canChange = loggedIn && status !== "expired";
 
   return (
     <section className={className} aria-labelledby="my-skin-title" data-testid="my-skin-card">
-      <div className="flex items-center gap-3">
-        <span className="shrink-0 overflow-hidden rounded-xl border border-white/10">
-          <SkinPreview slot="block" id={equipped.block} level={levels.block} width={96} height={40} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h2 id="my-skin-title" className="text-base font-semibold text-white">
-            {loggedIn ? "내 스킨" : "로그인하고 스킨 꾸미기"}
-          </h2>
-          <p className="truncate text-xs text-slate-400">
-            {loggedIn ? (status === "expired" ? "로그인이 만료됐어요 — 다시 로그인하면 내 스킨으로" : summary) : "블록·연출·보드·배경을 내 취향으로"}
-          </p>
+      {canChange ? (
+        <SkinChangeButton className="flex min-h-14 w-full items-center gap-3 rounded-2xl px-3 py-2 text-left hover:bg-white/5">
+          {preview}
+          <span className="min-w-0 flex-1">
+            <span id="my-skin-title" className="block text-sm font-semibold text-white">
+              내 스킨
+            </span>
+            <span className="block truncate text-xs text-slate-400">{summary}</span>
+          </span>
+          {points && <span className="shrink-0 text-sm font-semibold text-amber-200">{formatPoints(points.balance)}</span>}
+          <span aria-hidden="true" className="text-slate-400">
+            ›
+          </span>
+        </SkinChangeButton>
+      ) : (
+        <div className="flex min-h-14 items-center gap-3 px-3 py-2">
+          {preview}
+          <span className="min-w-0 flex-1">
+            <span id="my-skin-title" className="block text-sm font-semibold text-white">
+              {loggedIn ? "내 스킨" : "로그인하고 스킨 꾸미기"}
+            </span>
+            <span className="block truncate text-xs text-slate-400">
+              {loggedIn ? "로그인이 만료됐어요" : "점수로 포인트를 모아 스킨 강화"}
+            </span>
+          </span>
+          <ReloginButton className="shrink-0" label={loggedIn ? "다시 로그인" : "로그인"} />
         </div>
-      </div>
-      <div className="mt-3 flex gap-2">
-        {loggedIn && status !== "expired" ? (
-          <SkinChangeButton className="flex min-h-11 flex-1 items-center justify-center rounded-full bg-sky-500/20 px-4 text-sm font-semibold text-sky-100 hover:bg-sky-500/30">
-            바꾸기
-          </SkinChangeButton>
-        ) : (
-          <ReloginButton className="flex-1" label={loggedIn ? undefined : "카카오로 로그인"} />
-        )}
-        <Link
-          href="/games/tetris/skins"
-          className="flex min-h-11 flex-1 items-center justify-center rounded-full border border-white/20 px-4 text-sm font-semibold text-slate-200 hover:border-white/40"
-        >
-          도감
-        </Link>
-      </div>
+      )}
     </section>
   );
 }

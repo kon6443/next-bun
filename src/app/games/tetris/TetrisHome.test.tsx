@@ -40,33 +40,68 @@ describe('TetrisHome 설정 (games-polish FE-52)', () => {
     setItem.mockRestore();
   });
 
-  it('게임 시작 바로 아래 "내 스킨" 카드 — 랭킹 미리보기보다 위 (D-003)', async () => {
+  it('위계(tetris-home) — 상단 바(h1·톱니) → 게임 시작 → 내 스킨 한 줄 → 기록 탭(오늘 랭킹 먼저), 채움 버튼은 게임 시작 하나', async () => {
     await act(async () => {
       render(<TetrisHome />);
     });
-    const card = screen.getByTestId('my-skin-card');
+    const heading = screen.getByRole('heading', { level: 1, name: '테트리스' });
     const start = screen.getByRole('link', { name: '게임 시작' });
-    const ranking = screen.getByRole('heading', { name: /오늘의 TOP/ });
-    expect(start.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(card.compareDocumentPosition(ranking) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const card = screen.getByTestId('my-skin-card');
+    const tabs = screen.getByRole('tablist', { name: '기록' });
+    for (const [before, after] of [
+      [heading, start],
+      [start, card],
+      [card, tabs],
+    ]) {
+      expect(before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    expect(within(tabs).getAllByRole('tab').map((t) => t.textContent)).toEqual(['오늘 랭킹', '인기 리플레이', '최근 대전']);
+    expect(within(tabs).getByRole('tab', { name: '오늘 랭킹' }).getAttribute('aria-selected')).toBe('true');
+    // 설정 카드·스킨 도감 큰 버튼은 없다 — 설정은 톱니, 도감은 아래 링크 줄
+    expect(screen.queryByTestId('tetris-settings-entry')).toBeNull();
+    expect(screen.getByRole('link', { name: '스킨 도감' }).getAttribute('href')).toBe('/games/tetris/skins');
+    // 게스트는 포인트 내역 링크가 없다(로그인 전용 화면)
+    expect(screen.queryByRole('link', { name: '포인트 내역' })).toBeNull();
+    expect(screen.getByRole('link', { name: '게임 목록' }).getAttribute('href')).toBe('/games');
   });
 
-  it('아래 설정 섹션은 진입 줄 하나 — 같은 시트를 열고, 닫으면 그 줄로 포커스가 돌아온다 (D-001)', async () => {
+  it('설정은 오른쪽 위 톱니 한 곳 — 같은 시트를 열고, 닫으면 톱니로 포커스가 돌아온다 (D-001)', async () => {
     await act(async () => {
       render(<TetrisHome />);
     });
     expect(screen.queryByRole('slider', { name: /DAS/ })).toBeNull();
     // 키보드 조작 표는 홈에 두지 않는다 — 시트 조작 상세·플레이 준비 화면에 (D-005)
     expect(screen.queryByText('Space')).toBeNull();
-    const entry = screen.getByTestId('tetris-settings-entry');
-    // 키보드로 누른 경우(포커스가 줄에 있다)
-    entry.focus();
-    fireEvent.click(entry);
+    const gear = screen.getByTestId('tetris-settings-open');
+    gear.focus();
+    fireEvent.click(gear);
     const sheet = screen.getByRole('dialog', { name: '설정' });
     expect(within(sheet).getByTestId('settings-group-controls')).toBeTruthy();
     fireEvent.click(within(sheet).getByRole('button', { name: '닫기' }));
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(document.activeElement).toBe(entry);
+    expect(document.activeElement).toBe(gear);
+  });
+
+  it('기록 탭 — 다른 탭은 고를 때 처음 그리고(요청을 늘리지 않게), ←·→로 옮긴다', async () => {
+    await act(async () => {
+      render(<TetrisHome />);
+    });
+    const tabs = screen.getByRole('tablist', { name: '기록' });
+    expect(screen.getAllByRole('tabpanel')).toHaveLength(1);
+    // 아직 그리지 않은 탭은 가리킬 패널이 없다
+    expect(within(tabs).getByRole('tab', { name: '인기 리플레이' }).hasAttribute('aria-controls')).toBe(false);
+    const ranking = within(tabs).getByRole('tab', { name: '오늘 랭킹' });
+    ranking.focus();
+    fireEvent.keyDown(ranking, { key: 'ArrowRight' });
+    const replays = within(tabs).getByRole('tab', { name: '인기 리플레이' });
+    expect(replays.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(replays);
+    // 오늘 랭킹 패널은 남아 있다(숨김) — 다시 오갈 때 다시 받지 않게
+    expect(screen.getAllByRole('tabpanel', { hidden: true })).toHaveLength(2);
+    expect(screen.getByRole('link', { name: '인기 리플레이 전체 보기' }).getAttribute('href')).toBe('/games/tetris/rankings');
+    fireEvent.keyDown(replays, { key: 'End' });
+    expect(within(tabs).getByRole('tab', { name: '최근 대전' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('link', { name: '최근 대전 전체 보기' }).getAttribute('href')).toBe('/games/tetris/battle/matches');
   });
 
   it('등록하지 못한 기록은 확인 뒤 버릴 수 있다 — 이름 없이 보관된 기록은 "등록할 이름"을 묻는다 (games-polish P5)', async () => {

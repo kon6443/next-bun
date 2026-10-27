@@ -78,6 +78,7 @@ export function GameOverPanel({ result, daily = null, challenge = null, ...rest 
       }
       // 스킨 포인트(skin-levels) — 쌓인 포인트를 강화 화면에도 반영(내 스킨 저장소를 서버에서 다시 맞춘다)
       onRegistered={(registered) => syncPointsAfterScore(registered.points)}
+      pointsHref="/games/tetris/points"
       // 판이 끝난 순간 스킨을 바꿔 보고 다음 판에 — 스킨 상세로 바로 (D-003)
       footer={
         <SkinChangeButton className="mt-2 inline-flex min-h-11 items-center px-2 text-sm text-sky-300 hover:text-sky-200">

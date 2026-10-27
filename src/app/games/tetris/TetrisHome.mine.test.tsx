@@ -2,6 +2,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 
+/** 인기 리플레이는 기록 탭을 고를 때 처음 그린다(tetris-home) */
+const openReplaysTab = () => fireEvent.click(screen.getByRole('tab', { name: '인기 리플레이' }));
+
 /** 로그인 상태를 테스트마다 바꾼다 */
 const session = vi.hoisted(() => ({ value: { data: null as unknown, status: 'unauthenticated' as string } }));
 vi.mock('next-auth/react', () => ({ useSession: () => session.value }));
@@ -57,6 +60,7 @@ describe('TetrisHome — 서버 기준 "나"·내 최고 점수', () => {
     expect(getMyBestScore).not.toHaveBeenCalled();
     expect(bestText()).toContain('1,200');
     expect(getGameRankings).toHaveBeenCalledWith('tetris', 'daily', 5, undefined, undefined);
+    openReplaysTab();
     expect(popularProps).toHaveBeenLastCalledWith(expect.objectContaining({ accessToken: undefined, ready: true }));
   });
 
@@ -70,6 +74,7 @@ describe('TetrisHome — 서버 기준 "나"·내 최고 점수', () => {
     expect(getMyBestScore).toHaveBeenCalledWith('tetris', 'tok');
     expect(bestText()).toContain('4,500');
     expect(getGameRankings).toHaveBeenCalledWith('tetris', 'daily', 5, undefined, 'tok');
+    openReplaysTab();
     expect(popularProps).toHaveBeenLastCalledWith(expect.objectContaining({ accessToken: 'tok', ready: true }));
   });
 
@@ -95,6 +100,7 @@ describe('TetrisHome — 서버 기준 "나"·내 최고 점수', () => {
     });
     expect(getGameRankings).not.toHaveBeenCalled();
     expect(getMyBestScore).not.toHaveBeenCalled();
+    openReplaysTab();
     expect(popularProps).toHaveBeenLastCalledWith(expect.objectContaining({ ready: false }));
     expect(bestText()).toContain('…');
   });
