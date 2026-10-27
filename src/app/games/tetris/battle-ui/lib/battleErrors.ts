@@ -28,6 +28,7 @@ const MESSAGES: Record<BattleRequestErrorCode, string> = {
   PLAYER_NOT_ALIVE: '이미 탈락했어요.',
   SEAT_IN_USE: '다른 탭이나 기기에서 이 방의 경기를 하고 있어요. 경기가 끝나면 들어올 수 있어요.',
   PLAYER_NOT_FOUND: '그 플레이어는 방에 없어요.',
+  LOBBY_CHAT_NOT_JOINED: '채팅에 다시 들어가는 중이에요. 잠시 후 다시 보내 주세요.',
   TIMEOUT: '서버 응답이 없어요. 연결 상태를 확인해 주세요.',
   DISCONNECTED: '서버와 연결되지 않았어요. 다시 연결하는 중이에요.',
 };

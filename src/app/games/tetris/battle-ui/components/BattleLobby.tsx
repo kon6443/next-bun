@@ -21,6 +21,7 @@ import { battleErrorMessage } from "../lib/battleErrors";
 import { normalizeRoomCode, normalizeRoomName, validateRoomName, validateRoomPassword } from "../lib/roomForm";
 import { battleRoomPath, pickQuickJoinRoom } from "../lib/battleList";
 import { ConnectionBadge } from "./ConnectionBadge";
+import { LobbyChatPanel } from "./LobbyChatPanel";
 
 const cardStyles = "rounded-3xl border border-slate-700/50 bg-slate-800/50 p-5";
 const PLAYER_COUNTS = Array.from({ length: ROOM_MAX_PLAYERS - ROOM_MIN_PLAYERS + 1 }, (_, i) => ROOM_MIN_PLAYERS + i);
@@ -34,7 +35,7 @@ export const LIST_RETRY_MS = 2000;
 const LIST_RETRIES = 3;
 
 /**
- * 대전 로비 — 이름 · 방 목록(빠른 참가) · 방 만들기 · 코드로 입장 — 들어온 사람이 먼저 열린 방을 보게 (games-polish P7)
+ * 대전 로비 — 이름 · 방 목록(빠른 참가) · 로비 채팅 · 방 만들기 · 코드로 입장 — 들어온 사람이 먼저 열린 방을 보게 (games-polish P7·tetris-chat)
  */
 export function BattleLobby() {
   const router = useRouter();
@@ -197,6 +198,19 @@ export function BattleLobby() {
             빠른 참가
           </Button>
         </section>
+
+        {/* 로비 전체 채팅(tetris-chat) — 게스트는 위 "내 이름"으로 보낸다 */}
+        <LobbyChatPanel
+          resolveGuestName={() => {
+            const resolved = player.resolve();
+            if (resolved.error !== null) {
+              fieldError("name", resolved.error, "battle-player-name");
+              return null;
+            }
+            return resolved.name;
+          }}
+          onGuestNameError={(message) => fieldError("name", message, "battle-player-name")}
+        />
 
         {/* 입구의 "방 만들기"가 여기로 온다(#battle-create) */}
         <form id="battle-create" onSubmit={submitCreate} className={`${cardStyles} scroll-mt-4`}>
