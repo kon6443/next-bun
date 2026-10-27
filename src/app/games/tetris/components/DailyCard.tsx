@@ -54,18 +54,14 @@ export function DailyCard({ className = "" }: { className?: string }) {
             )}
           </p>
         </div>
+        {/* 첫 판 전에는 도전하기만 — "오늘 순위"를 값 없이 두면 비어 있는 라벨로 읽힌다(첫 판 뒤 3칸에 순위 링크) */}
         {!first && (
-          <div className="flex shrink-0 items-center gap-1">
-            <Link href={rankingHref} className="flex min-h-11 items-center px-2 text-xs text-emerald-200 hover:text-emerald-100">
-              오늘 순위
-            </Link>
-            <Link
-              href={DAILY_PLAY_PATH}
-              className="flex min-h-11 items-center rounded-full border border-emerald-300/50 px-4 text-sm font-semibold text-emerald-100 hover:bg-emerald-400/10"
-            >
-              도전하기
-            </Link>
-          </div>
+          <Link
+            href={DAILY_PLAY_PATH}
+            className="flex min-h-11 shrink-0 items-center rounded-full border border-emerald-300/50 px-4 text-sm font-semibold text-emerald-100 hover:bg-emerald-400/10"
+          >
+            도전하기
+          </Link>
         )}
       </div>
       {first && (

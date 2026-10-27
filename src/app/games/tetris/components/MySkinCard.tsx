@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { GameSettingsButton } from "@/app/games/_shared/components/GameSettingsButton";
 import { ReloginButton } from "@/app/games/_shared/components/ReloginButton";
 import { useMySkins } from "../hooks/useMySkins";
-import { SKIN_ITEM_LABELS, SKIN_SLOTS, SKIN_SLOT_LABELS } from "../lib/skins";
+import { SKIN_ITEM_LABELS, SKIN_SLOT_LABELS } from "../lib/skins";
 import { SkinPreview } from "./SkinPreview";
 import { formatPoints } from "../lib/points";
 import { type ControlsMode, TetrisSettingsSheet } from "./TetrisSettingsSheet";
@@ -15,10 +15,8 @@ import { type ControlsMode, TetrisSettingsSheet } from "./TetrisSettingsSheet";
  */
 export function MySkinCard({ className = "" }: { className?: string }) {
   const { equipped, levels, loggedIn, status, points } = useMySkins();
-  // 레벨은 Lv2부터 붙인다 — 모두 Lv1이면 레벨 도입 전과 같은 요약
-  const summary = SKIN_SLOTS.map(
-    (slot) => `${SKIN_SLOT_LABELS[slot]} ${SKIN_ITEM_LABELS[equipped[slot]] ?? equipped[slot]}${levels[slot] >= 2 ? ` Lv${levels[slot]}` : ""}`,
-  ).join(" · ");
+  // 한 줄에 들어가게 블록 슬롯과 레벨만(375에서 네 슬롯을 다 쓰면 말줄임) — 나머지 슬롯은 누르면 여는 스킨 상세에
+  const summary = `${SKIN_SLOT_LABELS.block} ${SKIN_ITEM_LABELS[equipped.block] ?? equipped.block} Lv${levels.block}`;
   const preview = (
     <span className="shrink-0 overflow-hidden rounded-lg border border-white/10">
       <SkinPreview slot="block" id={equipped.block} level={levels.block} width={64} height={28} />

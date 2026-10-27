@@ -46,7 +46,9 @@ describe('홈 "내 스킨" 한 줄 (D-003·tetris-home)', () => {
       render(<MySkinCard />);
     });
     const row = screen.getByRole('button', { name: /^내 스킨/ });
-    expect(row.textContent).toContain('블록 네온');
+    // 한 줄 — 블록 슬롯과 레벨만(다른 슬롯은 스킨 상세에), 레벨 1도 보인다
+    expect(row.textContent).toContain('블록 네온 Lv1');
+    expect(row.textContent).not.toContain('보드');
     expect(row.textContent).toContain('12,345 P');
     fireEvent.click(row);
     expect(screen.getByRole('dialog', { name: '스킨' })).toBeTruthy();
@@ -73,4 +75,21 @@ describe('홈 "내 스킨" 한 줄 (D-003·tetris-home)', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(change);
   });
+
+  it('레벨은 장착한 블록 아이템의 것 — 다른 슬롯 레벨이 섞이지 않는다', async () => {
+    session.value = { data: { user: { accessToken: 'tok' } }, status: 'authenticated' };
+    getMySkins.mockResolvedValue({
+      code: 'SUCCESS',
+      data: {
+        equipped,
+        catalog: { ...catalog, block: [{ id: 'neon', owned: true, unlock: 'free', level: 3 }], board: [{ id: 'gameboy', owned: true, unlock: 'free', level: 5 }] },
+      },
+      message: '',
+    });
+    await act(async () => {
+      render(<MySkinCard />);
+    });
+    expect(screen.getByRole('button', { name: /^내 스킨/ }).textContent).toContain('블록 네온 Lv3');
+  });
 });
+
