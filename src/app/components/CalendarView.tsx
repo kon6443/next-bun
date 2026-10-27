@@ -156,6 +156,17 @@ function assignRows(bars: Omit<TaskBar, 'row'>[]): TaskBar[] {
   return result;
 }
 
+/**
+ * 고정 요소가 제자리에 있을 때의 위쪽 — 자동 숨김 하단 내비(ui-bnb-autohide)는 transform으로 내려가 있거나 올라오는 중일 수 있다
+ * 조금만 올려도 다시 나타나니 화면 밖 위치가 아니라 제자리(bottom 기준 레이아웃 위치)를 경계로 삼는다. bottom을 모르면 지금 위치
+ */
+function overlayRestingTop(overlay: HTMLElement, rect: DOMRect): number {
+  const style = window.getComputedStyle(overlay);
+  const bottom = parseFloat(style.bottom);
+  if (style.position !== 'fixed' || !Number.isFinite(bottom)) return rect.top;
+  return Math.min(rect.top, window.innerHeight - bottom - overlay.offsetHeight);
+}
+
 export function CalendarView({ tasks, teamId, initialMonth, onMonthChange }: CalendarViewProps) {
   const router = useRouter();
   const [currentDate, setCurrentDateState] = useState(() => parseCalendarMonth(initialMonth));
@@ -256,7 +267,7 @@ export function CalendarView({ tasks, teamId, initialMonth, onMonthChange }: Cal
       document.querySelectorAll<HTMLElement>('[data-fixed-bottom-overlay]').forEach(overlay => {
         const r = overlay.getBoundingClientRect();
         // 보이고, 팝오버와 가로로 겹치는 고정 요소만 경계로 삼는다
-        if (r.height > 0 && r.left < popRight && r.right > popLeft) bottomLimit = Math.min(bottomLimit, r.top);
+        if (r.height > 0 && r.left < popRight && r.right > popLeft) bottomLimit = Math.min(bottomLimit, overlayRestingTop(overlay, r));
       });
       const headerBottom = headerRef.current?.getBoundingClientRect().bottom ?? 0;
 
