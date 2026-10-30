@@ -28,6 +28,11 @@ export const TetrisBattleClientEvents = {
   HEARTBEAT: 'heartbeat',
   /** 방장 — 대기·결과 단계에서 다른 참가자를 내보낸다 (D-011) */
   KICK_PLAYER: 'kickPlayer',
+  /** 로비 전체 채팅 구독 — ack로 최근 글(≤50, 30분 이내)·내 정보·참여자 수 (tetris-chat). 재연결 뒤에는 다시 보낸다(서버가 자동으로 다시 넣지 않는다) */
+  JOIN_LOBBY_CHAT: 'joinLobbyChat',
+  LEAVE_LOBBY_CHAT: 'leaveLobbyChat',
+  /** 로비 채팅 보내기 — join 전이면 LOBBY_CHAT_NOT_JOINED. 서버가 보낸 사람 포함 전원에게 lobbyChatMessage로 방송 */
+  LOBBY_CHAT: 'lobbyChat',
 } as const;
 
 /** 서버 → 클라이언트 */
@@ -49,6 +54,8 @@ export const TetrisBattleServerEvents = {
   PRESENCE_PING: 'presencePing',
   /** 방장이 나를 내보냈다 — 내보내진 소켓에만. 토큰은 서버에서 이미 무효 (D-011) */
   KICKED: 'kicked',
+  /** 로비 채팅 글 — 구독 중인 소켓 전원(보낸 사람 포함) */
+  LOBBY_CHAT_MESSAGE: 'lobbyChatMessage',
 } as const;
 
 // ===== 에러 코드 =====
@@ -81,6 +88,8 @@ export const TetrisBattleErrorCodes = {
   SEAT_IN_USE: 'SEAT_IN_USE',
   /** 내보낼 대상이 없거나 방장 자신 (D-011) */
   PLAYER_NOT_FOUND: 'PLAYER_NOT_FOUND',
+  /** 로비 채팅을 구독하지 않은 소켓의 lobbyChat (tetris-chat) */
+  LOBBY_CHAT_NOT_JOINED: 'LOBBY_CHAT_NOT_JOINED',
 } as const;
 
 export type TetrisBattleErrorCode = (typeof TetrisBattleErrorCodes)[keyof typeof TetrisBattleErrorCodes];
@@ -237,6 +246,47 @@ export interface RoomsChangedPayload {
   rooms: RoomSummary[];
 }
 
+// ===== 로비 채팅 (tetris-chat) =====
+
+/**
+ * 로비 채팅 글 — 저장하지 않고 서버 메모리(Redis)에 최근 50개를 30분만 둔다
+ * senderKey: 차단용 불투명 키(같은 사람이면 같은 값 — 로그인은 계정, 게스트는 접속 IP 기준. 신원은 알 수 없다)
+ * name: 로그인이면 서버가 계정 이름으로, 게스트는 보낸 이름(회원 이름과 같을 수 있다 — 게스트 표시로 구분한다)
+ * text·name은 HTML 이스케이프 없이 온다 — 반드시 글자로만 그린다
+ */
+export interface LobbyChatMessage {
+  id: string;
+  senderKey: string;
+  name: string;
+  isGuest: boolean;
+  text: string;
+  /** ISO 8601 (UTC) */
+  at: string;
+}
+
+export interface JoinLobbyChatAckData {
+  /** 오래된 것 → 최신, ≤50, 30분 이내 */
+  messages: LobbyChatMessage[];
+  /**
+   * 게스트면 name null — 보낼 때 이름을 함께 보낸다. senderKey는 내 글의 senderKey와 같다
+   * (게스트는 IP 기준이라 같은 공유기의 다른 게스트와 같을 수 있다)
+   */
+  me: { isGuest: boolean; name: string | null; senderKey: string };
+  /** 그 시점 로비 채팅 참여 소켓 수(전 서버 합) */
+  onlineCount: number;
+}
+
+export interface LobbyChatPayload {
+  /** 1~100자(코드포인트, trim 뒤). 줄바꿈·제어·bidi 문자는 CHAT_FORBIDDEN */
+  text: string;
+  /** 게스트만 — 로그인이면 무시된다. 대전 이름 정책(NAME_INVALID·NAME_FORBIDDEN) */
+  name?: string;
+}
+
+export interface LobbyChatAckData {
+  message: LobbyChatMessage;
+}
+
 export interface ChatMessagePayload {
   playerId: string;
   name: string;
@@ -367,6 +417,7 @@ export interface TetrisBattleServerToClientEvents {
   [TetrisBattleServerEvents.SESSION_REPLACED]: (payload: SessionReplacedPayload) => void;
   [TetrisBattleServerEvents.PRESENCE_PING]: () => void;
   [TetrisBattleServerEvents.KICKED]: (payload: KickedPayload) => void;
+  [TetrisBattleServerEvents.LOBBY_CHAT_MESSAGE]: (payload: LobbyChatMessage) => void;
 }
 
 export interface TetrisBattleClientToServerEvents {
@@ -383,6 +434,9 @@ export interface TetrisBattleClientToServerEvents {
   [TetrisBattleClientEvents.TOP_OUT]: (payload: TopOutPayload, ack: Ack<EmptyAckData>) => void;
   [TetrisBattleClientEvents.HEARTBEAT]: (payload: RoomCodePayload) => void;
   [TetrisBattleClientEvents.KICK_PLAYER]: (payload: KickPlayerPayload, ack: Ack<EmptyAckData>) => void;
+  [TetrisBattleClientEvents.JOIN_LOBBY_CHAT]: (payload: Record<string, never>, ack: Ack<JoinLobbyChatAckData>) => void;
+  [TetrisBattleClientEvents.LEAVE_LOBBY_CHAT]: (payload: Record<string, never>, ack: Ack<EmptyAckData>) => void;
+  [TetrisBattleClientEvents.LOBBY_CHAT]: (payload: LobbyChatPayload, ack: Ack<LobbyChatAckData>) => void;
 }
 
 export type TetrisBattleSocket = Socket<TetrisBattleServerToClientEvents, TetrisBattleClientToServerEvents>;

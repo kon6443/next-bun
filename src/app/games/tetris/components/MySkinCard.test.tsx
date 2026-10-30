@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const session = vi.hoisted(() => ({ value: { data: null as unknown, status: 'unauthenticated' } }));
@@ -10,7 +10,7 @@ const startLogin = vi.hoisted(() => vi.fn());
 vi.mock('@/app/auth/useKakaoLogin', () => ({ useKakaoLogin: () => ({ start: startLogin, isStarting: false }) }));
 
 import { __resetMySkinsForTests } from '../lib/mySkins';
-import { MySkinCard } from './MySkinCard';
+import { MySkinButton } from './MySkinCard';
 
 const equipped = { block: 'neon', effect: 'default', board: 'gameboy', background: 'default' };
 const catalog = { block: [{ id: 'neon', owned: true, unlock: 'free' }], effect: [], board: [], background: [] };
@@ -29,27 +29,26 @@ afterEach(() => {
   session.value = { data: null, status: 'unauthenticated' };
 });
 
-describe('홈 "내 스킨" 한 줄 (D-003·tetris-home)', () => {
-  it('게스트 — 같은 자리에 "로그인하고 스킨 꾸미기"와 로그인 버튼(도감은 홈 아래 링크 줄)', () => {
-    render(<MySkinCard />);
-    expect(screen.getByRole('region', { name: '로그인하고 스킨 꾸미기' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '로그인' }));
+describe('홈 상단 바 "내 스킨" 아이콘 버튼 (tetris-home-chat)', () => {
+  it('게스트 — 같은 시트를 열고 시트 안에서 로그인을 권한다', () => {
+    render(<MySkinButton />);
+    const button = screen.getByRole('button', { name: '내 스킨 · 로그인하고 스킨 꾸미기' });
+    expect(button.className).toContain('h-11 w-11');
+    fireEvent.click(button);
+    const sheet = screen.getByRole('dialog', { name: '스킨' });
+    fireEvent.click(within(sheet).getByRole('button', { name: '카카오로 로그인' }));
     expect(startLogin).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('link', { name: '도감' })).toBeNull();
-    expect(screen.queryByRole('button', { name: /^내 스킨/ })).toBeNull();
   });
 
-  it('로그인 — 줄 전체가 버튼(장착 요약·보유 포인트), 누르면 설정 시트의 스킨 상세로 바로(←는 설정 목록)', async () => {
+  it('로그인 — 접근 이름에 블록 스킨·레벨·포인트, 누르면 설정 시트의 스킨 상세로 바로(←는 설정 목록)', async () => {
     session.value = { data: { user: { accessToken: 'tok' } }, status: 'authenticated' };
     getMySkins.mockResolvedValue({ code: 'SUCCESS', data: { equipped, catalog, points: { balance: 12_345, earned: 20_000, spent: 7_655 } }, message: '' });
     await act(async () => {
-      render(<MySkinCard />);
+      render(<MySkinButton />);
     });
-    const row = screen.getByRole('button', { name: /^내 스킨/ });
-    // 한 줄 — 블록 슬롯과 레벨만(다른 슬롯은 스킨 상세에), 레벨 1도 보인다
-    expect(row.textContent).toContain('블록 네온 Lv1');
-    expect(row.textContent).not.toContain('보드');
-    expect(row.textContent).toContain('12,345 P');
+    const row = screen.getByRole('button', { name: '내 스킨 · 블록 네온 Lv1 · 포인트 12,345 P' });
+    // Lv1이면 배지는 없다
+    expect(row.textContent).not.toContain('Lv');
     fireEvent.click(row);
     expect(screen.getByRole('dialog', { name: '스킨' })).toBeTruthy();
     expect(screen.getByRole('tablist', { name: '스킨 슬롯' })).toBeTruthy();
@@ -61,7 +60,7 @@ describe('홈 "내 스킨" 한 줄 (D-003·tetris-home)', () => {
     session.value = { data: { user: { accessToken: 'tok' } }, status: 'authenticated' };
     getMySkins.mockResolvedValue({ code: 'SUCCESS', data: { equipped, catalog, points: { balance: 12_345, earned: 20_000, spent: 7_655 } }, message: '' });
     await act(async () => {
-      render(<MySkinCard />);
+      render(<MySkinButton />);
     });
     const change = screen.getByRole('button', { name: /^내 스킨/ });
     change.focus();
@@ -87,9 +86,10 @@ describe('홈 "내 스킨" 한 줄 (D-003·tetris-home)', () => {
       message: '',
     });
     await act(async () => {
-      render(<MySkinCard />);
+      render(<MySkinButton />);
     });
-    expect(screen.getByRole('button', { name: /^내 스킨/ }).textContent).toContain('블록 네온 Lv3');
+    const button = screen.getByRole('button', { name: '내 스킨 · 블록 네온 Lv3' });
+    expect(button.textContent).toContain('Lv3');
   });
 });
 

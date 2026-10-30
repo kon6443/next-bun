@@ -12,6 +12,8 @@ type Props = {
   testId?: string;
   /** 톱니 대신 버튼 안에 넣을 내용(일시정지 메뉴의 "설정"·홈의 설정 줄) — 이때 모양은 className이 정한다 */
   children?: ReactNode;
+  /** children이 아이콘뿐일 때의 접근 이름 — 톱니(children 없음)는 소리 상태를 담은 이름을 스스로 단다 */
+  ariaLabel?: string;
   className?: string;
   /** square = 테트리스 머리줄 버튼, round = 디펜스 HUD 알약 버튼 */
   shape?: "square" | "round";
@@ -34,7 +36,17 @@ const SHAPES = {
  * 시트가 닫히면 포커스는 이 버튼으로 돌아온다 — 키보드로 열면 useDialog가, 마우스·터치로 열면 close가
  * 톱니는 머리줄 소리 버튼 자리를 대신하므로 소리 상태를 잃지 않게 — 꺼져 있으면 모서리에 음소거 배지, 이름에도 상태
  */
-export function GameSettingsButton({ renderSheet, onOpenChange, testId, children, className = "", shape = "square", music = true, restoreFocus = true }: Props) {
+export function GameSettingsButton({
+  renderSheet,
+  onOpenChange,
+  testId,
+  children,
+  ariaLabel,
+  className = "",
+  shape = "square",
+  music = true,
+  restoreFocus = true,
+}: Props) {
   const { settings: sound } = useSoundSettings();
   const soundOn = sound.sfx || (music && sound.music);
   const [open, setOpen] = useState(false);
@@ -80,7 +92,7 @@ export function GameSettingsButton({ renderSheet, onOpenChange, testId, children
           if (soundOn) unlockSounds();
           show(true);
         }}
-        aria-label={children ? undefined : `설정 (소리 ${soundOn ? "켜짐" : "꺼짐"})`}
+        aria-label={children ? ariaLabel : `설정 (소리 ${soundOn ? "켜짐" : "꺼짐"})`}
         data-sound={children ? undefined : soundOn ? "on" : "off"}
         aria-haspopup="dialog"
         data-testid={testId}

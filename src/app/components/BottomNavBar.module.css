@@ -11,6 +11,19 @@
   box-shadow: 0 20px 40px rgba(15, 23, 42, 0.5);
   z-index: 50;
   pointer-events: none;
+  /* 자동 숨김(ui-bnb-autohide) — transform만 움직인다(레이아웃·페인트 없이 합성) */
+  transition: transform 0.25s ease;
+}
+
+/* 스크롤로 숨김 — 아래 여백(1~1.5rem)·그림자(.nav box-shadow 위쪽 퍼짐 약 20px)·safe-area까지 넘겨 화면 밖으로. 그림자를 키우면 여기도 늘린다 */
+.hidden {
+  transform: translate(-50%, calc(100% + 3rem + env(safe-area-inset-bottom)));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav {
+    transition: none;
+  }
 }
 
 .list {

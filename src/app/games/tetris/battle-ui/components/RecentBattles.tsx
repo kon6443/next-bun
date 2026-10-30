@@ -12,10 +12,10 @@ const RECENT_LIMIT = 5;
 type RecentState = { status: "loading" } | { status: "error" } | { status: "ready"; items: BattleMatchListItem[]; now: number };
 
 /**
- * 테트리스 홈 "최근 대전" (DESIGN §19) — 저장된 최근 5경기, 전체 목록으로
+ * 테트리스 홈 "최근 대전" (DESIGN §19) — 저장된 최근 경기(limit, 기본 5 · 홈 기록 탭은 3), 전체 목록으로
  * bare: 카드·제목·전체 보기 없이 목록만(테트리스 홈 기록 탭 안 — 전체 보기는 탭 아래 링크)
  */
-export function RecentBattles({ bare = false }: { bare?: boolean } = {}) {
+export function RecentBattles({ bare = false, limit = RECENT_LIMIT }: { bare?: boolean; limit?: number } = {}) {
   const [state, setState] = useState<RecentState>({ status: "loading" });
   /** "다시 시도" — 바뀌면 다시 받는다 */
   const [attempt, setAttempt] = useState(0);
@@ -23,7 +23,7 @@ export function RecentBattles({ bare = false }: { bare?: boolean } = {}) {
   useEffect(() => {
     let cancelled = false;
     setState({ status: "loading" });
-    loadBattleMatchList(RECENT_LIMIT, null)
+    loadBattleMatchList(limit, null)
       .then(({ items }) => {
         if (!cancelled) setState({ status: "ready", items, now: Date.now() });
       })
@@ -33,7 +33,7 @@ export function RecentBattles({ bare = false }: { bare?: boolean } = {}) {
     return () => {
       cancelled = true;
     };
-  }, [attempt]);
+  }, [attempt, limit]);
 
   const body =
     state.status === "loading" ? (
