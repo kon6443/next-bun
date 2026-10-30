@@ -102,6 +102,15 @@ describe('로비 채팅 (tetris-chat)', () => {
     // 보낸 뒤 입력이 비고, 내 글은 숨기기 메뉴가 없다
     expect((screen.getByLabelText('보낼 글') as HTMLInputElement).value).toBe('');
     expect(within(screen.getByTestId('lobby-chat-message-9')).queryByRole('button')).toBeNull();
+    // 내 글은 오른쪽 말풍선 — 이름 대신 스크린리더용 "나:", 게스트 표시는 그대로. 남의 글은 왼쪽(이름·시각)
+    const mine = screen.getByTestId('lobby-chat-message-9');
+    expect(mine.className).toContain('justify-end');
+    expect(within(mine).getByText('나:')).toBeTruthy();
+    expect(within(mine).queryByText('게스트이름')).toBeNull();
+    expect(within(mine).getByTestId('lobby-chat-guest')).toBeTruthy();
+    const other = screen.getByTestId('lobby-chat-message-3');
+    expect(other.querySelector('.justify-start')).toBeTruthy();
+    expect(within(other).getByText('사람3')).toBeTruthy();
   });
 
   it('게스트는 로비 이름 칸의 이름을 함께 보내고, 로그인은 이름 없이 보낸다', async () => {
@@ -224,20 +233,22 @@ describe('로비 채팅 (tetris-chat)', () => {
     expect(screen.queryByRole('button', { name: '모두 보이기' })).toBeNull();
     // 이름만 같은 다른 키는 남의 글
     expect(within(screen.getByTestId('lobby-chat-message-3')).getByRole('button')).toBeTruthy();
-    // 이름 칸을 바꿔도 보이기는 그대로 — 색만 바뀐다
-    const name = () => within(screen.getByTestId('lobby-chat-message-1')).getByText('게스트이름');
-    expect(name().className).toContain('text-sky-300');
+    // 이름 칸을 바꿔도 보이기는 그대로 — 말풍선 쪽(내 글·남의 글)만 바뀐다
+    const row1 = () => screen.getByTestId('lobby-chat-message-1');
+    expect(within(row1()).getByText('나:')).toBeTruthy();
+    expect(within(row1()).queryByText('게스트이름')).toBeNull();
+    expect(within(screen.getByTestId('lobby-chat-message-2')).queryByText('나:')).toBeNull();
     view.rerender(<LobbyChatPanel guestName="새이름" resolveGuestName={resolveGuestName} onGuestNameError={onGuestNameError} />);
-    expect(screen.getByTestId('lobby-chat-message-1')).toBeTruthy();
-    expect(within(screen.getByTestId('lobby-chat-message-1')).queryByRole('button')).toBeNull();
-    expect(name().className).not.toContain('text-sky-300');
+    expect(within(row1()).queryByRole('button')).toBeNull();
+    expect(within(row1()).queryByText('나:')).toBeNull();
+    expect(within(row1()).getByText('게스트이름')).toBeTruthy();
   });
 
   it('로그인 사용자는 senderKey만으로 내 글(이름과 무관)', async () => {
     io.acks.joinLobbyChat = joinOk([msg('1', { senderKey: 'k-me', name: '다른이름' }), msg('2', { senderKey: 'k-other' })], false);
     await renderPanel();
     expect(within(screen.getByTestId('lobby-chat-message-1')).queryByRole('button')).toBeNull();
-    expect(within(screen.getByTestId('lobby-chat-message-1')).getByText('다른이름').className).toContain('text-sky-300');
+    expect(within(screen.getByTestId('lobby-chat-message-1')).getByText('나:')).toBeTruthy();
     expect(within(screen.getByTestId('lobby-chat-message-2')).getByRole('button')).toBeTruthy();
   });
 

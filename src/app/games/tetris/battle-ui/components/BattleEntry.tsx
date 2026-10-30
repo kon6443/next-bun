@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useBattleLobbyStats } from "../hooks/useBattleLobbyStats";
-import { LOBBY_CHAT_HREF, lobbyStatsLabel } from "../lib/battleList";
+import { lobbyStatsLabel } from "../lib/battleList";
 import { BattleRoomsPreview } from "./BattleRoomsPreview";
 
-/** 홈 대전 섹션 — 화면이 보이는 동안 방 목록을 이 간격으로 다시 받는다(서버 캐시 2초, 소켓 없음 D-025) */
+/** 홈 대전 섹션 — 화면이 보이는 동안 방 목록을 이 간격으로 다시 받는다(HTTP, 서버 캐시 2초 D-025). 홈의 대전 소켓은 로비 채팅 카드(HomeLobbyChat)만 연다 */
 export const LOBBY_REFRESH_MS = 10_000;
 
 /** /games 카드의 대전 링크가 여기로 온다 */
@@ -45,10 +45,6 @@ export function BattleEntry() {
           <BattleRoomsPreview rooms={stats?.rooms ?? null} />
         </div>
       )}
-      {/* 로비 전체 채팅 입구(tetris-chat) — 로비 화면의 채팅 자리로 */}
-      <Link href={LOBBY_CHAT_HREF} className="mt-1 flex min-h-11 items-center text-sm text-fuchsia-200 hover:text-fuchsia-100">
-        <span aria-hidden="true">💬&nbsp;</span>로비 채팅에서 상대 찾기<span aria-hidden="true">&nbsp;›</span>
-      </Link>
     </section>
   );
 }

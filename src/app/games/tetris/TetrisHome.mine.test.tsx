@@ -20,9 +20,11 @@ vi.mock('@/app/games/_shared/components/PopularReplaysPreview', () => ({
   },
 }));
 vi.mock('./battle-ui/components/BattleEntry', () => ({ BattleEntry: () => null }));
+// 홈 채팅 카드는 대전 소켓을 연다 — 홈 테스트에서는 자리만(카드 자체는 HomeLobbyChat.test)
+vi.mock('./battle-ui/components/HomeLobbyChat', () => ({ HomeLobbyChat: () => <section data-testid="home-lobby-chat" /> }));
 vi.mock('./battle-ui/components/RecentBattles', () => ({ RecentBattles: () => null }));
 vi.mock('./components/DailyCard', () => ({ DailyCard: () => null }));
-vi.mock('./components/MySkinCard', () => ({ MySkinCard: () => null }));
+vi.mock('./components/MySkinCard', () => ({ MySkinButton: () => null }));
 
 import TetrisHome from './TetrisHome';
 import { tetrisStorage } from './lib/storage';

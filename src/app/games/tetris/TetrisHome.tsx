@@ -13,12 +13,13 @@ import { RankingTable } from "@/app/games/_shared/components/RankingTable";
 import { invalidateRankings } from "@/app/games/_shared/components/RankingsView";
 import { TETRIS_GAME } from "./lib/game";
 import { BattleEntry } from "./battle-ui/components/BattleEntry";
+import { HomeLobbyChat } from "./battle-ui/components/HomeLobbyChat";
 import { DailyCard } from "./components/DailyCard";
 import { tetrisRankLabel } from "./lib/replayCard";
 import { GameSettingsButton } from "@/app/games/_shared/components/GameSettingsButton";
 import { ReloginButton } from "@/app/games/_shared/components/ReloginButton";
 import { TetrisSettingsSheet } from "./components/TetrisSettingsSheet";
-import { MySkinCard } from "./components/MySkinCard";
+import { MySkinButton } from "./components/MySkinCard";
 import { RECORDS_LIMIT, TetrisRecordsCard } from "./components/TetrisRecordsCard";
 import { formatScore } from "@/app/games/_shared/lib/format";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
@@ -174,8 +175,9 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
   return (
     <TeamsPageLayout maxWidth="lg-wide">
       {/*
-        위계(tetris-home): 상단 바 → 플레이(게임 시작 타일 + 오늘의 테트리스 타일) → 친구와 대전 → 내 스킨 한 줄 → (등록 못 한 기록 한 줄) → 기록 탭(3줄) → 링크 줄·소개(접기)
-        채움은 "게임 시작" 하나 — 나머지는 테두리·줄·글자 링크. 375 첫 화면에 기록 탭 머리까지(D-003). 데스크톱(lg)은 왼쪽 플레이 쪽·오른쪽 기록 쪽 2단
+        위계(tetris-home·tetris-home-chat): 상단 바(내 스킨 🎨·설정 ⚙) → 플레이(게임 시작 타일 + 오늘의 테트리스 타일) → 로비 채팅 3줄 → 친구와 대전
+        → (등록 못 한 기록 한 줄) → 기록 탭(3줄) → 링크 줄·소개(접기)
+        채움은 "게임 시작" 하나 — 나머지는 테두리·줄·글자 링크. 375 첫 화면에 대전 카드까지. 데스크톱(lg)은 왼쪽 플레이 쪽·오른쪽 기록 쪽 2단
       */}
       <header className="flex items-center gap-1">
         <Link
@@ -186,7 +188,8 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
           <span aria-hidden="true">‹</span>
         </Link>
         <h1 className="flex-1 text-2xl font-bold text-white [text-shadow:0_0_14px_rgba(56,189,248,0.6)]">테트리스</h1>
-        {/* 설정(소리·조작·화면·스킨)은 첫 화면 오른쪽 위 한 곳 (P8·D-001) */}
+        {/* 내 스킨(스킨 상세로 바로)·설정(소리·조작·화면·스킨)은 첫 화면 오른쪽 위 (P8·D-001) */}
+        <MySkinButton />
         <GameSettingsButton testId="tetris-settings-open" renderSheet={(close) => <TetrisSettingsSheet onClose={close} />} />
       </header>
       <div className="flex flex-col gap-3 sm:gap-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6">
@@ -208,11 +211,11 @@ export default function TetrisHome({ about }: { about?: ReactNode }) {
             <DailyCard className="flex-1" />
           </section>
 
-          {/* 대전 — 게임 시작 다음, 첫 화면 안에 색 테두리로 (games-polish P8·tetris-home) */}
-          <BattleEntry />
+          {/* 로비 채팅 — 최근 3줄·한 줄 입력, 홈에 있는 동안만 대전 소켓을 연다 (tetris-home-chat) */}
+          <HomeLobbyChat />
 
-          {/* 내 스킨 — 한 줄(레벨·포인트), 누르면 스킨 상세 (D-003) */}
-          <MySkinCard className={`${cardStyles.section} p-1`} />
+          {/* 대전 — 첫 화면 안에 색 테두리로 (games-polish P8·tetris-home) */}
+          <BattleEntry />
 
           {/* 등록 못 한 기록 — 이름이 있으면 한 줄(등록·버리기), 이름부터 물어야 하면 펼친다 */}
           {pending && !askName ? (

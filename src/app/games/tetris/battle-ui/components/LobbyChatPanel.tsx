@@ -1,18 +1,12 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { formatTimeOfDay } from "@/app/utils/dateUtils";
-import { CHAT_TEXT_MAX_LENGTH, type LobbyChatMessage, TetrisBattleErrorCodes } from "@/types/tetrisBattleSocket";
+import { CHAT_TEXT_MAX_LENGTH, type LobbyChatMessage } from "@/types/tetrisBattleSocket";
 import { useLobbyChat } from "../hooks/useLobbyChat";
-import { battleErrorMessage } from "../lib/battleErrors";
+import { lobbyChatOwnership, useLobbyChatComposer } from "../hooks/useLobbyChatComposer";
 import { LOBBY_CHAT_SECTION_ID } from "../lib/battleList";
 import { loadHiddenSenders, saveHiddenSenders } from "../lib/lobbyChatHidden";
-
-/** 글자 수는 서버와 같게 코드포인트(이모지 한 개 = 1자)로 센다 */
-const countChars = (text: string) => [...text.trim()].length;
-
-/** 한 줄 입력 — 붙여넣은 탭(줄바꿈은 입력칸이 먼저 거른다)은 공백으로. 서버는 줄바꿈·제어 문자가 있으면 CHAT_FORBIDDEN */
-const oneLine = (text: string) => text.replace(/[\r\n\t]+/g, " ");
+import { LobbyChatBubble, lobbyChatRowAlign } from "./LobbyChatBubble";
 
 /** 맨 아래로 붙어 있다고 보는 여유(px) — 그 안이면 새 글이 오면 따라 내려간다 */
 const STICK_SLACK = 24;
@@ -28,19 +22,13 @@ type Props = {
 
 /**
  * 테트리스 로비 전체 채팅 패널(tetris-chat) — 게스트도 쓴다. 최근 50개·30분만 서버에 남는다(저장 안 함)
- * - 게스트 글에는 늘 "게스트" 표시 — 서버는 게스트 이름이 회원 이름과 같아도 막지 않는다(운영자 사칭만 막음). 구분 수단은 isGuest뿐
- * - 이름·글은 글자로만 그린다(서버가 HTML 이스케이프를 하지 않는다 — dangerouslySetInnerHTML 금지)
+ * - 글은 말풍선(LobbyChatBubble) — 내 글은 오른쪽, 남의 글은 왼쪽. 게스트 글에는 늘 "게스트" 표시, 이름·글은 글자로만
  * - 다른 사람 글을 누르면 "이 사람 숨기기" — 이 브라우저에만(senderKey). 숨긴 사람은 "모두 보이기"로 되돌린다
- * - senderKey가 me.senderKey와 같은 글(과 이 화면에서 보낸 글)은 숨길 수 없다 — 숨기면 내 글도 함께 가려진다.
- *   게스트 키는 IP 기준이라 같은 공유기의 다른 게스트도 여기에 든다(서버 한계)
- * - "내 글" 색은 그중 회원 글, 또는 이름이 지금 이름 칸과 같은 게스트 글 — 색만 바뀌고 보이기·숨기기에는 쓰지 않는다
+ * - 내 키의 글은 숨길 수 없고, "내 글"(오른쪽 말풍선)은 그중 회원 글·이름이 같은 게스트 글 — lobbyChatOwnership
  * - 목록은 role=log(새 글을 읽어 준다). 맨 아래에 있을 때만 새 글을 따라 내려간다(위 글을 읽는 중이면 그대로)
  */
 export function LobbyChatPanel({ guestName, resolveGuestName, onGuestNameError }: Props) {
   const chat = useLobbyChat();
-  const [text, setText] = useState("");
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [hidden, setHidden] = useState<string[]>([]);
   /** 숨기기 메뉴를 연 글 */
   const [selected, setSelected] = useState<string | null>(null);
@@ -51,11 +39,7 @@ export function LobbyChatPanel({ guestName, resolveGuestName, onGuestNameError }
     setHidden(loadHiddenSenders());
   }, []);
 
-  const myKey = chat.me?.senderKey ?? null;
-  const sentByMe = (m: LobbyChatMessage) => chat.myMessageIds.has(String(m.id));
-  const hasMyKey = (m: LobbyChatMessage) => myKey !== null && m.senderKey === myKey;
-  const canHide = (m: LobbyChatMessage) => !sentByMe(m) && !hasMyKey(m);
-  const isMine = (m: LobbyChatMessage) => sentByMe(m) || (hasMyKey(m) && (!m.isGuest || m.name === guestName));
+  const { canHide, isMine } = lobbyChatOwnership(chat, guestName);
   const isHidden = (m: LobbyChatMessage) => canHide(m) && hidden.includes(m.senderKey);
   const visible = chat.messages.filter((m) => !isHidden(m));
   const hiddenCount = new Set(chat.messages.filter(isHidden).map((m) => m.senderKey)).size;
@@ -90,46 +74,15 @@ export function LobbyChatPanel({ guestName, resolveGuestName, onGuestNameError }
     saveHiddenSenders([]);
   };
 
-  const length = countChars(text);
-  // 들어가는 중에도 입력칸은 열어 둔다(disabled면 포커스·모바일 키보드가 닫힌다) — 보내기만 막는다
-  const ready = chat.join === "joined" && chat.status === "connected";
-  const canSend = ready && !sending && length > 0 && length <= CHAT_TEXT_MAX_LENGTH;
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!canSend) return;
-    let sendName: string | undefined;
-    if (chat.me?.isGuest) {
-      const name = resolveGuestName();
-      if (!name) return;
-      sendName = name;
-    }
-    // 보내면 바로 비운다 — 기다리는 동안 이어 친 글에 보낸 글이 섞이지 않게. 실패하면 칸이 비어 있을 때만 되돌린다
-    const submitted = text;
-    setText("");
-    setSending(true);
-    setError(null);
-    const result = await chat.send(submitted.trim(), sendName);
-    setSending(false);
-    if (!result.ok) setText((current) => (current === "" ? submitted : current));
-    if (result.ok) {
-      // 방송이 ack보다 먼저 와 이미 그려졌을 수도 있다 — 직접 내려간다
+  const { text, change, sending, error, length, ready, canSend, submit } = useLobbyChatComposer(chat, {
+    resolveGuestName,
+    onGuestNameError,
+    // 방송이 ack보다 먼저 와 이미 그려졌을 수도 있다 — 직접 내려간다
+    onSent: () => {
       stickRef.current = true;
       scrollToBottom();
-      return;
-    }
-    if (result.code === TetrisBattleErrorCodes.NAME_INVALID || result.code === TetrisBattleErrorCodes.NAME_FORBIDDEN) {
-      onGuestNameError(battleErrorMessage(result.code));
-      return;
-    }
-    setError(
-      result.code === TetrisBattleErrorCodes.RATE_LIMITED
-        ? "너무 빨리 보내고 있어요. 잠시 후 다시 보내 주세요."
-        : result.code === TetrisBattleErrorCodes.INVALID_PAYLOAD
-          ? `글은 1~${CHAT_TEXT_MAX_LENGTH}자로 보내 주세요.`
-          : battleErrorMessage(result.code),
-    );
-  };
+    },
+  });
 
   return (
     <section id={LOBBY_CHAT_SECTION_ID} aria-labelledby="lobby-chat-title" className="scroll-mt-4 rounded-3xl border border-white/10 bg-slate-900/80 p-4" data-testid="lobby-chat">
@@ -159,7 +112,7 @@ export function LobbyChatPanel({ guestName, resolveGuestName, onGuestNameError }
         role="log"
         aria-label="로비 채팅 글"
         tabIndex={0}
-        className="mt-3 flex max-h-72 min-h-24 flex-col gap-0.5 overflow-y-auto overscroll-contain rounded-2xl bg-slate-950/50 p-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40"
+        className="mt-3 flex max-h-72 min-h-24 flex-col gap-1 overflow-y-auto overscroll-contain rounded-2xl bg-slate-950/50 p-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40"
         data-testid="lobby-chat-list"
       >
         {visible.length === 0 && chat.join === "joined" && <li className="px-2 py-3 text-center text-sm text-slate-500">아직 글이 없어요. 먼저 인사해 보세요!</li>}
@@ -191,10 +144,7 @@ export function LobbyChatPanel({ guestName, resolveGuestName, onGuestNameError }
         <input
           id="lobby-chat-input"
           value={text}
-          onChange={(e) => {
-            setText(oneLine(e.target.value));
-            setError(null);
-          }}
+          onChange={(e) => change(e.target.value)}
           enterKeyHint="send"
           autoComplete="off"
           aria-invalid={length > CHAT_TEXT_MAX_LENGTH}
@@ -224,41 +174,31 @@ export function LobbyChatPanel({ guestName, resolveGuestName, onGuestNameError }
 
 type RowProps = { message: LobbyChatMessage; mine: boolean; hideable: boolean; selected: boolean; onSelect: () => void; onHide: () => void };
 
-/** 글 한 줄 — 이름(게스트 표시)·시각·내용은 모두 글자로. 숨길 수 있는 글은 눌러 숨기기 메뉴를 연다 */
+/** 글 한 줄 — 숨길 수 있는 글(남의 글)은 말풍선을 눌러 숨기기 메뉴를 연다 */
 function ChatRow({ message, mine, hideable, selected, onSelect, onHide }: RowProps) {
   const rowButtonRef = useRef<HTMLButtonElement>(null);
-  const body = (
-    <>
-      <span className={`font-semibold ${mine ? "text-sky-300" : "text-slate-200"}`}>{message.name}</span>
-      {message.isGuest && (
-        <span className="ml-1 rounded-full bg-slate-700/70 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-slate-300" data-testid="lobby-chat-guest">
-          게스트
-        </span>
-      )}
-      <span className="ml-1.5 text-[11px] text-slate-500">{formatTimeOfDay(new Date(message.at))}</span>
-      <span className="block break-words text-slate-100">{message.text}</span>
-    </>
-  );
+  const bubble = <LobbyChatBubble message={message} mine={mine} />;
   if (!hideable) {
     return (
-      <li className="rounded-xl px-2 py-1.5 text-sm" data-testid={`lobby-chat-message-${message.id}`}>
-        {body}
+      <li className={`${lobbyChatRowAlign(mine)} px-1 text-sm`} data-testid={`lobby-chat-message-${message.id}`}>
+        {bubble}
       </li>
     );
   }
   return (
-    <li className="text-sm" data-testid={`lobby-chat-message-${message.id}`}>
+    <li className="px-1 text-sm" data-testid={`lobby-chat-message-${message.id}`}>
+      {/* 줄 전체가 누르는 자리 — 폭을 정해 둬야 말풍선의 최대 폭(%)이 내용 폭에 물려 줄어들지 않는다 */}
       <button
         ref={rowButtonRef}
         type="button"
         onClick={onSelect}
         aria-expanded={selected}
-        className={`block min-h-11 w-full rounded-xl px-2 py-1.5 text-left ${selected ? "bg-white/5" : "hover:bg-white/5"}`}
+        className={`${lobbyChatRowAlign(mine)} min-h-11 w-full items-center rounded-2xl text-left ${selected ? "bg-white/5" : "hover:bg-white/5"}`}
       >
-        {body}
+        {bubble}
       </button>
       {selected && (
-        <div className="flex gap-2 px-2 pb-1">
+        <div className="flex gap-2 px-1 pb-1 pt-1">
           <button type="button" onClick={onHide} className="min-h-11 rounded-full border border-rose-400/40 px-3 text-xs font-semibold text-rose-200 hover:bg-rose-500/10">
             {message.name} 님 글 숨기기
           </button>
