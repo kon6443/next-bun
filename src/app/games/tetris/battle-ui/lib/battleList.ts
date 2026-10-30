@@ -19,6 +19,10 @@ export const battleRoomPath = (code: string, locked = false) => `/games/tetris/b
 /** 로비의 방 만들기 카드 — 입구의 "방 만들기"가 여기로 */
 export const BATTLE_CREATE_HREF = '/games/tetris/battle#battle-create';
 
+/** 로비의 전체 채팅 자리(tetris-chat) — 입구의 "로비 채팅" 링크가 여기로 */
+export const LOBBY_CHAT_SECTION_ID = 'lobby-chat';
+export const LOBBY_CHAT_HREF = `/games/tetris/battle#${LOBBY_CHAT_SECTION_ID}`;
+
 type JoinCandidate = { playerCount: number; maxPlayers: number; locked: boolean; status?: RoomStatus };
 
 /**

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatRelativeTime, lobbyStatsLabel, pickQuickJoinRoom } from './battleList';
+import { battleRoomPath, formatRelativeTime, lobbyStatsLabel, pickQuickJoinRoom } from './battleList';
 
 describe('lobbyStatsLabel — 테트리스 홈 방 수', () => {
   it('들어갈 수 있는 방이 있으면 개수 — 경기 중인 방은 세지 않는다', () => {
@@ -52,5 +52,12 @@ describe('pickQuickJoinRoom (games-polish P7)', () => {
   it('들어갈 방이 없으면 null', () => {
     expect(pickQuickJoinRoom([room('A', 1, { locked: true }), room('B', 2, { maxPlayers: 2 })])).toBeNull();
     expect(pickQuickJoinRoom([])).toBeNull();
+  });
+});
+
+describe('battleRoomPath', () => {
+  it('잠긴 방은 비밀번호부터 묻는 주소(?locked=1) — 홈 입구에서 방 목록이 빠져도 로비가 쓴다', () => {
+    expect(battleRoomPath('ABC123')).toBe('/games/tetris/battle/ABC123');
+    expect(battleRoomPath('ABC123', true)).toBe('/games/tetris/battle/ABC123?locked=1');
   });
 });

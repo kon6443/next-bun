@@ -9,6 +9,8 @@ import { TETRIS_GAME } from "../lib/game";
 import { nextTabByKey } from "../lib/tabKeys";
 
 const TABS = ["ranking", "replays", "battles"] as const;
+/** 탭마다 보일 줄 수 — 홈은 미리보기라 3줄(tetris-home D-003), 나머지는 "전체 보기"에서 */
+export const RECORDS_LIMIT = 3;
 type RecordsTab = (typeof TABS)[number];
 
 const TAB_LABELS: Record<RecordsTab, string> = {
@@ -59,8 +61,8 @@ export function TetrisRecordsCard({ ranking, myScoreIds, accessToken, authReady 
 
   const panels: Record<RecordsTab, ReactNode> = {
     ranking,
-    replays: <PopularReplaysPreview game={TETRIS_GAME} myScoreIds={myScoreIds} accessToken={accessToken} ready={authReady} bare />,
-    battles: <RecentBattles bare />,
+    replays: <PopularReplaysPreview game={TETRIS_GAME} myScoreIds={myScoreIds} accessToken={accessToken} ready={authReady} limit={RECORDS_LIMIT} bare />,
+    battles: <RecentBattles bare limit={RECORDS_LIMIT} />,
   };
 
   return (
