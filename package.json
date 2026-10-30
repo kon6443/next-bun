@@ -23,7 +23,7 @@
     "react-colorful": "^5.8.1",
     "react-dom": "^19.0.1",
     "react-hot-toast": "^2.6.0",
-    "socket.io-client": "^4.8.3"
+    "socket.io-client": "^4.8.4"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -33,15 +33,20 @@
     "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitest/coverage-v8": "4.0.18",
+    "@vitest/coverage-v8": "4.1.12",
     "eslint": "^9",
     "eslint-config-next": "15.5.28",
     "jsdom": "^27.4.0",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.12"
   },
   "pnpm": {
+    "overrides": {
+      "sharp": "^0.35.5",
+      "next>postcss": "^8.5.32",
+      "vite": "^7.3.7"
+    },
     "onlyBuiltDependencies": [],
     "ignoredBuiltDependencies": [
       "esbuild",
