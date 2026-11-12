@@ -9,6 +9,8 @@ import { type PadDirection, padDirection } from "../lib/padDirection";
  *   유지형 방향은 누르는 동안, 즉시형 방향은 새로 누를 때만(미끄러져 들어오면 무시, 유지형 방향을 뗀 직후 GUARD 안은 무시)
  * - 왼쪽 위 어깨 버튼(L)·오른쪽 버튼들: 슬롯에 놓인다. 즉시형은 누르는 순간 1회, 유지형은 누르는 동안. 미끄러져 들어와도 동작하지 않는다
  * - 한 손가락만 십자 패드를 맡고(두 번째 무시), 뗌·취소·캡처 잃음·창 숨김·pagehide·blur·언마운트에서 모두 뗀다
+ *   onHoldEnd의 cancelled — 손가락을 정상으로 뗐을 때(pointerup·키보드 누름·다른 방향으로 미끄러짐)만 false, 취소·캡처 잃음·blur·숨김·pagehide·언마운트는 true
+ *   (뗄 때 동작하는 입력 — 예: 포트리스 발사 충전 — 이 취소에서는 동작하지 않게 가를 수 있다. 받지 않는 게임은 그대로)
  * - active가 true가 되는 순간 누르고 있던 유지형 입력을 다시 보낸다(멈춤·카운트다운 동안 게임이 받지 않았다 — 터치에는 키 반복이 없다)
  * - 가로 화면에서는 부모(relative) 위에 겹쳐 좌우 끝으로 갈라진다(판 높이를 먹지 않게)
  */
@@ -16,7 +18,8 @@ import { type PadDirection, padDirection } from "../lib/padDirection";
 /** 누르는 동안 유지(press → release 코드) 또는 누르는 순간 1회 */
 export type PadAction = { kind: "hold"; press: number; release: number } | { kind: "instant"; action: number };
 
-export type PadDirectionSpec = { action: PadAction; aria: string; label: string };
+/** disabled — 지금은 못 쓰는 방향·버튼(흐리게, 눌러도 무동작). 없으면 쓸 수 있다 */
+export type PadDirectionSpec = { action: PadAction; aria: string; label: string; disabled?: boolean };
 
 /** 오른쪽: top = A·B 위 넓은 버튼, a = 위·오른쪽 큰 원, b = 왼쪽 아래 원 · 왼쪽: shoulder = 십자 패드 위 알약 */
 export type PadSlot = "top" | "a" | "b" | "shoulder";
@@ -29,6 +32,7 @@ export type PadButtonSpec = {
   content: ReactNode;
   /** 색 — neutral(기본) · primary(주 동작) · accent(되돌릴 수 없는 동작 — 강조색) */
   tone?: "neutral" | "primary" | "accent";
+  disabled?: boolean;
 };
 
 /**
@@ -47,7 +51,8 @@ export type GamePadLayout = {
 type GamePadProps = {
   layout: GamePadLayout;
   onHoldStart: (press: number, release: number) => void;
-  onHoldEnd: (press: number) => void;
+  /** cancelled — 정상 뗌이면 false, 취소(pointercancel·캡처 잃음·blur·숨김·pagehide·언마운트)면 true */
+  onHoldEnd: (press: number, cancelled?: boolean) => void;
   onInstant: (action: number) => void;
   /** 게임이 입력을 받는 중인가 */
   active: boolean;
@@ -113,14 +118,15 @@ export function GamePad({ layout, onHoldStart, onHoldEnd, onInstant, active }: G
   const [shown, setShown] = useState<PadDirection | null>(null);
 
   /** 십자 방향 바꾸기 — fresh: 새로 누른 순간(즉시형 방향은 이때만). 배치에 없는 방향은 무동작 */
-  const setDirection = useCallback((raw: PadDirection | null, fresh: boolean) => {
+  // cancelled: 떼는 이유가 취소인가(뗌일 때만 의미)
+  const setDirection = useCallback((raw: PadDirection | null, fresh: boolean, cancelled = false) => {
     const { layout: current, onHoldStart: start, onHoldEnd: end, onInstant: instant } = latestRef.current;
-    const next = raw && current.dpad[raw] ? raw : null;
+    const next = raw && current.dpad[raw] && !current.dpad[raw]?.disabled ? raw : null;
     const prev = dirRef.current;
     if (prev === next) return;
     const prevAction = prev ? current.dpad[prev]?.action : undefined;
     if (prevAction?.kind === "hold") {
-      end(prevAction.press);
+      end(prevAction.press, cancelled);
       lastHoldEndRef.current = now();
     }
     dirRef.current = next;
@@ -143,17 +149,18 @@ export function GamePad({ layout, onHoldStart, onHoldEnd, onInstant, active }: G
   };
 
   /** 십자 패드를 맡은 손가락이 떨어졌다(뗌·취소·캡처 잃음) */
-  const endDpad = (pointerId: number) => {
+  const endDpad = (pointerId: number, cancelled: boolean) => {
     if (pointerId !== pointerRef.current) return;
     pointerRef.current = null;
-    setDirection(null, false);
+    setDirection(null, false, cancelled);
   };
 
+  // blur·숨김·pagehide·언마운트 — 손가락을 뗀 게 아니라 취소다
   const releaseAll = useCallback(() => {
     pointerRef.current = null;
-    setDirection(null, false);
+    setDirection(null, false, true);
     const held = heldButtonsRef.current;
-    for (const hold of held.values()) latestRef.current.onHoldEnd(hold.press);
+    for (const hold of held.values()) latestRef.current.onHoldEnd(hold.press, true);
     held.clear();
   }, [setDirection]);
 
@@ -183,11 +190,11 @@ export function GamePad({ layout, onHoldStart, onHoldEnd, onInstant, active }: G
   }, [releaseAll]);
 
   /** 키보드·스위치·스크린리더 누름 — 포인터 없이 click만 온다(detail 0). 유지형은 누르고 바로 떼 한 번, 즉시형은 1회 */
-  const keyboardPress = (action: PadAction) => (e: React.MouseEvent) => {
-    if (e.detail !== 0) return;
+  const keyboardPress = (action: PadAction, disabled?: boolean) => (e: React.MouseEvent) => {
+    if (e.detail !== 0 || disabled) return;
     if (action.kind === "hold") {
       onHoldStart(action.press, action.release);
-      onHoldEnd(action.press);
+      onHoldEnd(action.press, false);
     } else {
       onInstant(action.action);
     }
@@ -195,21 +202,24 @@ export function GamePad({ layout, onHoldStart, onHoldEnd, onInstant, active }: G
 
   const button = (spec: PadButtonSpec, slotClass = SLOT_CLASS[spec.slot]) => {
     const { action } = spec;
-    const endHold = (pointerId: number) => {
+    const endHold = (pointerId: number, cancelled: boolean) => {
       const hold = heldButtonsRef.current.get(pointerId);
       if (!hold) return;
       heldButtonsRef.current.delete(pointerId);
-      onHoldEnd(hold.press);
+      onHoldEnd(hold.press, cancelled);
     };
     return (
       <button
         key={spec.id}
         type="button"
         aria-label={spec.aria}
+        aria-disabled={spec.disabled || undefined}
         data-testid={`pad-${spec.id}`}
-        className={`pointer-events-auto absolute flex items-center justify-center border font-bold shadow-[0_8px_20px_rgba(2,6,23,0.5)] active:brightness-125 ${TONES[spec.tone ?? "neutral"]} ${slotClass}`}
+        data-pad-hold={action.kind === "hold" || undefined}
+        className={`pointer-events-auto absolute flex items-center justify-center border font-bold shadow-[0_8px_20px_rgba(2,6,23,0.5)] ${spec.disabled ? "opacity-40" : "active:brightness-125"} ${TONES[spec.tone ?? "neutral"]} ${slotClass}`}
         onPointerDown={(e) => {
           e.preventDefault();
+          if (spec.disabled) return;
           if (action.kind === "instant") {
             onInstant(action.action);
             return;
@@ -222,10 +232,10 @@ export function GamePad({ layout, onHoldStart, onHoldEnd, onInstant, active }: G
           heldButtonsRef.current.set(e.pointerId, { press: action.press, release: action.release });
           onHoldStart(action.press, action.release);
         }}
-        onPointerUp={(e) => endHold(e.pointerId)}
-        onPointerCancel={(e) => endHold(e.pointerId)}
-        onLostPointerCapture={(e) => endHold(e.pointerId)}
-        onClick={keyboardPress(action)}
+        onPointerUp={(e) => endHold(e.pointerId, false)}
+        onPointerCancel={(e) => endHold(e.pointerId, true)}
+        onLostPointerCapture={(e) => endHold(e.pointerId, true)}
+        onClick={keyboardPress(action, spec.disabled)}
       >
         {spec.content}
       </button>
@@ -236,17 +246,26 @@ export function GamePad({ layout, onHoldStart, onHoldEnd, onInstant, active }: G
    * 십자 패드의 길게 누르기 제스처(iOS 선택·확대경·"복사하기" 콜아웃, Android 롱프레스)를 끈다 — iOS는 터치 롱프레스에 contextmenu를 보내지 않아
    * CSS 힌트(user-select·-webkit-touch-callout)·onContextMenu로는 못 막는다. React onTouchStart는 passive라 직접 passive: false로 붙인다
    * 십자 입력은 pointer 이벤트로 처리한다(touchstart를 취소해도 pointer는 그대로 온다)
-   * 범위는 십자만 — 길게 누르는 조작은 ←→↓(유지형)뿐이고, 오른쪽·어깨 버튼(즉시형 탭)은 터치 취소가 :active 눌림 표시를 끌 수 있어 두지 않는다
+   * 범위는 십자와 유지형(hold) 버튼 — 길게 누르는 조작이라 제스처가 포인터를 가져가면(pointercancel) 누름이 취소로 끝난다(예: 포트리스 발사 충전이 버려짐)
+   * 즉시형(탭) 버튼은 두지 않는다 — 터치 취소가 :active 눌림 표시를 끌 수 있다(테트리스 버튼은 모두 즉시형이라 그대로)
    */
   const dpadRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const root = dpadRef.current;
-    if (!root) return;
+    const dpad = dpadRef.current;
+    const root = rootRef.current;
     const block = (e: Event) => {
       if (e.cancelable) e.preventDefault();
     };
-    root.addEventListener("touchstart", block, { passive: false });
-    return () => root.removeEventListener("touchstart", block);
+    const blockHold = (e: Event) => {
+      if (e.target instanceof Element && e.target.closest("[data-pad-hold]")) block(e);
+    };
+    dpad?.addEventListener("touchstart", block, { passive: false });
+    root?.addEventListener("touchstart", blockHold, { passive: false });
+    return () => {
+      dpad?.removeEventListener("touchstart", block);
+      root?.removeEventListener("touchstart", blockHold);
+    };
   }, []);
 
   const shoulder = layout.buttons.filter((b) => b.slot === "shoulder");
@@ -256,6 +275,7 @@ export function GamePad({ layout, onHoldStart, onHoldEnd, onInstant, active }: G
 
   return (
     <div
+      ref={rootRef}
       data-testid="game-pad"
       className="pointer-events-none flex w-full shrink-0 items-end justify-between gap-3 pt-2 landscape:absolute landscape:inset-x-0 landscape:bottom-0"
       style={ROOT_STYLE}
@@ -286,9 +306,9 @@ export function GamePad({ layout, onHoldStart, onHoldEnd, onInstant, active }: G
             if (e.pointerId !== pointerRef.current) return;
             setDirection(directionAt(e), false);
           }}
-          onPointerUp={(e) => endDpad(e.pointerId)}
-          onPointerCancel={(e) => endDpad(e.pointerId)}
-          onLostPointerCapture={(e) => endDpad(e.pointerId)}
+          onPointerUp={(e) => endDpad(e.pointerId, false)}
+          onPointerCancel={(e) => endDpad(e.pointerId, true)}
+          onLostPointerCapture={(e) => endDpad(e.pointerId, true)}
         >
           <span aria-hidden="true" className={`absolute left-1/3 w-1/3 bg-slate-800/90 ${tee ? "top-0 h-1/2" : "top-1/3 h-1/3"}`} />
           {DIRECTIONS.map((dir) => {
@@ -302,10 +322,11 @@ export function GamePad({ layout, onHoldStart, onHoldEnd, onInstant, active }: G
                 key={dir}
                 type="button"
                 aria-label={spec.aria}
+                aria-disabled={spec.disabled || undefined}
                 // 누른 방향 표시는 화면용 — 순간 동작이라 토글(aria-pressed)로 읽히지 않게
                 data-pressed={shown === dir}
-                onClick={keyboardPress(spec.action)}
-                className={`absolute flex items-center justify-center text-lg font-bold transition-colors ${position} ${shown === dir ? "bg-sky-500/60 text-white" : "bg-slate-800/90 text-slate-200"}`}
+                onClick={keyboardPress(spec.action, spec.disabled)}
+                className={`absolute flex items-center justify-center text-lg font-bold transition-colors ${position} ${shown === dir ? "bg-sky-500/60 text-white" : spec.disabled ? "bg-slate-800/50 text-slate-500" : "bg-slate-800/90 text-slate-200"}`}
               >
                 <span aria-hidden="true">{spec.label}</span>
               </button>

@@ -15,6 +15,7 @@ afterEach(() => {
 /** 공개 링크는 값으로 고정한다 — 목록(GAME_CATALOG)을 잘못 고쳐도 테스트가 따라 바뀌지 않게 */
 const EXPECTED_GAMES = [
   { title: "테트리스", play: "/games/tetris", secondary: ["랭킹 보기", "/games/tetris/rankings"] },
+  { title: "포트리스", play: "/games/fortress", secondary: ["친구와 대전", "/games/fortress/battle"] },
   { title: "타워 디펜스", play: "/games/defense", secondary: ["스테이지 1", "/games/defense/campaign/s1"] },
   { title: "낚시", play: "/fishing", secondary: ["물고기 도감", "/fishing/guide"] },
 ] as const;
@@ -32,7 +33,8 @@ describe("사이트 홈 (site-home D-002)", () => {
       const card = within(games.getByRole("heading", { level: 3, name: game.title }).closest("li") as HTMLElement);
       expect(card.getByRole("link", { name: `${game.title} 플레이` })).toHaveAttribute("href", game.play);
       expect(card.getByRole("link", { name: game.secondary[0] })).toHaveAttribute("href", game.secondary[1]);
-      expect(card.queryByRole("link", { name: "친구와 대전" }) !== null).toBe(game.title === "테트리스");
+      // 열린 방 수를 붙이는 대전 입구(BattleEntryLink)는 테트리스만 — 포트리스는 보조 링크가 로비(방 목록)
+      expect(card.queryByRole("link", { name: "친구와 대전" })?.getAttribute("href") === "/games/tetris#battle").toBe(game.title === "테트리스");
     }
 
     const tools = within(screen.getByRole("region", { name: "도구" }));

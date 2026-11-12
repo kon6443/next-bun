@@ -29,6 +29,16 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     battleEntry: true,
   },
   {
+    key: "fortress",
+    title: "포트리스",
+    description: "바람을 읽고 각도와 파워를 맞춰 상대 탱크를 맞히는 턴제 포격전이에요. AI와 겨루거나, 같은 기기·온라인에서 2~4명이 대전해요.",
+    tagline: "턴제 포격전 · AI·친구와 대전",
+    emoji: "💥",
+    playHref: "/games/fortress",
+    secondary: { href: "/games/fortress/battle", label: "친구와 대전" },
+    accent: "from-orange-500/25 to-rose-500/10",
+  },
+  {
     key: "defense",
     title: "타워 디펜스",
     description: "돌 받침에 타워를 세워 몰려오는 적을 막아요. 캠페인 8스테이지를 하나씩 열어 가세요.",

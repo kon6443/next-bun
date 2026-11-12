@@ -1,5 +1,4 @@
 import type { BattleLobbyStats } from '@/services/tetrisBattleService';
-import type { RoomStatus } from '@/types/tetrisBattleSocket';
 
 /**
  * 대전 입구 문구 (DESIGN §19) — 테트리스 홈의 방 수, 최근 대전 목록의 시각
@@ -23,20 +22,7 @@ export const BATTLE_CREATE_HREF = '/games/tetris/battle#battle-create';
 export const LOBBY_CHAT_SECTION_ID = 'lobby-chat';
 export const LOBBY_CHAT_HREF = `/games/tetris/battle#${LOBBY_CHAT_SECTION_ID}`;
 
-type JoinCandidate = { playerCount: number; maxPlayers: number; locked: boolean; status?: RoomStatus };
-
-/**
- * 빠른 참가할 방 — 잠기지 않은 대기 방 중 빈자리가 있고 사람이 가장 많은 곳(같으면 목록 앞쪽). 없으면 null
- * 입구(REST) 목록은 상태 없이 대기 방만 오고 이미 사람 많은 순이라 첫 열린 방이 된다
- */
-export function pickQuickJoinRoom<T extends JoinCandidate>(rooms: readonly T[]): T | null {
-  let best: T | null = null;
-  for (const room of rooms) {
-    if (room.locked || room.playerCount >= room.maxPlayers || (room.status !== undefined && room.status !== 'WAITING')) continue;
-    if (!best || room.playerCount > best.playerCount) best = room;
-  }
-  return best;
-}
+export { pickQuickJoinRoom } from '@/app/games/_shared/battle-room/lib/pickQuickJoinRoom';
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;

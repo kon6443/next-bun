@@ -56,6 +56,14 @@ const DEFENSE_ENGINE_BITWISE = {
   message: "비트 연산은 random.ts(PRNG·해시)에서만 — 2³¹ 이상을 잘라먹는다 (§E1)",
 };
 
+const FORTRESS_PURE_FILES = ["src/app/games/fortress/engine/**/*.ts", "src/app/games/fortress/ai/**/*.ts"];
+const FORTRESS_RESTRICTED_GLOBALS = [
+  ...["Date", "performance", "Map", "Set", "WeakMap", "WeakSet", "window", "document", "globalThis", "JSON", "crypto"],
+  ...["ArrayBuffer", "SharedArrayBuffer", "DataView", "Atomics", "BigInt"],
+  ...["Int8Array", "Uint8Array", "Uint8ClampedArray", "Int16Array", "Uint16Array", "Int32Array", "Uint32Array"],
+  ...["Float32Array", "Float64Array", "BigInt64Array", "BigUint64Array"],
+];
+
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
@@ -77,6 +85,26 @@ const eslintConfig = [
   },
   {
     files: ["src/app/games/defense/engine/random.ts"],
+    rules: { "no-restricted-syntax": ["error", ...DEFENSE_ENGINE_SYNTAX] },
+  },
+  // 포트리스 엔진·AI 결정성 규칙(fortress DESIGN §10, D-008) — 디펜스 규약 복제 + typed array·ArrayBuffer 금지(state는 순수 JSON)
+  // AI는 백엔드 사본·매니페스트 대상 밖이지만 같은 규칙(싱글 랭킹 서버 재현 대비). 우회는 fortress/engine-dev/tokenScan.test.ts가 잡는다
+  {
+    files: FORTRESS_PURE_FILES,
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "no-restricted-globals": ["error", ...FORTRESS_RESTRICTED_GLOBALS],
+      "no-restricted-properties": [
+        "error",
+        { object: "Object", property: "keys" },
+        { object: "Object", property: "values" },
+        { object: "Object", property: "entries" },
+      ],
+      "no-restricted-syntax": ["error", ...DEFENSE_ENGINE_SYNTAX, DEFENSE_ENGINE_BITWISE],
+    },
+  },
+  {
+    files: ["src/app/games/fortress/engine/random.ts"],
     rules: { "no-restricted-syntax": ["error", ...DEFENSE_ENGINE_SYNTAX] },
   },
 ];

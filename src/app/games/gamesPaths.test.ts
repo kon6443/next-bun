@@ -26,6 +26,11 @@ describe('isFullscreenGamePath — 하단 내비 숨김', () => {
     }
   });
 
+  it('포트리스 — 플레이·대전(로비·방)은 전체화면, 홈은 허브', () => {
+    for (const path of ['/games/fortress/play', '/games/fortress/battle', '/games/fortress/battle/ABC234']) expect(isFullscreenGamePath(path)).toBe(true);
+    for (const path of ['/games/fortress', '/games/fortress/battles']) expect(isFullscreenGamePath(path)).toBe(false);
+  });
+
   it('목록·소개·도감·랭킹은 보인다', () => {
     for (const path of [
       '/games',
@@ -34,6 +39,7 @@ describe('isFullscreenGamePath — 하단 내비 숨김', () => {
       '/games/defense',
       '/games/defense/campaign',
       '/games/defense/rankings',
+      '/games/fortress', // 포트리스 홈(F8) — 허브
       '/fishing/guide',
       '/fishing/about',
       '/games/tetris/battles', // battle 접두 경계 — 세그먼트 단위로만 대전으로 본다

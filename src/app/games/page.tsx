@@ -8,8 +8,8 @@ import { BattleEntryLink } from "./tetris/battle-ui/components/BattleEntryLink";
 import { GAME_CATALOG } from "./_shared/lib/gameCatalog";
 
 export const metadata: Metadata = gamePageMetadata({
-  title: "무료 브라우저 미니게임 — 테트리스·타워 디펜스·낚시",
-  description: "설치 없이 브라우저에서 바로 하는 무료 미니게임 모음 — 온라인 테트리스 랭킹·대전, 타워 디펜스, 멀티플레이어 낚시.",
+  title: "무료 브라우저 미니게임 — 테트리스·포트리스·타워 디펜스·낚시",
+  description: "설치 없이 브라우저에서 바로 하는 무료 미니게임 모음 — 온라인 테트리스 랭킹·대전, 턴제 포격전 포트리스, 타워 디펜스, 멀티플레이어 낚시.",
   path: "/games",
 });
 
@@ -26,7 +26,8 @@ export default function GamesPage() {
         <p className="mt-2 text-sm text-slate-400">브라우저에서 바로 즐기는 미니게임이에요.</p>
       </section>
 
-      <ul className="grid grid-cols-1 gap-4">
+      {/* 고정 하단 내비가 마지막 게임 카드를 가리지 않게 아래 여백을 더 둔다(내비가 커지는 521px부터 더) — 포트리스 홈과 같은 값 */}
+      <ul className="grid grid-cols-1 gap-4 pb-4 min-[521px]:pb-8">
         {GAME_CATALOG.map((game) => (
           <li key={game.title} className={`${cardStyles.section} p-5`}>
             <div className="flex items-start gap-4">

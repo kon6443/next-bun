@@ -12,6 +12,9 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* 휴대폰 가로(세로가 짧은 가로 화면) — 게임 조작부를 전장 위 오버레이로 바꿀 때 */
+@custom-variant short-land (@media (orientation: landscape) and (max-height: 500px));
+
 body {
   min-height: 100vh;
   /* 모바일 주소창 변화에 맞춰 실제 보이는 높이를 쓴다 (미지원 브라우저는 위 100vh) */

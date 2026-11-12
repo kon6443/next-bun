@@ -13,6 +13,8 @@ import { type PointHistoryItem, getPointHistory } from "@/services/userService";
 import type { SkinPoints } from "@/types/game";
 import { formatPoints } from "../lib/points";
 import { SKIN_ITEM_LABELS, SKIN_SLOT_LABELS, type SkinSlot } from "../lib/skins";
+import { isFortressMatchId } from "@/services/fortressService";
+import { fortressMatchPath } from "@/app/games/fortress/battle-ui/lib/fortressShare";
 
 type Filter = "all" | "earn" | "spend";
 const FILTERS: { key: Filter; label: string }[] = [
@@ -53,6 +55,11 @@ export function describePointItem(item: PointHistoryItem): { title: string; deta
       return { title: `${SKIN_SLOT_LABELS[slot]} ${SKIN_ITEM_LABELS[skinId] ?? skinId} Lv${level} 강화`, detail: null, replayHref: null };
     }
     return { title: "스킨 강화", detail: item.memo, replayHref: null };
+  }
+  if (item.reason === "FORTRESS_MATCH") {
+    // meta는 null — 내역은 memo, 경기는 refKey(matchId:playerId)의 앞부분
+    const matchId = item.refKey?.split(":")[0] ?? "";
+    return { title: "포트리스 경기", detail: item.memo, replayHref: isFortressMatchId(matchId) ? fortressMatchPath(matchId) : null };
   }
   return { title: item.memo ?? "포인트", detail: null, replayHref: null };
 }
@@ -233,7 +240,7 @@ function PointRow({ item }: { item: PointHistoryItem }) {
   const content = (
     <>
       <span aria-hidden="true" className="w-6 shrink-0 text-center text-base">
-        {item.reason === "TETRIS_SCORE" ? "🎮" : item.reason === "SKIN_UPGRADE" ? "✨" : "•"}
+        {item.reason === "TETRIS_SCORE" ? "🎮" : item.reason === "FORTRESS_MATCH" ? "💥" : item.reason === "SKIN_UPGRADE" ? "✨" : "•"}
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm text-slate-100">{title}</span>

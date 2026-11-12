@@ -26,6 +26,13 @@ function setup(layout: GamePadLayout = TETRIS_PAD_LAYOUT, height = TEE_H) {
 afterEach(() => vi.restoreAllMocks());
 
 describe('테트리스 패드 배치 (games-polish P9)', () => {
+  // 공용 GamePad는 유지형 버튼의 touchstart를 취소한다(길게 누르기 제스처 막기) — 테트리스 버튼은 모두 탭이라 :active 눌림 표시가 그대로여야 한다
+  it('테트리스 버튼은 모두 즉시형 — 길게 누르기 취소 대상(유지형)이 없다', () => {
+    setup();
+    expect(TETRIS_PAD_LAYOUT.buttons.every((b) => b.action.kind === 'instant')).toBe(true);
+    expect(document.querySelectorAll('[data-pad-hold]')).toHaveLength(0);
+  });
+
   it('↑ 팔이 없다(T자, D-004 C3) — 위로 미끄러져 나가도 입력 0, ↑ 버튼·흐린 팔 모두 없음', () => {
     const { onHoldStart, onHoldEnd, onInstant, pad, at } = setup();
     fireEvent.pointerDown(pad, at('left', 2));
