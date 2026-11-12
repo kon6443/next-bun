@@ -19,6 +19,7 @@ import type {
   ChatReadUpdatedPayload,
   MemberJoinedPayload,
   MemberStatusChangedPayload,
+  MemberNicknameChangedPayload,
   SocketErrorPayload,
 } from '@/types/socket';
 import { getChatMessages, getChatReadState, type ChatMemberReadState } from '@/services/teamService';
@@ -43,6 +44,7 @@ import {
   type TeamChatMessage,
 } from '@/app/utils/teamChatUtils';
 import { ChatOutbox } from '@/app/utils/chatOutbox';
+import { renameChatSender, renameUser } from '@/app/utils/teamNicknameUtils';
 import { useTeamSocketContext } from './TeamSocketContext';
 
 // ===== 설정 =====
@@ -484,6 +486,12 @@ export function TeamChatProvider({ children, teamId }: TeamChatProviderProps) {
       }
     };
 
+    // 팀 닉네임 변경 — 이미 받은 메시지의 보낸 사람과 읽음 명단 이름을 바꾼다 (재조회 없이, 멱등)
+    const handleMemberNicknameChanged = (payload: MemberNicknameChangedPayload) => {
+      setMessages((prev) => renameChatSender(prev, payload.userId, payload.userName));
+      setMembers((prev) => renameUser(prev, payload.userId, payload.userName));
+    };
+
     // 채팅 전송 거부 (연결 에러 상태는 TeamSocketContext가 CHAT_* 를 제외하고 관리)
     // clientMsgId가 없는 CHAT_* 는 chatRead 거부다 — 사용자가 한 일이 아니라 토스트 없이 넘긴다(보정이 다시 보냄)
     const handleError = (payload: SocketErrorPayload) => {
@@ -511,6 +519,7 @@ export function TeamChatProvider({ children, teamId }: TeamChatProviderProps) {
     socket.on(TeamSocketEvents.CHAT_READ_UPDATED, handleChatReadUpdated);
     socket.on(TeamSocketEvents.MEMBER_JOINED, handleMemberJoined);
     socket.on(TeamSocketEvents.MEMBER_STATUS_CHANGED, handleMemberStatusChanged);
+    socket.on(TeamSocketEvents.MEMBER_NICKNAME_CHANGED, handleMemberNicknameChanged);
     socket.on(TeamSocketEvents.ERROR, handleError);
 
     return () => {
@@ -519,6 +528,7 @@ export function TeamChatProvider({ children, teamId }: TeamChatProviderProps) {
       socket.off(TeamSocketEvents.CHAT_READ_UPDATED, handleChatReadUpdated);
       socket.off(TeamSocketEvents.MEMBER_JOINED, handleMemberJoined);
       socket.off(TeamSocketEvents.MEMBER_STATUS_CHANGED, handleMemberStatusChanged);
+      socket.off(TeamSocketEvents.MEMBER_NICKNAME_CHANGED, handleMemberNicknameChanged);
       socket.off(TeamSocketEvents.ERROR, handleError);
     };
   }, [socket, raiseLatestId, advanceMyCursor, resync, outbox]);

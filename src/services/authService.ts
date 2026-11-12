@@ -1,8 +1,8 @@
 import serverFetchInstance from './serverFetch';
 import { getRequestContext } from '@/lib/requestContext';
 
+// 카카오 닉네임은 보내지 않는다 — 신규 가입자 닉네임은 서버가 랜덤으로 부여한다
 type KakaoSignInUpRequest = {
-  kakaoNickname: string;
   accessToken: string;
 };
 
@@ -48,7 +48,6 @@ async function extractErrorMessage(response: Response, defaultMessage: string): 
  * 카카오 로그인/회원가입
  */
 export async function postKakaoSignInUp({
-  kakaoNickname,
   accessToken,
 }: KakaoSignInUpRequest): Promise<KakaoSignInUpResponse> {
   // AbortController를 사용하여 timeout 설정
@@ -70,7 +69,7 @@ export async function postKakaoSignInUp({
     const response = await serverFetchInstance.backendFetch({
       method: 'POST',
       endpoint: '/api/v1/auth/kakao',
-      body: { kakaoNickname, accessToken },
+      body: { accessToken },
       headers,
       signal: controller.signal,
     });

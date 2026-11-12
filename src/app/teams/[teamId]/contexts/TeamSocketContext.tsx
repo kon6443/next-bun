@@ -15,6 +15,7 @@ import { io } from 'socket.io-client';
 import type { TeamSocket, OnlineUserInfo } from '@/types/socket';
 import { TeamSocketEvents } from '@/types/socket';
 import { isChatError } from '@/app/utils/teamChatUtils';
+import { renameUser } from '@/app/utils/teamNicknameUtils';
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_API ?? '';
 
@@ -224,6 +225,11 @@ export function TeamSocketProvider({ children, teamId }: TeamSocketProviderProps
           );
         }
       });
+    });
+
+    // 팀 닉네임 변경 — 서버도 온라인 목록 이름을 바꾸지만 이미 받은 목록은 다시 오지 않아 직접 반영한다
+    newSocket.on(TeamSocketEvents.MEMBER_NICKNAME_CHANGED, (payload) => {
+      setOnlineUsers((prev) => renameUser(prev, payload.userId, payload.userName));
     });
 
     // ref와 state 모두 업데이트

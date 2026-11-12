@@ -34,12 +34,14 @@ import { ConfirmModal } from '@/app/components/ConfirmModal';
 import { TaskTagChips } from '@/app/components/TagChip';
 import { EditIcon, TrashIcon, CommentIcon, SendIcon, ArchiveIcon, RestoreIcon } from '@/app/components/Icons';
 import { formatCompactDateTime } from '@/app/utils/taskUtils';
+import { renameInTaskDetail } from '@/app/utils/teamNicknameUtils';
 import { loadBoardState, consumeTaskOpenedFromBoard, buildBoardHref } from '@/app/utils/boardStateStorage';
 import { getStatusBorderClassName, type TaskStatusKey } from '@/app/config/taskStatusConfig';
 import { cardStyles } from '@/styles/teams';
 import { useTeamTaskId, useTeamSocketEvents } from '@/app/hooks';
 import { useTeamSocketContext } from '../../contexts';
 import type {
+  MemberNicknameChangedPayload,
   TaskUpdatedPayload,
   TaskStatusChangedPayload,
   TaskActiveStatusChangedPayload,
@@ -233,6 +235,11 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
     [taskIdNum],
   );
 
+  // Socket 이벤트 핸들러: 팀 닉네임 변경 — 작성자·댓글 작성자 이름 (토스트 없이)
+  const handleSocketMemberNicknameChanged = useCallback((payload: MemberNicknameChangedPayload) => {
+    setTaskDetail(prev => (prev ? renameInTaskDetail(prev, payload.userId, payload.userName) : prev));
+  }, []);
+
   // Socket 이벤트 리스너 등록
   useTeamSocketEvents(
     socket,
@@ -243,6 +250,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
       onCommentCreated: handleSocketCommentCreated,
       onCommentUpdated: handleSocketCommentUpdated,
       onCommentDeleted: handleSocketCommentDeleted,
+      onMemberNicknameChanged: handleSocketMemberNicknameChanged,
     },
     session?.user?.userId,
   );

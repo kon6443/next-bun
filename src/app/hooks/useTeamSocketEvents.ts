@@ -20,6 +20,7 @@ import type {
   OnlineUsersPayload,
   MemberRoleChangedPayload,
   MemberStatusChangedPayload,
+  MemberNicknameChangedPayload,
 } from '@/types/socket';
 import { TeamSocketEvents } from '@/types/socket';
 
@@ -58,6 +59,8 @@ interface TeamSocketEventHandlers {
   onMemberRoleChanged?: (payload: MemberRoleChangedPayload) => void;
   /** 멤버 상태 변경 이벤트 핸들러 */
   onMemberStatusChanged?: (payload: MemberStatusChangedPayload) => void;
+  /** 팀 닉네임 변경 이벤트 핸들러 (본인 것도 전달) */
+  onMemberNicknameChanged?: (payload: MemberNicknameChangedPayload) => void;
 }
 
 /**
@@ -172,6 +175,12 @@ export function useTeamSocketEvents(
       handlersRef.current.onMemberStatusChanged?.(payload);
     };
 
+    // 팀 닉네임 변경은 본인 것도 전달한다 — 같은 사용자의 다른 탭이 모르면 그 탭의 태스크 작성자·멤버 목록에
+    // 옛 이름이 남고, 설정 폼 초깃값도 옛 값이 된다. 받는 쪽 반영(teamNicknameUtils)이 모두 멱등이라 안전하다
+    const handleMemberNicknameChanged = (payload: MemberNicknameChangedPayload) => {
+      handlersRef.current.onMemberNicknameChanged?.(payload);
+    };
+
     socket.on(TeamSocketEvents.TASK_CREATED, handleTaskCreated);
     socket.on(TeamSocketEvents.TASK_UPDATED, handleTaskUpdated);
     socket.on(TeamSocketEvents.TASK_STATUS_CHANGED, handleTaskStatusChanged);
@@ -189,6 +198,7 @@ export function useTeamSocketEvents(
     socket.on(TeamSocketEvents.ONLINE_USERS, handleOnlineUsers);
     socket.on(TeamSocketEvents.MEMBER_ROLE_CHANGED, handleMemberRoleChanged);
     socket.on(TeamSocketEvents.MEMBER_STATUS_CHANGED, handleMemberStatusChanged);
+    socket.on(TeamSocketEvents.MEMBER_NICKNAME_CHANGED, handleMemberNicknameChanged);
 
     return () => {
       socket.off(TeamSocketEvents.TASK_CREATED, handleTaskCreated);
@@ -208,6 +218,7 @@ export function useTeamSocketEvents(
       socket.off(TeamSocketEvents.ONLINE_USERS, handleOnlineUsers);
       socket.off(TeamSocketEvents.MEMBER_ROLE_CHANGED, handleMemberRoleChanged);
       socket.off(TeamSocketEvents.MEMBER_STATUS_CHANGED, handleMemberStatusChanged);
+      socket.off(TeamSocketEvents.MEMBER_NICKNAME_CHANGED, handleMemberNicknameChanged);
     };
   }, [socket, isSelfTriggered]);
 }

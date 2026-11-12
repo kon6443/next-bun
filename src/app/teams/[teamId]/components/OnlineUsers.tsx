@@ -5,12 +5,16 @@ import { CloseIcon } from '@/app/components/Icons';
 import { useDialog } from '@/app/hooks/useDialog';
 import { UserAvatar } from '@/app/components/UserAvatar';
 import type { OnlineUserInfo } from '@/types/socket';
+import type { MyTeamNickname } from '@/app/hooks/useMyTeamNickname';
+import { TeamNicknameInlineEditor } from './TeamNicknameEditor';
 
 type OnlineUsersProps = {
   users: OnlineUserInfo[];
   currentUserId?: number;
   /** 모달 열림/닫힘 상태 변경 콜백 (FAB 숨김 처리용) */
   onModalOpenChange?: (isOpen: boolean) => void;
+  /** 내 항목에서 "이 팀에서 내 이름" 바꾸기 (TeamBoard의 useMyTeamNickname 하나를 같이 쓴다) */
+  myNickname?: MyTeamNickname;
 };
 
 /**
@@ -25,7 +29,7 @@ type OnlineUsersProps = {
  * - 현재 유저 강조 표시
  * - 다중 탭 접속 시 배지 표시
  */
-export function OnlineUsers({ users, currentUserId, onModalOpenChange }: OnlineUsersProps) {
+export function OnlineUsers({ users, currentUserId, onModalOpenChange, myNickname }: OnlineUsersProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // 현재 유저를 맨 앞으로, 나머지는 이름순 정렬
@@ -72,6 +76,7 @@ export function OnlineUsers({ users, currentUserId, onModalOpenChange }: OnlineU
         onClose={handleCloseModal}
         users={sortedUsers}
         currentUserId={currentUserId}
+        myNickname={myNickname}
       />
     </>
   );
@@ -153,10 +158,34 @@ function OnlineUsersMiniView({
 function OnlineUserListItem({
   user,
   isCurrentUser,
+  myNickname,
 }: {
   user: OnlineUserInfo;
   isCurrentUser: boolean;
+  myNickname?: MyTeamNickname;
 }) {
+  const nameBlock = (
+    <>
+      <p className="font-medium text-slate-200 truncate">
+        {user.userName}
+        {isCurrentUser && (
+          <span className="ml-2 text-xs text-emerald-400 font-normal">(나)</span>
+        )}
+      </p>
+      {user.connectionCount > 1 && (
+        <p className="text-xs text-slate-400">
+          {user.connectionCount}개 기기에서 접속 중
+        </p>
+      )}
+    </>
+  );
+  const status = (
+    <span className="flex shrink-0 items-center gap-1.5 text-xs text-emerald-400">
+      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+      온라인
+    </span>
+  );
+
   return (
     <div
       className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition ${
@@ -171,23 +200,17 @@ function OnlineUserListItem({
         connectionCount={user.connectionCount}
         size="md"
       />
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-slate-200 truncate">
-          {user.userName}
-          {isCurrentUser && (
-            <span className="ml-2 text-xs text-emerald-400 font-normal">(나)</span>
-          )}
-        </p>
-        {user.connectionCount > 1 && (
-          <p className="text-xs text-slate-400">
-            {user.connectionCount}개 기기에서 접속 중
-          </p>
-        )}
-      </div>
-      <span className="flex items-center gap-1.5 text-xs text-emerald-400">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-        온라인
-      </span>
+      {isCurrentUser && myNickname ? (
+        // 내 항목은 같은 행 안에서 바꾼다 — 연필 버튼 → 이름 자리가 입력 칸으로 (시트 위에 대화상자를 겹치지 않는다)
+        <TeamNicknameInlineEditor nickname={myNickname} trailing={status}>
+          {nameBlock}
+        </TeamNicknameInlineEditor>
+      ) : (
+        <>
+          <div className="flex-1 min-w-0">{nameBlock}</div>
+          {status}
+        </>
+      )}
     </div>
   );
 }
@@ -203,11 +226,13 @@ function OnlineUsersModal({
   onClose,
   users,
   currentUserId,
+  myNickname,
 }: {
   isOpen: boolean;
   onClose: () => void;
   users: OnlineUserInfo[];
   currentUserId?: number;
+  myNickname?: MyTeamNickname;
 }) {
   const dialogRef = useDialog<HTMLDivElement>(isOpen, onClose);
   if (!isOpen) return null;
@@ -255,14 +280,15 @@ function OnlineUsersModal({
               </button>
             </div>
 
-            {/* 유저 목록 - 하단 네비게이션 바 높이(약 80px) + safe-area 고려 */}
-            <div className="px-4 pb-24 max-h-[60vh] overflow-y-auto">
+            {/* 유저 목록 — 시트가 하단 내비(z-50) 위(z-[100])를 덮으므로 내비 높이는 비우지 않고 safe-area만 (ChatReadersModal과 같음) */}
+            <div className="px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] max-h-[60vh] overflow-y-auto">
               <div className="space-y-1">
                 {users.map(user => (
                   <OnlineUserListItem
                     key={user.userId}
                     user={user}
                     isCurrentUser={user.userId === currentUserId}
+                    myNickname={myNickname}
                   />
                 ))}
               </div>

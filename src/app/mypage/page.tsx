@@ -107,6 +107,8 @@ export default function Mypage() {
                 autoFocus
               />
               <p className="text-xs text-slate-400 mt-1">{newUserName.length}/20</p>
+              {/* 팀 닉네임은 가입 때 복사해 둔 값이라 여기서 바꿔도 팀 안 이름은 그대로다 */}
+              <p className="text-xs text-slate-400 mt-1">팀 안에서 보이는 이름은 각 팀 화면에서 따로 바꿀 수 있어요.</p>
             </div>
           ) : (
             <div className="mb-3">
