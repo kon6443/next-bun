@@ -219,7 +219,10 @@ export type UpdateTaskResponse = {
 
 export type TeamUserResponse = {
   userId: number;
+  /** 이 팀 안의 표시 이름 (팀 닉네임 → 계정 닉네임 → 사용자{id}) */
   userName: string | null;
+  /** 팀 닉네임 원값 — 가입 때 계정 닉네임을 복사해 두므로 사실상 늘 있다(옛 데이터 대비 null 허용) */
+  teamNickname: string | null;
   role: string;
   joinedAt: Date;
   userActStatus: 0 | 1;
@@ -1044,6 +1047,49 @@ export async function updateMemberStatus(
       404: '팀 멤버를 찾을 수 없습니다.',
       default: '상태 변경 실패',
     });
+  }
+
+  return response.json();
+}
+
+// ==================== 팀 닉네임 API ====================
+
+export type TeamNicknameData = {
+  teamId: number;
+  userId: number;
+  teamNickname: string;
+  /** 이 팀 안의 표시 이름 (= 저장한 팀 닉네임) */
+  userName: string;
+};
+
+export type TeamNicknameResponse = {
+  code: 'SUCCESS';
+  message: string;
+  data: TeamNicknameData;
+};
+
+const TEAM_NICKNAME_ERROR_MESSAGES = {
+  403: '활성 멤버만 팀 닉네임을 바꿀 수 있습니다.',
+  default: '팀 닉네임 변경 실패',
+};
+
+/**
+ * 이 팀에서 쓸 내 닉네임 설정 (본인만, 1~20자)
+ */
+export async function updateMyTeamNickname(
+  teamId: number,
+  teamNickname: string,
+  accessToken: string,
+): Promise<TeamNicknameResponse> {
+  const response = await fetchServiceInstance.backendFetch({
+    method: 'PUT',
+    endpoint: `/api/v1/teams/${teamId}/users/me/nickname`,
+    accessToken,
+    body: { teamNickname },
+  });
+
+  if (!response.ok) {
+    await handleApiError(response, TEAM_NICKNAME_ERROR_MESSAGES);
   }
 
   return response.json();

@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getMyTeams, updateTeam, getTeamUsers, deleteTelegramLink, getTeamTasks, getTaskDetail } from './teamService';
+import {
+  getMyTeams,
+  updateTeam,
+  getTeamUsers,
+  deleteTelegramLink,
+  getTeamTasks,
+  getTaskDetail,
+  updateMyTeamNickname,
+} from './teamService';
 import { ApiError } from '@/types/api';
 
 // 서비스 → FetchService → fetch 경로 전체를 실제로 타고, 네트워크만 stub 한다
@@ -93,5 +101,23 @@ describe('teamService 응답·에러 처리', () => {
       code: 'FORBIDDEN',
       message: '팀 멤버만 텔레그램 연동을 해제할 수 있습니다.',
     });
+  });
+
+  it('updateMyTeamNickname: PUT users/me/nickname 에 teamNickname만 싣는다', async () => {
+    const body = { code: 'SUCCESS', message: '', data: { teamId: 7, userId: 1, teamNickname: '수달', userName: '수달' } };
+    fetchMock.mockResolvedValue(json(body));
+    await expect(updateMyTeamNickname(7, '수달', 'tok')).resolves.toEqual(body);
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toMatch(/\/api\/v1\/teams\/7\/users\/me\/nickname$/);
+    expect(init.method).toBe('PUT');
+    expect(JSON.parse(init.body)).toEqual({ teamNickname: '수달' });
+  });
+
+  it('updateMyTeamNickname: 403·422는 백엔드 code 그대로', async () => {
+    fetchMock.mockResolvedValue(json({ code: 'TEAM_FORBIDDEN', message: 'forbidden' }, 403));
+    await expect(updateMyTeamNickname(7, '수달', 'tok')).rejects.toMatchObject({ code: 'TEAM_FORBIDDEN', status: 403 });
+    fetchMock.mockResolvedValue(json({ code: 'VALIDATION_ERROR', message: 'bad' }, 422));
+    await expect(updateMyTeamNickname(7, '', 'tok')).rejects.toMatchObject({ code: 'VALIDATION_ERROR', status: 422 });
   });
 });

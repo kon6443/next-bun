@@ -8,6 +8,8 @@ import { getRoleMeta, CURRENT_USER_BADGE_CLASSNAME, type RoleKey } from '@/app/c
 import { formatFullDateTime } from '@/app/utils/taskUtils';
 import { TelegramSection } from './TelegramSection';
 import { DiscordSection } from './DiscordSection';
+import { TeamNicknameInlineEditor } from './TeamNicknameEditor';
+import type { MyTeamNickname } from '@/app/hooks/useMyTeamNickname';
 import type { TeamUserResponse, TeamInviteResponse, TelegramStatusResponse, DiscordStatusResponse } from '@/services/teamService';
 import { cardStyles } from '@/styles/teams';
 
@@ -63,6 +65,9 @@ type TeamManagementSectionProps = {
   // 상태 변경 관련
   onToggleMemberStatus?: (member: TeamUserResponse, newStatus: 0 | 1) => Promise<void>;
   togglingMemberIds?: number[];
+
+  // 팀 닉네임 (내 카드에서만 — TeamBoard의 useMyTeamNickname 하나를 같이 쓴다)
+  myNickname?: MyTeamNickname;
 };
 
 // 탭 설정 타입
@@ -114,6 +119,7 @@ export function TeamManagementSection({
   onOpenRoleChange,
   onToggleMemberStatus,
   togglingMemberIds = [],
+  myNickname,
 }: TeamManagementSectionProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>('stats');
@@ -346,6 +352,21 @@ export function TeamManagementSection({
                     const isToggling = togglingMemberIds.includes(member.userId);
                     const isInactive = member.userActStatus === 0;
 
+                    const nameRow = (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className={`min-w-0 break-words text-lg font-semibold ${isInactive ? 'text-slate-400' : 'text-white'}`}>
+                          {member.userName || `사용자 ${member.userId}`}
+                        </p>
+                        <span className={roleMeta.className}>{roleMeta.label}</span>
+                        {isCurrentUser && <span className={CURRENT_USER_BADGE_CLASSNAME}>나</span>}
+                        {isInactive && (
+                          <span className="rounded-full border border-slate-600/50 bg-slate-700/30 px-2 py-0.5 text-xs font-medium text-slate-400">
+                            비활성
+                          </span>
+                        )}
+                      </div>
+                    );
+
                     return (
                       <div 
                         key={member.userId} 
@@ -358,18 +379,12 @@ export function TeamManagementSection({
                         {/* 좁은 폭에서는 버튼 묶음이 다음 줄로 — 이름·배지 칸이 버튼에 밀려 겹치지 않게 */}
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div className="min-w-0 flex-1 basis-32">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className={`min-w-0 break-words text-lg font-semibold ${isInactive ? 'text-slate-400' : 'text-white'}`}>
-                                {member.userName || `사용자 ${member.userId}`}
-                              </p>
-                              <span className={roleMeta.className}>{roleMeta.label}</span>
-                              {isCurrentUser && <span className={CURRENT_USER_BADGE_CLASSNAME}>나</span>}
-                              {isInactive && (
-                                <span className="rounded-full border border-slate-600/50 bg-slate-700/30 px-2 py-0.5 text-xs font-medium text-slate-400">
-                                  비활성
-                                </span>
-                              )}
-                            </div>
+                            {isCurrentUser && myNickname ? (
+                              // 내 카드는 이름 줄 끝 연필 버튼으로 같은 줄에서 바꾼다 — 따로 한 줄을 쓰지 않는다
+                              <TeamNicknameInlineEditor nickname={myNickname}>{nameRow}</TeamNicknameInlineEditor>
+                            ) : (
+                              nameRow
+                            )}
                             <p className="mt-2 text-xs text-slate-400">가입일: {formatMemberDate(member.joinedAt)}</p>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
