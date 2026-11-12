@@ -2,6 +2,7 @@ import serverFetchInstance from './serverFetch';
 import type { ApiResponse } from '@/types/api';
 import type { GameType, ScoreDetailByGame, ScoreSummary } from '@/types/game';
 import type { BattleMatch } from './tetrisBattleService';
+import type { FortressMatch } from './fortressService';
 
 /**
  * 기록은 바뀌지 않는다 — 미리보기 메타·이미지가 같은 기록을 반복 조회해도 백엔드는 10분에 한 번만
@@ -52,6 +53,26 @@ export async function getBattleMatchSummary(matchId: string): Promise<BattleMatc
     });
     if (!response.ok) return null;
     const body = (await response.json()) as ApiResponse<BattleMatch>;
+    return body?.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 서버(Next) 전용 — 저장된 포트리스 경기 요약 (경기 페이지 링크 미리보기 메타·OG 이미지)
+ * 테트리스 대전 요약과 같은 규칙: 실패는 null(일반 미리보기로 폴백), 200만 10분 캐시 — 저장 전 404는 캐시되지 않는다
+ */
+export async function getFortressMatchSummary(matchId: string): Promise<FortressMatch | null> {
+  try {
+    const response = await serverFetchInstance.backendFetch({
+      method: 'GET',
+      endpoint: `/api/v1/fortress/matches/${encodeURIComponent(matchId)}`,
+      next: { revalidate: SCORE_SUMMARY_REVALIDATE_SECONDS },
+      signal: AbortSignal.timeout(SUMMARY_TIMEOUT_MS),
+    });
+    if (!response.ok) return null;
+    const body = (await response.json()) as ApiResponse<FortressMatch>;
     return body?.data ?? null;
   } catch {
     return null;

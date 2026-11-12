@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { GamePad, type GamePadLayout, PAD_INSTANT_GUARD_MS } from './GamePad';
 
 /** 게임 무관 시험 배치 — 유지형 ←→↓, 즉시형 ↑, 즉시형 A·B, 유지형 어깨 버튼 */
@@ -69,12 +69,13 @@ describe('공통 GamePad — 포인터 처리 (games-polish P9)', () => {
     const { onHoldStart, onHoldEnd, onInstant, down, move, up } = setupPad(LAYOUT);
     down('left');
     move('right');
-    expect(onHoldEnd).toHaveBeenLastCalledWith(L.press);
+    // 다른 방향으로 미끄러짐 — 정상 뗌(cancelled false)
+    expect(onHoldEnd).toHaveBeenLastCalledWith(L.press, false);
     expect(onHoldStart).toHaveBeenLastCalledWith(R.press, R.release);
     move('up');
     move('down');
     up();
-    expect(onHoldEnd).toHaveBeenLastCalledWith(D.press);
+    expect(onHoldEnd).toHaveBeenLastCalledWith(D.press, false);
     expect(onInstant).not.toHaveBeenCalledWith(UP);
     clock += PAD_INSTANT_GUARD_MS - 10;
     down('up');
@@ -92,19 +93,20 @@ describe('공통 GamePad — 포인터 처리 (games-polish P9)', () => {
     down('right', 2);
     expect(onHoldStart).toHaveBeenCalledTimes(1);
     fireEvent.pointerCancel(pad, { pointerId: 1 });
-    expect(onHoldEnd).toHaveBeenLastCalledWith(L.press);
+    // 취소·숨김·blur는 cancelled true — 뗄 때 동작하는 입력(발사 충전 등)이 동작하지 않게 가를 수 있다
+    expect(onHoldEnd).toHaveBeenLastCalledWith(L.press, true);
 
     down('down', 3);
     fireEvent.pointerDown(screen.getByTestId('pad-sh'), { pointerId: 4 });
     expect(onHoldStart).toHaveBeenLastCalledWith(S.press, S.release);
     vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
     document.dispatchEvent(new Event('visibilitychange'));
-    expect(onHoldEnd).toHaveBeenCalledWith(D.press);
-    expect(onHoldEnd).toHaveBeenCalledWith(S.press);
+    expect(onHoldEnd).toHaveBeenCalledWith(D.press, true);
+    expect(onHoldEnd).toHaveBeenCalledWith(S.press, true);
 
     down('right', 5);
     window.dispatchEvent(new Event('blur'));
-    expect(onHoldEnd).toHaveBeenLastCalledWith(R.press);
+    expect(onHoldEnd).toHaveBeenLastCalledWith(R.press, true);
   });
 
   it('유지형 버튼은 누르는 동안 — 뗌·취소에서 뗀다', () => {
@@ -113,7 +115,7 @@ describe('공통 GamePad — 포인터 처리 (games-polish P9)', () => {
     fireEvent.pointerDown(sh, { pointerId: 7 });
     expect(onHoldStart).toHaveBeenCalledWith(S.press, S.release);
     fireEvent.pointerUp(sh, { pointerId: 7 });
-    expect(onHoldEnd).toHaveBeenCalledWith(S.press);
+    expect(onHoldEnd).toHaveBeenCalledWith(S.press, false);
     fireEvent.pointerCancel(sh, { pointerId: 7 });
     expect(onHoldEnd).toHaveBeenCalledTimes(1);
   });
@@ -133,12 +135,38 @@ describe('공통 GamePad — 포인터 처리 (games-polish P9)', () => {
     const { onHoldStart, onHoldEnd, onInstant } = setupPad(LAYOUT);
     fireEvent.click(screen.getByRole('button', { name: '왼쪽' }), { detail: 0 });
     expect(onHoldStart).toHaveBeenCalledWith(L.press, L.release);
-    expect(onHoldEnd).toHaveBeenCalledWith(L.press);
+    expect(onHoldEnd).toHaveBeenCalledWith(L.press, false);
     const a = screen.getByTestId('pad-a');
     fireEvent.pointerDown(a, { pointerId: 9 });
     fireEvent.click(a, { detail: 1 });
     fireEvent.click(a, { detail: 0 });
     expect(onInstant.mock.calls).toEqual([[A], [A]]);
+  });
+
+  it('disabled 버튼·방향은 흐리게, 누르거나(포인터·키보드) 미끄러져 들어가도 무동작 — 다른 입력은 그대로', () => {
+    const layout: GamePadLayout = {
+      dpad: { ...LAYOUT.dpad, right: { ...LAYOUT.dpad.right!, disabled: true } },
+      buttons: LAYOUT.buttons.map((b) => (b.id === 'a' || b.id === 'sh' ? { ...b, disabled: true } : b)),
+    };
+    const { onHoldStart, onHoldEnd, onInstant, down, move, up } = setupPad(layout);
+    const a = screen.getByTestId('pad-a');
+    expect(a).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: '오른쪽' })).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.pointerDown(a, { pointerId: 2 });
+    fireEvent.click(a, { detail: 0 });
+    fireEvent.pointerDown(screen.getByTestId('pad-sh'), { pointerId: 3 });
+    fireEvent.click(screen.getByRole('button', { name: '오른쪽' }), { detail: 0 });
+    down('right');
+    expect(onInstant).not.toHaveBeenCalled();
+    expect(onHoldStart).not.toHaveBeenCalled();
+    // 쓸 수 있는 방향에서 막힌 방향으로 미끄러지면 뗀다(눌린 채 남지 않게)
+    move('left');
+    expect(onHoldStart).toHaveBeenCalledWith(L.press, L.release);
+    move('right');
+    expect(onHoldEnd).toHaveBeenCalledWith(L.press, false);
+    up();
+    fireEvent.pointerDown(screen.getByTestId('pad-b'), { pointerId: 4 });
+    expect(onInstant).toHaveBeenCalledWith(B);
   });
 
   it('누른 방향 팔만 밝힌다(data-pressed — 순간 동작이라 토글로 읽히지 않게)', () => {
@@ -167,16 +195,30 @@ describe('공통 GamePad — 길게 누르기 제스처 차단 (iOS 선택·확�
     expect(touchStart(pad.querySelector('[aria-label="왼쪽"]') ?? pad)).toBe(true);
   });
 
-  it('탭으로 쓰는 버튼(A·어깨)은 취소하지 않는다 — 터치 :active 눌림 표시를 지킨다', () => {
+  it('탭으로 쓰는 즉시형 버튼(A·B)은 취소하지 않는다 — 터치 :active 눌림 표시를 지킨다', () => {
     setupPad(LAYOUT);
     expect(touchStart(screen.getByRole('button', { name: 'A' }))).toBe(false);
-    expect(touchStart(screen.getByRole('button', { name: '어깨' }))).toBe(false);
+    expect(touchStart(screen.getByRole('button', { name: 'B' }))).toBe(false);
+  });
+
+  // D-025 보충 2 리뷰: 유지형 버튼을 길게 누르면 iOS가 제스처로 포인터를 가져가(pointercancel) 누름이 취소로 끝났다 — 포트리스 발사 충전이 버려진다
+  it('길게 누르는 유지형 버튼(시험 배치의 어깨)은 touchstart를 취소한다 — 안의 글자를 눌러도', () => {
+    const layout: GamePadLayout = { ...LAYOUT, buttons: LAYOUT.buttons.map((b) => (b.id === 'sh' ? { ...b, content: <span data-testid='sh-label'>L</span> } : b)) };
+    setupPad(layout);
+    expect(touchStart(screen.getByRole('button', { name: '어깨' }))).toBe(true);
+    expect(touchStart(screen.getByTestId('sh-label'))).toBe(true);
   });
 
   it('취소할 수 있게 passive: false로 붙인다(React onTouchStart는 passive라 취소가 무시된다)', () => {
     const add = vi.spyOn(HTMLElement.prototype, 'addEventListener');
     setupPad(LAYOUT);
-    expect(add.mock.calls.some(([type, , options]) => type === 'touchstart' && typeof options === 'object' && options?.passive === false)).toBe(true);
+    // 십자 영역과 패드 루트(유지형 버튼용) 둘 다
+    const targets = add.mock.contexts.filter((_, i) => {
+      const [type, , options] = add.mock.calls[i];
+      return type === 'touchstart' && typeof options === 'object' && options?.passive === false;
+    });
+    expect(targets).toContain(screen.getByTestId('game-pad-dpad'));
+    expect(targets).toContain(screen.getByTestId('game-pad'));
   });
 
   it('터치를 취소해도 포인터 입력은 그대로 — 누르기·떼기가 동작한다', () => {
@@ -185,6 +227,39 @@ describe('공통 GamePad — 길게 누르기 제스처 차단 (iOS 선택·확�
     down('left');
     up();
     expect(onHoldStart).toHaveBeenCalledWith(L.press, L.release);
-    expect(onHoldEnd).toHaveBeenCalledWith(L.press);
+    expect(onHoldEnd).toHaveBeenCalledWith(L.press, false);
+  });
+
+  it('뗌 콜백의 cancelled — 버튼의 캡처 잃음·취소와 언마운트는 true, 정상 뗌만 false', () => {
+    const { onHoldEnd, down, up, pad } = setupPad(LAYOUT);
+    // 십자 — 캡처 잃음은 취소(true), 정상 뗌 뒤 따라오는 캡처 잃음은 두 번째 뗌이 아니다
+    down('left');
+    fireEvent.lostPointerCapture(pad, { pointerId: 1 });
+    expect(onHoldEnd).toHaveBeenLastCalledWith(L.press, true);
+    down('left');
+    up();
+    fireEvent.lostPointerCapture(pad, { pointerId: 1 });
+    expect(onHoldEnd).toHaveBeenLastCalledWith(L.press, false);
+    expect(onHoldEnd).toHaveBeenCalledTimes(2);
+    onHoldEnd.mockClear();
+    const sh = screen.getByTestId('pad-sh');
+    fireEvent.pointerDown(sh, { pointerId: 7 });
+    fireEvent.lostPointerCapture(sh, { pointerId: 7 });
+    expect(onHoldEnd).toHaveBeenLastCalledWith(S.press, true);
+    fireEvent.pointerDown(sh, { pointerId: 8 });
+    fireEvent.pointerCancel(sh, { pointerId: 8 });
+    expect(onHoldEnd).toHaveBeenLastCalledWith(S.press, true);
+    // 정상 뗌 뒤 따라오는 캡처 잃음은 두 번째 뗌이 아니다(이미 뗐다)
+    fireEvent.pointerDown(sh, { pointerId: 9 });
+    fireEvent.pointerUp(sh, { pointerId: 9 });
+    fireEvent.lostPointerCapture(sh, { pointerId: 9 });
+    expect(onHoldEnd).toHaveBeenLastCalledWith(S.press, false);
+    expect(onHoldEnd).toHaveBeenCalledTimes(3);
+    // 언마운트 — 누르던 십자·버튼 모두 취소로 뗀다
+    down('left');
+    fireEvent.pointerDown(sh, { pointerId: 10 });
+    cleanup();
+    expect(onHoldEnd).toHaveBeenCalledWith(L.press, true);
+    expect(onHoldEnd).toHaveBeenLastCalledWith(S.press, true);
   });
 });

@@ -11,6 +11,8 @@ import { gameListJsonLd, gamePageMetadata, videoGameJsonLd } from './seo';
 vi.mock('@/app/games/defense/components/CampaignMap', () => ({ CampaignMap: () => null }));
 vi.mock('@/app/games/defense/components/HubActions', () => ({ HubActions: () => null }));
 vi.mock('@/app/games/defense/components/RankedCards', () => ({ RankedCards: () => null }));
+vi.mock('@/app/games/fortress/components/FortressHome', () => ({ FortressHome: () => null }));
+vi.mock('@/app/games/fortress/battle-ui/components/FortressMatchArchive', () => ({ FortressMatchArchive: () => null }));
 
 describe('게임 페이지 SEO 메타', () => {
   it('페이지 메타는 자기 canonical·og:url·기본 미리보기 이미지를 갖는다', () => {
@@ -41,6 +43,7 @@ describe('게임 페이지 SEO 메타', () => {
       '/games/tetris': async () => (await import('@/app/games/tetris/page')).metadata,
       '/games/tetris/rankings': async () => (await import('@/app/games/tetris/rankings/page')).metadata,
       '/games/tetris/skins': async () => (await import('@/app/games/tetris/skins/page')).metadata,
+      '/games/fortress': async () => (await import('@/app/games/fortress/page')).metadata,
       '/games/defense': async () => (await import('@/app/games/defense/page')).metadata,
       '/games/defense/rankings': async () => (await import('@/app/games/defense/rankings/page')).metadata,
     };
@@ -60,6 +63,9 @@ describe('게임 페이지 SEO 메타', () => {
 
   it('최근 대전 목록은 자기 canonical, 도감은 noindex(클라이언트 진행도만 그려 서버 HTML이 비었다)', async () => {
     expect((await import('@/app/games/tetris/(fullscreen)/battle/matches/page')).metadata.alternates?.canonical).toBe('/games/tetris/battle/matches');
+    const fortressMatches = (await import('@/app/games/fortress/(fullscreen)/battle/matches/page')).metadata;
+    expect(fortressMatches.alternates?.canonical).toBe('/games/fortress/battle/matches');
+    expect(fortressMatches.robots).toBeUndefined();
     expect((await import('@/app/games/defense/codex/page')).metadata.robots).toMatchObject({ index: false });
   });
 
@@ -88,6 +94,7 @@ describe('robots·sitemap', () => {
         '/games',
         '/games/tetris',
         '/games/tetris/rankings',
+        '/games/fortress',
         '/games/defense',
         '/games/defense/rankings',
         '/games/defense/campaign/s1',
