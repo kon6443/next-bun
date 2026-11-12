@@ -133,6 +133,13 @@ describe('포인트 내역 (tetris-home A)', () => {
     expect(screen.getByRole('button', { name: '다시 로그인' })).toBeTruthy();
   });
 
+  it('포트리스 경기 줄 — meta null이라 memo로 내역, refKey(matchId:playerId)로 경기 기록 링크', () => {
+    const memo = '포트리스 경기 · 참가 20,000 · 승리 30,000';
+    const row = { ...score(9, 50_000, 0), reason: 'FORTRESS_MATCH', refKey: 'kYDnp6WGrJZAlFGf:p1', meta: null, memo };
+    expect(describePointItem(row)).toEqual({ title: '포트리스 경기', detail: memo, replayHref: '/games/fortress/battle/matches/kYDnp6WGrJZAlFGf' });
+    expect(describePointItem({ ...row, refKey: null })).toMatchObject({ title: '포트리스 경기', replayHref: null });
+  });
+
   it('줄 설명 — 모르는 사유는 memo, meta가 이상하면 일반 문구, 점수 줄의 scoreId가 없으면 링크 없음', () => {
     expect(describePointItem({ ...upgrade(1, 0), meta: null })).toMatchObject({ title: '스킨 강화', replayHref: null });
     expect(describePointItem({ ...score(2, 1, 0), meta: null })).toMatchObject({ title: '테트리스 점수', replayHref: null });
