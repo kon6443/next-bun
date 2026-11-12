@@ -30,29 +30,35 @@ const load = async () => ({
 
 const lastRequest = () => {
   const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit & { headers: Record<string, string> }];
-  return { url, headers: init.headers };
+  return { url, headers: init.headers, body: init.body };
 };
 
 describe('postKakaoSignInUp', () => {
   it('서버 전용 주소로 보내고, 매번 새 연결(Connection: close)을 쓴다', async () => {
     const { postKakaoSignInUp } = await load();
-    await postKakaoSignInUp({ accessToken: 'kakao-token', kakaoNickname: '닉' });
+    await postKakaoSignInUp({ accessToken: 'kakao-token' });
     const { url, headers } = lastRequest();
     expect(url).toBe('http://internal.test:3500/api/v1/auth/kakao');
     expect(headers.Connection).toBe('close');
   });
 
+  it('카카오 닉네임은 보내지 않는다 — 본문은 accessToken뿐', async () => {
+    const { postKakaoSignInUp } = await load();
+    await postKakaoSignInUp({ accessToken: 'kakao-token' });
+    expect(JSON.parse(String(lastRequest().body))).toEqual({ accessToken: 'kakao-token' });
+  });
+
   it('요청 컨텍스트에 사용자 IP 가 있으면 X-Forwarded-For 로 넘긴다', async () => {
     const { postKakaoSignInUp, runWithRequestContext } = await load();
     await runWithRequestContext({ clientIp: '203.0.113.5' }, () =>
-      postKakaoSignInUp({ accessToken: 'kakao-token', kakaoNickname: '닉' }),
+      postKakaoSignInUp({ accessToken: 'kakao-token' }),
     );
     expect(lastRequest().headers['X-Forwarded-For']).toBe('203.0.113.5');
   });
 
   it('사용자 IP 가 없으면 X-Forwarded-For 를 붙이지 않는다', async () => {
     const { postKakaoSignInUp, runWithRequestContext } = await load();
-    await runWithRequestContext({}, () => postKakaoSignInUp({ accessToken: 'kakao-token', kakaoNickname: '닉' }));
+    await runWithRequestContext({}, () => postKakaoSignInUp({ accessToken: 'kakao-token' }));
     expect(lastRequest().headers).not.toHaveProperty('X-Forwarded-For');
   });
 
@@ -66,7 +72,7 @@ describe('postKakaoSignInUp', () => {
     );
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const { postKakaoSignInUp } = await load();
-    await expect(postKakaoSignInUp({ accessToken: 'kakao-token', kakaoNickname: '닉' })).rejects.toThrow(
+    await expect(postKakaoSignInUp({ accessToken: 'kakao-token' })).rejects.toThrow(
       '서버 응답 형식이 올바르지 않습니다.',
     );
     expect(errorSpy).toHaveBeenCalled();

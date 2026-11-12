@@ -39,6 +39,16 @@ describe('useDialog', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('안쪽 요소가 이미 처리한(preventDefault) Esc로는 닫지 않는다 — 바텀시트 안 인라인 폼', () => {
+    const onClose = vi.fn();
+    render(<Harness isOpen onClose={onClose} />);
+    // Next App Router는 React 루트가 document라 stopPropagation으로 막을 수 없다 — 같은 노드의 리스너 상황을 그대로 만든다
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    event.preventDefault();
+    document.dispatchEvent(event);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it('closeOnEscape=false면 Esc로 닫지 않는다', () => {
     const onClose = vi.fn();
     render(<Harness isOpen onClose={onClose} closeOnEscape={false} />);
