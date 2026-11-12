@@ -70,6 +70,11 @@ type TeamManagementSectionProps = {
   myNickname?: MyTeamNickname;
 };
 
+/** 탭 버튼 이름 — 숫자가 있으면 "라벨 숫자" */
+function tabAccessibleName(tab: { label: string; count: number | null }): string {
+  return tab.count !== null ? `${tab.label} ${tab.count}` : tab.label;
+}
+
 // 탭 설정 타입
 type TabKey = 'members' | 'stats' | 'invites' | 'telegram' | 'discord';
 
@@ -255,13 +260,21 @@ export function TeamManagementSection({
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
           <SectionLabel>Team Management</SectionLabel>
-          <div className="flex flex-wrap items-center gap-2">
-            {visibleTabs.map(tab => (
-              <span key={tab.key} className="flex items-center gap-1 text-xs text-slate-400" title={tab.label}>
-                {tab.icon}
-                {tab.count !== null && tab.count}
-              </span>
-            ))}
+          {/* 접힌 상태의 요약 — 숫자 있는 항목(멤버·초대)만 둔다. 숫자 없는 아이콘(통계·연동)은 정보가 없어 자리만 차지했다(모바일 두 줄의 원인).
+              숫자만 읽히지 않게 "라벨 숫자"로 읽히고, 펼치면 같은 내용을 탭 버튼이 읽어 주므로 요약은 숨겨 두 번 읽지 않게 한다 */}
+          <div className="flex flex-wrap items-center gap-2" aria-hidden={isExpanded || undefined}>
+            {visibleTabs
+              .filter(tab => tab.count !== null)
+              .map(tab => (
+                <span key={tab.key} className="flex items-center gap-1 text-xs text-slate-400">
+                  {/* 마우스 툴팁(title)은 낭독에서 빠진 쪽에 둔다 */}
+                  <span aria-hidden="true" className="flex items-center gap-1" title={tab.label}>
+                    {tab.icon}
+                    {tab.count}
+                  </span>
+                  <span className="sr-only">{tabAccessibleName(tab)}</span>
+                </span>
+              ))}
           </div>
         </div>
         <button
@@ -277,7 +290,7 @@ export function TeamManagementSection({
       {isExpanded && (
         <>
           {/* 탭 버튼 */}
-          <div className="mt-4 flex gap-1 rounded-xl border border-white/10 bg-slate-900/30 p-1">
+          <div role="group" aria-label="팀 관리 보기 전환" className="mt-4 flex gap-1 rounded-xl border border-white/10 bg-slate-900/30 p-1">
             {visibleTabs.map(tab => (
               <button
                 key={tab.key}
@@ -287,7 +300,11 @@ export function TeamManagementSection({
                     ? 'bg-gradient-to-r from-indigo-500/20 to-sky-500/20 text-white border border-white/10'
                     : 'text-slate-400 hover:text-slate-300'
                 }`}
-                title={tab.label}
+                // 보이는 내용이 아이콘+숫자뿐이라 숫자만 읽히지 않게 이름을 준다 (예: "멤버 2", "통계").
+                // title도 같은 값 — 다르면 접근 가능한 설명으로 한 번 더 읽힌다
+                title={tabAccessibleName(tab)}
+                aria-label={tabAccessibleName(tab)}
+                aria-pressed={activeTab === tab.key}
               >
                 {tab.icon}
                 {tab.count !== null && <span>{tab.count}</span>}

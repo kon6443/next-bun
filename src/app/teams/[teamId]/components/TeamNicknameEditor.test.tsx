@@ -256,8 +256,7 @@ describe('진입점은 모두 같은 컨트롤러(useMyTeamNickname 결과)를 �
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: '펼치기' }));
-    // 헤더 요약(span)과 탭 버튼이 같은 title — 탭 버튼을 누른다
-    fireEvent.click(screen.getAllByTitle('멤버').find((el) => el.tagName === 'BUTTON')!);
+    fireEvent.click(screen.getByRole('button', { name: '멤버 2' }));
     expect(screen.getAllByRole('button', { name: EDIT_LABEL })).toHaveLength(1);
 
     await saveFrom(document.body, '카드에서');
