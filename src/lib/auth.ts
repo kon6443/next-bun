@@ -76,7 +76,6 @@ export const authOptions: NextAuthOptions = {
         try {
           const response = await postKakaoSignInUp({
             accessToken: account.access_token,
-            kakaoNickname: user.name ?? "",
           });
 
           console.log(
