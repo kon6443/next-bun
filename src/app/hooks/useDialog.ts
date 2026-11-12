@@ -51,6 +51,9 @@ export function useDialog<T extends HTMLElement = HTMLDivElement>(
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        // 안쪽 요소가 이미 Esc를 처리했다(preventDefault) — 예: 바텀시트 안 인라인 폼이 자기만 닫는 경우.
+        // Next App Router는 React 루트가 document라 안쪽의 stopPropagation으로는 이 리스너를 막을 수 없다
+        if (event.defaultPrevented) return;
         if (!closeOnEscapeRef.current) return;
         event.stopPropagation();
         onCloseRef.current();
