@@ -15,6 +15,7 @@ import { EditIcon, UserGroupIcon, PlusIcon, QuestionMarkIcon, CommentIcon, TagIc
 import { DropdownMenu } from './components/DropdownMenu';
 import type { Task } from '../../types/task';
 import { useTaskFilter, useTelegramLink, useDiscordLink, useTeamInvite, useTeamSocketEvents, useSafeNavigation, useLatestFlag } from '../../hooks';
+import { useMyTeamNickname } from '../../hooks/useMyTeamNickname';
 import { useTeamSocketContext, useTeamChatContext, useTeamTagsContext } from './contexts';
 import {
   getTeamTasks,
@@ -30,8 +31,10 @@ import { loadBoardState, saveBoardState, consumeBoardReturn, parseDataTabParam, 
 import { shouldInsertCreatedTask } from '../../utils/taskUtils';
 import { normalizeTaskTags } from '../../utils/tagUtils';
 import { extractErrorMessage } from '../../utils/errorUtils';
+import { renameTaskCreator } from '../../utils/teamNicknameUtils';
 import { STATUS_TO_COLUMN, type ColumnKey } from '../../config/taskStatusConfig';
 import { TeamManagementSection, InviteModal, RoleChangeModal, ViewModeToggle, OnlineUsers, TutorialGuide, shouldAutoShowTutorial, markTutorialSeen, TeamChatPanel, TagModal, BoardLoadError, type ViewMode, type DataTab } from './components';
+import { TeamNicknameChip } from './components/TeamNicknameEditor';
 import { ROLES } from '../../config/roleConfig';
 import type {
   TaskCreatedPayload,
@@ -42,6 +45,7 @@ import type {
   UserLeftPayload,
   MemberRoleChangedPayload,
   MemberStatusChangedPayload,
+  MemberNicknameChangedPayload,
 } from '@/types/socket';
 
 // taskStatus를 ColumnKey로 매핑
@@ -105,6 +109,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
   // 온라인 유저 모달 상태 (FAB 숨김용)
   const [isOnlineModalOpen, setIsOnlineModalOpen] = useState(false);
+  const [isNicknameDialogOpen, setIsNicknameDialogOpen] = useState(false);
   const [showTagModal, setShowTagModal] = useState(false);
 
   // 데이터 탭: 활성 / 보관함 — 보기 방식처럼 URL(`?tab=archive`)에서 파생해 새로고침·공유 링크에서도 유지한다
@@ -464,6 +469,44 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     );
   }, []);
 
+  // 팀 닉네임 반영 — 멤버 목록(태스크 생성 이벤트의 작성자 조회에도 쓰인다)과 태스크 작성자 이름.
+  // 소켓 이벤트와 내 저장 응답이 같은 변경을 두 번 넣어도 결과가 같다(멱등)
+  const applyTeamNickname = useCallback(
+    ({ userId, userName, teamNickname }: Pick<MemberNicknameChangedPayload, 'userId' | 'userName' | 'teamNickname'>) => {
+      setMembers(prev => {
+        if (!prev.some(m => m.userId === userId && (m.userName !== userName || m.teamNickname !== teamNickname))) {
+          return prev;
+        }
+        return prev.map(m => (m.userId === userId ? { ...m, userName, teamNickname } : m));
+      });
+      setTasks(prev => {
+        let changed = false;
+        const next = { ...prev };
+        for (const key of Object.keys(prev) as ColumnKey[]) {
+          next[key] = renameTaskCreator(prev[key], userId, userName);
+          if (next[key] !== prev[key]) changed = true;
+        }
+        return changed ? next : prev;
+      });
+    },
+    [],
+  );
+
+  // "이 팀에서 내 이름" — 헤더 칩·온라인 목록·멤버 카드가 이 하나를 같이 쓴다
+  const myNickname = useMyTeamNickname({
+    teamId: teamIdNum,
+    accessToken: session?.user?.accessToken,
+    accountUserName: session?.user?.userName ?? undefined,
+    myMember: members.find(m => m.userId === session?.user?.userId),
+    onApplied: applyTeamNickname,
+  });
+
+  // 팀 닉네임 변경 이벤트 (토스트 없이 이름만 — 본인 것도 온다)
+  const handleMemberNicknameChanged = useCallback(
+    (payload: MemberNicknameChangedPayload) => applyTeamNickname(payload),
+    [applyTeamNickname],
+  );
+
   // Socket 이벤트 리스너 등록 (온라인 유저 상태는 Context에서 관리, 여기서는 토스트 등 UI만 처리)
   useTeamSocketEvents(
     socket,
@@ -476,6 +519,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       onUserLeft: handleUserLeft,
       onMemberRoleChanged: handleMemberRoleChanged,
       onMemberStatusChanged: handleMemberStatusChanged,
+      onMemberNicknameChanged: handleMemberNicknameChanged,
     },
     session?.user?.userId,
   );
@@ -976,6 +1020,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
     showInviteModal ||
     showRoleChangeModal ||
     isOnlineModalOpen ||
+    isNicknameDialogOpen ||
     showTelegramDeleteConfirm ||
     showDiscordDeleteConfirm;
   useEffect(() => {
@@ -1005,6 +1050,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
               users={onlineUsers}
               currentUserId={session?.user?.userId}
               onModalOpenChange={setIsOnlineModalOpen}
+              myNickname={myNickname}
             />
           </div>
           <div>
@@ -1013,7 +1059,13 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                 <h1 className="text-3xl font-bold text-white truncate">
                   {isLoading ? <Skeleton width="200px" height="2rem" /> : teamName || ''}
                 </h1>
-                {teamDescription && <p className="mt-2 break-words text-sm text-slate-400">{teamDescription}</p>}
+                {/* 설명 줄 끝에 "내 이름" 알약 — 따로 한 줄을 쓰지 않는다. 설명이 길면 알약만 다음 줄로 넘어간다 */}
+                {(teamDescription || myNickname.canEdit) && (
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                    {teamDescription && <p className="min-w-0 break-words text-sm text-slate-400">{teamDescription}</p>}
+                    <TeamNicknameChip nickname={myNickname} onOpenChange={setIsNicknameDialogOpen} />
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <IconButton
@@ -1071,6 +1123,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
           onOpenRoleChange={handleOpenRoleChange}
           onToggleMemberStatus={handleToggleMemberStatus}
           togglingMemberIds={togglingMemberIds}
+          myNickname={myNickname}
         />
 
         {/* 태스크를 못 불러왔으면 빈 보드 대신 오류와 다시 시도 — 빈 칸반은 "태스크가 없다"로 읽힌다 */}
@@ -1192,7 +1245,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       <TeamChatPanel />
 
       {/* FAB: 새 카드 작성 (온라인 유저 모달/채팅이 열려있으면 숨김) */}
-      {!isOnlineModalOpen && !isChatOpen && <FAB href={`/teams/${teamId}/tasks/new`} label="새 카드 작성" />}
+      {!isOnlineModalOpen && !isNicknameDialogOpen && !isChatOpen && <FAB href={`/teams/${teamId}/tasks/new`} label="새 카드 작성" />}
     </>
   );
 }

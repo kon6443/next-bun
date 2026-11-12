@@ -37,6 +37,7 @@ export const TeamSocketEvents = {
   MEMBER_ROLE_CHANGED: 'memberRoleChanged',
   MEMBER_STATUS_CHANGED: 'memberStatusChanged',
   MEMBER_JOINED: 'memberJoined',
+  MEMBER_NICKNAME_CHANGED: 'memberNicknameChanged',
 
   // Server → Client (채팅)
   CHAT_RECEIVED: 'chatReceived',
@@ -252,6 +253,18 @@ export interface MemberJoinedPayload {
   lastReadMessageId: number;
 }
 
+/**
+ * 팀 닉네임 변경 이벤트 (room 전체, 본인 포함)
+ *
+ * userName은 이 팀 안의 표시 이름, teamNickname은 저장된 원값(옛 데이터 대비 null 허용).
+ */
+export interface MemberNicknameChangedPayload {
+  teamId: number;
+  userId: number;
+  userName: string;
+  teamNickname: string | null;
+}
+
 // ===== 채팅 관련 타입 =====
 
 /**
@@ -325,6 +338,7 @@ export interface ServerToClientEvents {
   [TeamSocketEvents.MEMBER_ROLE_CHANGED]: (payload: MemberRoleChangedPayload) => void;
   [TeamSocketEvents.MEMBER_STATUS_CHANGED]: (payload: MemberStatusChangedPayload) => void;
   [TeamSocketEvents.MEMBER_JOINED]: (payload: MemberJoinedPayload) => void;
+  [TeamSocketEvents.MEMBER_NICKNAME_CHANGED]: (payload: MemberNicknameChangedPayload) => void;
   [TeamSocketEvents.CHAT_RECEIVED]: (payload: ChatReceivedPayload) => void;
   [TeamSocketEvents.CHAT_READ_UPDATED]: (payload: ChatReadUpdatedPayload) => void;
   [TeamSocketEvents.JOINED_TEAM]: (payload: JoinedTeamPayload) => void;
