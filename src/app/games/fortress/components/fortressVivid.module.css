@@ -1,0 +1,513 @@
+/*
+ * 시안 "vivid" HUD·조작부(D-025 B) — 경기 화면 루트에 .vivid가 붙을 때만 적용된다(classic 화면·공용 GamePad 코드는 그대로)
+ * 장난감 상자 톤: 남보라 판 + 굵은 잉크 외곽선 + 아래 두께(0 3px 0 잉크) + 윗면 빛. 주 버튼은 노랑 3D
+ * Tailwind v4 유틸리티는 @layer 안이라, 레이어 밖인 이 규칙이 우선한다(!important 불필요)
+ * Tailwind 클래스를 선택자로 쓸 때는 :global(...)로 감싼다 — 감싸지 않으면 CSS 모듈이 이름을 해시해 아무 요소에도 걸리지 않는다
+ * blur 없음 — 깊이는 그림자·반투명 배경으로(CLAUDE.md Never)
+ */
+
+.vivid {
+  --ink: #160b1c;
+  --panel-top: #4a3590;
+  --panel-bottom: #2a1d5c;
+  --panel-edge: #1d1442;
+  --gold-top: #ffe066;
+  --gold-bottom: #ffa31a;
+  --gold-edge: #c9620a;
+}
+
+/* ===== 판(칩·알약·패널) ===== */
+.vivid [data-hud="bar"] {
+  background: linear-gradient(180deg, #2f2266 0%, #1d1545 100%);
+  border-bottom: 3px solid var(--ink);
+  box-shadow: inset 0 -2px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* 온라인 타이머는 5초 경고색(rose)을 지키려고 뺀다 */
+.vivid [data-hud="pill"]:not([data-testid="fortress-timer"]),
+.vivid [data-hud="chip"],
+.vivid [data-testid="fortress-settings-button"],
+.vivid [data-testid="fortress-touch-hud"] {
+  background: linear-gradient(180deg, var(--panel-top) 0%, var(--panel-bottom) 100%);
+  border: 2px solid var(--ink);
+  color: #fff;
+  font-weight: 800;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.22),
+    0 3px 0 var(--ink);
+  text-shadow: 0 1px 0 var(--ink);
+}
+.vivid [data-hud="chip"]:hover {
+  filter: brightness(1.12);
+}
+.vivid [data-testid="fortress-touch-hud"] dt,
+.vivid [data-testid="fortress-touch-hud"] dt span:not([data-testid]) {
+  color: #c9bdf0;
+}
+
+/* 플레이어 칸 — 차례인 사람은 노란 테두리·빛. 4명까지 스크롤 없이 같은 폭으로 나눠 담고(이름은 말줄임), 테두리·아래 두께가 잘리지 않게 안쪽 여백 */
+.vivid [aria-label="플레이어"] {
+  padding: 3px 3px 6px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  overflow: visible;
+}
+.vivid [data-hud="player"] {
+  min-width: 0;
+}
+/* 좁은 화면 + 3명 이상 — HP 숫자는 숨기고 막대를 칸 폭에 맞춘다(낭독용 HP 글자는 따로 남는다). 2명은 숫자까지 들어간다 */
+@media (max-width: 639.98px) {
+  .vivid [aria-label="플레이어"]:is([data-count="3"], [data-count="4"]) [data-hud="hp-num"] {
+    display: none;
+  }
+  .vivid [aria-label="플레이어"]:is([data-count="3"], [data-count="4"]) [data-hud="hp"] {
+    width: 100%;
+    min-width: 0;
+  }
+  .vivid [data-hud="player"] {
+    padding-left: 5px;
+    padding-right: 5px;
+    gap: 4px;
+  }
+  .vivid [aria-label="플레이어"] {
+    gap: 4px;
+  }
+}
+/* 아주 좁은 화면(380px 미만) — 색 점·글자를 조금 줄여 4명 이름이 잘리지 않게 */
+@media (max-width: 379.98px) {
+  .vivid [data-hud="player"] {
+    font-size: 11px;
+    padding-left: 4px;
+    padding-right: 4px;
+    gap: 3px;
+  }
+  .vivid [data-hud="player"] [data-hud="dot"] {
+    width: 7px;
+    height: 7px;
+  }
+}
+/* 4명 이상이 좁은 화면에 들어가면 "AI 상" 꼬리표는 숨겨 이름(P1~P4)이 보이게 — 3명까지는 둔다 */
+@media (max-width: 639.98px) {
+  /* 화면에서만 숨기고 낭독은 남긴다(sr-only와 같은 방식) */
+  .vivid [aria-label="플레이어"][data-count="4"] [data-hud="ai"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+.vivid [data-hud="player"] {
+  background: linear-gradient(180deg, var(--panel-top) 0%, var(--panel-bottom) 100%);
+  border: 2px solid var(--ink);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.2),
+    0 3px 0 var(--ink);
+  color: #fff;
+}
+.vivid [data-hud="player"][aria-current="true"] {
+  background: linear-gradient(180deg, #6a4ab8 0%, #3b2783 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.28),
+    0 0 0 2px var(--gold-top),
+    0 3px 0 2px var(--ink);
+}
+.vivid [data-hud="player"] [data-hud="hp"] {
+  height: 6px;
+  width: 3rem;
+  background: #120a26;
+  border: 1.5px solid var(--ink);
+}
+.vivid [data-hud="player"] [data-hud="hp"] > span {
+  background: linear-gradient(180deg, #8af07a 0%, #2fbf4a 100%);
+}
+
+/* 바람 */
+.vivid [data-testid="fortress-wind"] {
+  background: linear-gradient(180deg, var(--panel-top) 0%, var(--panel-bottom) 100%);
+  border: 2px solid var(--ink);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.22),
+    0 4px 0 var(--ink);
+}
+.vivid [data-testid="fortress-wind"] span[aria-hidden],
+.vivid [data-testid="fortress-wind"] span:global(.tabular-nums) {
+  text-shadow: 0 2px 0 var(--ink);
+}
+
+/* ===== 조작부 ===== */
+/* 휴대폰 세로(전장 아래 판) — 넓은 화면·휴대폰 가로는 전장 위 반투명 띠라 그대로 둔다 */
+@media (max-width: 1023.98px) and (not ((orientation: landscape) and (max-height: 500px))) {
+  .vivid [data-hud="controls"] {
+    background: linear-gradient(180deg, #2f2266 0%, #170f38 100%);
+    border-top: 3px solid var(--ink);
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* 넓은 화면·휴대폰 가로 — 전장 위 아래쪽 띠도 검정 대신 남보라로 */
+@media (min-width: 1024px), ((orientation: landscape) and (max-height: 500px)) {
+  .vivid [data-hud="controls"] {
+    background: linear-gradient(0deg, rgba(23, 15, 56, 0.96) 0%, rgba(29, 21, 69, 0.78) 55%, rgba(29, 21, 69, 0) 100%);
+  }
+}
+
+/* 넓은 화면 조작 띠 — 판 3개(조준 정보·무기 / 이동·포신 / 파워·발사)로 묶고 글자를 키운다(휴대폰 가로는 높이가 모자라 그대로) */
+@media (min-width: 1024px) and (min-height: 501px) {
+  .vivid [data-hud="deck"] {
+    background: linear-gradient(180deg, rgba(74, 53, 144, 0.94) 0%, rgba(42, 29, 92, 0.94) 100%);
+    border: 2px solid var(--ink);
+    border-radius: 16px;
+    padding: 10px 12px;
+    box-shadow:
+      inset 0 2px 0 rgba(255, 255, 255, 0.18),
+      0 4px 0 var(--ink);
+  }
+  .vivid [data-hud="deck"] [data-testid="fortress-hud"] dt {
+    font-size: 13px;
+    font-weight: 700;
+    color: #d9d0ff;
+  }
+  .vivid [data-hud="deck"] [data-testid="fortress-hud"] dt span:not([data-testid]) span {
+    color: #fff;
+  }
+  .vivid [data-hud="deck"] [data-testid="fortress-hud"] dd {
+    font-size: 26px;
+    line-height: 1.05;
+    font-weight: 900;
+    text-shadow: 0 2px 0 var(--ink);
+  }
+  .vivid [data-hud="deck"] [data-testid="fortress-hud"] [data-testid="fortress-fuel"] {
+    height: 10px;
+  }
+  .vivid [data-hud="deck"] p[aria-hidden],
+  .vivid [data-hud="deck"] > div > p[aria-hidden] {
+    font-size: 13px;
+    font-weight: 700;
+    color: #e4dcff;
+  }
+  .vivid [data-hud="deck"] [data-testid="fortress-last-shot"] {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gold-top);
+  }
+  .vivid [data-hud="deck"] kbd {
+    min-width: 1.6rem;
+    padding: 1px 6px;
+    font-size: 13px;
+    line-height: 20px;
+    font-weight: 800;
+    color: var(--gold-top);
+    background: var(--ink);
+    border: 1.5px solid #6a56b8;
+    border-radius: 6px;
+  }
+  .vivid [data-hud="deck"] [role="group"][aria-label="무기"] > button {
+    font-size: 15px;
+    font-weight: 800;
+    min-height: 3rem;
+  }
+  .vivid [data-hud="deck"] [role="group"][aria-label="무기"] > button span {
+    font-size: 12px;
+    font-weight: 700;
+    color: inherit;
+    opacity: 0.85;
+  }
+  .vivid [data-hud="deck"] [data-hud="key"] {
+    font-size: 20px;
+    min-height: 3rem;
+  }
+  .vivid [data-hud="deck"] button[type="button"]:not([data-hud]):not([data-testid]):not([aria-pressed]) {
+    font-size: 13px;
+    font-weight: 700;
+    color: #e4dcff;
+  }
+  .vivid [data-testid="fortress-fire"] {
+    min-height: 3.25rem;
+    font-size: 20px;
+  }
+}
+
+/* 리플레이 조작부 등 늘 아래에 붙는 판 — 화면 크기와 무관하게 */
+.vivid [data-hud="panel"] {
+  background: linear-gradient(180deg, #2f2266 0%, #170f38 100%);
+  border-top: 3px solid var(--ink);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* 연료 막대 */
+.vivid [data-testid="fortress-fuel"] {
+  background: #120a26;
+  border: 1.5px solid var(--ink);
+}
+.vivid [data-testid="fortress-fuel"] > div {
+  background: linear-gradient(180deg, #8af07a 0%, #2fbf4a 100%);
+}
+
+/* 파워 슬라이더 */
+.vivid [data-testid="fortress-power"] {
+  accent-color: var(--gold-bottom);
+}
+
+/* 발사 — 노랑 3D(누르면 내려앉는다) */
+.vivid [data-testid="pad-fire"],
+.vivid [data-testid="fortress-fire"] {
+  background: linear-gradient(180deg, var(--gold-top) 0%, var(--gold-bottom) 100%);
+  border: 3px solid var(--ink);
+  color: #3a1600;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+  font-weight: 900;
+  box-shadow:
+    inset 0 -5px 0 var(--gold-edge),
+    inset 0 3px 0 rgba(255, 255, 255, 0.6),
+    0 4px 0 var(--ink);
+}
+.vivid [data-testid="pad-fire"]:active,
+.vivid [data-testid="fortress-fire"]:active {
+  transform: translateY(3px);
+  box-shadow:
+    inset 0 -2px 0 var(--gold-edge),
+    inset 0 3px 0 rgba(255, 255, 255, 0.6),
+    0 1px 0 var(--ink);
+}
+
+/*
+ * 필살기를 고르면 빛나는 테두리 — 무기 버튼·발사 버튼(패드는 버튼 안 내용 span). 빛은 ::after 한 겹, 맥박은 opacity만(다시 칠하기 최소)
+ * 무기 버튼 규칙(.vivid [role=group][aria-label=무기] > button)보다 우선하도록 같은 자리를 함께 지정. 움직임 줄이기면 맥박 없이 고정
+ */
+.vivid [data-special-glow="true"],
+.vivid [role="group"][aria-label="무기"] > button[data-special-glow="true"] {
+  position: relative;
+  box-shadow:
+    0 0 0 2px #ffd65a,
+    0 3px 0 var(--ink);
+}
+.vivid [data-special-glow="true"]::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  box-shadow:
+    0 0 0 1px #ffe48a,
+    0 0 18px 5px rgba(255, 160, 50, 0.85);
+  pointer-events: none;
+  animation: vividSpecialGlow 1.4s ease-in-out infinite;
+}
+/* 패드 버튼 안 내용(span)은 버튼 모양(원·둥근 사각)을 따르고, overflow-hidden이라 ::after가 잘린다 — 자기 자신에 고정 빛(맥박 없음) */
+.vivid span[data-special-glow="true"] {
+  border-radius: inherit;
+  box-shadow:
+    0 0 0 2px #ffd65a,
+    inset 0 0 0 1px #ffe48a,
+    0 0 16px 4px rgba(255, 160, 50, 0.85);
+}
+.vivid span[data-special-glow="true"]::after {
+  content: none;
+}
+@keyframes vividSpecialGlow {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vivid [data-special-glow="true"]::after {
+    animation: none;
+    opacity: 0.8;
+  }
+}
+
+/* 충전 중 — 게이지 막대가 맥박치고(밝기), 발사 버튼이 살짝 부풀었다 줄었다. 움직임 줄이기면 고정 */
+.vivid [data-charge-bar="true"],
+.vivid [data-testid="fortress-fire"][data-charging] > span:first-child {
+  animation: vividChargePulse 0.42s ease-in-out infinite alternate;
+}
+.vivid [data-testid="fortress-fire"][data-charging] {
+  animation: vividChargeSwell 0.42s ease-in-out infinite alternate;
+}
+@keyframes vividChargePulse {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* 개별 scale 속성 — transform(:active의 translateY 눌림)과 따로 돌아 누르는 동안에도 눌림이 남는다 */
+@keyframes vividChargeSwell {
+  from {
+    scale: 1;
+  }
+  to {
+    scale: 1.035;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vivid [data-charge-bar="true"],
+  .vivid [data-testid="fortress-fire"][data-charging] > span:first-child,
+  .vivid [data-testid="fortress-fire"][data-charging] {
+    animation: none;
+  }
+}
+
+/* 무기(패드 a) — 보라 3D 원 */
+.vivid [data-testid="pad-weapon"] {
+  background: linear-gradient(180deg, #8e6cff 0%, #5a37d6 100%);
+  border: 3px solid var(--ink);
+  color: #fff;
+  text-shadow: 0 1px 0 var(--ink);
+  box-shadow:
+    inset 0 -4px 0 #3b1fa3,
+    inset 0 3px 0 rgba(255, 255, 255, 0.35),
+    0 4px 0 var(--ink);
+}
+.vivid [data-testid="pad-weapon"]:active {
+  transform: translateY(3px);
+  box-shadow:
+    inset 0 -2px 0 #3b1fa3,
+    0 1px 0 var(--ink);
+}
+
+/* 십자 — 남보라 판 + 잉크 외곽선, 누른 방향은 노랑 */
+.vivid [data-testid="game-pad-dpad"] > span,
+.vivid [data-testid="game-pad-dpad"] > button {
+  background: linear-gradient(180deg, var(--panel-top) 0%, var(--panel-bottom) 100%);
+  border: 2px solid var(--ink);
+  color: #fff;
+  text-shadow: 0 1px 0 var(--ink);
+}
+.vivid [data-testid="game-pad-dpad"] > button[aria-disabled="true"] {
+  color: #8a7fb5;
+}
+.vivid [data-testid="game-pad-dpad"] > button[data-pressed="true"] {
+  background: linear-gradient(180deg, var(--gold-top) 0%, var(--gold-bottom) 100%);
+  color: #3a1600;
+  text-shadow: none;
+}
+.vivid [data-testid="game-pad-dpad"] > span[data-testid$="-off"] {
+  opacity: 0.45;
+}
+
+/* 데스크톱 — 이동·포신 버튼, 무기 고르기 */
+.vivid [data-hud="key"],
+.vivid [role="group"][aria-label="무기"] > button {
+  background: linear-gradient(180deg, var(--panel-top) 0%, var(--panel-bottom) 100%);
+  border: 2px solid var(--ink);
+  color: #fff;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.2),
+    0 3px 0 var(--ink);
+}
+.vivid [role="group"][aria-label="무기"] > button[aria-pressed="true"] {
+  background: linear-gradient(180deg, var(--gold-top) 0%, var(--gold-bottom) 100%);
+  color: #3a1600;
+  font-weight: 900;
+}
+.vivid [role="group"][aria-label="무기"] > button:disabled {
+  filter: grayscale(0.6) brightness(0.8);
+}
+
+/* ===== 결과 화면 ===== */
+.vivid [data-hud="card"] {
+  background: linear-gradient(180deg, var(--panel-top) 0%, var(--panel-bottom) 100%);
+  border: 2px solid var(--ink);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.2),
+    0 4px 0 var(--ink);
+}
+/* 판 위 작은 보조 글자 — slate-400·500은 남보라 판에서 대비가 4.5:1에 못 미친다 → 터치 HUD와 같은 밝은 보라(약 5.8:1) */
+.vivid [data-hud="card"] :is(:global(.text-slate-400), :global(.text-slate-500)) {
+  color: #c9bdf0;
+}
+/* 금테 1위 판(더 밝은 보라) 위 작은 글자 — slate-300·sky-300은 4.5:1에 못 미쳐 더 밝게 */
+.vivid [data-hud="card"][data-win="true"] :global(.text-slate-300) {
+  color: #f3efff;
+}
+.vivid [data-hud="card"][data-win="true"] :global(.text-sky-300) {
+  color: #d6f3ff;
+}
+.vivid [data-hud="card"][data-win="true"] {
+  background: linear-gradient(180deg, #7a56c8 0%, #45308f 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.28),
+    0 0 0 2px var(--gold-top),
+    0 4px 0 2px var(--ink);
+}
+.vivid button[data-testid="fortress-rematch"],
+.vivid button[data-testid="fortress-rematch-online"] {
+  background: linear-gradient(180deg, var(--gold-top) 0%, var(--gold-bottom) 100%);
+  border: 3px solid var(--ink);
+  color: #3a1600;
+  font-weight: 900;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+  box-shadow:
+    inset 0 -5px 0 var(--gold-edge),
+    inset 0 3px 0 rgba(255, 255, 255, 0.6),
+    0 4px 0 var(--ink);
+}
+.vivid button[data-testid="fortress-replay"],
+.vivid button[data-testid="fortress-replay-online"],
+.vivid button[data-testid="fortress-viewer-replay"] {
+  background: linear-gradient(180deg, #8e6cff 0%, #5a37d6 100%);
+  border: 3px solid var(--ink);
+  color: #fff;
+  font-weight: 800;
+  text-shadow: 0 1px 0 var(--ink);
+  box-shadow:
+    inset 0 -4px 0 #3b1fa3,
+    inset 0 3px 0 rgba(255, 255, 255, 0.35),
+    0 4px 0 var(--ink);
+}
+.vivid button[data-testid="fortress-rematch"]:active,
+.vivid button[data-testid="fortress-rematch-online"]:active,
+.vivid button[data-testid="fortress-replay"]:active,
+.vivid button[data-testid="fortress-replay-online"]:active {
+  transform: translateY(3px);
+}
+
+/* 기록 보기·온라인 결과의 보조 버튼(공유·기록 보기 링크) — 남보라 3D 판 */
+.vivid [data-testid="fortress-viewer-share"],
+.vivid a[data-testid="fortress-record-link"],
+.vivid button[data-testid="fortress-record-share"] {
+  background: linear-gradient(180deg, var(--panel-top) 0%, var(--panel-bottom) 100%);
+  border: 3px solid var(--ink);
+  color: #fff;
+  font-weight: 800;
+  text-shadow: 0 1px 0 var(--ink);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.22),
+    0 4px 0 var(--ink);
+}
+.vivid [data-testid="fortress-viewer-share"]:active,
+.vivid a[data-testid="fortress-record-link"]:active,
+.vivid button[data-testid="fortress-record-share"]:active,
+.vivid button[data-testid="fortress-viewer-replay"]:active {
+  transform: translateY(3px);
+}
+
+/* 데스크톱 발사 버튼 + 필살기 — overflow-hidden이라 ::after 빛이 잘린다: 노랑 3D 그림자에 금빛 고리·바깥 빛을 합쳐 자기 자신에(맥박 없음) */
+.vivid button[data-testid="fortress-fire"][data-special-glow="true"] {
+  box-shadow:
+    inset 0 -5px 0 var(--gold-edge),
+    inset 0 3px 0 rgba(255, 255, 255, 0.6),
+    0 4px 0 var(--ink),
+    0 0 0 3px #ffd65a,
+    0 0 18px 5px rgba(255, 160, 50, 0.85);
+}
+.vivid button[data-testid="fortress-fire"][data-special-glow="true"]::after {
+  content: none;
+}
+.vivid button[data-testid="fortress-fire"][data-special-glow="true"]:active {
+  box-shadow:
+    inset 0 -2px 0 var(--gold-edge),
+    inset 0 3px 0 rgba(255, 255, 255, 0.6),
+    0 1px 0 var(--ink),
+    0 0 0 3px #ffd65a,
+    0 0 18px 5px rgba(255, 160, 50, 0.85);
+}
