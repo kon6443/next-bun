@@ -44,6 +44,14 @@ const match: BattleMatch = {
   disputed: false,
 };
 const replay: BattleReplayDetail = { ...survivor, matchId: MATCH_ID, playerId: 'p1' };
+/**
+ * 재생 준비(리플레이 받기·판 만들기)를 기다린다 — 기본 1초는 전체 실행처럼 부하가 걸리면 모자라 가끔 "일시정지"를 못 찾는다
+ * loopStarted가 있으면 재생 루프가 rAF를 잡을 때까지도 — 버튼이 그려진 뒤 효과가 돌기 전에 프레임을 넣으면 루프가 받지 못한다
+ */
+async function waitForPlayable(loopStarted?: () => boolean) {
+  await waitFor(() => expect(screen.getByRole('button', { name: '일시정지' })).toBeEnabled(), { timeout: 4000 });
+  if (loopStarted) await waitFor(() => expect(loopStarted()).toBe(true));
+}
 
 describe('대전 경기 페이지 (DESIGN §18)', () => {
   beforeEach(() => {
@@ -94,19 +102,23 @@ describe('대전 경기 페이지 (DESIGN §18)', () => {
       getBattleMatch.mockResolvedValue({ data: match });
       getBattleReplay.mockResolvedValue({ data: replay });
       render(<BattleMatchViewer matchId={MATCH_ID} />);
-      await waitFor(() => expect(screen.getByRole('button', { name: '일시정지' })).toBeEnabled());
+      await waitForPlayable(() => frame !== null);
       const slider = screen.getByRole('slider', { name: '재생 위치' });
       let t = 1000;
       const step = (ms: number) => act(() => frame?.((t += ms)));
-      step(0);
-      step(17);
-      expect(slider).toHaveValue('0');
-      for (let i = 0; i < 6; i++) step(17);
-      expect(Number((slider as HTMLInputElement).value)).toBeGreaterThanOrEqual(6);
+      // 루프가 언제 첫 프레임을 받는지(시계 초기화·효과 재실행)에 기대지 않는다 — 처음 움직일 때까지 돌리고 그 폭을 본다
+      // (몇 번째 step에서 6프레임이 차는지 세던 예전 검사는 부하가 걸린 전체 실행에서 가끔 0에 머물렀다)
+      let shown = 0;
+      for (let i = 0; i < 60 && shown === 0; i++) {
+        step(17);
+        shown = Number((slider as HTMLInputElement).value);
+      }
+      // 매 프레임이 아니라 몇 프레임(6)마다 한 번에 올라간다
+      expect(shown).toBeGreaterThanOrEqual(6);
       // 갱신 간격 사이에서 멈추면 화면 시간을 판의 실제 프레임에 맞춘다
       step(17);
       step(17);
-      const shown = Number((slider as HTMLInputElement).value);
+      expect(Number((slider as HTMLInputElement).value)).toBe(shown);
       fireEvent.click(screen.getByRole('button', { name: '일시정지' }));
       expect(Number((slider as HTMLInputElement).value)).toBeGreaterThan(shown);
     } finally {
@@ -212,6 +224,8 @@ describe('대전 경기 페이지 (DESIGN §18)', () => {
     };
 
     beforeEach(() => {
+      // 앞 테스트의 루프를 붙잡고 있지 않게
+      frame = null;
       fire.mockReset();
       Object.values(sound).forEach((fn) => fn.mockReset());
       vi.stubGlobal('requestAnimationFrame', (fn: FrameRequestCallback) => {
@@ -226,7 +240,7 @@ describe('대전 경기 페이지 (DESIGN §18)', () => {
       getBattleMatch.mockResolvedValue({ data: match });
       getBattleReplay.mockResolvedValue({ data: { ...replay, garbageFrom } });
       render(<BattleMatchViewer matchId={MATCH_ID} />);
-      await waitFor(() => expect(screen.getByRole('button', { name: '일시정지' })).toBeEnabled());
+      await waitForPlayable(() => frame !== null);
       step(0);
     }
 
@@ -273,7 +287,7 @@ describe('대전 경기 페이지 (DESIGN §18)', () => {
     getBattleMatch.mockResolvedValue({ data: match });
     getBattleReplay.mockResolvedValue({ data: replay });
     render(<BattleMatchViewer matchId={MATCH_ID} />);
-    await waitFor(() => expect(screen.getByRole('button', { name: '일시정지' })).toBeEnabled());
+    await waitForPlayable();
     fireEvent.click(screen.getByRole('button', { name: '일시정지' }));
     const seek = screen.getByRole('slider', { name: '재생 위치' }) as HTMLInputElement;
     const before = seek.value;
