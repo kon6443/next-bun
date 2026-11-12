@@ -77,7 +77,24 @@ describe('teamService 응답·에러 처리', () => {
     const res = await getTeamUsers(7, 'tok', 0);
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/v1\/teams\/7\/users\?status=0$/);
     expect(res.data[0].joinedAt).toBeInstanceOf(Date);
-    expect(res.data[0].joinedAt.toISOString()).toBe('2026-10-20T01:00:00.000Z');
+    expect(res.data[0].joinedAt?.toISOString()).toBe('2026-10-20T01:00:00.000Z');
+  });
+
+  it('getTeamUsers: joinedAt이 null·누락·잘못된 값이면 null (Invalid Date·1970년 금지)', async () => {
+    const base = { userName: 'a', teamNickname: 'a', role: 'MEMBER', userActStatus: 1 };
+    fetchMock.mockResolvedValue(
+      json({
+        code: 'SUCCESS',
+        message: 'ok',
+        data: [
+          { ...base, userId: 1, joinedAt: null },
+          { ...base, userId: 2 },
+          { ...base, userId: 3, joinedAt: 'not-a-date' },
+        ],
+      }),
+    );
+    const res = await getTeamUsers(7, 'tok');
+    expect(res.data.map((u) => u.joinedAt)).toEqual([null, null, null]);
   });
 
   it('태스크 목록·상세 응답에 tags가 없으면(태그 도입 전 백엔드) 빈 배열로 맞춘다', async () => {

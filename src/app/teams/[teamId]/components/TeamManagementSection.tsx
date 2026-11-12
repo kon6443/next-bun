@@ -81,7 +81,8 @@ type TabConfig = {
   visible: boolean;
 };
 
-function formatMemberDate(date: Date) {
+function formatMemberDate(date: Date | null) {
+  if (!date) return '-';
   return new Date(date).toLocaleDateString('ko-KR', {
     year: 'numeric',
     month: 'long',

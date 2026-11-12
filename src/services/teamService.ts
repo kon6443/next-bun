@@ -70,6 +70,13 @@ async function handleApiError(response: Response, errorMessages: ErrorMessageMap
   );
 }
 
+/** ISO 문자열 → Date. 비었거나 해석할 수 없으면 null */
+function parseOptionalDate(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 // ==================== 타입 정의 ====================
 
 export type TeamMemberResponse = {
@@ -224,7 +231,8 @@ export type TeamUserResponse = {
   /** 팀 닉네임 원값 — 가입 때 계정 닉네임을 복사해 두므로 사실상 늘 있다(옛 데이터 대비 null 허용) */
   teamNickname: string | null;
   role: string;
-  joinedAt: Date;
+  /** 이 팀 가입 시각(재가입이면 재가입 시각). 응답은 ISO 문자열 | null — getTeamUsers가 Date로 바꾼다, 없거나 잘못된 값이면 null */
+  joinedAt: Date | null;
   userActStatus: 0 | 1;
 };
 
@@ -448,11 +456,11 @@ export async function getTeamUsers(
   }
 
   const data = await response.json();
-  // 날짜 변환
+  // 날짜 변환 — null·누락·잘못된 값은 null (new Date(null)은 1970년, new Date(undefined)는 Invalid Date가 된다)
   if (data.data && Array.isArray(data.data)) {
-    data.data = data.data.map((user: Omit<TeamUserResponse, 'joinedAt'> & { joinedAt: string }) => ({
+    data.data = data.data.map((user: Omit<TeamUserResponse, 'joinedAt'> & { joinedAt?: string | null }) => ({
       ...user,
-      joinedAt: new Date(user.joinedAt),
+      joinedAt: parseOptionalDate(user.joinedAt),
     }));
   }
   return data;
