@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import { BarLoader } from "@/app/teams/components";
+// 루트 레이아웃은 모든 페이지에 실리니 배럴(@/app/teams/components)이 아니라 파일을 직접 가져온다 — 배럴에 무거운 화면 컴포넌트가 늘어도 딸려 오지 않게
+import { BarLoader } from "@/app/teams/components/LoadingSpinner";
 
 // sessionStorage 키
 export const AUTH_LOADING_KEY = "auth_loading";

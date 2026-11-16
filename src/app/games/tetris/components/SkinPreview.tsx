@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { drawBlock } from "../lib/blockSprites";
 import { drawBoardLevelLayer } from "../lib/levelLayers";
-import { type SkinSlot, backgroundStyle, blockSkin, boardSkin, effectSkin } from "../lib/skins";
+import { type SkinSlot, backgroundStyle, boardSkin, effectSkin } from "../lib/skins";
 
 type Props = {
   slot: SkinSlot;
@@ -139,9 +139,4 @@ export function SkinPreview({ slot, id, level = 1, width = 120, height = 64 }: P
     return <div aria-hidden="true" className="rounded-md" style={{ width, height, background: backgroundStyle(id, level) }} />;
   }
   return <canvas ref={canvasRef} aria-hidden="true" className="block rounded-md" style={{ width, height }} />;
-}
-
-/** 블록 스킨이 7종을 무늬로도 가르는지 — 미리보기 아래 안내용 */
-export function hasPatterns(id: string): boolean {
-  return blockSkin(id).patterns;
 }

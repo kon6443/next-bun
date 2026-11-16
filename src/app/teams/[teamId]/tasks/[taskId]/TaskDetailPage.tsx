@@ -21,14 +21,13 @@ import {
   Button,
   ButtonLink,
   SectionLabel,
-  TaskForm,
   ErrorAlert,
   SuccessAlert,
   Skeleton,
   SkeletonText,
   DateInfoInline,
-  type TaskFormData,
 } from '../../../components';
+import { TaskForm, type TaskFormData } from '../../../components/TaskForm';
 import { StatusDropdown } from '@/app/components/StatusDropdown';
 import { ConfirmModal } from '@/app/components/ConfirmModal';
 import { TaskTagChips } from '@/app/components/TagChip';
@@ -255,6 +254,14 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
     session?.user?.userId,
   );
 
+  // 상세 조회 순번 — 더 늦게 시작한 조회가 있으면 먼저 시작한 조회의 응답은 반영하지 않는다(TeamBoard taskFetchSeqRef와 같은 방식).
+  // 댓글 작성 직후 조회와 재입장 조회가 겹칠 때 늦게 온 옛 응답이 새 응답을 덮는 것을 막는다
+  const detailFetchSeqRef = useRef(0);
+  useEffect(() => () => {
+    // 태스크가 바뀌거나 언마운트되면 진행 중인 응답을 모두 버린다
+    detailFetchSeqRef.current += 1;
+  }, [teamIdNum, taskIdNum]);
+
   const fetchTaskDetail = useCallback(
     async (showLoading = true) => {
       // 세션이 아직 로딩 중이면 기다림
@@ -278,8 +285,10 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
         setIsLoading(true);
       }
       setError(null);
+      const seq = ++detailFetchSeqRef.current;
       try {
         const response = await getTaskDetail(teamIdNum, taskIdNum, session.user.accessToken);
+        if (seq !== detailFetchSeqRef.current) return;
 
         // 날짜 변환
         const taskData = {
@@ -296,12 +305,14 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
 
         setTaskDetail(taskData);
       } catch (err) {
+        if (seq !== detailFetchSeqRef.current) return;
         const errorMessage =
           err instanceof Error ? err.message : '태스크 상세 정보를 불러오는데 실패했습니다.';
         setError(errorMessage);
         console.error('Failed to fetch task detail:', err);
       } finally {
-        if (showLoading) {
+        // 로딩은 가장 늦게 시작한 조회가 끝낼 때 내린다 — 첫 조회(로딩 표시)를 조용한 재조회가 앞질러도 로딩이 남지 않게
+        if (seq === detailFetchSeqRef.current) {
           setIsLoading(false);
         }
       }

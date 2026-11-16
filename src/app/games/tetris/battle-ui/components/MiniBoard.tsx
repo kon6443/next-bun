@@ -7,6 +7,9 @@ import { useReducedEffects } from "../../hooks/useReducedEffects";
 import fx from "./battleFx.module.css";
 import { PresenceDot } from "./PresenceDot";
 
+/** 백버퍼 배율 상한 — 메인 판(TetrisCanvas)과 같은 값 */
+const DPR_CAP = 2;
+
 export type MiniBoardProps = {
   playerId: string;
   name: string;
@@ -61,7 +64,7 @@ export const MiniBoard = memo(function MiniBoard({
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
     // 크기가 같으면 백버퍼를 다시 만들지 않는다 — 아래 전체 채우기가 지우기를 겸한다 (FE-19)
     const w = Math.round(width * dpr);
     const h = Math.round(height * dpr);

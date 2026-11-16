@@ -342,10 +342,6 @@ export function toEquippedSkins(value: unknown): EquippedSkins {
   return { block: pickId(raw, 'block'), effect: pickId(raw, 'effect'), board: pickId(raw, 'board'), background: pickId(raw, 'background') };
 }
 
-export function toEquippedSkinLevels(value: unknown): EquippedSkinLevels {
-  return { ...toBoardSkinLevels(value), background: toSkinLevel(asRecord(value).background) };
-}
-
 /** 내 장착(아이템·레벨) → 내 판을 그릴 보드 슬롯 */
 export function boardSkinsOf(equipped: EquippedSkins, levels: EquippedSkinLevels): BoardSkins {
   return { block: equipped.block, effect: equipped.effect, board: equipped.board, levels: { block: levels.block, effect: levels.effect, board: levels.board } };

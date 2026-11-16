@@ -15,7 +15,6 @@ import {
   type Wave,
   composeWave,
   endlessPool,
-  endlessPressure,
   endlessStage,
   generateEndlessWaves,
   roleOfWave,
@@ -197,13 +196,6 @@ export async function generateEndlessDesigned(pool: SimPool, seeds: readonly num
     await pool.map('endlessFix', seeds.map((seed) => [seed, n, pressure]), pin);
   }
   return { pressures, criticals };
-}
-
-/** 확정한 압력표로 무한 31+ 램프까지 포함한 웨이브 압력 (보고서용) */
-export function endlessPressureTable(designed: readonly number[], rampPermille: number): number[] {
-  const out: number[] = [];
-  for (let n = 1; n <= MAX_WAVE; n++) out.push(endlessPressure(designed, n, rampPermille));
-  return out;
 }
 
 const ENDLESS_COMPOSE = { groundPaths: MAP_ENDLESS.groundPaths.length, hasAirPath: MAP_ENDLESS.airPaths.length > 0, airDouble: false, bossEscort: false };

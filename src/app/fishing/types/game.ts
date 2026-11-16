@@ -13,9 +13,6 @@ export interface Camera {
 /** 방향 */
 export type Direction = 'up' | 'down' | 'left' | 'right';
 
-/** 맵 영역 타입 */
-export type TerrainType = 'ground' | 'water' | 'fishing_point';
-
 /** 맵 설정 */
 export interface GameMap {
   id: string;
@@ -51,9 +48,6 @@ export interface FishingPoint {
   /** 낚시 가능 반경 (px) */
   radius: number;
 }
-
-/** 게임 전체 상태 */
-export type GamePhase = 'loading' | 'playing' | 'paused';
 
 /** 낚시 상태 */
 export type FishingState =

@@ -290,32 +290,3 @@ export function TaskFilters({
     </div>
   );
 }
-
-// 마감일 상태 배지 컴포넌트 (공통 사용)
-export function DeadlineBadge({
-  status,
-  label,
-  size = 'sm',
-}: {
-  status: 'overdue' | 'today' | 'soon' | 'normal' | 'none';
-  label: string;
-  size?: 'sm' | 'xs';
-}) {
-  if (status === 'normal' || status === 'none') return null;
-
-  const styles = {
-    overdue: 'bg-red-500/20 text-red-400 border-red-500/30',
-    today: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-    soon: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-    normal: '',
-    none: '',
-  };
-
-  const sizeStyles = size === 'sm' ? 'px-2 py-0.5 text-[11px]' : 'px-1.5 py-0.5 text-[11px]';
-
-  return (
-    <span className={`inline-block rounded border font-semibold ${styles[status]} ${sizeStyles}`}>
-      {label}
-    </span>
-  );
-}

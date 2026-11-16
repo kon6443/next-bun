@@ -9,10 +9,9 @@ import {
   TeamsPageLayout,
   ButtonLink,
   SectionLabel,
-  TaskForm,
   ErrorAlert,
-  type TaskFormData,
 } from "../../../components";
+import { TaskForm, type TaskFormData } from "../../../components/TaskForm";
 import { cardStyles } from "@/styles/teams";
 
 type CreateTaskPageProps = {
