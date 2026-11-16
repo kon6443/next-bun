@@ -8,6 +8,9 @@ import { type QualityMonitor, createQualityMonitor, sampleDraw } from "../lib/re
 import { type BoardSkins, DEFAULT_BOARD_SKINS } from "../lib/skins";
 import { useReducedEffects } from "../hooks/useReducedEffects";
 
+/** 백버퍼 배율 상한(포트리스·디펜스와 같은 값) — 스프라이트는 ctx 변환에서 배율을 읽어(renderer currentDpr) 캐시 키도 따라 바뀐다 */
+const DPR_CAP = 2;
+
 type TetrisCanvasProps = {
   /** 그릴 때 읽는다 — 엔진 진행은 부모가 맡는다 */
   stateRef: React.RefObject<GameState | null>;
@@ -104,7 +107,7 @@ export function TetrisCanvas({ stateRef, drawRef, effectsRef, garbageRef, skins 
     };
     const resize = () => {
       const rect = container.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
       canvas.width = Math.round(rect.width * dpr);
       canvas.height = Math.round(rect.height * dpr);
       canvas.style.width = `${rect.width}px`;

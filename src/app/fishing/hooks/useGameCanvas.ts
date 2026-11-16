@@ -3,6 +3,9 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { CANVAS_RESIZE_DEBOUNCE } from '../config/constants';
 
+/** 백버퍼 배율 상한 — 3x 기기에서 매 프레임 칠하는 픽셀을 2x 대비 2.25배로 늘리지 않는다(포트리스·디펜스와 같은 값) */
+const DPR_CAP = 2;
+
 export interface CanvasSize {
   width: number;
   height: number;
@@ -20,7 +23,7 @@ export function useGameCanvas() {
     if (!parent) return;
 
     const rect = parent.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
     const w = rect.width;
     const h = rect.height;
 
