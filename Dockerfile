@@ -6,7 +6,7 @@
 # 패키지 매니저는 pnpm 이다(package.json packageManager 고정 버전, corepack 이 받는다).
 
 # 1. 의존성 설치
-FROM node:24.22.1-bookworm-slim AS base
+FROM node:24.22.2-bookworm-slim AS base
 # corepack 은 Node 24 까지 기본 포함이다 — Node 25+ 로 올리면 `npm i -g corepack` 이 먼저 필요하다
 # 비대화형 빌드에서 corepack 이 pnpm 다운로드 확인을 묻지 않게 한다
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
@@ -35,7 +35,7 @@ RUN --mount=type=cache,target=/app/.next/cache node node_modules/next/dist/bin/n
 
 # 3. 운영 이미지 — standalone 출력만 담는다 (pnpm 없음)
 # base 와 같은 태그 — 같이 올린다(파일 머리 주석)
-FROM node:24.22.1-bookworm-slim AS production
+FROM node:24.22.2-bookworm-slim AS production
 WORKDIR /app
 # root 가 아닌 이미지 기본 사용자(node)로 실행한다 — 런타임에 .next/cache 등을 쓸 수 있게 소유권을 넘긴다
 COPY --from=builder --chown=node:node /app/public ./public
