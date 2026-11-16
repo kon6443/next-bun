@@ -1,7 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`drawScene 그리기 기록 골든 > canyon · high 1`] = `"37639:81a19351"`;
+exports[`drawScene 그리기 기록 골든 > canyon · high 1`] = `"37639:faef7efd"`;
 
-exports[`drawScene 그리기 기록 골든 > canyon · low 1`] = `"37226:38a0456e"`;
+exports[`drawScene 그리기 기록 골든 > canyon · low 1`] = `"37226:893f175e"`;
 
-exports[`drawScene 그리기 기록 골든 > hills · high 1`] = `"38307:be314243"`;
+exports[`drawScene 그리기 기록 골든 > hills · high 1`] = `"38307:f9244dc6"`;

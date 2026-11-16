@@ -6,7 +6,13 @@ import type { MapId } from "../engine";
  * 렌더러를 나누거나 정리해도(그림 변경 없음) 해시가 같아야 한다. 그림을 일부러 바꿨다면 새 해시로 갱신하고 그 이유를 커밋에 적는다
  */
 
-const round = (v: unknown) => (typeof v === "number" ? Math.round(v * 1000) / 1000 : typeof v === "string" ? v : typeof v === "object" && v && "__id" in v ? `#${(v as { __id: number }).__id}` : typeof v);
+/**
+ * 숫자는 소수 둘째 자리까지 — Node(V8) 버전마다 Math.pow·sin 등의 마지막 자리가 달라(로컬 22 · CI 24) 그대로 해시하면 그림이 같아도 깨진다
+ * 문자열 안의 실수(rgba(…, 0.4523) 같은 색)도 같은 이유로 반올림한다
+ */
+const fix = (n: number) => String(Math.round(n * 100) / 100 || 0);
+const round = (v: unknown) =>
+  typeof v === "number" ? fix(v) : typeof v === "string" ? v.replace(/-?\d+\.\d+(e-?\d+)?/g, (m) => fix(Number(m))) : typeof v === "object" && v && "__id" in v ? `#${(v as { __id: number }).__id}` : typeof v;
 
 function recorder() {
   const log: string[] = [];
