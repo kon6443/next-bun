@@ -144,20 +144,6 @@ export function getStatusLabel(statusKey: number): string {
 }
 
 /**
- * 상태 키로 배지 클래스 가져오기
- */
-export function getStatusBadgeClassName(statusKey: number): string {
-  return getStatusMeta(statusKey).badgeClassName;
-}
-
-/**
- * 상태 키로 그라데이션 색상 가져오기
- */
-export function getStatusAccent(statusKey: number): string {
-  return getStatusMeta(statusKey).accent;
-}
-
-/**
  * 상태 키로 배경 클래스 가져오기
  */
 export function getStatusBgClassName(statusKey: number): string {

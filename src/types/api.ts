@@ -218,22 +218,3 @@ export function createApiError(errorResponse: ApiErrorResponse, status: number):
     errorResponse.details,
   );
 }
-
-// ==================== 유틸리티 함수 ====================
-
-/**
- * 에러 코드가 유효한지 확인
- */
-export function isValidErrorCode(code: string): code is ErrorCode {
-  return code in ERROR_CODE_MESSAGES;
-}
-
-/**
- * 에러 코드에 해당하는 메시지 반환
- */
-export function getErrorMessage(code: string, fallback?: string): string {
-  if (isValidErrorCode(code)) {
-    return ERROR_CODE_MESSAGES[code];
-  }
-  return fallback || '알 수 없는 오류가 발생했습니다.';
-}

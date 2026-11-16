@@ -98,7 +98,10 @@ export function SkinUpgradePanel({ mine, slot, id, allowUpgrade = true, levelCos
   /** 확인 단계의 Esc는 취소 — 설정 시트 전체를 닫지 않는다 */
   const onConfirmKey = (e: React.KeyboardEvent) => {
     if (e.key !== "Escape") return;
-    // 보내는 중에도 시트를 닫지 않는다(결과를 이 자리에서 알린다) — 취소는 보내기 전만
+    // 보내는 중에도 시트를 닫지 않는다(결과를 이 자리에서 알린다) — 취소는 보내기 전만.
+    // App Router는 React 루트가 document라 stopPropagation으로는 시트(useDialog)의 document 리스너를 못 막는다 —
+    // useDialog는 defaultPrevented를 보고 물러선다
+    e.preventDefault();
     e.stopPropagation();
     if (!upgrading) closeConfirm();
   };

@@ -190,6 +190,38 @@ describe('스킨 강화 (skin-levels) — 설정 시트의 스킨 상세', () =>
     expect(document.activeElement).toBe(within(panel).getByRole('button', { name: '강화' }));
   });
 
+  // jsdom의 React 루트는 div라 stopPropagation만으로도 위 테스트가 통과한다. 실제 App Router는 루트가 document여서
+  // 시트(useDialog)의 document 리스너가 같은 노드에서 함께 돌고, 그 리스너는 defaultPrevented만 보고 물러선다 —
+  // 그래서 Esc가 "처리됨(preventDefault)"으로 표시되는지를 직접 본다
+  it('확인 단계의 Esc는 preventDefault로 처리 표시 — document 루트에서도 시트의 Esc 닫기가 물러선다', async () => {
+    getMySkins.mockResolvedValueOnce(response({ level: 1, nextCost: 100_000 }, 100_000));
+    const panel = await openSkin();
+    fireEvent.click(within(panel).getByRole('button', { name: '강화' }));
+    let notPrevented = true;
+    await act(async () => {
+      notPrevented = fireEvent.keyDown(within(panel).getByRole('button', { name: '강화하기' }), { key: 'Escape' });
+      await nextFrame();
+    });
+    expect(notPrevented).toBe(false);
+  });
+
+  it('보내는 중 Esc도 preventDefault로 처리 표시 — document 루트에서도 시트가 닫히지 않는다', async () => {
+    getMySkins.mockResolvedValueOnce(response({ level: 1, nextCost: 100_000 }, 300_000));
+    const panel = await openSkin();
+    fireEvent.click(within(panel).getByRole('button', { name: '강화' }));
+    let resolve!: (v: unknown) => void;
+    upgradeMySkin.mockReturnValueOnce(new Promise((r) => (resolve = r)));
+    await act(async () => {
+      fireEvent.click(within(panel).getByRole('button', { name: '강화하기' }));
+    });
+    const sending = within(panel).getByRole('button', { name: '강화 중…' });
+    expect(fireEvent.keyDown(sending, { key: 'Escape' })).toBe(false);
+    await act(async () => {
+      resolve(response({ level: 2, nextCost: 200_000 }, 200_000));
+      await nextFrame();
+    });
+  });
+
   it('강화 뒤 잔액이 모자라 [강화]가 잠기면 포커스는 레벨 영역으로 — 잠긴 버튼에 두면 body로 빠진다', async () => {
     getMySkins.mockResolvedValueOnce(response({ level: 1, nextCost: 100_000 }, 100_000));
     const panel = await openSkin();

@@ -70,6 +70,12 @@ describe('TetrisCanvas DPR (games-polish FE-19)', () => {
     listeners[listeners.length - 1]();
     expect(canvas.width).toBe(200);
     expect(matchMedia).toHaveBeenLastCalledWith('(resolution: 2dppx)');
+    // 3x 기기는 백버퍼를 2배로 묶는다(포트리스·디펜스와 같은 상한) — 감시는 실제 DPR(3)로 걸어 다음 변화도 잡는다
+    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 3 });
+    listeners[listeners.length - 1]();
+    expect(canvas.width).toBe(200);
+    expect(canvas.height).toBe(400);
+    expect(matchMedia).toHaveBeenLastCalledWith('(resolution: 3dppx)');
     vi.unstubAllGlobals();
   });
 });

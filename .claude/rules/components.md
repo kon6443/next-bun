@@ -22,7 +22,8 @@ paths:
 - **네이티브 form 요소**(`input[type=date|time|number]`, `select`)에는 `max-w-full box-border appearance-none`을 항상 넣는다. iOS Safari에서는 이 요소들이 고유 최소 너비를 가져 `w-full`만으로는 부모를 뚫고 넘친다. wrapper의 `overflow-hidden`을 빼기 전에 자식의 intrinsic width를 확인한다. iOS Safari CSS 변경은 실기기로 확인하기 전까지 미확정으로 보고한다
 
 ## 로딩 컴포넌트
-`src/app/teams/components/LoadingSpinner.tsx`에 있고 `@/app/teams/components`에서 import한다.
+`src/app/teams/components/LoadingSpinner.tsx`에 있고 `@/app/teams/components`에서 import한다. 단 루트 레이아웃(`src/app/layout.tsx`)이 렌더하는 컴포넌트는 파일 경로로 직접 import한다.
+- 배럴(`src/app/teams/components/index.ts`)에는 가벼운 공용 UI만 둔다. 무거운 의존(dnd-kit·react-colorful·소켓 컨텍스트 등)을 끌고 오는 컴포넌트를 넣으면, 배럴을 쓰는 모든 화면(홈·게임·피드백 등)에 실린다. 예: `TaskForm`은 배럴에서 빼고 `./TaskForm`을 직접 import한다.
 
 | 컴포넌트 | 용도 |
 |---|---|

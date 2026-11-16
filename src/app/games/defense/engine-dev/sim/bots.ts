@@ -13,7 +13,6 @@ import {
   AUGMENTS,
   OP,
   RARITY,
-  TOWERS,
   type GameState,
   branchCost,
   buildCost,
@@ -244,6 +243,3 @@ export function scriptedBot(script: readonly ScriptStep[]): Bot {
     },
   };
 }
-
-/** 타워 종류 수 — 보고서 타워 다양성용 */
-export const TOWER_KIND_COUNT = TOWERS.length;
