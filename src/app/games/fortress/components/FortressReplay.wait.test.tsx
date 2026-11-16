@@ -22,7 +22,6 @@ const hook = vi.hoisted(() => {
   return { state, api };
 });
 vi.mock("../hooks/useBattleView", () => ({
-  slotColor: () => "#38bdf8",
   useBattleView: (opts: { onPlaybackEnd: () => void }) => {
     hook.state.onEnd = opts.onPlaybackEnd;
     return hook.api;

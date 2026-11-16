@@ -24,6 +24,7 @@ import {
   type RoomSummary,
   type TurnResolvedPayload,
 } from "@/types/fortressSocket";
+import { sleep } from "@/app/games/_shared/lib/sleep";
 import { battleErrorMessage } from "../lib/battleErrors";
 import { type MatchFeed, mismatchDecision, reduceFeed } from "../lib/matchFeed";
 import { clearRoomSession, loadRoomSession, resetRoomSessionForTest, saveRoomSession } from "../lib/roomSession";
@@ -36,7 +37,7 @@ export type BattleResult<T> = CoreBattleResult<T, FortressErrorCode>;
 export type TurnInput = { move: number; angle: number; power: number; weaponId: number };
 
 /** TURN_MISMATCH 뒤 새 턴 소식을 기다리는 시간(D-015 — 도착 순서는 보장되지 않는다) */
-export const MISMATCH_WAIT_MS = 1000;
+const MISMATCH_WAIT_MS = 1000;
 const MISMATCH_POLL_MS = 50;
 /** 놓친 행동을 맞추는 resync가 실패했을 때 다시 시도하는 간격 */
 const RESYNC_RETRY_MS = 1000;
@@ -154,7 +155,7 @@ export function FortressSocketProvider({ children }: { children: ReactNode }) {
     void (async () => {
       while (!cancelled && feedRef.current?.needsResync) {
         await resync();
-        await new Promise((resolve) => setTimeout(resolve, RESYNC_RETRY_MS));
+        await sleep(RESYNC_RETRY_MS);
       }
     })();
     return () => {
@@ -209,7 +210,7 @@ export function FortressSocketProvider({ children }: { children: ReactNode }) {
         }
         if (decision === "drop") return first;
         if (Date.now() >= deadline) break;
-        await new Promise((resolve) => setTimeout(resolve, MISMATCH_POLL_MS));
+        await sleep(MISMATCH_POLL_MS);
       }
       void resync();
       return first;

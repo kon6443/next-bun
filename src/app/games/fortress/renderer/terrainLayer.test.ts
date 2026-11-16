@@ -6,7 +6,7 @@ import { worldTheme } from "./vividWorld";
 /** 칠하기는 대역 ctx(아무것도 하지 않음) — origTop(파인 면 기준)만 본다 */
 function fakeLayer(): TerrainLayer {
   const ctx = new Proxy({}, { get: () => () => {}, set: () => true }) as unknown as CanvasRenderingContext2D;
-  return { canvas: {} as HTMLCanvasElement, ctx, dirt: "#000", depth: "#000" as unknown as CanvasGradient, world: { theme: worldTheme("hills"), ground: "#000", deep: "#000" as unknown as CanvasGradient, origTop: null } };
+  return { canvas: {} as HTMLCanvasElement, ctx, world: { theme: worldTheme("hills"), ground: "#000", deep: "#000" as unknown as CanvasGradient, origTop: null } };
 }
 const flat = (top: number): Terrain => ({ cols: Array.from({ length: WORLD_WIDTH }, () => [top, WORLD_HEIGHT]) });
 

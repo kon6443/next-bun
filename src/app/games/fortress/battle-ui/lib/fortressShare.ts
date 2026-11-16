@@ -12,7 +12,7 @@ import { TEAM_LABEL } from './roomLabels';
 
 export const fortressMatchPath = (matchId: string) => `/games/fortress/battle/matches/${matchId}`;
 /** route group 밖 고정 route handler (battle/matches/[matchId]/og/route.tsx) — 카카오 카드에 넣을 URL이 고정되게 */
-export const fortressMatchImagePath = (matchId: string) => `/games/fortress/battle/matches/${matchId}/og`;
+const fortressMatchImagePath = (matchId: string) => `/games/fortress/battle/matches/${matchId}/og`;
 export const FORTRESS_MATCHES_PATH = '/games/fortress/battle/matches';
 
 const FALLBACK = {

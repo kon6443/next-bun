@@ -2,36 +2,36 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { advanceClock, createClock, resetClock } from "@/app/games/_shared/lib/fixedStep";
-import { type MapId, type MatchEvent, type MatchState, TANKS, TICKS_PER_SECOND, type Tank, type Terrain, WORLD_WIDTH, carveCircle, groundAt } from "../engine";
+import { type MatchEvent, type MatchState, TANKS, TICKS_PER_SECOND, type Tank, type Terrain, WORLD_WIDTH, carveCircle, groundAt } from "../engine";
 import type { Quality } from "../renderer/backdrop";
-import { type Camera, type ViewSize, approachLimited, clampCamera, panBy, screenToWorld, worldToScreen, zoomAt } from "../renderer/camera";
+import { type Camera, type ViewSize, approachLimited, clampCamera, worldToScreen } from "../renderer/camera";
 import { type FlightPlan, IMPACT_HOLD_MS, TURN_MOTION, TURN_ZOOM, flightBegin, flightStep, flightTarget, followPlan, planFlight, readyToFly } from "../renderer/follow";
-import { type Aim, SLOT_COLORS, TEAM_COLORS, blastDrawRadius, drawScene } from "../renderer/drawScene";
-import { type BlastStyle, createEffects, hitJolt, spawnExplosion, spawnExplosionVivid, spawnMuzzleBlast, spawnTrailSmoke, spawnWreckSmoke, updateEffects } from "../renderer/effects";
-import { type TankView, blastsAt, explosionsUntil, firstShotIn, playbackEnd, popupsAt, shellsAt, tanksAt } from "../renderer/playback";
+import { type Aim, blastDrawRadius, drawScene } from "../renderer/drawScene";
+import { slotColor } from "../lib/slotColors";
+import { createEffects, spawnExplosionVivid, spawnTrailSmoke, updateEffects } from "../renderer/effects";
+import { blastsAt, explosionsUntil, playbackEnd, popupsAt, shellsAt, tanksAt } from "../renderer/playback";
 import { type TerrainLayer, createTerrainLayer, paintAll, paintColumns, scorch } from "../renderer/terrainLayer";
-import { DEFAULT_LOOK, type Look, usesVivid } from "../lib/look";
-import { createJankJudge } from "../renderer/jankJudge";
-import { type WeaponFx, weaponFx } from "../renderer/vivid";
+import { createQualityJudge } from "../renderer/qualityJudge";
+import { frameCues } from "../lib/sound/frameCues";
+import { useCameraInput } from "./useCameraInput";
+import { weaponFx } from "../renderer/vivid";
+import { blastStyle, createTankAnimStepper } from "../renderer/tankAnimFrame";
 import type { FortressCue } from "../lib/sound/recipes";
-import { worldTheme } from "../renderer/vividWorld";
-import { type TankAnim, createTankAnim, stepTankAnim } from "../renderer/tankArt";
+import type { TankAnim } from "../renderer/tankArt";
 import { recordFrame, trimPerf } from "../lib/perfProbe";
 import type { TankSkin } from "../lib/tankSkins";
 import { useFortressCanvas } from "./useFortressCanvas";
+import { prefersReducedMotion, reducedMotionQuery } from "@/app/games/_shared/lib/motion";
 
 const FRAME_MS = 1000 / TICKS_PER_SECOND;
 const MAX_CATCH_UP_MS = 250;
 /** 화면 위 HUD(바람 게이지)에 가리는 높이(px) */
 const HUD_TOP = 84;
-/** 그리기 시간(ms, 지수 평균)이 이보다 긴 프레임이 이어지면 품질을 낮춘다 — 한 번 낮추면 그 화면 동안 유지 */
-const SLOW_DRAW_MS = 8;
-const SLOW_FRAMES_TO_DROP = 90;
 /** 맵 밖으로 나간 탄의 OUT 표시 시간(ms) */
 const OUT_SHOW_MS = 1200;
 
 /** 쏜 탄의 첫 두 표본으로 포신 각도(도, 0 = 오른쪽, 90 = 위) */
-export function barrelAngleFromShot(events: readonly MatchEvent[]): number | null {
+function barrelAngleFromShot(events: readonly MatchEvent[]): number | null {
   const shot = events.find((e) => e.type === "shot");
   if (!shot || shot.type !== "shot" || shot.samples.length < 4) return null;
   const [x0, y0, x1, y1] = shot.samples;
@@ -45,12 +45,6 @@ type Playback = { before: (Tank | null)[]; events: MatchEvent[]; next: MatchStat
 
 /** play의 연출 재료 — 엔진 결과에는 없는 값(행동에서 온다) */
 export type PlayMeta = { weaponId?: number };
-
-/** 팀전은 팀 색, 개인전은 slot 색 */
-export function slotColor(state: MatchState, slot: number): string {
-  const t = state.tanks[slot];
-  return state.mode === "team" && t ? TEAM_COLORS[t.team] : SLOT_COLORS[slot];
-}
 
 /** 캔버스 끌기 조준 — start가 true를 돌려주면 그 손가락은 카메라 대신 조준을 움직인다(월드 좌표) */
 export type AimDrag = { start: (x: number, y: number, zoom: number) => boolean; move: (x: number, y: number, zoom: number) => void; end: () => void };
@@ -73,19 +67,6 @@ export function nearestEnemy(state: MatchState, tanks: readonly { slot: number; 
   return best;
 }
 
-/**
- * 전장 캔버스 — 보이는 state 1개 + 턴 연출 1개를 30틱/초 고정 스텝으로 그린다 (경기·리플레이 공용)
- * - play(before, events, next, meta?): 턴 연출 시작(meta.weaponId — 시안의 무기별 연출). 끝나면 보이는 state = next, onPlaybackEnd(next)
- * - show(state): 연출을 버리고 그 state로 바로(지형 전체 다시 칠함) — 리플레이 턴 이동
- * - setPaused: 연출 틱을 멈춘다(카메라 조작은 그대로)
- * 카메라: 한 손가락 끌기 = 팬, 두 손가락 = 핀치, 휠 = 줌. 만지면 그 턴 자동 추적을 멈춘다
- */
-/** 시안 폭발 재료 — 파편·먼지는 맵 지면 색, 불은 무기 색 */
-function blastStyle(mapId: MapId, w: WeaponFx): BlastStyle {
-  const g = worldTheme(mapId).ground;
-  return { kind: w.kind, fire: w.fire, debris: [g.cap, g.capDark, g.bands[0], g.bands[2], g.pebble], dust: g.pebble };
-}
-
 /** 한 프레임 — onFrame이 받는다. 폭발은 화면 px(가운데·반지름)·진행(0~1) */
 export type BattleFrame = {
   source: HTMLCanvasElement;
@@ -101,6 +82,13 @@ export type BattleFrame = {
   slow: boolean;
 };
 
+/**
+ * 전장 캔버스 — 보이는 state 1개 + 턴 연출 1개를 30틱/초 고정 스텝으로 그린다 (경기·리플레이 공용)
+ * - play(before, events, next, meta?): 턴 연출 시작(meta.weaponId — 시안의 무기별 연출). 끝나면 보이는 state = next, onPlaybackEnd(next)
+ * - show(state): 연출을 버리고 그 state로 바로(지형 전체 다시 칠함) — 리플레이 턴 이동
+ * - setPaused: 연출 틱을 멈춘다(카메라 조작은 그대로)
+ * 카메라: 한 손가락 끌기 = 팬, 두 손가락 = 핀치, 휠 = 줌. 만지면 그 턴 자동 추적을 멈춘다
+ */
 export function useBattleView({
   initial,
   getAim,
@@ -109,7 +97,6 @@ export function useBattleView({
   aimDrag,
   getInsets,
   onPlaybackEnd,
-  look = DEFAULT_LOOK,
   onFrame,
   origin,
   onCues,
@@ -124,11 +111,9 @@ export function useBattleView({
   /** 전장 위에 겹친 조작부가 가리는 아래 높이·양옆 폭(px) — 카메라가 그 안쪽에 담는다 */
   getInsets?: () => { bottom: number; side?: number };
   onPlaybackEnd: (next: MatchState) => void;
-  /** 시안(D-025 B) — 그리기만 바뀐다(엔진·카메라 규칙 그대로) */
-  look?: Look;
   /** 한 프레임을 그린 뒤 — 시안 glow의 WebGL 후처리가 이 캔버스를 원본으로 쓴다(폭발 자리는 화면 px) */
   onFrame?: (frame: BattleFrame) => void;
-  /** 연출 사건의 소리 신호(D-025 보충 6) — 프레임마다 그 사이에 지난 발사(행동당 첫 탄)·착탄·피격·격파를 한 번에. 그림과 무관(classic도) */
+  /** 연출 사건의 소리 신호(D-025 보충 6) — 프레임마다 그 사이에 지난 발사(행동당 첫 탄)·착탄·피격·격파를 한 번에 */
   onCues?: (cues: FortressCue[]) => void;
   /** 경기 시작 때 지형 — vivid가 "원래 지표면"(풀)과 "파인 면"(그을린 흙)을 가르는 기준. 없으면 initial의 지형(중간에 들어온 온라인 경기는 넘겨야 한다) */
   origin?: Terrain;
@@ -138,8 +123,6 @@ export function useBattleView({
   const onCuesRef = useRef(onCues);
   onCuesRef.current = onCues;
   originRef.current = origin;
-  const lookRef = useRef(look);
-  lookRef.current = look;
   /** 시안 탱크 애니메이션 상태(slot별) — 반동·번쩍임·궤도·포신·잔해 */
   const animsRef = useRef(new Map<number, TankAnim>());
   const onFrameRef = useRef(onFrame);
@@ -203,7 +186,7 @@ export function useBattleView({
 
   // 지형 레이어 — 처음 보이는 state로 전체를 한 번 칠한다
   useEffect(() => {
-    layerRef.current = createTerrainLayer({ vivid: usesVivid(lookRef.current), mapId: shownRef.current.mapId });
+    layerRef.current = createTerrainLayer({ mapId: shownRef.current.mapId });
     if (layerRef.current) paintAll(layerRef.current, shownRef.current.terrain, originRef.current);
     focusTurn(shownRef.current);
   }, [focusTurn]);
@@ -227,7 +210,6 @@ export function useBattleView({
       resetGenRef.current++;
       fxRef.current.particles = [];
       fxRef.current.shake = 0;
-      fxRef.current.flash = 0;
       // 메가탄 붉은 틴트도 버린다(리플레이 턴 이동·재동기화 뒤 화면이 붉게 남지 않게)
       fxRef.current.tint = 0;
       animsRef.current.clear();
@@ -246,15 +228,10 @@ export function useBattleView({
     const clock = createClock();
     let raf = 0;
     let lastFrame = 0;
-    let drawAvg = 0;
-    let slowFrames = 0;
-    let quality: Quality = "high";
-    // 시안 — 프레임 간격으로도 느린 기기를 본다(그리기는 짧은데 래스터·합성이 느린 기기). classic은 그리기 시간만(지금 그대로)
-    let jank = createJankJudge();
-    /** 후처리가 켜진 동안 프레임이 밀렸다 — 다음 프레임에 후처리에 알린다 */
-    let glowSlow = false;
+    // 품질 자동 하향 — 그리기 시간, 시안은 프레임 간격까지(renderer/qualityJudge)
+    const judge = createQualityJudge();
     const fx = fxRef.current;
-    const motion = typeof window.matchMedia === "function" ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+    const motion = reducedMotionQuery();
     const colorOf = (slot: number) => slotColor(shownRef.current, slot);
     const maxHpOf = (slot: number) => {
       const t = shownRef.current.tanks[slot];
@@ -266,87 +243,20 @@ export function useBattleView({
       const t = shownRef.current.tanks[slot];
       return t && t.x > WORLD_WIDTH / 2 ? 120 : 60;
     };
-    /** 시안 탱크 연출 — 이 프레임까지 지난 이벤트(발사·피격·격파)를 반영하고, 궤도·포신·반동을 진행한다. 그리기 전용 */
-    const stepTankAnims = (tanks: readonly TankView[], aim: Aim | null, dt: number, paused: boolean) => {
-      const anims = animsRef.current;
-      const pb = playbackRef.current;
-      if (pb !== animPb) {
-        animPb = pb;
-        animTick = -1;
-        animFired = false;
-      }
-      if (pb) {
-        // 발사 연출(반동·포구 연기·흔들림)은 행동마다 처음 탄 한 번 — 분열탄 자식탄·폭격 폭탄도 shot이라 공중에서 다시 나지 않게
-        const e0 = firstShotIn(pb.events, animTick, pb.tick, animFired);
-        if (e0) {
-          animFired = true;
-          const a = anims.get(pb.shooter);
-          if (a) {
-            // 반동 — 움직임 줄이기면 밀리지 않는다(포구 연기는 그대로)
-            if (!fx.reducedMotion) a.recoil = 1;
-            // 포구 연기·바닥 먼지 — 방향은 탄의 첫 두 표본
-            const n = e0.samples.length;
-            const dx = n >= 4 ? e0.samples[2] - e0.samples[0] : 1;
-            const dy = n >= 4 ? e0.samples[3] - e0.samples[1] : 0;
-            const len = Math.hypot(dx, dy) || 1;
-            const shooter = tanks.find((x) => x.slot === pb.shooter);
-            spawnMuzzleBlast(fx, e0.samples[0], e0.samples[1], dx / len, dy / len, shooter?.x ?? e0.samples[0], shooter?.y ?? e0.samples[1]);
-            if (!fx.reducedMotion) fx.shake = Math.max(fx.shake, 2.5);
-          }
-        }
-        for (const e of pb.events) {
-          if (e.t <= animTick || e.t > pb.tick) continue;
-          if (e.type === "damage") {
-            const a = anims.get(e.slot);
-            // 피격 — 흰 번쩍임 + 피해에 비례한 흔들림(움직임 줄이기면 둘 다 없다)
-            if (a && !fx.reducedMotion) {
-              a.flash = 1;
-              a.jolt = Math.max(a.jolt, hitJolt(e.amount));
-            }
-          } else if (e.type === "death") {
-            const t = tanks.find((x) => x.slot === e.slot);
-            // 격파 폭발 — 이 함수는 시안에서만 돈다(classic엔 원래 없다)
-            if (t) spawnExplosionVivid(fx, t.x, t.y - 10, 44, blastStyle(shownRef.current.mapId, weaponFx(2)));
-          }
-        }
-        animTick = pb.tick;
-      }
-      for (const t of tanks) {
-        let a = anims.get(t.slot);
-        const target = aim && aim.slot === t.slot ? aim.angle : barrelOf(t.slot);
-        if (!a) {
-          a = createTankAnim(t.x, target);
-          if (!t.alive) a.wreck = 1;
-          anims.set(t.slot, a);
-        }
-        stepTankAnim(a, t.x, target, t.alive, dt, fx.reducedMotion);
-        // 충전 중 — 파워가 오를수록 조금씩 더 움찔(움직임 줄이기면 없다)
-        if (aim?.charging && aim.slot === t.slot && !fx.reducedMotion) a.jolt = Math.max(a.jolt, 0.5 + aim.power * 0.014);
-        // 많이 다친 탱크 — 검은 연기가 피어오른다
-        const max = maxHpOf(t.slot);
-        // 일시정지 중에는 연기를 만들지 않는다 — 입자가 멈춰 있어 같은 자리에 쌓인다
-        if (!paused && t.alive && max > 0 && t.hp / max < 0.35 && Math.random() < dt * 0.006) spawnTrailSmoke(fx, t.x + (Math.random() - 0.5) * 10, t.y - 18);
-        // 격파된 잔해 — 툰 연기가 계속 피어오른다(초당 약 1.5덩이, 품질 low면 줄인다)
-        if (!paused && !t.alive && Math.random() < dt * (fx.quality === "low" ? 0.0006 : 0.0015)) spawnWreckSmoke(fx, t.x, t.y - 6);
-      }
-    };
+    // 시안 탱크 연출(반동·피격·격파·궤도·포신) — renderer/tankAnimFrame
+    const stepTankAnims = createTankAnimStepper(fx, animsRef.current);
     /** 마지막 착탄(또는 맵 밖으로 나간 탄) 뒤 카메라가 머무는 시각까지 */
     let holdUntil = 0;
     /** 맵 밖으로 나간 탄 표시 — 화면 가장자리 OUT */
     let outs: { x: number; y: number; until: number }[] = [];
     let outSeen = new Set<number>();
     let seenPlayback: Playback | null = null;
-    /** 탱크 연출이 이벤트를 어디까지 반영했나 — 같은 행동 안에서 틱이 지날 때만 */
     /** 차례 탱크와 그 차례를 받은 시각(차례 시작 고리) */
     let lastActive: number | null = null;
     let activeSince = 0;
     /** 소리 신호를 어디까지 냈나(연출마다 처음부터) */
     let cueTick = -1;
     let cueFired = false;
-    let animPb: Playback | null = null;
-    let animTick = -1;
-    /** 이 행동의 발사 연출을 이미 했나(행동마다 한 번) */
-    let animFired = false;
     /** 이번 연출의 비행 계획(발사 순간 한 번) · 지난 목표(따라갈 때 되돌아가지 않게) */
     let flight: FlightPlan | null = null;
     let flightPrev = { cx: 0, cy: 0 };
@@ -372,8 +282,7 @@ export function useBattleView({
       const view: ViewSize = viewRef.current;
       if (!ctx || view.width === 0) return;
       const dt = lastFrame > 0 ? Math.min(now - lastFrame, 200) : 16;
-      fx.quality = quality;
-      fx.rich = usesVivid(lookRef.current);
+      fx.quality = judge.quality;
       // 시안 파편이 떨어질 땅 — 연출 중엔 패인 지형, 아니면 보이는 state
       const groundTerrain = playbackRef.current?.terrain ?? shownRef.current.terrain;
       fx.ground = (x, y) => {
@@ -407,24 +316,13 @@ export function useBattleView({
         }
         const passed = explosionsUntil(pb.events, pb.tick, pb.blastsApplied);
         // 소리 신호 — 이 프레임에 지난 사건(일시정지면 진행이 없어 울리지 않는다)
-        const cues: FortressCue[] = [];
-        const weapon = weaponFx(pb.weaponId).kind;
-        const shot = firstShotIn(pb.events, cueTick, pb.tick, cueFired);
-        if (shot) {
-          cueFired = true;
-          cues.push({ kind: "fire", weapon });
-        }
-        for (const b of passed.blasts) cues.push({ kind: "explode", weapon, radius: b.r });
-        for (const e of pb.events) {
-          if (e.t <= cueTick || e.t > pb.tick) continue;
-          if (e.type === "damage") cues.push({ kind: "hit", amount: e.amount });
-          else if (e.type === "death") cues.push({ kind: "death" });
-        }
+        const fc = frameCues(pb.events, cueTick, pb.tick, cueFired, passed.blasts, weaponFx(pb.weaponId).kind);
+        const cues = fc.cues;
+        cueFired = fc.fired;
         cueTick = pb.tick;
         if (cues.length > 0) onCuesRef.current?.(cues);
         for (const b of passed.blasts) {
-          if (usesVivid(lookRef.current)) spawnExplosionVivid(fx, b.x, b.y, b.r, blastStyle(shownRef.current.mapId, weaponFx(pb.weaponId)));
-          else spawnExplosion(fx, b.x, b.y, b.r);
+          spawnExplosionVivid(fx, b.x, b.y, b.r, blastStyle(shownRef.current.mapId, weaponFx(pb.weaponId)));
           holdUntil = now + IMPACT_HOLD_MS;
           const carve = carveCircle(pb.terrain, b.x, b.y, b.r);
           if (!carve) continue;
@@ -460,7 +358,7 @@ export function useBattleView({
       const aim = playing ? null : (getAimRef.current?.() ?? null);
       const tanks = playing ? tanksAt(playing.before, playing.events, playing.tick) : tanksAt(s.tanks, [], 0);
       const shells = playing ? shellsAt(playing.events, playing.tick) : [];
-      if (usesVivid(lookRef.current)) stepTankAnims(tanks, aim, dt, paused);
+      stepTankAnims(playbackRef.current, tanks, aim, dt, paused, { mapId: shownRef.current.mapId, barrelOf, maxHpOf });
       // 연기 꼬리는 연출 틱이 진행한 만큼만(일시정지·고주사율 화면에서 쌓이지 않게), 입자도 일시정지 중엔 멈춘다
       for (let k = Math.min(advanced, 3); k > 0; k--) for (const sh of shells) spawnTrailSmoke(fx, sh.x, sh.y);
       if (!paused) updateEffects(fx, dt, s.wind);
@@ -517,8 +415,7 @@ export function useBattleView({
         weaponId: playing?.weaponId,
         time: now,
         wind: s.wind,
-        quality,
-        look: lookRef.current,
+        quality: judge.quality,
         reducedMotion: fx.reducedMotion,
         fx,
       });
@@ -533,9 +430,9 @@ export function useBattleView({
           time: now,
           reducedMotion: fx.reducedMotion,
           // 시안 폭발은 화면 섬광 대신 메가탄 붉은 틴트를 쓴다 — 후처리 섬광도 그 세기로
-          flash: Math.max(fx.flash, fx.tint ?? 0),
-          quality,
-          slow: glowSlow,
+          flash: fx.tint ?? 0,
+          quality: judge.quality,
+          slow: judge.glowSlow,
           blasts: blasts.map((b) => {
             const [x, y] = worldToScreen(cam, view, b.x, b.y);
             // 화면에 그린 불덩이와 같은 크기(멀리 볼 때 최소 크기 보정 포함)
@@ -543,18 +440,7 @@ export function useBattleView({
           }),
         });
       }
-      // 품질 자동 하향 — 그리기 시간(지수 평균)으로 판단한다(저전력 모드처럼 프레임만 30Hz로 묶인 기기를 느린 기기로 오인하지 않게)
-      drawAvg = drawAvg * 0.95 + drawMs * 0.05;
-      slowFrames = drawAvg > SLOW_DRAW_MS ? slowFrames + 1 : 0;
-      if (slowFrames > SLOW_FRAMES_TO_DROP) quality = "low";
-      if (lastFrame > 0 && usesVivid(lookRef.current) && !document.hidden && jank.push(now - lastFrame)) {
-        // 후처리(glow)가 켜져 있으면 그것부터 끄고 판정을 새로 시작한다 — glow가 꺼진 뒤에도 밀리면 그때 전장 품질을 낮춘다
-        if (onFrameRef.current) {
-          glowSlow = true;
-          jank = createJankJudge();
-        } else quality = "low";
-      }
-      if (!onFrameRef.current) glowSlow = false;
+      judge.push({ drawMs, gapMs: lastFrame > 0 ? now - lastFrame : null, hidden: document.hidden, glowOn: Boolean(onFrameRef.current) });
       if (playing && lastFrame > 0) recordFrame(now - lastFrame, drawMs);
       lastFrame = now;
     };
@@ -562,71 +448,8 @@ export function useBattleView({
     return () => cancelAnimationFrame(raf);
   }, [ctxRef, viewRef]);
 
-  // ===== 카메라 입력 =====
-  const pinchRef = useRef<number | null>(null);
-  const toWorld = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    return screenToWorld(cameraRef.current, viewRef.current, e.clientX - rect.left, e.clientY - rect.top);
-  };
-  const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    if (pointersRef.current.size === 0 && aimPointerRef.current === null && aimDragRef.current) {
-      const [wx, wy] = toWorld(e);
-      if (aimDragRef.current.start(wx, wy, cameraRef.current.zoom)) {
-        aimPointerRef.current = e.pointerId;
-        return;
-      }
-    }
-    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    setFollow(false);
-    pinchRef.current = null;
-  };
-  const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (aimPointerRef.current === e.pointerId) {
-      const [wx, wy] = toWorld(e);
-      aimDragRef.current?.move(wx, wy, cameraRef.current.zoom);
-      return;
-    }
-    const pointers = pointersRef.current;
-    const prev = pointers.get(e.pointerId);
-    if (!prev) return;
-    const view = viewRef.current;
-    const rect = e.currentTarget.getBoundingClientRect();
-    if (pointers.size === 1) {
-      cameraRef.current = panBy(cameraRef.current, view, e.clientX - prev.x, e.clientY - prev.y, userBounds());
-    } else if (pointers.size === 2) {
-      const other = [...pointers.entries()].find(([id]) => id !== e.pointerId)?.[1];
-      if (other) {
-        const dist = Math.hypot(e.clientX - other.x, e.clientY - other.y);
-        const mid = { x: (e.clientX + other.x) / 2 - rect.left, y: (e.clientY + other.y) / 2 - rect.top };
-        if (pinchRef.current) cameraRef.current = zoomAt(cameraRef.current, view, mid.x, mid.y, dist / pinchRef.current, userBounds());
-        pinchRef.current = dist;
-      }
-    }
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  };
-  const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (aimPointerRef.current === e.pointerId) {
-      aimPointerRef.current = null;
-      aimDragRef.current?.end();
-      return;
-    }
-    pointersRef.current.delete(e.pointerId);
-    pinchRef.current = null;
-  };
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    // React onWheel은 passive라 preventDefault가 안 된다 — 직접 붙인다
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const rect = canvas.getBoundingClientRect();
-      setFollow(false);
-      cameraRef.current = zoomAt(cameraRef.current, viewRef.current, e.clientX - rect.left, e.clientY - rect.top, e.deltaY < 0 ? 1.12 : 1 / 1.12, { bottomPx: getInsetsRef.current?.().bottom ?? 0, sidePx: getInsetsRef.current?.().side ?? 0 });
-    };
-    canvas.addEventListener("wheel", onWheel, { passive: false });
-    return () => canvas.removeEventListener("wheel", onWheel);
-  }, [canvasRef, viewRef, setFollow]);
+  // 카메라 입력 — 끌기·집기·휠, 포신 근처는 조준 끌기
+  const canvasHandlers = useCameraInput({ cameraRef, viewRef, canvasRef, pointersRef, aimPointerRef, aimDragRef, getInsetsRef, setFollow, userBounds });
 
   /**
    * 다음 발(events)을 지금 카메라에서 컷 없이 따라갈 수 있나 — AI 발사·리플레이 자동 재생이 쏘기 전에 기다릴지 정한다(lib/cameraWait)
@@ -636,7 +459,7 @@ export function useBattleView({
     (events: readonly MatchEvent[]) => {
       const view = viewRef.current;
       if (view.width === 0 || !followRef.current) return true;
-      if (typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return true;
+      if (prefersReducedMotion()) return true;
       const insets = getInsetsRef.current?.();
       const plan = planFlight(events, view, { hudTop: HUD_TOP, bottomPx: insets?.bottom ?? 0, sidePx: insets?.side ?? 0 }, false);
       return !plan || readyToFly(plan, events, cameraRef.current, view);
@@ -650,6 +473,5 @@ export function useBattleView({
     setFollow(true);
   }, [setFollow]);
 
-  const canvasHandlers = { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp, onLostPointerCapture: onPointerUp };
   return { containerRef, canvasRef, canvasHandlers, play, show, setPaused, following, recenter, cameraReadyFor };
 }

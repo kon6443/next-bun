@@ -7,7 +7,7 @@ import { MOVE_PX_PER_TICK, type MatchEvent, type Tank, eventsEndTick } from "../
 
 export const EXPLOSION_TICKS = 14;
 export const FALL_TICKS = 12;
-export const POPUP_TICKS = 36;
+const POPUP_TICKS = 36;
 /** 마지막 이벤트 뒤 여운 */
 export const TAIL_TICKS = 18;
 

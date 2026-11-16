@@ -45,8 +45,6 @@ export function fortressPadLayout(o: {
   /** 반대쪽을 보고 있으면 첫 누름은 돌아서기 */
   facing: 1 | -1;
   fireAria: string;
-  /** 시안(D-025 보충 6) — 무기 버튼에 아이콘, 필살기를 고르면 빛나는 테두리. classic은 글자 그대로 */
-  vivid?: boolean;
 }): GamePadLayout {
   const weapons = TANKS[o.tank.tankId].weapons;
   const special = weapons.find((id) => WEAPONS[id].cooldown > 0);
@@ -68,9 +66,9 @@ export function fortressPadLayout(o: {
         aria: o.fireAria,
         tone: "accent",
         content: (
-          <span className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-2xl" aria-hidden="true" data-special-glow={o.vivid && specialPicked ? "true" : undefined}>
+          <span className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-2xl" aria-hidden="true" data-special-glow={specialPicked ? "true" : undefined}>
             {/* 충전 막대 — 버튼 안을 왼쪽부터 채운다(시안은 충전 중 맥박) */}
-            <span className="absolute inset-y-0 left-0 bg-amber-300/45" style={{ width: `${o.charge ?? 0}%` }} data-charge-bar={o.vivid && o.charge !== null ? "true" : undefined} />
+            <span className="absolute inset-y-0 left-0 bg-amber-300/45" style={{ width: `${o.charge ?? 0}%` }} data-charge-bar={o.charge !== null ? "true" : undefined} />
             <span className="relative text-base tabular-nums">{o.charge !== null ? `파워 ${o.charge}` : `발사 ${o.power}`}</span>
           </span>
         ),
@@ -83,18 +81,13 @@ export function fortressPadLayout(o: {
         tone: "primary",
         // 고를 무기가 하나뿐이면 바꿀 것이 없다 — 지금 탱크는 모두 일반 무기 2 + 필살기 1이라 실제로는 켜지지 않는다(구성이 바뀔 때를 위한 안전장치)
         disabled: usableWeapons(o.tank).length <= 1,
-        content: o.vivid ? (
-          <span className="relative flex h-full w-full flex-col items-center justify-center px-1 text-center leading-none" aria-hidden="true" data-special-glow={specialPicked ? "true" : undefined}>
-            <WeaponIcon weaponId={o.weaponId} size={26} />
-            <span className="mt-0.5 text-[11px] font-bold">{name}</span>
-            {cooling ? <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-[#160b1c] bg-amber-300 px-1 text-[10px] font-black leading-none text-slate-900">{o.tank.cooldown}</span> : null}
-          </span>
-        ) : (
-          <span className="relative flex h-full w-full flex-col items-center justify-center px-1 text-center leading-tight" aria-hidden="true">
-            <span className="text-[11px] font-semibold text-sky-200">무기</span>
-            <span className="text-xs">{name}</span>
-            {cooling ? <span className="absolute -right-1 -top-1 rounded-full border border-slate-900 bg-amber-400 px-1 text-[10px] font-bold leading-[14px] text-slate-900">{o.tank.cooldown}</span> : null}
-          </span>
+        // 아이콘 + 이름, 필살기를 고르면 빛나는 테두리, 대기 중이면 남은 턴 배지
+        content: (
+        <span className="relative flex h-full w-full flex-col items-center justify-center px-1 text-center leading-none" aria-hidden="true" data-special-glow={specialPicked ? "true" : undefined}>
+          <WeaponIcon weaponId={o.weaponId} size={26} />
+          <span className="mt-0.5 text-[11px] font-bold">{name}</span>
+          {cooling ? <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-[#160b1c] bg-amber-300 px-1 text-[10px] font-black leading-none text-slate-900">{o.tank.cooldown}</span> : null}
+        </span>
         ),
       },
     ],

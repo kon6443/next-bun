@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { WIND_MAX } from "../engine";
+import { prefersReducedMotion } from "@/app/games/_shared/lib/motion";
 
 /** 세기별 색 — 약(하늘) · 중(노랑, 최대의 40%~) · 강(빨강, 70%~). 최대(WIND_MAX)가 바뀌어도 비율로 따라간다 */
 function tone(strength: number): { text: string; fill: string } {
@@ -27,7 +28,7 @@ export function WindGauge({ wind, turnKey }: { wind: number; turnKey: number }) 
     if (!last || last.turnKey === turnKey || last.wind === wind) return;
     const el = ref.current;
     if (!el || typeof el.animate !== "function") return;
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    if (prefersReducedMotion()) return;
     el.animate([{ transform: "scale(1)", boxShadow: "0 0 0 0 rgba(125, 211, 252, 0)" }, { transform: "scale(1.12)", boxShadow: "0 0 0 6px rgba(125, 211, 252, 0.35)" }, { transform: "scale(1)", boxShadow: "0 0 0 0 rgba(125, 211, 252, 0)" }], { duration: 650, easing: "ease-out" });
   }, [wind, turnKey]);
 

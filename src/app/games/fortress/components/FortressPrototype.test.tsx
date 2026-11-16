@@ -31,19 +31,6 @@ vi.mock("./FortressResult", () => ({
     </>
   ),
 }));
-// 기본 그림이 vivid(보충 5)라 결과 화면은 FortressResultVivid — 같은 버튼 둘짜리 대역(classic은 위 FortressResult)
-vi.mock("./FortressResultVivid", () => ({
-  FortressResultVivid: (p: { onReplay: () => void; onRematch: () => void }) => (
-    <>
-      <button type="button" onClick={p.onReplay}>
-        다시 보기
-      </button>
-      <button type="button" onClick={p.onRematch}>
-        다시하기
-      </button>
-    </>
-  ),
-}));
 vi.mock("./FortressReplay", () => ({
   FortressReplay: (p: { skins?: unknown; onClose: () => void }) => {
     seen.replay = p.skins;

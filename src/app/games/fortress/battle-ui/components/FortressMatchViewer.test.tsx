@@ -115,27 +115,20 @@ describe("저장된 경기 페이지 (F6)", () => {
     expect(view.skins).toEqual([{ id: "default", level: 1 }, { id: "default", level: 1 }]);
   });
 
-  it("그림(보충 5): 기본은 vivid, ?look=classic이면 마운트 뒤 classic", async () => {
+  it("결과 — 카드 행 순위·승자 탱크 그림·등급 배지(예전 ?look=classic 주소도 같은 화면, D-027 보충 1)", async () => {
+    window.history.replaceState(null, "", "/games/fortress/battle/matches/x?look=classic");
     svc.getFortressMatch.mockResolvedValue(ok(match));
     svc.getFortressReplay.mockResolvedValue(ok(replay));
     await act(async () => {
       render(<FortressMatchViewer matchId={match.matchId} />);
     });
-    expect(screen.getByTestId("fortress-match-viewer").getAttribute("data-look")).toBe("vivid");
-    // 순위는 vivid면 카드 행(솔로 vivid 결과와 같은 모양), classic이면 표
+    // 순위는 카드 행(솔로 결과와 같은 모양)
     expect(screen.getByTestId("fortress-result-cards").querySelectorAll("li").length).toBe(match.players.length);
     // 시안 결과 공통(보충 6): 승자 탱크 그림·등급 배지
     expect(screen.getByTestId("result-hero")).toBeTruthy();
     expect(screen.getAllByText(/등급/).length).toBe(match.players.length);
     expect(screen.queryByRole("table")).toBeNull();
-    cleanup();
-    window.history.replaceState(null, "", "/games/fortress/battle/matches/x?look=classic");
-    await act(async () => {
-      render(<FortressMatchViewer matchId={match.matchId} />);
-    });
-    expect(screen.getByTestId("fortress-match-viewer").getAttribute("data-look")).toBe("classic");
-    expect(screen.getByRole("table").textContent).toContain("다라");
-    expect(screen.queryByTestId("fortress-result-cards")).toBeNull();
+    window.history.replaceState(null, "", "/");
   });
 
   it("포트리스 홈 링크 — 공유로 들어온 사람도 게임 홈으로", async () => {

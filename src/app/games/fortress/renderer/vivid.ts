@@ -1,15 +1,16 @@
 /**
  * 시안 "vivid"(D-025 B) — 무기별 탄·폭발·데미지 숫자. 배경·지형은 renderer/vividWorld, 탱크는 renderer/tankArt
- * 기본 화면(classic)은 그대로 — look이 vivid·glow일 때만 쓴다. 연출 전용(엔진·리플레이와 무관)
+ * 연출 전용(엔진·리플레이와 무관)
  */
 
 import type { BlastView, PopupView, ShellView } from "./playback";
+import { hash01 } from "./noise";
+import { INK } from "./color";
 
 // ===== 무기별 연출 =====
 
 type Rgb = readonly [number, number, number];
 const rgba = (c: Rgb, a: number) => `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
-const INK = "#160b1c";
 
 /**
  * 무기별 탄·폭발 팔레트와 모양 — 엔진 WEAPONS id 순서(0 포탄 · 1 3연발 · 2 대형탄 · 3 분열탄 · 4 메가탄 · 5 폭격)
@@ -40,12 +41,6 @@ const FX: readonly WeaponFx[] = [
 
 export function weaponFx(weaponId?: number): WeaponFx {
   return (weaponId !== undefined && FX[weaponId]) || FX[0];
-}
-
-/** 0~1 고정 의사난수(같은 자리는 같은 모양 — 프레임마다 흔들리지 않게) */
-function hash(n: number): number {
-  const s = Math.sin(n * 127.1 + 311.7) * 43758.5453;
-  return s - Math.floor(s);
 }
 
 /**
@@ -203,7 +198,7 @@ export function drawBlastVivid(ctx: CanvasRenderingContext2D, blast: BlastView, 
     ctx.lineCap = "round";
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
-      const a = (i / 6) * Math.PI * 2 + hash(seed) * 0.5;
+      const a = (i / 6) * Math.PI * 2 + hash01(seed) * 0.5;
       ctx.moveTo(b.x + Math.cos(a) * r * 0.4, b.y + Math.sin(a) * r * 0.4);
       ctx.lineTo(b.x + Math.cos(a) * r * (0.9 + b.progress * 1.2), b.y + Math.sin(a) * r * (0.9 + b.progress * 1.2));
     }
@@ -219,9 +214,9 @@ export function drawBlastVivid(ctx: CanvasRenderingContext2D, blast: BlastView, 
     const pr = r * (0.55 + 0.35 * Math.min(1, k * 1.6)) * (k > 0.6 ? 1 - (k - 0.6) / 0.4 : 1);
     const blob = new Path2D();
     for (let i = 0; i < petals; i++) {
-      const a = (i / petals) * Math.PI * 2 + hash(seed + i) * 0.4;
-      const d = pr * (0.55 + 0.25 * hash(seed + i * 3));
-      const rr = pr * (0.42 + 0.2 * hash(seed + i * 5));
+      const a = (i / petals) * Math.PI * 2 + hash01(seed + i) * 0.4;
+      const d = pr * (0.55 + 0.25 * hash01(seed + i * 3));
+      const rr = pr * (0.42 + 0.2 * hash01(seed + i * 5));
       const x = b.x + Math.cos(a) * d;
       const y = b.y + Math.sin(a) * d - pr * 0.1;
       blob.moveTo(x + rr, y);
@@ -307,7 +302,7 @@ export function drawBlastVivid(ctx: CanvasRenderingContext2D, blast: BlastView, 
       const a = Math.PI + (i / 3) * Math.PI;
       const x = b.x + Math.cos(a) * sr * 0.7;
       const y = b.y - rise + Math.sin(a) * sr * 0.35;
-      const rr = sr * (0.5 + 0.2 * hash(seed + i * 7));
+      const rr = sr * (0.5 + 0.2 * hash01(seed + i * 7));
       smoke.moveTo(x + rr, y);
       smoke.arc(x, y, rr, 0, Math.PI * 2);
     }
@@ -340,7 +335,7 @@ function popupScale(progress: number, reducedMotion: boolean): number {
 }
 
 /** 숫자 기준선(혼자 떠 있을 때) — 탱크 머리 위에서 위로 떠오른다 */
-export function popupNaturalY(p: PopupView, py: number, reducedMotion = false): number {
+function popupNaturalY(p: PopupView, py: number, reducedMotion = false): number {
   return py - 22 - (reducedMotion ? 0 : p.progress * 40);
 }
 

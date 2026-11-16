@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { FORTRESS_HOME_PATH } from "../battle-ui/lib/roomLabels";
 
 /**
  * 포트리스 화면 공통 모양 — 테트리스 화면과 같은 토큰(칩 버튼·카드·선택 칸·키 표시)을 한곳에 둔다
@@ -9,6 +10,9 @@ import Link from "next/link";
 
 /** 화면 위 작은 버튼(나가기·도움말) */
 export const CHIP_BUTTON = "flex min-h-11 min-w-11 shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-slate-700/60 bg-slate-900/70 px-3 text-xs text-slate-400 hover:text-slate-200";
+
+/** 결과·기록·리플레이 끝의 보조 동작(기록 보기·공유·포트리스 홈·결과로) — 같은 줄에 나란히 놓이는 둥근 테두리 버튼 */
+export const SECONDARY_ACTION = "flex min-h-11 flex-1 items-center justify-center rounded-full border border-white/15 px-3 text-sm font-semibold text-slate-200 hover:border-white/30";
 
 /** 페이지 카드 */
 export const CARD = "rounded-3xl border border-white/10 bg-slate-900/80 p-5";
@@ -35,7 +39,6 @@ export function noMouseFocus(e: React.MouseEvent) {
 }
 
 /** 포트리스 홈 주소 — 결과 화면의 "포트리스 홈" 버튼이 간다 */
-export const FORTRESS_HOME_PATH = "/games/fortress";
 
 /**
  * 결과 화면의 "포트리스 홈" 버튼 — AI전·온라인 결과·리플레이 끝·기록 보기가 같이 쓴다

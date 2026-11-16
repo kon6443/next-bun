@@ -1,17 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { prefersReducedMotion } from "@/app/games/_shared/lib/motion";
 import type { MapId } from "../engine";
 import { DEFAULT_TANK_SKIN, type TankSkin } from "../lib/tankSkins";
-import { SLOT_COLORS, TEAM_COLORS } from "../renderer/drawScene";
+import { SLOT_COLORS, TEAM_COLORS } from "../lib/slotColors";
 import { TankSkinPreview } from "./TankSkinPreview";
 
 /**
  * 결과 화면 연출 조각(D-025 보충 6) — 솔로·온라인·기록 보기가 함께 쓴다(vivid)
  * 숫자 카운트업 · 등급 배지 · 꽃가루 · 승자 탱크 포즈. 움직임 줄이기면 모두 정적으로(숫자는 바로 최종값)
  */
-
-export const prefersReducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
 
 /** 0에서 target까지 부드럽게 올라가는 숫자 — 움직임 줄이기·테스트 환경(rAF 없음)이면 바로 target */
 export function useCountUp(target: number, { duration = 900, delay = 0 }: { duration?: number; delay?: number } = {}): number {
@@ -118,7 +117,7 @@ export function HeroTanks({ tanks, label, mapId, className = "h-36" }: { tanks: 
   }, []);
   return (
     <div ref={ref} data-testid="result-hero">
-      <TankSkinPreview tanks={tanks} look="vivid" mapId={mapId} className={className} label={label} />
+      <TankSkinPreview tanks={tanks} mapId={mapId} className={className} label={label} />
     </div>
   );
 }

@@ -12,7 +12,7 @@ import { type FortressSkins, equipFortressSkin, getMyFortressSkins, upgradeFortr
 import { cardStyles } from "@/styles/teams";
 import { ApiError } from "@/types/api";
 import { TankSkinPreview } from "../components/TankSkinPreview";
-import { SLOT_COLORS } from "../renderer/drawScene";
+import { SLOT_COLORS } from "../lib/slotColors";
 import { formatPoints } from "../lib/points";
 import {
   DEFAULT_TANK_SKIN_ID,
@@ -24,6 +24,7 @@ import {
   type TankSkinId,
   isTankSkinId,
 } from "../lib/tankSkins";
+import { FORTRESS_HOME_PATH } from "../battle-ui/lib/roomLabels";
 
 type Status = "guest" | "loading" | "ready" | "error" | "expired";
 
@@ -160,7 +161,7 @@ export function FortressSkinsView() {
     <TeamsPageLayout maxWidth="lg-wide">
       <div className="flex flex-col gap-4 pb-8">
         <header className="flex items-center gap-1">
-          <Link href="/games/fortress" aria-label="포트리스 홈" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-2xl text-slate-200 hover:bg-white/10">
+          <Link href={FORTRESS_HOME_PATH} aria-label="포트리스 홈" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-2xl text-slate-200 hover:bg-white/10">
             <span aria-hidden="true">‹</span>
           </Link>
           <h1 className="text-2xl font-bold text-white">탱크 스킨</h1>
@@ -372,7 +373,7 @@ function UpgradeConfirm({ cost, balance, target, busy, onConfirm, onCancel }: { 
 }
 
 /** 장착·강화 오류 문구 — 코드별 한국어(테트리스 upgradeErrorMessage와 같은 문구), 그 밖은 서버 메시지 */
-export function skinErrorMessage(err: ApiError): string {
+function skinErrorMessage(err: ApiError): string {
   if (err.code === "USER_POINTS_INSUFFICIENT") return "포인트가 부족해요.";
   if (err.code === "USER_SKIN_LEVEL_MISMATCH") return "레벨이 다른 곳에서 바뀌었어요. 최신 상태로 다시 불러올게요.";
   if (err.code === "USER_SKIN_NOT_OWNED") return "보유한 스킨만 쓸 수 있어요.";

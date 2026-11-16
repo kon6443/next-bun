@@ -5,10 +5,10 @@
 
 import { type Action, type MatchConfig, type MatchState, applyAction, createMatch } from "../engine";
 
-export const POINTS_PARTICIPATE = 20_000;
-export const POINTS_WIN = 30_000;
-export const POINTS_PER_KO = 10_000;
-export const POINTS_MAX_KOS = 3;
+const POINTS_PARTICIPATE = 20_000;
+const POINTS_WIN = 30_000;
+const POINTS_PER_KO = 10_000;
+const POINTS_MAX_KOS = 3;
 
 /** 포인트 표기 — 정수·천 단위 쉼표·" P"(음수는 0). 테트리스 formatPoints와 같은 모양 */
 export const formatPoints = (points: number) => `${Math.max(0, Math.floor(points)).toLocaleString("ko-KR")} P`;
@@ -22,8 +22,8 @@ export function maxPointsIfLoggedIn({ won, kos }: { won: boolean; kos: number })
 }
 
 /** 유효 경기 조건 — 백엔드 fortress-points.rules.ts(minTurns 6 · minRealShots 3)와 같은 값 */
-export const POINTS_MIN_TURNS = 6;
-export const POINTS_MIN_REAL_SHOTS = 3;
+const POINTS_MIN_TURNS = 6;
+const POINTS_MIN_REAL_SHOTS = 3;
 
 /** 끝난 턴 수 — 엔진은 승패를 낸 턴에서 turn.no를 올리지 않고 끝내므로 그 턴을 더한다(턴 상한이면 그대로). 백엔드 playedTurns와 같다 */
 export function playedTurns(state: Pick<MatchState, "turn" | "maxTurns">): number {

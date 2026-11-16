@@ -6,7 +6,7 @@ import { SoundSettingsSection } from "@/app/games/_shared/components/SoundSettin
 import { useSoundSettings } from "@/app/games/_shared/hooks/useSoundSettings";
 import { DEFAULT_FORTRESS_SETTINGS, type FortressSettings, getFortressSettings, saveFortressSettings, subscribeFortressSettings } from "../lib/fortressSettings";
 
-export function useFortressSettings(): { settings: FortressSettings; update: (partial: Partial<FortressSettings>) => FortressSettings } {
+function useFortressSettings(): { settings: FortressSettings; update: (partial: Partial<FortressSettings>) => FortressSettings } {
   const settings = useSyncExternalStore(subscribeFortressSettings, getFortressSettings, () => DEFAULT_FORTRESS_SETTINGS);
   return { settings, update: saveFortressSettings };
 }
