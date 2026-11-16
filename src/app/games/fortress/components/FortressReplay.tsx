@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { loadReplayEngine } from "../engine-versions";
 import { CAMERA_WAIT_POLL_MS, cameraWaitDone } from "../lib/cameraWait";
-import { CHIP_BUTTON } from "./fortressUi";
+import { CHIP_BUTTON, FortressHomeButton } from "./fortressUi";
 import { WindGauge } from "./WindGauge";
 import { slotColor, useBattleView } from "../hooks/useBattleView";
 import { type Replay, type ReplayData, buildReplay, stateAt } from "../lib/replay";
@@ -33,12 +33,14 @@ type Props = {
   /** 닫기 문구 — 결과 화면 안에서는 "결과로 돌아가기"(기본), 공유 페이지에서는 다른 문구 */
   closeLabel?: string;
   onClose: () => void;
+  /** 끝 화면의 "포트리스 홈" — 온라인 방 안에서는 방을 나가는 흐름을 준다. 없으면 홈 링크 */
+  onHome?: () => void;
   /** 그림(보충 5) — 없으면 주소의 ?look(기본 vivid) */
   look?: Look;
 };
 
 /** 리플레이 다시 보기 — 기록의 엔진 버전으로 처음부터 다시 돌려(buildReplay) 턴마다 연출한다 */
-export function FortressReplay({ data, controllers, names, skins, expectedHash, closeLabel = "결과로 돌아가기", onClose, look: lookProp }: Props) {
+export function FortressReplay({ data, controllers, names, skins, expectedHash, closeLabel = "결과로 돌아가기", onClose, onHome, look: lookProp }: Props) {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [look] = useState<Look>(() => lookProp ?? lookFromUrl());
 
@@ -60,7 +62,7 @@ export function FortressReplay({ data, controllers, names, skins, expectedHash, 
   }, [data, expectedHash]);
 
   if (loaded && "replay" in loaded)
-    return <ReplayPlayer replay={loaded.replay} hashCheck={loaded.hashCheck} controllers={controllers} names={names} skins={skins} closeLabel={closeLabel} onClose={onClose} look={look} />;
+    return <ReplayPlayer replay={loaded.replay} hashCheck={loaded.hashCheck} controllers={controllers} names={names} skins={skins} closeLabel={closeLabel} onClose={onClose} onHome={onHome} look={look} />;
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
       <p className="text-sm text-slate-300" role={loaded ? "alert" : "status"}>
@@ -72,6 +74,9 @@ export function FortressReplay({ data, controllers, names, skins, expectedHash, 
     </div>
   );
 }
+
+/** 끝 화면 버튼(돌아가기·포트리스 홈) — 결과 화면 보조 버튼과 같은 모양 */
+const END_ACTION = "flex min-h-11 flex-1 items-center justify-center whitespace-nowrap rounded-full border border-white/15 px-3 text-sm font-semibold text-slate-200 hover:border-white/30";
 
 // 끝에 닿아도 disabled로 바꾸지 않는다(누른 버튼이 disabled가 되면 키보드 포커스가 body로 빠진다) — aria-disabled + 무시
 const CONTROL = "min-h-12 min-w-12 rounded-xl border border-white/15 bg-slate-800/80 px-3 text-base text-slate-100 active:bg-slate-700 aria-disabled:opacity-40";
@@ -95,6 +100,7 @@ function ReplayPlayer({
   skins,
   closeLabel,
   onClose,
+  onHome,
   look,
 }: {
   replay: Replay;
@@ -104,6 +110,7 @@ function ReplayPlayer({
   skins?: readonly TankSkin[];
   closeLabel: string;
   onClose: () => void;
+  onHome?: () => void;
   look: Look;
 }) {
   const total = replay.turns.length;
@@ -221,6 +228,15 @@ function ReplayPlayer({
             ▶▶
           </button>
         </div>
+        {/* 끝까지 보면 — 돌아가기(결과·기록) · 포트리스 홈 */}
+        {atEnd ? (
+          <div className="mx-auto mt-2 flex max-w-md gap-2" data-testid="fortress-replay-end">
+            <button type="button" onClick={onClose} className={END_ACTION} data-testid="fortress-replay-close">
+              {closeLabel}
+            </button>
+            <FortressHomeButton className={END_ACTION} onClick={onHome} />
+          </div>
+        ) : null}
       </section>
     </div>
   );

@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 /**
  * 포트리스 화면 공통 모양 — 테트리스 화면과 같은 토큰(칩 버튼·카드·선택 칸·키 표시)을 한곳에 둔다
  * 근거: 칩 버튼 TetrisPlay header, 카드 cardStyles.section·BattleLobbyView, 선택 칸 BattleLobbyView 인원 pill
@@ -30,4 +32,26 @@ export function Keycap({ children }: { children: React.ReactNode }) {
  */
 export function noMouseFocus(e: React.MouseEvent) {
   e.preventDefault();
+}
+
+/** 포트리스 홈 주소 — 결과 화면의 "포트리스 홈" 버튼이 간다 */
+export const FORTRESS_HOME_PATH = "/games/fortress";
+
+/**
+ * 결과 화면의 "포트리스 홈" 버튼 — AI전·온라인 결과·리플레이 끝·기록 보기가 같이 쓴다
+ * onClick이 없으면 링크로 이동한다. 온라인 방 안에서는 onClick으로 방을 나가는 흐름(나가기와 같은)을 탄다
+ * 모양은 부르는 쪽 className(그 화면의 보조 버튼과 같게). vivid 3D 판은 data-testid로 입힌다(fortressVivid.module.css)
+ */
+export function FortressHomeButton({ className, onClick }: { className: string; onClick?: () => void }) {
+  if (onClick)
+    return (
+      <button type="button" onClick={onClick} className={className} data-testid="fortress-home">
+        포트리스 홈
+      </button>
+    );
+  return (
+    <Link href={FORTRESS_HOME_PATH} className={className} data-testid="fortress-home">
+      포트리스 홈
+    </Link>
+  );
 }

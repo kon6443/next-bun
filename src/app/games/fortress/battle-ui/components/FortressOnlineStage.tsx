@@ -8,7 +8,7 @@ import { Button } from "@/app/teams/components/Button";
 import { ENGINE_VERSION } from "../../engine";
 import { type Controller, FortressMatch, type OnlineLink } from "../../components/FortressMatch";
 import { FortressReplay } from "../../components/FortressReplay";
-import { CARD, EYEBROW } from "../../components/fortressUi";
+import { CARD, EYEBROW, FORTRESS_HOME_PATH, FortressHomeButton } from "../../components/fortressUi";
 import vividStyles from "../../components/fortressVivid.module.css";
 import { lookFromUrl, usesVivid } from "../../lib/look";
 import { useResultMusic } from "../../lib/sound/useResultMusic";
@@ -49,12 +49,14 @@ type View =
  * "다시 보기"는 저장됐으면 서버 리플레이(해시 대조), 아니면 이 경기에서 쌓은 로컬 기록
  * 저장 대기(published)는 여기서 한 번 — 결과 ↔ 다시 보기를 오가도 폴링을 처음부터 다시 하지 않는다
  */
-export function FortressOnlineStage({ room, onExit }: RoomStageProps<RoomState>) {
+export function FortressOnlineStage({ room, onExit, onExitTo }: RoomStageProps<RoomState>) {
   const { feed, myPlayerId, submitTurn, resync, rematch } = useFortressSocket();
   const [viewState, setView] = useState<View>({ kind: "match" });
   const view: View = viewState.kind !== "match" && viewState.matchId !== feed?.matchId ? { kind: "match" } : viewState;
   const published = useFortressMatchPublished(view.kind === "match" || !feed ? null : feed.matchId);
   const isHost = myPlayerId === room.hostId;
+  // 결과·리플레이의 "포트리스 홈" — 방 나가기와 같은 흐름(먼저 이동, 방은 뒤에서 나간다)으로 홈에
+  const goHome = () => onExitTo(FORTRESS_HOME_PATH);
 
   // 진행 중 경기를 나가면 기권 — 경기 화면 밖(불러오는 중·버전 다름)에서도 확인을 받는다
   const [exitAsk, setExitAsk] = useState(false);
@@ -145,6 +147,7 @@ export function FortressOnlineStage({ room, onExit }: RoomStageProps<RoomState>)
         skins={server?.skins ?? skins}
         expectedHash={server?.expectedHash}
         onClose={() => setView({ kind: "result", matchId: view.matchId, replay: view.replay })}
+        onHome={goHome}
       />
     );
   }
@@ -167,6 +170,7 @@ export function FortressOnlineStage({ room, onExit }: RoomStageProps<RoomState>)
         }}
         onRematch={() => void runRematch(rematch)}
         onExit={onExit}
+        onHome={goHome}
       />
     );
   }
@@ -270,6 +274,7 @@ export function OnlineResult({
   onReplay,
   onRematch,
   onExit,
+  onHome,
 }: {
   matchId: string;
   /** 이 경기에서 쌓은 행동 기록 — 게스트 "로그인했다면" 적립 조건 판정에 쓴다 */
@@ -285,6 +290,8 @@ export function OnlineResult({
   onReplay: (published: boolean) => Promise<void>;
   onRematch: () => void;
   onExit: () => void;
+  /** 방을 나가 포트리스 홈으로 */
+  onHome: () => void;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => headingRef.current?.focus(), []);
@@ -375,6 +382,7 @@ export function OnlineResult({
         </p>
         {kakaoScript}
         {shareOpen && saved ? <ShareMenu content={buildFortressShareContent(saved)} kakao={kakao} subject="경기 기록" onClose={() => setShareOpen(false)} /> : null}
+        <FortressHomeButton className={RECORD_LINK} onClick={onHome} />
         {roomStatus === "RESULT" && !isHost ? <p className="text-center text-xs text-slate-400">방장이 다시 한 판을 열면 대기실로 가요.</p> : null}
         <ResultActions isHost={isHost && roomStatus === "RESULT"} onRematch={onRematch} onExit={onExit} />
       </div>

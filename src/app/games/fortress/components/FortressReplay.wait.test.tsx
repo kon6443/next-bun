@@ -165,3 +165,37 @@ describe("리플레이 연출의 무기 (D-025 B)", () => {
     expect(hook.state.metas[0]).toEqual({ weaponId: 2 });
   });
 });
+
+describe("리플레이 끝 화면 — 돌아가기 · 포트리스 홈", () => {
+  async function playToEnd(props: { onHome?: () => void; onClose?: () => void } = {}) {
+    hook.state.ready = true;
+    await act(async () => {
+      render(<FortressReplay data={{ engineVersion: ENGINE_VERSION, config, actions: twoShots() }} controllers={["human", "human"]} onClose={props.onClose ?? (() => {})} onHome={props.onHome} />);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    // 끝나기 전에는 끝 화면 버튼이 없다
+    expect(screen.queryByTestId("fortress-replay-end")).toBeNull();
+    act(() => hook.state.onEnd?.());
+    act(() => hook.state.onEnd?.());
+    expect(screen.getByTestId("fortress-replay-turn").textContent).toContain("끝");
+  }
+
+  it("onHome이 없으면(솔로·공유 페이지) 포트리스 홈은 링크, 돌아가기는 onClose", async () => {
+    const onClose = vi.fn();
+    await playToEnd({ onClose });
+    const home = screen.getByRole("link", { name: "포트리스 홈" });
+    expect(home.getAttribute("href")).toBe("/games/fortress");
+    fireEvent.click(screen.getByTestId("fortress-replay-close"));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("onHome이 있으면(온라인 방 안) 버튼으로 그 흐름(방 나가기 → 홈)을 부른다", async () => {
+    const onHome = vi.fn();
+    await playToEnd({ onHome });
+    expect(screen.queryByRole("link", { name: "포트리스 홈" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "포트리스 홈" }));
+    expect(onHome).toHaveBeenCalledTimes(1);
+  });
+});

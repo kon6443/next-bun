@@ -8,7 +8,7 @@ import { formatCompactDateTime } from "@/app/utils/dateUtils";
 import { type FortressMatch, type FortressReplay as ReplayBody, getFortressMatch, getFortressReplay } from "@/services/fortressService";
 import { ApiError } from "@/types/api";
 import { FortressReplay } from "../../components/FortressReplay";
-import { CARD, EYEBROW } from "../../components/fortressUi";
+import { CARD, EYEBROW, FortressHomeButton } from "../../components/fortressUi";
 import vividStyles from "../../components/fortressVivid.module.css";
 import { DEFAULT_LOOK, lookFromUrl, usesVivid } from "../../lib/look";
 import type { ReplayData } from "../../lib/replay";
@@ -154,6 +154,7 @@ export function FortressMatchViewer({ matchId }: { matchId: string }) {
               <button type="button" onClick={() => setShareOpen(true)} aria-haspopup="dialog" className={LINK} data-testid="fortress-viewer-share">
                 공유
               </button>
+              <FortressHomeButton className={LINK} />
             </div>
             {kakaoScript}
             {shareOpen ? <ShareMenu content={buildFortressShareContent(loaded.match)} kakao={kakao} subject="경기 기록" onClose={() => setShareOpen(false)} /> : null}

@@ -29,7 +29,16 @@ export type BattleRoomApi<R extends BaseRoomState> = {
 };
 
 /** 들어가 있을 때 그리는 것(대기실·대전) — 게임마다 */
-export type RoomStageProps<R extends BaseRoomState> = { room: R; connection: ConnectionStatus; onReconnect: () => void; onExit: () => void; onCopyInvite: () => void };
+export type RoomStageProps<R extends BaseRoomState> = {
+  room: R;
+  connection: ConnectionStatus;
+  onReconnect: () => void;
+  /** 방을 나가 로비로 */
+  onExit: () => void;
+  /** 방을 나가 다른 화면으로(예: 게임 홈) — 나가는 흐름은 onExit와 같고 가는 곳만 다르다 */
+  onExitTo: (path: string) => void;
+  onCopyInvite: () => void;
+};
 
 type BattleRoomViewProps<R extends BaseRoomState> = {
   code: string;
@@ -163,10 +172,10 @@ export function BattleRoomView<R extends BaseRoomState>({
     );
   };
 
-  /** 먼저 이동한다 — 나가기 응답(최대 몇 초)을 기다리는 동안 입장 화면이 보이지 않게 */
-  const exit = () => {
+  /** 먼저 이동한다 — 나가기 응답(최대 몇 초)을 기다리는 동안 입장 화면이 보이지 않게. 기본은 로비 */
+  const exitTo = (path: string) => {
     setLeaving(true);
-    router.push(LOBBY_PATH);
+    router.push(path);
     void leaveRoom();
   };
 
@@ -183,7 +192,7 @@ export function BattleRoomView<R extends BaseRoomState>({
   if (leaving || kickedHere) return null;
 
   if (inRoom && room) {
-    return renderStage({ room, connection: status, onReconnect: reconnect, onExit: exit, onCopyInvite: copyInvite });
+    return renderStage({ room, connection: status, onReconnect: reconnect, onExit: () => exitTo(LOBBY_PATH), onExitTo: exitTo, onCopyInvite: copyInvite });
   }
 
   return (

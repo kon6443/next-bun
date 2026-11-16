@@ -6,7 +6,7 @@ import { slotColor } from "../hooks/useBattleView";
 import { type ReplayData, buildReplay, summarizeReplay } from "../lib/replay";
 import { Button } from "@/app/teams/components/Button";
 import { type Controller, playerName } from "./FortressMatch";
-import { CARD, EYEBROW } from "./fortressUi";
+import { CARD, EYEBROW, FortressHomeButton } from "./fortressUi";
 import { useResultMusic } from "../lib/sound/useResultMusic";
 
 const TEAM_NAMES = ["파랑", "주황"];
@@ -100,9 +100,13 @@ export function FortressResult({ data, controllers, onReplay, onRematch, onSetup
           <Button type="button" size="md" fullWidth className="min-h-12 text-base" onClick={onRematch} data-testid="fortress-rematch">
             다시하기
           </Button>
-          <Button type="button" variant="secondary" size="md" fullWidth className="min-h-12 text-base" onClick={onReplay} data-testid="fortress-replay">
-            다시 보기
-          </Button>
+          {/* 다시 보기 · 포트리스 홈 — 보조 버튼 둘은 한 줄에(세로 공간을 아낀다) */}
+          <div className="grid grid-cols-2 gap-2">
+            <Button type="button" variant="secondary" size="md" fullWidth className="min-h-12 px-3 text-base" onClick={onReplay} data-testid="fortress-replay">
+              다시 보기
+            </Button>
+            <FortressHomeButton className="flex min-h-12 items-center justify-center rounded-full border border-white/20 px-3 text-base font-semibold text-slate-200 transition hover:border-white/40" />
+          </div>
           <button type="button" onClick={onSetup} className="min-h-11 rounded-full px-2 text-sm text-sky-300">
             설정 바꾸기
           </button>

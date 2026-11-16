@@ -137,4 +137,13 @@ describe("저장된 경기 페이지 (F6)", () => {
     expect(screen.getByRole("table").textContent).toContain("다라");
     expect(screen.queryByTestId("fortress-result-cards")).toBeNull();
   });
+
+  it("포트리스 홈 링크 — 공유로 들어온 사람도 게임 홈으로", async () => {
+    svc.getFortressMatch.mockResolvedValue(ok(match));
+    svc.getFortressReplay.mockResolvedValue(ok(replay));
+    await act(async () => {
+      render(<FortressMatchViewer matchId={match.matchId} />);
+    });
+    expect(screen.getByRole("link", { name: "포트리스 홈" }).getAttribute("href")).toBe("/games/fortress");
+  });
 });
