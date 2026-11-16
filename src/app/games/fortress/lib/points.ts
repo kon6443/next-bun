@@ -25,7 +25,7 @@ export function maxPointsIfLoggedIn({ won, kos }: { won: boolean; kos: number })
 const POINTS_MIN_TURNS = 6;
 const POINTS_MIN_REAL_SHOTS = 3;
 
-/** 끝난 턴 수 — 엔진은 승패를 낸 턴에서 turn.no를 올리지 않고 끝내므로 그 턴을 더한다(턴 상한이면 그대로). 백엔드 playedTurns와 같다 */
+/** 적립 조건용 진행한 턴 수(백엔드 playedTurns와 같다) — 승패를 낸 턴을 더한다(턴 상한이면 그대로). 끝난 경기에서는 화면의 matchTurns(lib/replay)와 같은 값이다. 재적용이 중간에 실패해도 백엔드처럼 +1 하므로 matchTurns로 바꾸지 않는다 */
 export function playedTurns(state: Pick<MatchState, "turn" | "maxTurns">): number {
   return state.turn.no >= state.maxTurns ? state.turn.no : state.turn.no + 1;
 }
@@ -34,7 +34,7 @@ export type PointsEligibility = { eligible: true } | { eligible: false; reason: 
 
 /**
  * 이 경기가 slot에게 적립 대상이었는지 — 백엔드와 같은 규칙으로 행동 기록을 다시 적용해 센다
- * - 경기 조건: 끝난 턴 수 ≥ 6 · 개인 조건: 내 차례 실제 발사(파워 ≥ 1 fire) ≥ 3, 내 기권(resign) 없음
+ * - 경기 조건: 진행한 턴 수(playedTurns) ≥ 6 · 개인 조건: 내 차례 실제 발사(파워 ≥ 1 fire) ≥ 3, 내 기권(resign) 없음
  * - 쏜 사람 = 행동을 적용하기 직전 state의 turn.slot. 재적용이 실패하면 발사·턴은 거기까지만 센다(백엔드와 같다)
  * - 기권은 행동 기록 전체에서 본다(백엔드 fortress-result.service resigned 집합과 같다)
  */

@@ -43,7 +43,8 @@ export function fortressHeadline(match: Pick<FortressMatch, 'roomName'> & Result
   return match.roomName ? `${match.roomName} — ${result}` : result;
 }
 
-export function buildFortressShareContent(match: FortressMatch): ShareContent {
+/** 서버 경기(기록 보기·온라인 결과)와 막 올린 혼자 한 경기(lib/soloUpload)가 같이 쓴다 — 결과 모양만 있으면 된다 */
+export function buildFortressShareContent(match: Pick<FortressMatch, 'matchId' | 'roomName'> & ResultLike): ShareContent {
   const headline = fortressHeadline(match);
   const statLine = fortressStatLine(match);
   return {

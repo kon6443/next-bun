@@ -29,6 +29,7 @@ vi.mock("../hooks/useBattleView", () => ({
 }));
 
 import { type Action, type MatchState, applyAction, createMatch, ENGINE_VERSION } from "../engine";
+import golden from "../engine/__fixtures__/golden-matches.json";
 import { CAMERA_WAIT_MAX_MS } from "../lib/cameraWait";
 import { FortressReplay } from "./FortressReplay";
 
@@ -196,5 +197,34 @@ describe("리플레이 끝 화면 — 돌아가기 · 포트리스 홈", () => {
     expect(screen.queryByRole("link", { name: "포트리스 홈" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "포트리스 홈" }));
     expect(onHome).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("리플레이 진행 표시 — 진행한 턴 수(기록 머리 \"N턴\"과 같은 수)", () => {
+  it("골든 25수: 시작 \"0 / 25턴\" → 결정타 직전 \"24 / 25턴\" → 끝 \"끝 · 25 / 25턴\"", async () => {
+    hook.state.ready = true;
+    const g = (golden as unknown as { name: string; config: typeof config; actions: Action[] }[]).find((c) => c.name === "ffa 2인 hills AI 중·중");
+    if (!g) throw new Error("golden");
+    await act(async () => {
+      render(<FortressReplay data={{ engineVersion: ENGINE_VERSION, config: g.config, actions: g.actions }} controllers={[1, 1]} onClose={() => {}} />);
+    });
+    const label = () => screen.getByTestId("fortress-replay-turn").textContent ?? "";
+    // 이동 버튼은 행동 단위 — 이름도 "턴"이 아니라 "수"
+    expect(screen.getByTestId("fortress-replay-prev").getAttribute("aria-label")).toBe("이전 수");
+    expect(screen.getByTestId("fortress-replay-next").getAttribute("aria-label")).toBe("다음 수");
+    expect(label()).toMatch(/^0 \/ 25턴/);
+    for (let i = 0; i < 25; i++) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      act(() => hook.state.onEnd?.());
+      // 첫 발은 턴을 끝낸다 — 끝난 턴 수가 실제로 오른다(늘 0인 회귀를 잡는다)
+      if (i === 0) expect(label()).toMatch(/^1 \/ 25턴/);
+      const m = label().match(/(\d+) \/ (\d+)턴/);
+      expect(m && Number(m[1]) <= Number(m[2])).toBe(true);
+      // 결정타를 걸기 직전(24수 뒤) — 아직 결정 전이라 25가 아니다
+      if (i === 23) expect(label()).toMatch(/^24 \/ 25턴/);
+    }
+    expect(label()).toMatch(/^끝 · 25 \/ 25턴/);
   });
 });

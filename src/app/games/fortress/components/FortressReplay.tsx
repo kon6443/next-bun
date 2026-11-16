@@ -7,7 +7,7 @@ import { CHIP_BUTTON, FortressHomeButton, SECONDARY_ACTION } from "./fortressUi"
 import { WindGauge } from "./WindGauge";
 import { useBattleView } from "../hooks/useBattleView";
 import { slotColor } from "../lib/slotColors";
-import { type Replay, type ReplayData, buildReplay, stateAt } from "../lib/replay";
+import { type Replay, type ReplayData, buildReplay, replayTurnProgress, stateAt } from "../lib/replay";
 import { type Controller, playerName } from "../lib/controllers";
 import { type TankSkin, toTankSkin } from "../lib/tankSkins";
 import vividStyles from "./fortressVivid.module.css";
@@ -88,6 +88,11 @@ function checkHash(mine: string, expected: string | undefined, actions: number):
   return "mismatch";
 }
 
+/** 진행 표시 — "진행한 턴 / 전체 턴". 시작 "0 / 25턴" → 결정타 직전 "24 / 25턴" → 끝 "끝 · 25 / 25턴"(기록 머리 "25턴"과 같은 수) */
+function replayTurnLabel({ current, total }: { current: number; total: number }, atEnd: boolean): string {
+  return `${atEnd ? "끝 · " : ""}${current} / ${total}턴`;
+}
+
 function ReplayPlayer({
   replay,
   hashCheck,
@@ -107,8 +112,9 @@ function ReplayPlayer({
   onClose: () => void;
   onHome?: () => void;
 }) {
-  const total = replay.turns.length;
-  /** 끝난 턴 수 — 연출 중이면 turns[index]를 그리는 중 */
+  /** 행동 수 — 이동·자동 재생의 범위(화면의 턴 수는 replayTurnProgress) */
+  const actionCount = replay.turns.length;
+  /** 끝난 행동 수 — 연출 중이면 turns[index]를 그리는 중. 이동 버튼은 행동 단위, 보이는 숫자는 엔진 턴 수(replayTurnProgress) */
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [animating, setAnimating] = useState(false);
@@ -127,16 +133,16 @@ function ReplayPlayer({
 
   useEffect(() => setPaused(!playing), [playing, setPaused]);
 
-  /** 다음 턴을 걸기 전 카메라를 기다리기 시작한 때(턴별) · 다시 확인하라는 신호 — 그 턴을 걸거나 일시정지·이동하면 지운다(다음 방문은 처음부터 기다린다) */
+  /** 다음 행동을 걸기 전 카메라를 기다리기 시작한 때(행동별) · 다시 확인하라는 신호 — 그 행동을 걸거나 일시정지·이동하면 지운다(다음 방문은 처음부터 기다린다) */
   const waitRef = useRef<{ index: number; since: number } | null>(null);
   const [waitTick, setWaitTick] = useState(0);
 
-  // 재생 중이고 연출이 비면 다음 턴을 건다 — 마지막 턴 뒤엔 멈춘다
+  // 재생 중이고 연출이 비면 다음 행동을 건다 — 마지막 행동 뒤엔 멈춘다
   // 둘째 턴부터는 카메라가 그 발을 컷 없이 따라갈 자리에 올 때까지 조금 기다린다(최대 CAMERA_WAIT_MAX_MS, lib/cameraWait)
   useEffect(() => {
     if (!playing) waitRef.current = null;
     if (!playing || animating) return;
-    if (index >= total) {
+    if (index >= actionCount) {
       setPlaying(false);
       return;
     }
@@ -152,11 +158,11 @@ function ReplayPlayer({
     waitRef.current = null;
     play(turn.before, turn.events, turn.after, { weaponId: turn.action.kind === "fire" ? turn.action.weaponId : undefined });
     setAnimating(true);
-  }, [playing, animating, index, total, replay, play, cameraReadyFor, waitTick]);
+  }, [playing, animating, index, actionCount, replay, play, cameraReadyFor, waitTick]);
 
-  /** 그 턴 경계로 바로 — 연출 중이던 턴은 버린다(재생 중이면 거기서 이어서) */
+  /** 그 행동 경계로 바로 — 연출 중이던 행동은 버린다(재생 중이면 거기서 이어서) */
   const goTo = (i: number) => {
-    const target = Math.max(0, Math.min(total, i));
+    const target = Math.max(0, Math.min(actionCount, i));
     show(stateAt(replay, target));
     waitRef.current = null;
     setAnimating(false);
@@ -164,15 +170,16 @@ function ReplayPlayer({
   };
   const toggle = () => {
     if (playing) return setPlaying(false);
-    if (index >= total) goTo(0);
+    if (index >= actionCount) goTo(0);
     setPlaying(true);
   };
 
   const shown = stateAt(replay, index);
-  /** 지금(연출 중) 또는 다음에 연출할 턴의 행동자 — 표시 "턴 n"도 이 턴 기준이라 이전·다음이 늘 한 칸씩 움직인다 */
-  const actor = index < total ? replay.turns[index].actor : null;
+  /** 지금(연출 중) 또는 다음에 연출할 행동의 행동자 */
+  const actor = index < actionCount ? replay.turns[index].actor : null;
   const atStart = index === 0 && !animating;
-  const atEnd = index >= total;
+  const atEnd = index >= actionCount;
+  const turns = replayTurnProgress(replay, index);
 
   return (
     <div className={`flex h-full flex-col pt-[env(safe-area-inset-top)] ${vividStyles.vivid}`} data-testid="fortress-replay" data-hash-check={hashCheck}>
@@ -198,13 +205,13 @@ function ReplayPlayer({
       <div ref={view.containerRef} className="relative min-h-0 flex-1">
         <canvas ref={view.canvasRef} className="absolute inset-0 block touch-none" {...view.canvasHandlers} aria-label="리플레이 전장 — 끌어서 이동, 두 손가락으로 확대" />
         <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-center">
-          <WindGauge wind={(index < total ? replay.turns[index].before : shown).wind} turnKey={index} />
+          <WindGauge wind={(index < actionCount ? replay.turns[index].before : shown).wind} turnKey={index} />
         </div>
       </div>
 
       <section className="border-t border-white/10 bg-slate-900/80 px-3 pt-2 pb-[calc(0.75rem+env(safe-area-inset-bottom))]" aria-label="리플레이 조작" data-hud="panel">
         <p className="text-center text-sm tabular-nums text-slate-300" aria-live="polite" data-testid="fortress-replay-turn">
-          {atEnd ? `끝 · 전체 ${total}턴` : `턴 ${index + 1} / ${total}`}
+          {replayTurnLabel(turns, atEnd)}
           {actor !== null ? ` · ${playerName(controllers, actor, names)}` : ""}
           {atEnd ? <span className="sr-only">. 아래에서 {closeLabel} 또는 포트리스 홈을 고를 수 있어요</span> : null}
         </p>
@@ -212,13 +219,13 @@ function ReplayPlayer({
           <button type="button" data-hud="key" className={CONTROL} onClick={() => !atStart && goTo(0)} aria-disabled={atStart} aria-label="처음으로">
             ⏮
           </button>
-          <button type="button" data-hud="key" className={CONTROL} onClick={() => !atStart && goTo(index - 1)} aria-disabled={atStart} aria-label="이전 턴" data-testid="fortress-replay-prev">
+          <button type="button" data-hud="key" className={CONTROL} onClick={() => !atStart && goTo(index - 1)} aria-disabled={atStart} aria-label="이전 수" data-testid="fortress-replay-prev">
             ◀
           </button>
           <button type="button" data-hud="key" className={`${CONTROL} min-w-20 font-semibold`} onClick={toggle} aria-label={playing ? "일시정지" : "재생"} data-testid="fortress-replay-toggle">
             {playing ? "⏸" : "▶"}
           </button>
-          <button type="button" data-hud="key" className={CONTROL} onClick={() => !atEnd && goTo(index + 1)} aria-disabled={atEnd} aria-label="다음 턴" data-testid="fortress-replay-next">
+          <button type="button" data-hud="key" className={CONTROL} onClick={() => !atEnd && goTo(index + 1)} aria-disabled={atEnd} aria-label="다음 수" data-testid="fortress-replay-next">
             ▶▶
           </button>
         </div>
