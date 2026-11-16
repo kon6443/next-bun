@@ -6,15 +6,15 @@
 
 export const JANK_WINDOW = 120;
 /** 이 간격(ms)을 넘으면 늦은 프레임 — 40fps 아래 */
-export const JANK_FRAME_MS = 25;
+const JANK_FRAME_MS = 25;
 /** 창 안 늦은 프레임 비율이 이 이상이면 */
-export const JANK_RATIO = 0.5;
+const JANK_RATIO = 0.5;
 /** 간격의 변동계수(표준편차/평균)가 이보다 크면 들쭉날쭉 — 30Hz 고정은 거의 0 */
-export const JANK_MIN_CV = 0.15;
+const JANK_MIN_CV = 0.15;
 /** 평균 간격이 이보다 길면(25fps 아래) 고르더라도 느린 기기 — 30Hz 고정(33ms)보다 확실히 느림 */
-export const JANK_MEAN_MS = 40;
+const JANK_MEAN_MS = 40;
 /** 변동계수에서 빼는 가장 긴 간격 수(창의 5%) */
-export const JANK_OUTLIERS = 6;
+const JANK_OUTLIERS = 6;
 const LONG_GAP_MS = 250;
 
 export type JankJudge = { push: (intervalMs: number) => boolean };

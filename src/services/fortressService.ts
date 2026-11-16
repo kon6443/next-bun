@@ -14,6 +14,8 @@ type ErrorMessageMap = {
   403?: string;
   404?: string;
   409?: string;
+  413?: string;
+  422?: string;
   429?: string;
   default: string;
 };
@@ -270,6 +272,50 @@ export async function upgradeFortressSkin(request: { skinId: string; level: numb
   });
   if (!response.ok) {
     await handleApiError(response, { 403: '아직 갖지 않은 스킨이에요.', 409: '강화하지 못했어요. 화면을 새로 고쳐 주세요.', 429: TOO_MANY, default: '스킨을 강화하지 못했습니다.' });
+  }
+  return response.json();
+}
+
+// ==================== AI전·같은 기기 대전 공유 업로드 (D-027 보충 2, 게스트 가능) ====================
+
+/** 백엔드 short 스로틀 창(1000ms) + 경계 오차 여유 — tetrisBattleService와 같다 */
+const RETRY_AFTER_UNAUTHORIZED_MS = 1100;
+const SUBMIT_TIMEOUT_MS = 30_000;
+
+/**
+ * 혼자 한 경기 업로드 본문 — 이 필드 외에는 422 VALIDATION_ERROR(이름·스킨은 서버가 정한다)
+ * slots는 config.players와 같은 slot 집합, 사람 자리는 aiLevel 키를 아예 뺀다(null도 422)
+ */
+export type FortressSoloUploadRequest = {
+  engineVersion: number;
+  config: MatchConfig;
+  actions: Action[];
+  /** 마지막 행동 뒤 stateHash(final) — 소문자 hex 8자 */
+  stateHash: string;
+  slots: ({ slot: number; kind: 'human' } | { slot: number; kind: 'ai'; aiLevel: 0 | 1 | 2 })[];
+};
+
+/**
+ * 혼자 한 경기(AI전·같은 기기)를 서버에 올려 공유 링크용 matchId를 받는다 — 결과 화면 "기록 공유"를 눌렀을 때 한 번
+ * 로그인 토큰이 있으면 싣고(첫 사람 자리에 내 장착 스킨), 만료·무효로 401이면 토큰 없이 1회 다시(테트리스 리플레이 제출과 같은 가드)
+ * 에러: 409 FORTRESS_SOLO_ENGINE_MISMATCH · 422 FORTRESS_SOLO_REPLAY_INVALID(details.reason) · 422 VALIDATION_ERROR · 413 · 429
+ */
+export async function uploadFortressSoloMatch(body: FortressSoloUploadRequest, accessToken?: string): Promise<ApiResponse<{ matchId: string }>> {
+  const send = (auth: { accessToken?: string; notifyUnauthorized?: boolean }) =>
+    fetchServiceInstance.backendFetch({ method: 'POST', endpoint: '/api/v1/fortress/solo-matches', body, ...auth, signal: timeoutSignal(SUBMIT_TIMEOUT_MS) });
+  let response = await send(accessToken ? { accessToken, notifyUnauthorized: false } : {});
+  if (accessToken && response.status === 401) {
+    await new Promise((resolve) => setTimeout(resolve, RETRY_AFTER_UNAUTHORIZED_MS));
+    response = await send({});
+  }
+  if (!response.ok) {
+    await handleApiError(response, {
+      409: '게임이 새 버전으로 바뀌었어요. 새로 고친 뒤 다시 해 주세요.',
+      413: '기록이 너무 길어 공유할 수 없어요.',
+      422: '이 경기 기록을 확인하지 못해 공유할 수 없어요.',
+      429: TOO_MANY,
+      default: '기록을 올리지 못했어요.',
+    });
   }
   return response.json();
 }

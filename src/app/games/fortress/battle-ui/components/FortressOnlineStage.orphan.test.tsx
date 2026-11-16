@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next-auth/react", () => ({ useSession: () => ({ data: null, status: "unauthenticated" }) }));
@@ -55,7 +55,7 @@ afterEach(() => {
 
 describe("끊긴 사이 끝난 경기(고아 피드)", () => {
   it("방은 끝났는데 경기 소식이 끊긴 채면 잠시 뒤 결과 화면으로 — 저장된 경기 조회(published)를 시작한다", async () => {
-    render(<FortressOnlineStage room={room} connection="connected" onReconnect={() => {}} onExit={() => {}} onCopyInvite={() => {}} />);
+    render(<FortressOnlineStage room={room} connection="connected" onReconnect={() => {}} onExit={() => {}} onExitTo={() => {}} onCopyInvite={() => {}} />);
     expect(screen.getByTestId("fortress-match")).toBeTruthy();
     expect(published.calls.at(-1)).toBeNull();
     await act(async () => {
@@ -64,5 +64,17 @@ describe("끊긴 사이 끝난 경기(고아 피드)", () => {
     expect(screen.getByTestId("fortress-online-result")).toBeTruthy();
     expect(published.calls.at(-1)).toBe(feed.matchId);
     expect(screen.getByTestId("fortress-replay-online")).toBeTruthy();
+  });
+
+  it("결과 화면의 포트리스 홈은 방을 나가 /games/fortress로 — 로비로 가는 onExit가 아니다", async () => {
+    const onExit = vi.fn();
+    const onExitTo = vi.fn();
+    render(<FortressOnlineStage room={room} connection="connected" onReconnect={() => {}} onExit={onExit} onExitTo={onExitTo} onCopyInvite={() => {}} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4100);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "포트리스 홈" }));
+    expect(onExitTo).toHaveBeenCalledExactlyOnceWith("/games/fortress");
+    expect(onExit).not.toHaveBeenCalled();
   });
 });

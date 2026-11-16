@@ -4,20 +4,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmModal } from "@/app/components/ConfirmModal";
 import { GamePad } from "@/app/games/_shared/components/GamePad";
 import { useMediaQuery } from "@/app/games/_shared/hooks/useMediaQuery";
-import { type AiLevel, chooseTurn } from "../ai/chooseTurn";
-import { ANGLE_MAX, type Action, type MatchConfig, type MatchEvent, type MatchState, POWER_MAX, TANKS, type Tank, WEAPONS, applyAction, createMatch, fnv1a, previewShot, stateHash } from "../engine";
+import type { AiLevel } from "../ai/chooseTurn";
+import { ANGLE_MAX, type Action, type MatchConfig, type MatchState, POWER_MAX, TANKS, type Tank, WEAPONS, applyAction, previewShot, stateHash } from "../engine";
 import { type MatchFeed, remainingMs } from "../battle-ui/lib/matchFeed";
-import { nearestEnemy, slotColor, useBattleView } from "../hooks/useBattleView";
+import { nearestEnemy, useBattleView } from "../hooks/useBattleView";
+import { slotColor } from "../lib/slotColors";
+import { AI_LABELS, type Controller, playerName } from "../lib/controllers";
 import type { Aim } from "../renderer/drawScene";
-import { type AngleView, type Facing, angleSpeech, angleView, defaultAngleToward, elevate, facingOf, turnAround } from "../lib/aimAngle";
+import { type Facing, angleSpeech, angleView, defaultAngleToward, elevate, facingOf, turnAround } from "../lib/aimAngle";
 import { aimKeyAction, focusKind } from "../lib/aimKeys";
-import { CAMERA_WAIT_POLL_MS, cameraWaitDone } from "../lib/cameraWait";
 import { type LastShot, aimPath, lastShotOf } from "../lib/aimAssist";
-import { recordThink } from "../lib/perfProbe";
 import { moveReach } from "../lib/moveReach";
 import { type ReplayData, newReplayData } from "../lib/replay";
 import { type TankSkin, toTankSkin } from "../lib/tankSkins";
-import { type Look, lookFromUrl, usesVivid } from "../lib/look";
+import { type Look, useLook } from "../lib/look";
 import { FortressGuide, markGuideSeen, readGuideSeen } from "./FortressGuide";
 import { CHIP_BUTTON, Keycap, choiceClass, noMouseFocus } from "./fortressUi";
 import vividStyles from "./fortressVivid.module.css";
@@ -26,13 +26,16 @@ import { WeaponIcon } from "./WeaponIcon";
 import { GameSettingsButton } from "@/app/games/_shared/components/GameSettingsButton";
 import { FortressSettingsSheet } from "./FortressSettingsSheet";
 import { getFortressSound } from "../lib/sound/player";
-import type { FortressCue } from "../lib/sound/recipes";
-import { fortressVibrate } from "../lib/fortressSettings";
+import { useMatchSound } from "../hooks/useMatchSound";
+import { useOnlineDesync } from "../hooks/useOnlineDesync";
+import { useOnlineFeed } from "../hooks/useOnlineFeed";
+import { useAiTurn } from "../hooks/useAiTurn";
+import { useAimKeys } from "../hooks/useAimKeys";
+import { useOverlayInsets } from "../hooks/useOverlayInsets";
+import { AngleText, HoldButton, PlayerChip, TurnBanner } from "./matchParts";
+import { type Phase, currentTank, replayActions, startMatch } from "../lib/matchFlow";
 import { WindGauge } from "./WindGauge";
 import { PAD, fortressPadLayout, nextWeapon } from "./fortressPad";
-
-/** slot별 조작 — 사람(이 기기) · 다른 기기(온라인, 서버가 행동을 알려 준다) · AI 레벨 */
-export type Controller = "human" | "remote" | AiLevel;
 
 /**
  * 온라인 경기(F5) — 서버 권위 턴. 행동은 서버 피드(feed.actions) 순서로만 적용하고, 내 차례 입력은 submit으로 보낸다
@@ -54,8 +57,6 @@ export type OnlineLink = {
 const SUBMIT_WAIT_CODES = new Set(["TURN_EXPIRED", "NOT_YOUR_TURN", "TURN_MISMATCH", "MATCH_NOT_FOUND"]);
 /** 남은 시간 경고(초) — DESIGN §11 표시 */
 const TIMER_WARN_MS = 5000;
-/** 서버와 어긋나 resync한 횟수 상한 — 넘으면 멈추고 새로고침을 안내 */
-const MAX_DESYNC_RESYNCS = 3;
 
 /** 발사 버튼을 누르고 있으면 이 시간에 파워 0 → 100 */
 const CHARGE_MS = 1600;
@@ -66,43 +67,9 @@ const CHARGE_MS = 1600;
 const MIN_HOLD_MS = 250;
 /** 포인터로 누른 뒤 이 안에 오는 click은 포인터가 이미 처리했다 */
 const POINTER_CLICK_MS = 1000;
-const AI_DELAY_MS = 450;
 /** 포신 끌기 조준 — 포탑에서 이 거리(화면 px) 안을 눌러야 잡힌다, 이만큼 끌면 파워 최대 */
 const AIM_GRAB_PX = 64;
 const AIM_DRAG_FULL_PX = 170;
-export const AI_LABELS = ["AI 하", "AI 중", "AI 상"];
-
-/** 조작부가 전장 위 오버레이가 되는 화면 — 클래스의 lg(Tailwind 64rem~)·short-land(globals.css)와 같은 조건 */
-const OVERLAY_PANEL_QUERY = "(min-width: 64rem), (orientation: landscape) and (max-height: 500px)";
-
-/** aim 내 입력 · think AI 계산 · wait 다른 기기 차례 · submit 제출 응답·확정 대기 · play 연출 · over 끝 */
-type Phase = "aim" | "think" | "wait" | "submit" | "play" | "over";
-
-function start(config: MatchConfig): MatchState {
-  const r = createMatch(config);
-  if (!r.ok) throw new Error(`경기 설정 오류: ${r.reason}`);
-  return r.state;
-}
-
-export function playerName(controllers: readonly Controller[], slot: number, names?: readonly string[]): string {
-  const named = names?.[slot];
-  if (named) return named;
-  const c = controllers[slot];
-  return `P${slot + 1}${c === "human" || c === "remote" ? "" : ` (${AI_LABELS[c]})`}`;
-}
-
-/** 첫 state에 행동을 차례로 적용 — 엔진이 거부하면(서버와 어긋남) ok false. slot별 지난 발도 다시 만든다(재접속·스냅샷 뒤 조준 보조) */
-function replayActions(config: MatchConfig, actions: readonly Action[]): { state: MatchState; ok: boolean; lastShots: (LastShot | null)[] } {
-  let state = start(config);
-  const lastShots: (LastShot | null)[] = [null, null, null, null];
-  for (const action of actions) {
-    const r = applyAction(state, action);
-    if (!r.ok) return { state, ok: false, lastShots };
-    if (action.kind === "fire" && action.power > 0) lastShots[state.turn.slot] = lastShotOf(action, r.events);
-    state = r.state;
-  }
-  return { state, ok: true, lastShots };
-}
 
 const clampPower = (p: number) => Math.max(1, Math.min(POWER_MAX, Math.round(p)));
 
@@ -123,14 +90,14 @@ export function FortressMatch({
   online?: OnlineLink;
   /** 혼자하기(AI·같은 기기)의 slot별 스킨(D-025) — 온라인은 online.skins. 없거나 모르는 id는 기본, 그리기에만 쓴다 */
   skins?: readonly TankSkin[];
-  /** 경기 화면 그림(D-025 B·보충 5) — 그리기·장식만 바뀐다. 없으면 주소의 ?look(기본 vivid) — 온라인 경기도 이 규칙 */
+  /** 경기 화면 그림 — glow면 WebGL 후처리 층을 더한다. 없으면 주소의 ?look(기본 vivid) — 온라인 경기도 이 규칙 */
   look?: Look;
 }) {
-  const [look] = useState<Look>(() => lookProp ?? lookFromUrl());
+  const { glow: glowLook } = useLook(lookProp);
   // 경기 시작 때 지형 — 중간에 들어온 온라인 경기(재접속·늦은 입장)도 파인 면을 그을린 흙으로 칠하게
-  const [origin] = useState(() => start(config).terrain);
+  const [origin] = useState(() => startMatch(config).terrain);
   // 온라인은 이미 확정된 행동(재접속·늦은 입장)을 적용한 state에서 시작한다
-  const [boot] = useState(() => (online ? replayActions(config, online.feed.actions) : { state: start(config), ok: true, lastShots: [null, null, null, null] }));
+  const [boot] = useState(() => (online ? replayActions(config, online.feed.actions) : { state: startMatch(config), ok: true, lastShots: [null, null, null, null] }));
   const [state, setState] = useState<MatchState>(boot.state);
   const stateRef = useRef(state);
   const [phase, setPhase] = useState<Phase>("aim");
@@ -148,16 +115,7 @@ export function FortressMatch({
   const submitIdRef = useRef(0);
   /** 턴이 그대로인 행동(남의 기권) 연출 뒤 돌아갈 phase — 조준값·제출 대기를 지킨다 */
   const resumePhaseRef = useRef<Phase | null>(null);
-  /** 서버와 맞추지 못한 횟수 — 같은 경기에서 이만큼 넘으면 resync를 멈추고 새로고침을 안내(엔진 사본 어긋남 등) */
-  const desyncCountRef = useRef(0);
-  const [desyncFatal, setDesyncFatal] = useState(false);
-  /** 서버 행동을 내 엔진이 거부한 피드 세대 — 스냅샷(다음 세대)이 올 때까지 멈춘다 */
-  const rejectedEpochRef = useRef<number | null>(null);
-  const rejectedLengthRef = useRef(0);
-  const desyncReloadRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (desyncFatal) desyncReloadRef.current?.focus();
-  }, [desyncFatal]);
+  const { desyncFatal, desyncReloadRef, requestResync, verifyHash, resetDesyncCount } = useOnlineDesync(onlineRef, boot.ok);
 
   // 조준 입력 — slot마다 마지막 각도·파워·바라보는 쪽을 기억한다(다음 턴 시작값, 첫 턴은 가까운 적 쪽 60°)
   const lastAimRef = useRef<({ angle: number; power: number; facing: Facing } | null)[]>([null, null, null, null]);
@@ -186,7 +144,7 @@ export function FortressMatch({
     setPhase(p);
   };
 
-  const current = state.tanks[state.turn.slot] as Tank;
+  const current = currentTank(state);
   const controller = controllers[state.turn.slot];
   // beginTurn이 controllers 참조에 묶이면 부모가 새 배열로 다시 그릴 때 진행 중 턴이 초기화된다 — ref로 본다
   const controllersRef = useRef(controllers);
@@ -212,7 +170,7 @@ export function FortressMatch({
         setPhaseBoth("over");
         return;
       }
-      const t = s.tanks[s.turn.slot] as Tank;
+      const t = currentTank(s);
       const enemy = nearestEnemy(s, s.tanks.filter((x): x is Tank => x !== null), t.slot, t);
       const last = lastAimRef.current[t.slot] ?? { angle: defaultAngleToward(t.x, enemy ? enemy.x : null), power: 60, facing: enemy && enemy.x < t.x ? -1 : 1 };
       stopRepeat();
@@ -257,29 +215,15 @@ export function FortressMatch({
   /** 포커스를 돌려줄 slot — null이면 돌려주지 않는다 */
   const restoreFocusRef = useRef<number | null>(null);
   const aimRef = useRef<Aim | null>(null);
-  // 소리(D-025 보충 6) — 경기 배경음, 연출 사건의 효과음·진동(설정·움직임 줄이기에 따라)
-  useEffect(() => {
-    const sound = getFortressSound();
-    sound.setMusic("match");
-    return () => sound.setMusic(null);
-  }, []);
-  const onCues = useCallback((cues: FortressCue[]) => {
-    getFortressSound().playCues(cues);
-    // 진동 — 큰 사건 하나만(격파 > 가장 큰 폭발)
-    if (cues.some((c) => c.kind === "death")) fortressVibrate([60, 40, 90]);
-    else {
-      const r = Math.max(0, ...cues.map((c) => (c.kind === "explode" ? c.radius : 0)));
-      if (r > 0) fortressVibrate(Math.round(12 + r * 0.45));
-    }
-  }, []);
+  // 소리 — 경기 배경음, 연출 사건의 효과음·진동
+  const onCues = useMatchSound();
   // 시안 glow — WebGL 후처리 층(three는 켜질 때만 동적 import)
-  const glow = useGlowLayer(look === "glow");
+  const glow = useGlowLayer(glowLook);
   const view = useBattleView({
     initial: state,
     getAim: () => aimRef.current,
     labelOf: (slot) => onlineRef.current?.names[slot] ?? `P${slot + 1}`,
     skinOf: (slot) => toTankSkin((onlineRef.current ? onlineRef.current.skins : skinsRef.current)?.[slot]),
-    look,
     origin,
     onCues,
     onFrame: glow.onFrame,
@@ -323,41 +267,6 @@ export function FortressMatch({
   });
   const { play } = view;
 
-  /** 서버와 어긋났다 — 몇 번까지만 resync하고, 그래도 안 맞으면 멈추고 새로고침 안내(끝없는 resync·재시뮬레이션 방지) */
-  const requestResync = useCallback((report?: { seq: number; clientHash: string }) => {
-    const link = onlineRef.current;
-    if (!link) return;
-    desyncCountRef.current += 1;
-    if (desyncCountRef.current > MAX_DESYNC_RESYNCS) {
-      setDesyncFatal(true);
-      return;
-    }
-    link.resync(report);
-  }, []);
-
-  // 처음 받은 피드(재접속·늦은 입장)를 내 엔진이 끝까지 적용하지 못했다 — 재구성 경로와 같이 맞춘다(StrictMode 두 번 실행에도 한 번)
-  const bootCheckedRef = useRef(false);
-  useEffect(() => {
-    if (bootCheckedRef.current) return;
-    bootCheckedRef.current = true;
-    if (!boot.ok) requestResync();
-  }, [boot, requestResync]);
-
-  /** 온라인 — 행동 count개를 적용한 state가 서버 해시와 다르면 resync(마지막 적용 수·내 해시를 싣는다) */
-  const verifyHash = useCallback(
-    (count: number, s: MatchState) => {
-      const link = onlineRef.current;
-      const expected = link?.feed.hashes[count - 1];
-      if (!link || !expected) return true;
-      const mine = stateHash(s);
-      if (mine === expected) return true;
-      console.warn(`[fortress] 해시 불일치 seq=${count} client=${mine} server=${expected} — resync`);
-      requestResync({ seq: count, clientHash: mine });
-      return false;
-    },
-    [requestResync],
-  );
-
   /** 행동 적용 → 기록 → 연출 시작 */
   const playAction = useCallback(
     (action: Action) => {
@@ -395,63 +304,26 @@ export function FortressMatch({
     [playAction],
   );
 
-  // 온라인 — 피드의 다음 행동을 연출한다(연출이 끝나면 phase가 바뀌어 다음 것). 스냅샷이 바뀌면 처음부터 다시 만든다
-  const feedLength = online?.feed.actions.length ?? 0;
-  const feedEpoch = online?.feed.epoch ?? 0;
+  // 온라인 — 서버 피드를 차례로 연출, 스냅샷이면 다시 만든다
   const { show } = view;
-  useEffect(() => {
-    const link = onlineRef.current;
-    if (!link) return;
-    const { feed } = link;
-    if (feed.epoch !== epochRef.current) {
-      epochRef.current = feed.epoch;
-      const built = replayActions(feed.config, feed.actions);
-      lastShotRef.current = built.lastShots;
-      appliedRef.current = feed.actions.length;
-      replayRef.current = { ...newReplayData(feed.config), actions: [...feed.actions] };
-      stateRef.current = built.state;
-      setState(built.state);
-      show(built.state);
-      // 제출 응답을 기다리는 중(기권 연출 뒤 돌아갈 곳 포함)이면 그대로 둔다 — 새 턴으로 치면 조작부가 다시 열려 두 번 제출된다
-      const awaitingSubmit = phaseRef.current === "submit" || resumePhaseRef.current === "submit";
-      resumePhaseRef.current = null;
-      rejectedEpochRef.current = null;
-      if (!built.ok) requestResync();
-      // 스냅샷으로 맞았다 — 그동안의 어긋남은 풀렸으니 다시 센다
-      else if (verifyHash(appliedRef.current, built.state)) desyncCountRef.current = 0;
-      if (awaitingSubmit && built.state.result.kind === "ongoing" && built.state.turn.slot === link.mySlot) {
-        setPhaseBoth("submit");
-        return;
-      }
-      beginTurn(built.state);
-      return;
-    }
-    // 이 세대에서 이미 거부된 행동이 있으면 스냅샷이 올 때까지 다시 적용하지 않는다.
-    // 그사이 새 행동이 오면 resync만 다시 요청한다(앞 요청이 실패했을 수 있다 — 횟수 상한에 걸리면 새로고침 안내)
-    if (!desyncFatal && rejectedEpochRef.current === feed.epoch) {
-      if (feed.actions.length > rejectedLengthRef.current) {
-        rejectedLengthRef.current = feed.actions.length;
-        requestResync();
-      }
-      return;
-    }
-    if (desyncFatal || phase === "play" || appliedRef.current >= feed.actions.length) return;
-    const action = feed.actions[appliedRef.current];
-    const before = stateRef.current;
-    // 턴 주인이 아닌 사람의 기권은 턴을 바꾸지 않는다 — 연출 뒤 지금 phase로 돌아간다
-    const keepsTurn = action.kind === "resign" && before.result.kind === "ongoing" && action.slot !== before.turn.slot;
-    const resumeTo = keepsTurn ? phaseRef.current : null;
-    if (!playAction(action)) {
-      // 서버가 확정한 행동을 내 엔진이 거부 — 어긋났다
-      console.warn("[fortress] 서버 행동 적용 실패 — resync", action);
-      rejectedEpochRef.current = feed.epoch;
-      rejectedLengthRef.current = feed.actions.length;
-      requestResync();
-      return;
-    }
-    resumePhaseRef.current = resumeTo;
-    appliedRef.current += 1;
-  }, [feedLength, feedEpoch, phase, playAction, beginTurn, show, verifyHash, requestResync, desyncFatal]);
+  useOnlineFeed({
+    online,
+    onlineRef,
+    phase,
+    phaseRef,
+    setPhase: setPhaseBoth,
+    resumePhaseRef,
+    appliedRef,
+    epochRef,
+    stateRef,
+    setState,
+    replayRef,
+    lastShotRef,
+    show,
+    playAction,
+    beginTurn,
+    desync: { desyncFatal, verifyHash, requestResync, resetDesyncCount },
+  });
 
   useEffect(() => {
     beginTurn(stateRef.current);
@@ -490,37 +362,9 @@ export function FortressMatch({
     setGuideOpen(false);
   }, []);
 
-  // AI 차례 — 잠깐 "생각 중"을 보여 준 뒤 계산(메인 스레드, 실측은 perfProbe)
-  // 고른 발을 카메라가 컷 없이 따라갈 수 있는 자리에 올 때까지 조금 더 기다린다(최대 CAMERA_WAIT_MAX_MS, lib/cameraWait) — 앞 착탄 자리에서 바로 쏘면 비행 시작에 화면이 넘어간다
+  // AI 차례 — 생각 중 표시 뒤 계산, 카메라가 따라갈 자리까지 기다렸다 쏜다
   const { cameraReadyFor } = view;
-  useEffect(() => {
-    if (phase !== "think" || guideOpen || exitConfirm || settingsOpen) return;
-    let timer = 0;
-    let chosen: { action: Action; events: readonly MatchEvent[] | null; since: number } | null = null;
-    const step = () => {
-      const s = stateRef.current;
-      const level = controllers[s.turn.slot];
-      if (level === "human" || level === "remote") return;
-      if (!chosen) {
-        const t0 = performance.now();
-        const action = chooseTurn(s, s.turn.slot, level, fnv1a([config.seed, s.turn.no]));
-        recordThink(level, performance.now() - t0);
-        const r = applyAction(s, action);
-        chosen = { action, events: r.ok ? r.events : null, since: performance.now() };
-      }
-      if (chosen.events && !cameraWaitDone(performance.now() - chosen.since, cameraReadyFor(chosen.events))) {
-        timer = window.setTimeout(step, CAMERA_WAIT_POLL_MS);
-        return;
-      }
-      // AI가 거부되는 행동을 내면(규칙 변경 등) "생각 중"에 멈추지 않게 파워 0으로 넘긴다
-      if (!commit(chosen.action)) {
-        console.warn("[fortress] AI 행동 거부 — 넘기기로 대체", chosen.action);
-        commit({ kind: "fire", move: 0, angle: 90, power: 0, weaponId: TANKS[(s.tanks[s.turn.slot] as Tank).tankId].weapons[0] });
-      }
-    };
-    timer = window.setTimeout(step, AI_DELAY_MS);
-    return () => window.clearTimeout(timer);
-  }, [phase, guideOpen, exitConfirm, settingsOpen, controllers, config.seed, commit, cameraReadyFor]);
+  useAiTurn({ phase, paused: guideOpen || exitConfirm || settingsOpen, controllers, seed: config.seed, stateRef, commit, cameraReadyFor });
 
   // 이동·각도를 바꾸면 이동 뒤 위치를 엔진 previewShot으로(같은 이동 코드)
   /** 충전 표시는 탭과 구분되는 시간이 지난 뒤부터 */
@@ -692,9 +536,8 @@ export function FortressMatch({
     else commit({ kind: "fire", ...input });
   };
 
-  // 키보드(데스크톱) — 규칙은 lib/aimKeys. 핸들러는 ref로 최신 값을 보고, 리스너는 조준 가능할 때만 한 번 붙인다
-  const keyRef = useRef<{ down: (e: KeyboardEvent) => void; up: (e: KeyboardEvent) => void; cancel: () => void } | null>(null);
-  keyRef.current = {
+  // 키보드(데스크톱) — 규칙은 lib/aimKeys. 조준 가능할 때만 리스너를 붙인다
+  useAimKeys(canAim, {
     down: (e: KeyboardEvent) => {
       const action = aimKeyAction(e, focusKind(e.target));
       if (!action) return;
@@ -713,25 +556,7 @@ export function FortressMatch({
     cancel: () => {
       if (keyChargeRef.current) cancelCharge();
     },
-  };
-  useEffect(() => {
-    if (!canAim) return;
-    const down = (e: KeyboardEvent) => keyRef.current?.down(e);
-    const up = (e: KeyboardEvent) => keyRef.current?.up(e);
-    // 스페이스를 누른 채 창을 떠나면 keyup이 오지 않는다 — 충전을 버린다
-    const cancel = () => keyRef.current?.cancel();
-    const onVisibility = () => document.visibilityState === "hidden" && cancel();
-    window.addEventListener("keydown", down);
-    window.addEventListener("keyup", up);
-    window.addEventListener("blur", cancel);
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      window.removeEventListener("keydown", down);
-      window.removeEventListener("keyup", up);
-      window.removeEventListener("blur", cancel);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, [canAim]);
+  });
 
   // 조준을 못 하게 되면(안내 열기·발사·턴 전환) 진행 중인 충전을 버린다 — 리스너가 떨어져 keyup이 오지 않아 충전이 남지 않게
   // 터치 패드의 누르는 동안 반복도 멈춘다 — 패드는 조준 가능 여부가 바뀌면 다시 마운트돼(뗌) 멈추지만, 그 경로와 따로 한 번 더(이중 안전)
@@ -767,36 +592,8 @@ export function FortressMatch({
     setWeaponId((w) => nextWeapon(current, w));
   };
 
-  // 조작부 오버레이(데스크톱 lg · 휴대폰 가로 short-land) 높이 — 카메라가 그만큼 위로 담는다. 매 프레임 레이아웃을 읽지 않게 크기가 바뀔 때만 잰다
-  useEffect(() => {
-    const panel = panelRef.current;
-    const wide = typeof window.matchMedia === "function" ? window.matchMedia(OVERLAY_PANEL_QUERY) : null;
-    if (!panel || !wide) return;
-    const measure = () => {
-      overlayInsetRef.current = wide.matches ? panel.offsetHeight : 0;
-      // 터치 가로 — 패드가 전장 위 양끝에 겹친다(공용 GamePad의 landscape:absolute). 왼쪽 십자 묶음·오른쪽 버튼 묶음 중 넓은 쪽
-      overlaySideRef.current = 0;
-      const pad = panel.querySelector<HTMLElement>('[data-testid="game-pad"]');
-      if (pad && getComputedStyle(pad).position === "absolute") {
-        const box = pad.getBoundingClientRect();
-        const left = pad.querySelector('[data-testid="game-pad-dpad"]')?.getBoundingClientRect();
-        const right = pad.querySelector('[role="group"][aria-label="버튼"]')?.getBoundingClientRect();
-        overlaySideRef.current = Math.max(left ? left.right - box.left : 0, right ? box.right - right.left : 0);
-      }
-    };
-    measure();
-    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(measure) : null;
-    observer?.observe(panel);
-    // 가로 패드 크기는 화면 높이(vh)를 따른다 — 주소창이 접혀 높이만 바뀌어도 다시 잰다
-    const pad = panel.querySelector('[data-testid="game-pad"]');
-    if (pad) observer?.observe(pad);
-    wide.addEventListener("change", measure);
-    return () => {
-      observer?.disconnect();
-      wide.removeEventListener("change", measure);
-    };
-    // 패드가 다시 마운트되면(차례·조준 가능 여부가 바뀜) 새 노드를 다시 관찰한다 — 떨어진 옛 노드를 보고 있으면 높이(vh)만 바뀔 때 다시 재지 못한다
-  }, [touch, landscape, state.turn.no, canAim]);
+  // 조작부 오버레이 높이·양옆 폭 — 카메라가 그만큼 비워 담는다
+  useOverlayInsets({ panelRef, insetBottomRef: overlayInsetRef, insetSideRef: overlaySideRef, remeasure: [touch, landscape, state.turn.no, canAim] });
 
   // 키보드로 쏜 사람의 다음 턴이 오면 포커스를 발사 버튼으로 돌려준다(다른 사람 턴이면 버린다)
   useEffect(() => {
@@ -859,9 +656,8 @@ export function FortressMatch({
   return (
     // 루트 layout이 이미 <main>으로 감싼다 — 중첩하지 않는다
     <div
-      className={`relative flex h-full flex-col pt-[env(safe-area-inset-top)] ${usesVivid(look) ? vividStyles.vivid : ""}`}
+      className={`relative flex h-full flex-col pt-[env(safe-area-inset-top)] ${vividStyles.vivid}`}
       data-testid="fortress-match"
-      data-look={look}
       data-applied={online ? appliedRef.current : undefined}
       data-state-hash={online ? clientHash : undefined}
       data-phase={phase}
@@ -954,7 +750,7 @@ export function FortressMatch({
             ) : null}
           </div>
         ) : null}
-        {result.kind === "ongoing" && !guideOpen ? <TurnBanner key={state.turn.no} name={nameOf(state.turn.slot)} color={turnColor} look={look} mine={controller === "human"} /> : null}
+        {result.kind === "ongoing" && !guideOpen ? <TurnBanner key={state.turn.no} name={nameOf(state.turn.slot)} color={turnColor} mine={controller === "human"} /> : null}
         {guideOpen ? <FortressGuide onClose={closeGuide} /> : null}
         <ConfirmModal
           isOpen={exitConfirm}
@@ -1050,7 +846,7 @@ export function FortressMatch({
             <GamePad
               // 차례·조준 가능 여부가 바뀌면 새로 마운트 — 앞 사람(또는 막히기 전)에 누르던 입력이 남아 다음 차례에 저절로 다시 눌리지 않게(언마운트가 모두 뗀다)
               key={`${state.turn.no}:${canAim}`}
-              layout={fortressPadLayout({ tank: current, weaponId, power, charge: charging ? charge : null, facing, fireAria: `발사 ${power}, ${angleSpeech(angle, facing)}`, vivid: usesVivid(look) })}
+              layout={fortressPadLayout({ tank: current, weaponId, power, charge: charging ? charge : null, facing, fireAria: `발사 ${power}, ${angleSpeech(angle, facing)}` })}
               onHoldStart={padHoldStart}
               onHoldEnd={padHoldEnd}
               onInstant={padInstant}
@@ -1075,7 +871,6 @@ export function FortressMatch({
                 {TANKS[current.tankId].weapons.map((id) => {
                   const w = WEAPONS[id];
                   const cooling = w.cooldown > 0 && current.cooldown > 0;
-                  const vividLook = usesVivid(look);
                   return (
                     <button
                       key={id}
@@ -1088,24 +883,17 @@ export function FortressMatch({
                       aria-pressed={weaponId === id}
                       aria-label={cooling ? `${w.name} — ${current.cooldown}턴 뒤 사용 가능` : w.cooldown > 0 ? `${w.name} (필살기)` : w.name}
                       className={`${choiceClass(weaponId === id)} relative text-xs leading-tight`}
-                      data-special-glow={vividLook && weaponId === id && w.cooldown > 0 ? "true" : undefined}
+                      data-special-glow={weaponId === id && w.cooldown > 0 ? "true" : undefined}
                     >
-                      {vividLook ? (
-                        // 시안(D-025 보충 6) — 아이콘 + 이름, 필살기는 금색 줄, 대기 중이면 남은 턴 배지(시계)
-                        <span className="flex items-center justify-center gap-1.5" aria-hidden="true">
-                          <WeaponIcon weaponId={id} size={26} className={cooling ? "opacity-50 grayscale" : undefined} />
-                          <span className="flex flex-col items-start leading-tight">
-                            <span>{w.name}</span>
-                            {w.cooldown > 0 ? <span className={`text-[11px] font-bold ${cooling ? "text-slate-300" : "text-amber-300"}`}>{cooling ? `${current.cooldown}턴 뒤` : "필살기"}</span> : null}
-                          </span>
-                          {cooling ? <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#160b1c] bg-amber-300 px-1 text-[11px] font-black text-slate-900">⏳{current.cooldown}</span> : null}
+                      {/* 아이콘 + 이름, 필살기는 금색 줄, 대기 중이면 남은 턴 배지(시계) */}
+                      <span className="flex items-center justify-center gap-1.5" aria-hidden="true">
+                        <WeaponIcon weaponId={id} size={26} className={cooling ? "opacity-50 grayscale" : undefined} />
+                        <span className="flex flex-col items-start leading-tight">
+                          <span>{w.name}</span>
+                          {w.cooldown > 0 ? <span className={`text-[11px] font-bold ${cooling ? "text-slate-300" : "text-amber-300"}`}>{cooling ? `${current.cooldown}턴 뒤` : "필살기"}</span> : null}
                         </span>
-                      ) : (
-                        <>
-                          {w.name}
-                          {w.cooldown > 0 ? <span className="block text-[11px] text-slate-400">{cooling ? `${current.cooldown}턴 뒤` : "필살기"}</span> : null}
-                        </>
-                      )}
+                        {cooling ? <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#160b1c] bg-amber-300 px-1 text-[11px] font-black text-slate-900">⏳{current.cooldown}</span> : null}
+                      </span>
                     </button>
                   );
                 })}
@@ -1205,7 +993,7 @@ export function FortressMatch({
                   aria-label={`발사 ${power}, ${angleSpeech(angle, facing)}`}
                   className="relative min-h-12 min-w-32 touch-none short-land:min-w-24 short-land:max-sm:min-w-20 overflow-hidden rounded-xl border border-rose-300/50 bg-rose-600/85 px-3 text-base font-bold tabular-nums text-white shadow-[0_8px_20px_rgba(2,6,23,0.5)] active:bg-rose-500/85"
                   data-testid="fortress-fire"
-                  data-special-glow={usesVivid(look) && WEAPONS[weaponId]?.cooldown > 0 ? "true" : undefined}
+                  data-special-glow={WEAPONS[weaponId]?.cooldown > 0 ? "true" : undefined}
                   data-charging={charging || undefined}
                 >
                   {/* 충전 막대 — 버튼 안을 왼쪽부터 채운다 */}
@@ -1245,159 +1033,6 @@ export function FortressMatch({
           </div>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-/** 상단 플레이어 칸 — 차례인 사람은 노란 테두리, HP 막대 */
-function PlayerChip({ name, ai, color, hp, maxHp, alive, active }: { name: string; ai: string | null; color: string; hp: number; maxHp: number; alive: boolean; active: boolean }) {
-  return (
-    <li
-      className={`flex shrink-0 items-center gap-1.5 rounded-xl border px-2 py-1 text-xs ${active ? "border-amber-300/70 bg-amber-400/10" : "border-slate-700/60 bg-slate-900/70"} ${alive ? "" : "opacity-40"}`}
-      aria-current={active ? "true" : undefined}
-      data-hud="player"
-    >
-      <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: color }} aria-hidden data-hud="dot" />
-      <span className="flex min-w-0 flex-col leading-tight">
-        <span className={`truncate font-semibold ${active ? "text-amber-200" : "text-slate-200"} ${alive ? "" : "line-through"}`}>
-          {name}
-          {ai ? (
-            <span className="ml-1 text-[11px] font-normal text-slate-400" data-hud="ai">
-              {ai}
-            </span>
-          ) : null}
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="h-1 w-10 overflow-hidden rounded-full bg-slate-800" aria-hidden data-hud="hp">
-            <span className="block h-full rounded-full bg-emerald-400" style={{ width: `${Math.max(0, Math.min(100, (hp / maxHp) * 100))}%` }} />
-          </span>
-          {/* 숫자는 보이기용(좁은 시안 화면에서는 숨긴다) — 낭독은 아래 sr-only가 늘 맡는다 */}
-          <span className="tabular-nums text-slate-400" aria-hidden data-hud="hp-num">
-            {hp}
-          </span>
-          <span className="sr-only">HP {hp}</span>
-        </span>
-      </span>
-    </li>
-  );
-}
-
-/** 각도 표기 — 방향 화살표(낭독은 "오른쪽" 등 낱말) + 높이. 수직은 방향 없이(지난 발) */
-function AngleText({ view }: { view: AngleView }) {
-  return (
-    <>
-      {view.arrow ? <span aria-hidden="true">{view.arrow} </span> : null}
-      <span className="sr-only">{view.word} </span>
-      {view.height}°
-    </>
-  );
-}
-
-/** 누르고 있으면 반복(포인터), 키보드·보조기술 클릭(detail 0)이면 한 번 */
-function HoldButton({
-  label,
-  step,
-  hold,
-  release,
-  wide = false,
-  atLimit = false,
-  children,
-}: {
-  label: string;
-  step: () => void;
-  hold: (fn: () => void) => void;
-  release: () => void;
-  wide?: boolean;
-  /** 그 방향으로 더 못 간다 — 흐리게, 누르면 이유 안내(step이 막힌 걸 알린다) */
-  atLimit?: boolean;
-  children: React.ReactNode;
-}) {
-  // 누른 채 사라지면(턴이 AI로 넘어가 조작부가 바뀜) pointerup이 오지 않는다 — 언마운트 때 놓는다
-  const releaseRef = useRef(release);
-  releaseRef.current = release;
-  useEffect(() => () => releaseRef.current(), []);
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      aria-disabled={atLimit || undefined}
-      onPointerDown={(e) => {
-        if (e.button !== 0) return;
-        e.currentTarget.setPointerCapture(e.pointerId);
-        hold(step);
-      }}
-      onPointerUp={release}
-      onPointerCancel={release}
-      onPointerLeave={release}
-      onContextMenu={(e) => e.preventDefault()}
-      onClick={(e) => {
-        if (e.detail === 0) step();
-      }}
-      data-hud="key"
-      className={`min-h-11 min-w-11 ${wide ? "flex-1" : ""} rounded-xl border border-white/15 bg-slate-800/80 text-lg text-slate-100 active:bg-slate-700 ${atLimit ? "opacity-40" : ""}`}
-    >
-      {children}
-    </button>
-  );
-}
-
-/** 턴 전환 — 화면 가운데 큰 글씨가 잠깐 떴다 사라진다(움직임 줄이기면 띄우지 않는다, 위쪽 차례 표시는 그대로) */
-function TurnBanner({ name, color, look = "classic", mine = false }: { name: string; color: string; look?: Look; mine?: boolean }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [done, setDone] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || typeof el.animate !== "function" || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-      setDone(true);
-      return;
-    }
-    const anim = el.animate(
-      !usesVivid(look)
-        ? [
-            { opacity: 0, transform: "translateY(8px) scale(0.92)" },
-            { opacity: 1, transform: "translateY(0) scale(1)", offset: 0.18 },
-            { opacity: 1, transform: "translateY(0) scale(1)", offset: 0.75 },
-            { opacity: 0, transform: "translateY(-6px) scale(1.02)" },
-          ]
-        : // 시안 — 띠가 왼쪽에서 미끄러져 들어와 잠깐 멈췄다가 오른쪽으로 빠진다
-          [
-            { opacity: 0, transform: "translateX(-60px) skewX(-12deg)" },
-            { opacity: 1, transform: "translateX(0) skewX(-12deg)", offset: 0.16 },
-            { opacity: 1, transform: "translateX(6px) skewX(-12deg)", offset: 0.78 },
-            { opacity: 0, transform: "translateX(70px) skewX(-12deg)" },
-          ],
-      { duration: usesVivid(look) ? 1500 : 1300, easing: "ease-out", fill: "forwards" },
-    );
-    anim.onfinish = () => setDone(true);
-    return () => anim.cancel();
-  }, [look]);
-  if (done) return null;
-  if (usesVivid(look)) {
-    return (
-      <div className="pointer-events-none absolute inset-x-0 top-[36%] flex justify-center" aria-hidden>
-        <div ref={ref} className="relative w-[min(92%,30rem)] opacity-0">
-          {/* 띠 — 연기·폭발 위에서도 읽히게 짙은 판 + 잉크 외곽선(가운데에 차례 색 줄) */}
-          <div className="absolute inset-0 rounded-lg border-2 border-[#160b1c] bg-[#241a4a]/92 shadow-[inset_0_2px_0_rgba(255,255,255,0.18),0_4px_0_#160b1c]" />
-          <div className="absolute inset-x-3 bottom-1.5 h-1 rounded-full opacity-90" style={{ background: `linear-gradient(90deg, transparent, ${color}, transparent)` }} />
-          <div className="relative skew-x-[12deg] px-6 py-3 text-center">
-            <p className="text-[11px] font-black tracking-[0.5em]" style={{ color }}>
-              {mine ? "YOUR TURN" : "TURN"}
-            </p>
-            <p className="mt-0.5 text-3xl font-black text-white [text-shadow:0_2px_0_rgba(0,0,0,0.6),0_0_18px_rgba(255,190,120,0.45)]">{name}</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="pointer-events-none absolute inset-x-0 top-[38%] flex justify-center" aria-hidden>
-      <div ref={ref} className="rounded-2xl border border-white/10 bg-slate-950/75 px-6 py-3 text-center opacity-0 shadow-[0_8px_20px_rgba(2,6,23,0.5)]">
-        <p className="text-[11px] font-semibold tracking-[0.4em] text-slate-400">TURN</p>
-        <p className="mt-1 flex items-center justify-center gap-2 text-2xl font-black text-white">
-          <span className="inline-block h-3 w-3 rounded-full" style={{ background: color }} />
-          {name}
-        </p>
-      </div>
     </div>
   );
 }

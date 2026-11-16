@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useRef } from "react";
 import { type MapId, TANK_RADIUS, type Terrain, createMatch } from "../engine";
 import type { Camera } from "../renderer/camera";
-import { SLOT_COLORS, drawScene, tankDrawScale } from "../renderer/drawScene";
+import { drawScene, tankDrawScale } from "../renderer/drawScene";
+import { SLOT_COLORS } from "../lib/slotColors";
 import { type TerrainLayer, createTerrainLayer, paintAll } from "../renderer/terrainLayer";
 import type { TankSkin } from "../lib/tankSkins";
 import { useFortressCanvas } from "../hooks/useFortressCanvas";
-import { type Look, lookFromUrl, usesVivid } from "../lib/look";
+import { useRememberLook } from "../lib/look";
 
 export type PreviewTank = { skin: TankSkin; color?: string; label?: string };
 
@@ -27,7 +28,7 @@ function surfaceAt(terrain: Terrain, x: number): number {
  * 레이어는 그리기 전용(drawImage 원본)이라 여러 캔버스가 같이 써도 된다. 마지막 미리보기가 사라지면 레이어(월드 크기 캔버스, 맵마다 8MB)를 놓는다
  */
 const previewTerrains = new Map<MapId, Terrain | null>();
-/** 레이어 열쇠 — 맵 + 칠(기본·vivid) */
+/** 레이어 열쇠 — 맵 */
 const previewLayers = new Map<string, TerrainLayer | null>();
 function previewTerrain(mapId: MapId): Terrain | null {
   if (!previewTerrains.has(mapId)) {
@@ -52,10 +53,10 @@ function retainPreviewLayers(): () => void {
   };
 }
 
-function previewLayer(mapId: MapId, terrain: Terrain, vivid: boolean): TerrainLayer | null {
-  const key = `${mapId}:${vivid ? "vivid" : "classic"}`;
+function previewLayer(mapId: MapId, terrain: Terrain): TerrainLayer | null {
+  const key = mapId;
   if (!previewLayers.get(key)) {
-    const layer = createTerrainLayer({ vivid, mapId });
+    const layer = createTerrainLayer({ mapId });
     if (layer) paintAll(layer, terrain);
     previewLayers.set(key, layer);
   }
@@ -82,23 +83,22 @@ function flattestStart(terrain: Terrain, span: number): number {
   return best;
 }
 
-/** 그려지는 탱크의 위 끝(포신을 세웠을 때) — drawTank 기준, 그리는 반지름 R의 배수 */
+/** 그려지는 탱크의 위 끝(포신을 세웠을 때) — drawTankArt 기준, 그리는 반지름 R의 배수 */
 const TANK_TOP_R = 3.05;
 
 /**
  * 미리보기 카메라 — 탱크 줄 전체가 들어가는 줌, 세로는 그려지는 탱크(포신 끝 ~ 궤도 바닥)의 가운데
- * 줌이 작을수록 탱크를 크게 그린다(tankDrawScale, 최대 2.4배 → R ≤ 21.6). 판정 반지름 기준 가운데로 두면 48×36 같은 작은 칸에서 포신 끝이 잘렸다(D-025 리뷰)
- * 줌은 판정 반지름 기준 그대로 둬도 그려지는 크기가 들어간다: 높이 여유 TANK_RADIUS·9 = 81 ≥ 3.65·R최대 ≈ 78.8, 폭 여유 GAP·1.6 = 102.4 ≥ 3.4·R최대 ≈ 73.4
- * (위 상수를 바꾸면 이 부등식부터 다시 본다 — TankSkinPreview.camera.test가 화면 안에 들어가는지 확인한다)
+ * 줌이 작을수록 탱크를 크게 그린다(tankDrawScale, 최대 4.2배) — 판정 반지름 기준 가운데로 두면 48×36 같은 작은 칸에서 포신 끝이 잘렸다(D-025 리뷰)
+ * 그래서 판정 반지름 기준 줌을 먼저 잡고, 그려지는 크기로 몇 번 다시 맞춘다(TankSkinPreview.camera.test가 화면 안에 들어가는지 확인한다)
  */
-export function previewCamera(view: { width: number; height: number }, startX: number, span: number, minY: number, maxY: number, vivid = false): Camera {
+export function previewCamera(view: { width: number; height: number }, startX: number, span: number, minY: number, maxY: number): Camera {
   let zoom = Math.min(view.width / (span + GAP * 1.6), view.height / (maxY - minY + TANK_RADIUS * 9), 2.5);
   // 시안 탱크는 줌이 작을수록 더 크게(최대 4.2배) 그려 위 부등식이 깨진다 — 그려지는 크기로 몇 번 다시 맞춘다
-  for (let k = 0; vivid && k < 6; k++) {
-    const r = TANK_RADIUS * tankDrawScale(zoom, true);
+  for (let k = 0; k < 6; k++) {
+    const r = TANK_RADIUS * tankDrawScale(zoom);
     zoom = Math.min(zoom, view.height / (maxY - minY + r * 3.9), view.width / (span + r * 3.6));
   }
-  const R = TANK_RADIUS * tankDrawScale(zoom, vivid);
+  const R = TANK_RADIUS * tankDrawScale(zoom);
   // 위·아래 여백이 같게 — 탱크 줄의 맨 위(포신 끝)와 맨 아래(궤도 바닥) 가운데
   return { cx: startX + span / 2, cy: (minY - R * TANK_TOP_R + maxY) / 2, zoom };
 }
@@ -107,10 +107,9 @@ export function previewCamera(view: { width: number; height: number }, startX: n
  * 탱크 스킨 미리보기 (F7) — 실제 맵 위에 탱크를 나란히 세워 정지 화면 1장으로 그린다(연출·입력 없음)
  * 스킨 화면의 카드·큰 미리보기, 시안 확인에 쓴다
  */
-export function TankSkinPreview({ tanks, mapId = "hills", className, label, look: lookProp }: { tanks: readonly PreviewTank[]; mapId?: MapId; className?: string; label: string; look?: Look }) {
-  // 시안 확인용(D-025 B) — 지정하지 않으면 주소의 ?look=을 따른다(스킨 화면·대기실·홈을 새 탱크로 미리 보기). 없으면 기본 그림
-  // 그림(보충 5) — 없으면 주소의 ?look(기본 vivid). 캔버스만 달라지고 마크업은 같아 서버·클라이언트 불일치가 없다
-  const look = useMemo<Look>(() => lookProp ?? lookFromUrl(), [lookProp]);
+export function TankSkinPreview({ tanks, mapId = "hills", className, label }: { tanks: readonly PreviewTank[]; mapId?: MapId; className?: string; label: string }) {
+  // 홈·스킨 화면의 ?look=glow를 그 탭에 기억(미리보기는 그림이 하나라 쓰지는 않는다)
+  useRememberLook();
   const terrain = useMemo(() => previewTerrain(mapId), [mapId]);
   // 그리기보다 먼저 — 첫 그리기가 만든 레이어를 이 미리보기가 쥐고 있게
   useEffect(() => retainPreviewLayers(), []);
@@ -119,7 +118,7 @@ export function TankSkinPreview({ tanks, mapId = "hills", className, label, look
     const ctx = ctxRef.current;
     const view = viewRef.current;
     if (!ctx || !terrain || view.width === 0) return;
-    const layer = previewLayer(mapId, terrain, usesVivid(look));
+    const layer = previewLayer(mapId, terrain);
     // 가장 평평한 구간에 나란히 — 카메라는 탱크 줄을 담는 줌
     const span = GAP * Math.max(0, tanks.length - 1);
     const startX = flattestStart(terrain, span);
@@ -129,7 +128,7 @@ export function TankSkinPreview({ tanks, mapId = "hills", className, label, look
     });
     const minY = Math.min(...views.map((t) => t.y));
     const maxY = Math.max(...views.map((t) => t.y));
-    const camera = previewCamera(view, startX, span, minY, maxY, usesVivid(look));
+    const camera = previewCamera(view, startX, span, minY, maxY);
     drawScene(ctx, {
       camera,
       view,
@@ -147,7 +146,6 @@ export function TankSkinPreview({ tanks, mapId = "hills", className, label, look
       popups: [],
       time: 0,
       reducedMotion: true,
-      look,
       mapId,
     });
   };

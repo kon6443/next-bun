@@ -50,12 +50,17 @@ describe("spawnExplosionVivid — 시안 폭발 (D-025 B)", () => {
     spawnExplosionVivid(fx, 500, 500, 36, style(0));
     const chunks = fx.particles.filter((p) => p.kind === "chunk");
     expect(chunks.length).toBeGreaterThan(0);
-    const minLife = Math.min(...chunks.map((c) => c.max));
-    for (let t = 0; t < minLife - 20; t += 16) {
+    // 조각마다 제 수명 안에 땅에 닿아 멈춘다(개수·수명은 무작위 — 가장 짧은 수명으로 모두를 자르지 않는다)
+    const rested = new Set<object>();
+    const maxLife = Math.max(...chunks.map((c) => c.max));
+    for (let t = 0; t < maxLife; t += 16) {
       updateEffects(fx, 16, 0);
-      for (const c of chunks) expect(c.y).toBeLessThanOrEqual(520);
+      for (const c of chunks) {
+        expect(c.y).toBeLessThanOrEqual(520);
+        if (c.life > 0 && c.rest) rested.add(c);
+      }
     }
-    expect(chunks.every((c) => c.rest)).toBe(true);
+    expect(rested.size).toBe(chunks.length);
   });
 
   it("멈춘 조각도 다음 폭발로 발밑이 파이면 다시 떨어진다", () => {

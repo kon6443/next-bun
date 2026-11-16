@@ -4,14 +4,14 @@ import { useState } from "react";
 import { BattleLobbyView, type LobbyChatSlotContext } from "@/app/games/_shared/battle-room/components/BattleLobbyView";
 import { LobbyChatPanelView } from "@/app/games/_shared/battle-room/lobby-chat/LobbyChatPanel";
 import { useLobbyChatCore } from "@/app/games/_shared/battle-room/lobby-chat/useLobbyChat";
-import { usePlayerName } from "@/app/games/tetris/battle-ui/hooks/usePlayerName";
+import { usePlayerName } from "@/app/games/_shared/battle-room/hooks/usePlayerName";
 import { type CreateRoomPayload, ROOM_MAP_IDS, ROOM_MODES, type RoomMapId, type RoomMode, type RoomSummary } from "@/types/fortressSocket";
 import { useEnterScope, useFortressSocket } from "../contexts/FortressSocketContext";
 import { battleErrorMessage } from "../lib/battleErrors";
 import { fortressHiddenSenders } from "../lib/lobbyChatHidden";
-import { FORTRESS_LOBBY_CHAT_SECTION_ID, MAP_LABEL, MODE_LABEL, fortressRoomPath, settingsSummary } from "../lib/roomLabels";
+import { FORTRESS_HOME_PATH, FORTRESS_LOBBY_CHAT_SECTION_ID, MAP_LABEL, MODE_LABEL, fortressRoomPath, settingsSummary } from "../lib/roomLabels";
 
-const BACK = { href: "/games/fortress", label: "포트리스" };
+const BACK = { href: FORTRESS_HOME_PATH, label: "포트리스" };
 const INTRO = { title: "친구와 포트리스", description: "2~4명 개인전 또는 2:2 팀전. 차례대로 바람을 읽고 쏘세요." };
 /** 팀전은 4명 고정 */
 const FFA_COUNTS = [2, 3, 4] as const;

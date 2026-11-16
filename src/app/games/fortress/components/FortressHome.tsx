@@ -10,12 +10,12 @@ import { FortressMySkinButton } from "./FortressMySkinButton";
 import { RecentFortressMatches } from "../battle-ui/components/RecentFortressMatches";
 
 /** 플레이 진입 — /play가 vs 값으로 설정을 미리 채운다(FortressPrototype) */
-export const FORTRESS_AI_HREF = "/games/fortress/play?vs=ai";
-export const FORTRESS_LOCAL_HREF = "/games/fortress/play?vs=local";
+const FORTRESS_AI_HREF = "/games/fortress/play?vs=ai";
+const FORTRESS_LOCAL_HREF = "/games/fortress/play?vs=local";
 /** 온라인 대전 — 로비(방 목록·빠른 참가), 방 만들기 칸(#battle-create), 코드 입력 칸(#battle-room-code) */
-export const FORTRESS_ONLINE_HREF = "/games/fortress/battle";
-export const FORTRESS_CREATE_HREF = "/games/fortress/battle#battle-create";
-export const FORTRESS_CODE_HREF = "/games/fortress/battle#battle-room-code";
+const FORTRESS_ONLINE_HREF = "/games/fortress/battle";
+const FORTRESS_CREATE_HREF = "/games/fortress/battle#battle-create";
+const FORTRESS_CODE_HREF = "/games/fortress/battle#battle-room-code";
 
 const ONLINE_LINK =
   "flex min-h-14 flex-col items-center justify-center rounded-2xl border border-sky-400/40 bg-sky-500/10 px-2 text-center text-sm font-semibold leading-tight text-sky-100 hover:border-sky-300/70";

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { BLAST_MIN_PX, blastDrawRadius, drawTank, offscreenChipLayout, tankDrawScale } from "./drawScene";
+import { BLAST_MIN_PX, blastDrawRadius, offscreenChipLayout, tankDrawScale } from "./drawScene";
 import { type MatchConfig, type MatchEvent, type MatchState, MOVE_PX_PER_TICK, type Tank, type Terrain, WORLD_HEIGHT, WORLD_WIDTH, applyAction, carveCircle, createMatch, eventsEndTick } from "../engine";
 import { MAX_ZOOM, SKY_MARGIN, clampCamera, minZoom, panBy, screenToWorld, worldToScreen, zoomAt } from "./camera";
 import { EXPLOSION_TICKS, FALL_TICKS, TAIL_TICKS, blastsAt, explosionsUntil, playbackEnd, shellsAt, tanksAt } from "./playback";
@@ -177,50 +177,6 @@ describe("폭발 연출 크기", () => {
   });
 });
 
-describe("탱크 스킨 그리기(drawTank)", () => {
-  /** 칠한 색만 모으는 가짜 2D 컨텍스트 — 그리기 호출은 무시 */
-  function recordingCtx() {
-    const fills: string[] = [];
-    const strokes: string[] = [];
-    const target: Record<string | symbol, unknown> = {};
-    const ctx = new Proxy(target, {
-      get: (t, key) => (key in t ? t[key] : key === "createLinearGradient" ? () => ({ addColorStop: () => {} }) : () => {}),
-      set: (t, key, value) => {
-        if (key === "fillStyle" && typeof value === "string") fills.push(value);
-        if (key === "strokeStyle" && typeof value === "string") strokes.push(value);
-        t[key] = value;
-        return true;
-      },
-    }) as unknown as CanvasRenderingContext2D;
-    return { ctx, fills, strokes };
-  }
-  const draw = (skin?: { id: "default" | "desert" | "arctic" | "neon"; level: number }) => {
-    const r = recordingCtx();
-    drawTank(r.ctx, 100, 100, "#38bdf8", 60, 1, 1.4, skin);
-    return r;
-  };
-
-  it("기본은 지금 모양 그대로 — 장식(안테나·별) 없음, 몸통은 자리 색 그라데이션", () => {
-    const { fills, strokes } = draw();
-    expect(fills).not.toContain("#facc15");
-    expect(strokes).not.toContain("#94a3b8");
-    expect(fills).not.toContain("#0b1022");
-  });
-  it("스킨마다 무늬가 다르다 — 사막·설원은 두 색 얼룩, 네온은 어두운 차체에 자리 색 테두리", () => {
-    expect(draw({ id: "desert", level: 1 }).fills).toEqual(expect.arrayContaining(["rgba(230, 200, 140, 0.85)", "rgba(110, 76, 40, 0.7)"]));
-    expect(draw({ id: "arctic", level: 1 }).fills).toEqual(expect.arrayContaining(["rgba(248, 250, 252, 0.9)", "rgba(100, 116, 139, 0.6)"]));
-    const neon = draw({ id: "neon", level: 1 });
-    expect(neon.fills).toContain("#0b1022");
-    expect(neon.strokes).toContain("#38bdf8");
-  });
-  it("레벨은 장식을 더한다 — Lv2 안테나 · Lv3 깃발(자리 색) · Lv5 금색 별", () => {
-    expect(draw({ id: "default", level: 2 }).strokes).toContain("#94a3b8");
-    expect(draw({ id: "default", level: 3 }).fills).toContain("#38bdf8");
-    expect(draw({ id: "default", level: 4 }).fills).not.toContain("#facc15");
-    expect(draw({ id: "default", level: 5 }).fills).toContain("#facc15");
-  });
-});
-
 describe("화면 밖 탱크 칩 배치(offscreenChipLayout)", () => {
   const camera = { cx: 1500, cy: 600, zoom: 1 };
   const tank = (slot: number, x: number, y: number) => ({ slot, x, y, hp: 120, alive: true });
@@ -230,12 +186,12 @@ describe("화면 밖 탱크 칩 배치(offscreenChipLayout)", () => {
   const apart = (a: { cy: number }, b: { cy: number }) => Math.abs(a.cy - b.cy) >= STEP;
 
   // D-025 보충 5 메인 확인: 리플레이 390에서 화면 밖 적 칩이 가장자리의 화면 안 탱크를 덮었다
-  it("칩이 가장자리의 화면 안 탱크(몸통·이름표)를 덮으면 위아래로 비켜 놓고, 자리가 없으면 반투명 — 시안", () => {
+  it("칩이 가장자리의 화면 안 탱크(몸통·이름표)를 덮으면 위아래로 비켜 놓고, 자리가 없으면 반투명", () => {
     const onX = camera.cx - view.width / 2 + 40; // 화면 왼쪽 끝 근처(화면 x 40)
-    const chips = offscreenChipLayout({ camera, view, tanks: [tank(0, onX, 600), tank(1, 900, 600)], look: "vivid" });
+    const chips = offscreenChipLayout({ camera, view, tanks: [tank(0, onX, 600), tank(1, 900, 600)] });
     const chip = chips.find((c) => c.slot === 1)!;
     const [, y] = worldToScreen(camera, view, onX, 600 - 9);
-    const r = 9 * tankDrawScale(1, true);
+    const r = 9 * tankDrawScale(1);
     const boxTop = y - r * 1.4 - 28;
     const boxBottom = y + r * 0.9;
     const clear = chip.cy + CHIP_H / 2 <= boxTop || chip.cy - CHIP_H / 2 >= boxBottom;
@@ -247,21 +203,14 @@ describe("화면 밖 탱크 칩 배치(offscreenChipLayout)", () => {
     const onX = cam.cx + (view.width / 2 - 15) / zoom; // 화면 오른쪽 끝(x≈375)
     // 조작부 바로 위(아래로 비킬 자리가 없다) — 칩이 위로 비켜야 하는 장면
     const groundW = 600 + 85 / zoom;
-    const chips = offscreenChipLayout({ camera: cam, view, tanks: [tank(1, onX, groundW), tank(0, onX + 300 / zoom, groundW)], look: "vivid", insetBottom: 200 });
+    const chips = offscreenChipLayout({ camera: cam, view, tanks: [tank(1, onX, groundW), tank(0, onX + 300 / zoom, groundW)], insetBottom: 200 });
     const chip = chips.find((c) => c.slot === 0)!;
-    const scale = tankDrawScale(zoom, true);
+    const scale = tankDrawScale(zoom);
     const [, labelY] = worldToScreen(cam, view, onX, groundW - 9 * scale * 2.2 - 6);
     const [, groundY] = worldToScreen(cam, view, onX, groundW);
     const labelTop = labelY - 22;
     const clear = chip.cy + CHIP_H / 2 <= labelTop || chip.cy - CHIP_H / 2 >= groundY;
     expect(clear || chip.faded === true).toBe(true);
-  });
-  it("classic(되돌리기 경로)은 예전 배치 그대로 — 비키지 않는다", () => {
-    const onX = camera.cx - view.width / 2 + 40;
-    const chips = offscreenChipLayout({ camera, view, tanks: [tank(0, onX, 600), tank(1, 900, 600)], look: "classic" });
-    const chip = chips.find((c) => c.slot === 1)!;
-    expect(chip.cy).toBe(chip.ty);
-    expect(chip.faded).toBeUndefined();
   });
   it("같은 쪽(왼쪽)에 화면 밖 탱크가 둘이면 세로로 쌓아 겹치지 않는다", () => {
     const chips = offscreenChipLayout({ camera, view, tanks: [tank(1, 200, 610), tank(2, 260, 600), tank(0, 1500, 600)] });

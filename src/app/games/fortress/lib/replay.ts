@@ -35,12 +35,33 @@ export function buildReplay(engine: ReplayEngine, data: ReplayData): { ok: true;
   return { ok: true, replay: { initial: created.state, turns, final: state } };
 }
 
-/** index = 끝난 턴 수(0 … turns.length) 시점의 state */
+/**
+ * 진행한 턴 수 — 화면에 보이는 "N턴"의 유일한 계산(결과 화면 머리·공유 문구·리플레이 진행 표시). 행동 수가 아니다
+ * 엔진 turn.no는 턴을 끝내는 행동마다 +1이고, 승패를 가른 행동·남의 턴 기권은 올리지 않는다(턴 상한이면 상한값)
+ * - 승패가 났으면 그 턴까지 센다: turn.no + 1, 턴 상한 판정이면 turn.no 그대로 — 끝난 경기에서 백엔드 playedTurns(API turns)와 같다
+ * - 진행 중(리플레이 중간·중단된 경기)이면 끝난 턴 수 turn.no — 지금 차례는 아직 진행하지 않았다
+ */
+export function matchTurns(state: Pick<MatchState, "turn" | "maxTurns" | "result">): number {
+  if (state.result.kind === "ongoing") return state.turn.no;
+  return state.turn.no >= state.maxTurns ? state.turn.no : state.turn.no + 1;
+}
+
+/**
+ * 리플레이 진행 표시 — current = 보고 있는 시점(끝난 행동 index개 뒤) state의 턴 수, total = 경기 전체 턴 수(matchTurns(final))
+ * turn.no는 줄지 않고 승패가 나는 건 마지막 state뿐이라 current ≤ total. 행동 스텝 이동은 행동 단위 그대로라 남의 턴 기권에서는 숫자가 그대로다
+ */
+export function replayTurnProgress(replay: Replay, index: number): { current: number; total: number } {
+  const total = matchTurns(replay.final);
+  return { current: Math.min(matchTurns(stateAt(replay, index)), total), total };
+}
+
+/** index = 끝난 행동 수(0 … turns.length) 시점의 state */
 export function stateAt(replay: Replay, index: number): MatchState {
   return index <= 0 ? replay.initial : replay.turns[Math.min(index, replay.turns.length) - 1].after;
 }
 
 export type SlotSummary = { slot: number; team: number; hp: number; alive: boolean; dealt: number; kos: number };
+/** turns = matchTurns(final) — 진행한 턴 수(서버 API turns와 같은 값) */
 export type MatchSummary = { turns: number; slots: SlotSummary[] };
 
 /**
@@ -64,5 +85,5 @@ export function summarizeReplay(replay: Replay): MatchSummary {
   for (const t of replay.final.tanks) {
     if (t) slots.push({ slot: t.slot, team: t.team, hp: t.hp, alive: t.alive, dealt: dealt[t.slot], kos: kos[t.slot] });
   }
-  return { turns: replay.turns.length, slots };
+  return { turns: matchTurns(replay.final), slots };
 }

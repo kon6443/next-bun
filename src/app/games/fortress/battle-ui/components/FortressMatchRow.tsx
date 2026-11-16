@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { FortressMatchListItem } from "@/services/fortressService";
-import { formatRelativeTime } from "@/app/games/tetris/battle-ui/lib/battleList";
+import { formatRelativeTime } from "@/app/games/_shared/lib/format";
 import { fortressMatchPath, fortressResultHeadline, fortressStatLine } from "../lib/fortressShare";
 
 /** 최근 경기 한 줄 — 방 이름·인원·모드·결과·시각, 누르면 기록 페이지 (포트리스 홈 미리보기·전체 목록이 같이 쓴다) */

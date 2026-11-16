@@ -1,7 +1,7 @@
 import type { WeaponFx } from "../renderer/vivid";
 import { weaponFx } from "../renderer/vivid";
+import { INK } from "../renderer/color";
 
-const INK = "#160b1c";
 
 /** 탄 몸통(위를 향해 45° 누운 툰 탄) — 잉크 외곽선 + 무기 색 탄두 + 윗면 빛 */
 function Shell({ x, y, s, body, tip, rot = -45 }: { x: number; y: number; s: number; body: string; tip: string; rot?: number }) {

@@ -6,11 +6,12 @@ import { ConfirmModal } from "@/app/components/ConfirmModal";
 import type { RoomStageProps } from "@/app/games/_shared/battle-room/components/BattleRoomView";
 import { Button } from "@/app/teams/components/Button";
 import { ENGINE_VERSION } from "../../engine";
-import { type Controller, FortressMatch, type OnlineLink } from "../../components/FortressMatch";
+import { FortressMatch, type OnlineLink } from "../../components/FortressMatch";
+import type { Controller } from "../../lib/controllers";
 import { FortressReplay } from "../../components/FortressReplay";
-import { CARD, EYEBROW } from "../../components/fortressUi";
+import { CARD, EYEBROW, FortressHomeButton, SECONDARY_ACTION } from "../../components/fortressUi";
+import { FORTRESS_HOME_PATH } from "../lib/roomLabels";
 import vividStyles from "../../components/fortressVivid.module.css";
-import { lookFromUrl, usesVivid } from "../../lib/look";
 import { useResultMusic } from "../../lib/sound/useResultMusic";
 import { Confetti, HeroTanks, winnerTanks } from "../../components/resultFlair";
 import type { ReplayData } from "../../lib/replay";
@@ -22,14 +23,11 @@ import { FortressResultPoints } from "./FortressResultPoints";
 import { replayView } from "./FortressMatchViewer";
 import { type MatchPublished, useFortressMatchPublished } from "../hooks/useFortressMatchPublished";
 import { buildFortressShareContent, fortressMatchPath } from "../lib/fortressShare";
-import { ShareMenu } from "@/app/games/_shared/components/ShareMenu";
-import { useKakaoReady } from "@/app/games/_shared/hooks/useKakaoReady";
+import { ShareMenuButton } from "@/app/games/_shared/components/ShareMenuButton";
 import { getFortressReplay } from "@/services/fortressService";
 import type { MatchFeed } from "../lib/matchFeed";
 import { DEFAULT_TANK_SKIN, type TankSkin, toTankSkin } from "../../lib/tankSkins";
 import { pointsEligibility } from "../../lib/points";
-
-const RECORD_LINK = "flex min-h-11 flex-1 items-center justify-center rounded-full border border-white/15 px-3 text-sm font-semibold text-slate-200 hover:border-white/30";
 
 /** 방은 끝났는데(RESULT) 경기 소식이 끊긴 채 이만큼 지나면 경기 화면 대신 결과로 — resync가 실패한 경우(컨텍스트 대기 1.5초 + 응답) */
 const ORPHANED_FEED_MS = 4000;
@@ -49,12 +47,14 @@ type View =
  * "다시 보기"는 저장됐으면 서버 리플레이(해시 대조), 아니면 이 경기에서 쌓은 로컬 기록
  * 저장 대기(published)는 여기서 한 번 — 결과 ↔ 다시 보기를 오가도 폴링을 처음부터 다시 하지 않는다
  */
-export function FortressOnlineStage({ room, onExit }: RoomStageProps<RoomState>) {
+export function FortressOnlineStage({ room, onExit, onExitTo }: RoomStageProps<RoomState>) {
   const { feed, myPlayerId, submitTurn, resync, rematch } = useFortressSocket();
   const [viewState, setView] = useState<View>({ kind: "match" });
   const view: View = viewState.kind !== "match" && viewState.matchId !== feed?.matchId ? { kind: "match" } : viewState;
   const published = useFortressMatchPublished(view.kind === "match" || !feed ? null : feed.matchId);
   const isHost = myPlayerId === room.hostId;
+  // 결과·리플레이의 "포트리스 홈" — 방 나가기와 같은 흐름(먼저 이동, 방은 뒤에서 나간다)으로 홈에
+  const goHome = () => onExitTo(FORTRESS_HOME_PATH);
 
   // 진행 중 경기를 나가면 기권 — 경기 화면 밖(불러오는 중·버전 다름)에서도 확인을 받는다
   const [exitAsk, setExitAsk] = useState(false);
@@ -145,6 +145,7 @@ export function FortressOnlineStage({ room, onExit }: RoomStageProps<RoomState>)
         skins={server?.skins ?? skins}
         expectedHash={server?.expectedHash}
         onClose={() => setView({ kind: "result", matchId: view.matchId, replay: view.replay })}
+        onHome={goHome}
       />
     );
   }
@@ -167,6 +168,7 @@ export function FortressOnlineStage({ room, onExit }: RoomStageProps<RoomState>)
         }}
         onRematch={() => void runRematch(rematch)}
         onExit={onExit}
+        onHome={goHome}
       />
     );
   }
@@ -270,6 +272,7 @@ export function OnlineResult({
   onReplay,
   onRematch,
   onExit,
+  onHome,
 }: {
   matchId: string;
   /** 이 경기에서 쌓은 행동 기록 — 게스트 "로그인했다면" 적립 조건 판정에 쓴다 */
@@ -285,6 +288,8 @@ export function OnlineResult({
   onReplay: (published: boolean) => Promise<void>;
   onRematch: () => void;
   onExit: () => void;
+  /** 방을 나가 포트리스 홈으로 */
+  onHome: () => void;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => headingRef.current?.focus(), []);
@@ -304,15 +309,11 @@ export function OnlineResult({
   const mySlot = me?.slot ?? -1;
   const judgeEligibility = useCallback(() => pointsEligibility(replay.config, replay.actions, mySlot), [replay, mySlot]);
   const [replayLoading, setReplayLoading] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
-  const { kakao, kakaoScript } = useKakaoReady();
-  // 그림(보충 5) — 주소의 ?look(기본 vivid). vivid면 경기 화면과 같은 판·버튼 모양
-  const [vivid] = useState(() => usesVivid(lookFromUrl()));
 
   return (
-    <div className={`relative h-full overflow-y-auto overscroll-contain bg-gradient-to-b from-[#070b1d] via-[#141a3d] to-[#2a2350] ${vivid ? vividStyles.vivid : ""} px-4 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+env(safe-area-inset-bottom))]`} style={{ touchAction: "pan-y" }} data-testid="fortress-online-result" data-vivid={vivid || undefined}>
-      {/* 시안 — 내가 이긴 판이면 꽃가루(움직임 줄이기면 없음) */}
-      {vivid ? <Confetti active={me?.place === 1 && source?.result.kind === "win"} /> : null}
+    <div className={`relative h-full overflow-y-auto overscroll-contain bg-gradient-to-b from-[#070b1d] via-[#141a3d] to-[#2a2350] ${vividStyles.vivid} px-4 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+env(safe-area-inset-bottom))]`} style={{ touchAction: "pan-y" }} data-testid="fortress-online-result">
+      {/* 내가 이긴 판이면 꽃가루(움직임 줄이기면 없음) */}
+      <Confetti active={me?.place === 1 && source?.result.kind === "win"} />
       <div className="mx-auto flex max-w-md flex-col gap-4">
         <header className={`${CARD} text-center`} data-hud="card">
           <p className={EYEBROW}>RESULT</p>
@@ -320,13 +321,13 @@ export function OnlineResult({
             {headline}
           </h1>
         </header>
-        {vivid && source && source.result.kind === "win" ? (
+        {source && source.result.kind === "win" ? (
           <div className="overflow-hidden rounded-3xl" data-hud="card">
             <HeroTanks tanks={winnerTanks(source.players, skins)} mapId={replay.config.mapId} label={`승리한 탱크: ${winnerTanks(source.players, skins).map((t) => t.label).join(", ")}`} />
           </div>
         ) : null}
         {source ? (
-          <FortressResultTable players={source.players} myPlayerId={myPlayerId} vivid={vivid} />
+          <FortressResultTable players={source.players} myPlayerId={myPlayerId} />
         ) : gaveUp ? (
           <p className="text-center text-sm text-slate-400">
             {published.status === "unavailable" ? "연결이 끊긴 사이 순위를 받지 못했어요. 다시 보기로 경기를 확인할 수 있어요." : "순위를 다시 받는 중이에요…"}
@@ -355,16 +356,16 @@ export function OnlineResult({
           <p className="text-center text-xs text-slate-500">이 경기는 기록 보기를 열 수 없어요.</p>
         ) : saved ? (
           <div className="flex gap-2">
-            <a href={fortressMatchPath(matchId)} target="_blank" rel="noopener noreferrer" className={RECORD_LINK} data-testid="fortress-record-link">
+            <a href={fortressMatchPath(matchId)} target="_blank" rel="noopener noreferrer" className={SECONDARY_ACTION} data-testid="fortress-record-link">
               기록 보기<span className="sr-only"> (새 탭)</span>
             </a>
-            <button type="button" onClick={() => setShareOpen(true)} aria-haspopup="dialog" className={RECORD_LINK} data-testid="fortress-record-share">
+            <ShareMenuButton content={buildFortressShareContent(saved)} subject="경기 기록" className={SECONDARY_ACTION} testId="fortress-record-share">
               공유
-            </button>
+            </ShareMenuButton>
           </div>
         ) : (
           <div className="flex gap-2">
-            <span aria-disabled="true" className={`${RECORD_LINK} cursor-default opacity-50`}>
+            <span aria-disabled="true" className={`${SECONDARY_ACTION} cursor-default opacity-50`}>
               경기 저장 중…
             </span>
           </div>
@@ -373,8 +374,7 @@ export function OnlineResult({
         <p className="sr-only" role="status">
           {published.status === "ready" ? "경기가 저장됐어요. 기록 보기와 공유를 쓸 수 있어요." : published.status === "unavailable" ? "이 경기는 기록 보기를 열 수 없어요." : "경기를 저장하는 중이에요."}
         </p>
-        {kakaoScript}
-        {shareOpen && saved ? <ShareMenu content={buildFortressShareContent(saved)} kakao={kakao} subject="경기 기록" onClose={() => setShareOpen(false)} /> : null}
+        <FortressHomeButton className={SECONDARY_ACTION} onClick={onHome} />
         {roomStatus === "RESULT" && !isHost ? <p className="text-center text-xs text-slate-400">방장이 다시 한 판을 열면 대기실로 가요.</p> : null}
         <ResultActions isHost={isHost && roomStatus === "RESULT"} onRematch={onRematch} onExit={onExit} />
       </div>

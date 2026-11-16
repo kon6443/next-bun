@@ -2,15 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ShareMenu } from "@/app/games/_shared/components/ShareMenu";
-import { useKakaoReady } from "@/app/games/_shared/hooks/useKakaoReady";
+import { ShareMenuButton } from "@/app/games/_shared/components/ShareMenuButton";
 import { formatCompactDateTime } from "@/app/utils/dateUtils";
 import { type FortressMatch, type FortressReplay as ReplayBody, getFortressMatch, getFortressReplay } from "@/services/fortressService";
 import { ApiError } from "@/types/api";
 import { FortressReplay } from "../../components/FortressReplay";
-import { CARD, EYEBROW } from "../../components/fortressUi";
+import { CARD, EYEBROW, FortressHomeButton, SECONDARY_ACTION } from "../../components/fortressUi";
 import vividStyles from "../../components/fortressVivid.module.css";
-import { DEFAULT_LOOK, lookFromUrl, usesVivid } from "../../lib/look";
 import type { ReplayData } from "../../lib/replay";
 import { toTankSkin } from "../../lib/tankSkins";
 import { FORTRESS_MATCHES_PATH, buildFortressShareContent, fortressResultHeadline, fortressStatLine } from "../lib/fortressShare";
@@ -18,6 +16,7 @@ import { FORTRESS_LOBBY_PATH, MAP_LABEL } from "../lib/roomLabels";
 import { FortressResultTable } from "./FortressResultTable";
 import { HeroTanks, winnerTanks } from "../../components/resultFlair";
 import type { MapId } from "../../engine";
+import { useRememberLook } from "../../lib/look";
 
 type Loaded =
   | { status: "loading" }
@@ -25,8 +24,6 @@ type Loaded =
   | { status: "error"; message: string }
   /** replay null = 결과는 있지만 리플레이가 없다(404) — 결과만 보인다 */
   | { status: "ready"; match: FortressMatch; replay: ReplayBody | null };
-
-const LINK = "flex min-h-11 flex-1 items-center justify-center rounded-full border border-white/15 px-3 text-sm font-semibold text-slate-200 hover:border-white/30";
 
 /** 리플레이 본문 → 재생 데이터·이름·스킨(slot 순) */
 export function replayView(replay: ReplayBody): { data: ReplayData; names: string[]; skins: ReturnType<typeof toTankSkin>[] } {
@@ -46,11 +43,8 @@ export function replayView(replay: ReplayBody): { data: ReplayData; names: strin
 export function FortressMatchViewer({ matchId }: { matchId: string }) {
   const [loaded, setLoaded] = useState<Loaded>({ status: "loading" });
   const [playing, setPlaying] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
-  // 그림(보충 5) — 서버 렌더와 첫 렌더는 기본값(vivid)으로 같게, 마운트 뒤 주소·탭 기억(?look=classic 등)을 따른다(하이드레이션 불일치 없이)
-  const [look, setLook] = useState(DEFAULT_LOOK);
-  useEffect(() => setLook(lookFromUrl()), []);
-  const { kakao, kakaoScript } = useKakaoReady();
+  // 공유 링크로 들어온 ?look=glow를 그 탭에 기억(여기서 로비·경기로 이어 갈 때)
+  useRememberLook();
 
   const load = useCallback(async () => {
     setLoaded({ status: "loading" });
@@ -96,10 +90,9 @@ export function FortressMatchViewer({ matchId }: { matchId: string }) {
 
   return (
     <div
-      className={`h-full overflow-y-auto overscroll-contain bg-gradient-to-b from-[#070b1d] via-[#141a3d] to-[#2a2350] ${usesVivid(look) ? vividStyles.vivid : ""} px-4 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+env(safe-area-inset-bottom))]`}
+      className={`h-full overflow-y-auto overscroll-contain bg-gradient-to-b from-[#070b1d] via-[#141a3d] to-[#2a2350] ${vividStyles.vivid} px-4 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+env(safe-area-inset-bottom))]`}
       style={{ touchAction: "pan-y" }}
       data-testid="fortress-match-viewer"
-      data-look={look}
     >
       <div className="mx-auto flex max-w-md flex-col gap-4">
         <nav className="flex items-center justify-between text-sm">
@@ -137,26 +130,26 @@ export function FortressMatchViewer({ matchId }: { matchId: string }) {
                 {fortressStatLine(loaded.match)} · {MAP_LABEL[loaded.match.mapId as keyof typeof MAP_LABEL] ?? loaded.match.mapId} · {formatCompactDateTime(new Date(loaded.match.endedAt))}
               </p>
             </header>
-            {usesVivid(look) && loaded.match.result.kind === "win" ? (
+            {loaded.match.result.kind === "win" ? (
               <div className="overflow-hidden rounded-3xl" data-hud="card">
                 <HeroTanks tanks={winnerTanks(loaded.match.players, prepared?.skins)} mapId={loaded.match.mapId as MapId} label={`승리한 탱크: ${winnerTanks(loaded.match.players).map((t) => t.label).join(", ")}`} />
               </div>
             ) : null}
-            <FortressResultTable players={loaded.match.players} vivid={usesVivid(look)} />
+            <FortressResultTable players={loaded.match.players} />
             <div className="flex gap-2">
               {loaded.replay ? (
-                <button type="button" onClick={() => setPlaying(true)} className={`${LINK} border-sky-400/50 bg-sky-500/15 text-sky-50`} data-testid="fortress-viewer-replay">
+                <button type="button" onClick={() => setPlaying(true)} className={`${SECONDARY_ACTION} border-sky-400/50 bg-sky-500/15 text-sky-50`} data-testid="fortress-viewer-replay">
                   다시 보기
                 </button>
               ) : (
-                <span className={`${LINK} cursor-default opacity-60`}>리플레이가 없어요</span>
+                <span className={`${SECONDARY_ACTION} cursor-default opacity-60`}>리플레이가 없어요</span>
               )}
-              <button type="button" onClick={() => setShareOpen(true)} aria-haspopup="dialog" className={LINK} data-testid="fortress-viewer-share">
+              <ShareMenuButton content={buildFortressShareContent(loaded.match)} subject="경기 기록" className={SECONDARY_ACTION} testId="fortress-viewer-share">
                 공유
-              </button>
+              </ShareMenuButton>
             </div>
-            {kakaoScript}
-            {shareOpen ? <ShareMenu content={buildFortressShareContent(loaded.match)} kakao={kakao} subject="경기 기록" onClose={() => setShareOpen(false)} /> : null}
+            {/* 포트리스 홈은 아래 한 줄 — 위 줄을 셋으로 나누면 390px에서 "리플레이가 없어요"가 두 줄이 된다 */}
+            <FortressHomeButton className={SECONDARY_ACTION} />
           </>
         )}
       </div>

@@ -9,7 +9,9 @@ export function settingsSummary(settings: Pick<RoomSettings, 'mode' | 'mapId'>):
   return `${MODE_LABEL[settings.mode]} · ${MAP_LABEL[settings.mapId]}`;
 }
 
+/** 포트리스 홈 */
+export const FORTRESS_HOME_PATH = '/games/fortress';
 /** 방 경로·초대 링크 — 잠긴 방은 비밀번호부터 묻는다 */
-export const FORTRESS_LOBBY_PATH = '/games/fortress/battle';
+export const FORTRESS_LOBBY_PATH = `${FORTRESS_HOME_PATH}/battle`;
 export const fortressRoomPath = (code: string, locked = false) => `${FORTRESS_LOBBY_PATH}/${code}${locked ? '?locked=1' : ''}`;
 export const FORTRESS_LOBBY_CHAT_SECTION_ID = 'lobby-chat';

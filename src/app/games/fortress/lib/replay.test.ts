@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import { chooseTurn } from "../ai/chooseTurn";
 import * as engine from "../engine";
 import { type Action, type MatchConfig, type MatchState, applyAction, createMatch, fnv1a, simulateMatch, stateHash } from "../engine";
-import { type ReplayData, buildReplay, newReplayData, stateAt, summarizeReplay } from "./replay";
+import golden from "../engine/__fixtures__/golden-matches.json";
+import { playedTurns } from "./points";
+import { type ReplayData, buildReplay, matchTurns, newReplayData, replayTurnProgress, stateAt, summarizeReplay } from "./replay";
 
 const duel = (seed: number): MatchConfig => ({
   seed,
@@ -76,7 +78,8 @@ describe("로컬 리플레이", () => {
       if (!built.ok) throw new Error(built.reason);
       const { replay } = built;
       const summary = summarizeReplay(replay);
-      expect(summary.turns).toBe(replay.turns.length);
+      // 끝난 경기의 턴 수 = 백엔드 playedTurns와 같은 규칙(points.ts에 따로 옮겨 둔 것)
+      expect(summary.turns).toBe(playedTurns(replay.final));
 
       // 독립 계산: 턴 전후 적 HP 차이. 추락사(out)는 피해 이벤트 없이 HP가 0이 되므로 그런 판에선 상한으로만 본다
       const lost = [0, 0, 0, 0];
@@ -108,4 +111,71 @@ describe("로컬 리플레이", () => {
       expect(kos.reduce((n, k) => n + k, 0)).toBeGreaterThan(0);
     }
   }, 60_000);
+});
+
+describe("진행한 턴 수 — 서버 API turns(playedTurns)·기록 머리 \"N턴\"과 같다 (행동 수가 아니다)", () => {
+  const goldenReplay = (name: string) => {
+    const g = (golden as unknown as { name: string; config: MatchConfig; actions: Action[] }[]).find((c) => c.name === name);
+    if (!g) throw new Error(name);
+    const built = buildReplay(engine, { engineVersion: engine.ENGINE_VERSION, config: g.config, actions: g.actions });
+    if (!built.ok) throw new Error(built.reason);
+    return built.replay;
+  };
+  /** 행동 경계마다의 진행 표시 [current, total] */
+  const progress = (replay: ReturnType<typeof goldenReplay>) => Array.from({ length: replay.turns.length + 1 }, (_, i) => replayTurnProgress(replay, i)).map(({ current, total }) => [current, total]);
+
+  it("골든 25수(turn.no 24, 결정) — 25턴. 시작 0/25, 결정타 직전 24/25, 끝 25/25. 분자는 줄지 않고 분모를 넘지 않는다", () => {
+    const replay = goldenReplay("ffa 2인 hills AI 중·중");
+    expect(replay.turns.length).toBe(25);
+    expect(replay.final.turn.no).toBe(24);
+    expect(matchTurns(replay.final)).toBe(25);
+    expect(summarizeReplay(replay).turns).toBe(25);
+    const p = progress(replay);
+    expect(p[0]).toEqual([0, 25]);
+    expect(p[1]).toEqual([1, 25]);
+    // 승패를 가른 행동이 끝나야 그 턴을 센다
+    expect(p.at(-2)).toEqual([24, 25]);
+    expect(p.at(-1)).toEqual([25, 25]);
+    for (let i = 1; i < p.length; i++) expect(p[i][0]).toBeGreaterThanOrEqual(p[i - 1][0]);
+    for (const [current, total] of p) expect(current).toBeLessThanOrEqual(total);
+  });
+
+  it("턴 상한 60수 — 끝 60/60 (상한 판정은 turn.no 그대로, +1 하지 않는다)", () => {
+    for (const name of ["턴 상한 HP 판정 승", "턴 상한 무승부"]) {
+      const replay = goldenReplay(name);
+      expect(replay.turns.length).toBe(60);
+      expect(replay.final.turn.no).toBe(60);
+      const p = progress(replay);
+      expect(p[0]).toEqual([0, 60]);
+      expect(p.at(-2)).toEqual([59, 60]);
+      expect(p.at(-1)).toEqual([60, 60]);
+    }
+  });
+
+  it("기권 남의 턴·현재 턴(turn.no 0, 결정) — 1턴: 시작 0/1, 남의 턴 기권 뒤 0/1, 끝 1/1", () => {
+    const replay = goldenReplay("기권 남의 턴·현재 턴");
+    expect(replay.final.turn.no).toBe(0);
+    // 행동 수(2)와 갈리는 경기 — 결과 화면 머리(summary)도 1턴
+    expect(summarizeReplay(replay).turns).toBe(1);
+    expect(progress(replay)).toEqual([
+      [0, 1],
+      [0, 1],
+      [1, 1],
+    ]);
+  });
+
+  it("턴 상한 턴에 승패가 나면(turn.no = 상한-1, 결정) 그 턴까지 세 상한값 — HP 판정 끝(turn.no = 상한)과 같은 수", () => {
+    const final = goldenReplay("ffa 2인 hills AI 중·중").final;
+    expect(final.result.kind).toBe("win");
+    const decidedOnCapTurn = { ...final, maxTurns: final.turn.no + 1 };
+    expect(matchTurns(decidedOnCapTurn)).toBe(final.turn.no + 1);
+    expect(matchTurns(decidedOnCapTurn)).toBe(playedTurns(decidedOnCapTurn));
+  });
+
+  it("진행 중인 state(중단된 경기)는 끝난 턴 수 turn.no — 지금 차례는 세지 않는다", () => {
+    const replay = goldenReplay("ffa 2인 hills AI 중·중");
+    const mid = stateAt(replay, 10);
+    expect(mid.result.kind).toBe("ongoing");
+    expect(matchTurns(mid)).toBe(mid.turn.no);
+  });
 });
