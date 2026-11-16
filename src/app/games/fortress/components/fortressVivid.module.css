@@ -1,5 +1,5 @@
 /*
- * 시안 "vivid" HUD·조작부(D-025 B) — 경기 화면 루트에 .vivid가 붙을 때만 적용된다(classic 화면·공용 GamePad 코드는 그대로)
+ * "vivid" HUD·조작부(D-025 B) — 경기·리플레이·결과 화면 루트의 .vivid 아래에 적용된다(공용 GamePad 코드는 그대로)
  * 장난감 상자 톤: 남보라 판 + 굵은 잉크 외곽선 + 아래 두께(0 3px 0 잉크) + 윗면 빛. 주 버튼은 노랑 3D
  * Tailwind v4 유틸리티는 @layer 안이라, 레이어 밖인 이 규칙이 우선한다(!important 불필요)
  * Tailwind 클래스를 선택자로 쓸 때는 :global(...)로 감싼다 — 감싸지 않으면 CSS 모듈이 이름을 해시해 아무 요소에도 걸리지 않는다
@@ -471,10 +471,13 @@
   transform: translateY(3px);
 }
 
-/* 기록 보기·온라인 결과의 보조 버튼(공유·기록 보기 링크) — 남보라 3D 판 */
+/* 기록 보기·온라인·AI전 결과의 보조 버튼(공유·기록 보기 링크·기록 공유) — 남보라 3D 판 */
+.vivid button[data-testid="fortress-solo-share"],
 .vivid [data-testid="fortress-viewer-share"],
 .vivid a[data-testid="fortress-record-link"],
-.vivid button[data-testid="fortress-record-share"] {
+.vivid button[data-testid="fortress-record-share"],
+.vivid [data-testid="fortress-home"],
+.vivid button[data-testid="fortress-replay-close"] {
   background: linear-gradient(180deg, var(--panel-top) 0%, var(--panel-bottom) 100%);
   border: 3px solid var(--ink);
   color: #fff;
@@ -484,10 +487,13 @@
     inset 0 2px 0 rgba(255, 255, 255, 0.22),
     0 4px 0 var(--ink);
 }
+.vivid button[data-testid="fortress-solo-share"]:active,
 .vivid [data-testid="fortress-viewer-share"]:active,
 .vivid a[data-testid="fortress-record-link"]:active,
 .vivid button[data-testid="fortress-record-share"]:active,
-.vivid button[data-testid="fortress-viewer-replay"]:active {
+.vivid button[data-testid="fortress-viewer-replay"]:active,
+.vivid [data-testid="fortress-home"]:active,
+.vivid button[data-testid="fortress-replay-close"]:active {
   transform: translateY(3px);
 }
 

@@ -2,7 +2,7 @@
 
 import type { RoomState } from "@/types/fortressSocket";
 import { TankSkinPreview } from "../../components/TankSkinPreview";
-import { SLOT_COLORS, TEAM_COLORS } from "../../renderer/drawScene";
+import { SLOT_COLORS, TEAM_COLORS } from "../../lib/slotColors";
 import { DEFAULT_TANK_SKIN_ID, FORTRESS_SKINS_HREF, TANK_SKIN_LABELS, toTankSkin } from "../../lib/tankSkins";
 
 /** 스킨 이름 — 기본이면 "기본", 아니면 "네온 라인 Lv3" */

@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { loadLastName, saveLastName } from "../../lib/storage";
+import { createGameStorage } from "@/app/games/_shared/lib/storage";
 import { normalizePlayerName, validatePlayerName } from "@/app/games/_shared/lib/playerName";
+
+/** 대전 이름 저장값 — 테트리스 랭킹 등록 이름과 같은 키(tetris:lastName). 포트리스 대전도 공용화 전부터 이 값을 썼다 */
+const { loadLastName, saveLastName } = createGameStorage("tetris", { pendingKind: "session", pendingLimit: 5 });
 
 /**
  * 대전에서 쓸 이름 — 기본값은 마지막에 쓴 이름 → 로그인 닉네임(규칙을 통과하는 것만). 랭킹 등록 이름과 같은 저장값을 쓴다

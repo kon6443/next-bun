@@ -1,4 +1,3 @@
-import { CARD } from "../../components/fortressUi";
 import { TEAM_LABEL } from "../lib/roomLabels";
 import { DamageBar, GradeBadge, gradeOf } from "../../components/resultFlair";
 
@@ -6,45 +5,10 @@ import { DamageBar, GradeBadge, gradeOf } from "../../components/resultFlair";
 export type ResultRow = { playerId: string; name: string; slot: number; team: 0 | 1 | null; hp: number; damage: number; kos: number; place: number };
 
 /**
- * 순위표 — 순위·플레이어(나·팀)·남은 HP·준 피해·KO. 결과 화면과 경기 기록 페이지가 함께 쓴다
- * vivid(보충 5) — 솔로 vivid 결과와 같은 카드 행 + 준 피해 막대(1위 금테). 순서 목록(순위)이라 낭독은 "목록, 4개 항목"
+ * 순위표 — 결과 화면과 경기 기록 페이지가 함께 쓴다. 솔로 결과와 같은 카드 행(순위·플레이어(나·팀)·남은 HP·KO) + 준 피해 막대(1위 금테)
+ * 순서 목록(순위)이라 낭독은 "목록, 4개 항목"
  */
-export function FortressResultTable({ players, myPlayerId = null, vivid = false }: { players: readonly ResultRow[]; myPlayerId?: string | null; vivid?: boolean }) {
-  if (vivid) return <ResultCards players={players} myPlayerId={myPlayerId} />;
-  return (
-    <section className={`${CARD} px-4 py-3`} data-hud="card">
-      <table className="w-full text-sm">
-        <caption className="sr-only">순위</caption>
-        <thead>
-          <tr className="text-xs text-slate-400">
-            <th scope="col" className="py-2 text-left font-normal">순위</th>
-            <th scope="col" className="py-2 text-left font-normal">플레이어</th>
-            <th scope="col" className="py-2 text-right font-normal">남은 HP</th>
-            <th scope="col" className="py-2 text-right font-normal">준 피해</th>
-            <th scope="col" className="py-2 text-right font-normal">KO</th>
-          </tr>
-        </thead>
-        <tbody>
-          {players.map((p) => (
-            <tr key={p.playerId} className={`border-t border-slate-700/50 ${p.playerId === myPlayerId ? "bg-sky-500/10" : ""}`}>
-              <td className={`py-2.5 tabular-nums ${p.place === 1 ? "font-semibold text-amber-200" : "text-slate-300"}`}>{p.place}</td>
-              <th scope="row" className="py-2.5 text-left font-normal text-slate-200">
-                {p.name}
-                {p.playerId === myPlayerId ? <span className="ml-1 text-xs text-sky-300">(나)</span> : null}
-                {p.team !== null ? <span className="ml-1 text-xs text-slate-500">{TEAM_LABEL[p.team]}</span> : null}
-              </th>
-              <td className="py-2.5 text-right tabular-nums text-slate-300">{p.hp > 0 ? p.hp : "탈락"}</td>
-              <td className="py-2.5 text-right tabular-nums text-slate-100">{p.damage}</td>
-              <td className="py-2.5 text-right tabular-nums text-slate-100">{p.kos}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
-  );
-}
-
-function ResultCards({ players, myPlayerId }: { players: readonly ResultRow[]; myPlayerId: string | null }) {
+export function FortressResultTable({ players, myPlayerId = null }: { players: readonly ResultRow[]; myPlayerId?: string | null }) {
   const maxDamage = Math.max(1, ...players.map((p) => p.damage));
   return (
     // role="list" — 목록 표시를 지운 ol(Tailwind preflight)은 Safari·VoiceOver가 목록으로 읽지 않는다

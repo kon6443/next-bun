@@ -40,7 +40,7 @@ const endPlayback = () =>
 
 const { FortressMatch } = await import("./FortressMatch");
 type OnlineLink = import("./FortressMatch").OnlineLink;
-type Controller = import("./FortressMatch").Controller;
+type Controller = import("../lib/controllers").Controller;
 
 /** 온라인 경기(F5) — 서버 피드로만 진행: 내 차례 제출 · 피드 행동 적용 · 해시 대조 · 스냅샷 재구성 */
 const config: MatchConfig = {

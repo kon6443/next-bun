@@ -2,7 +2,7 @@
 
 import { HomeLobbyChatCard } from "@/app/games/_shared/battle-room/lobby-chat/HomeLobbyChatCard";
 import { BattleSocketProvider, useBattleSocket } from "../contexts/BattleSocketContext";
-import { usePlayerName } from "../hooks/usePlayerName";
+import { usePlayerName } from "@/app/games/_shared/battle-room/hooks/usePlayerName";
 import { LOBBY_CHAT_HREF } from "../lib/battleList";
 import { battleErrorMessage } from "../lib/battleErrors";
 import { tetrisHiddenSenders } from "../lib/lobbyChatHidden";

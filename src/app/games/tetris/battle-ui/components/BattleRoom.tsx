@@ -2,9 +2,9 @@
 
 import { BattleRoomView } from "@/app/games/_shared/battle-room/components/BattleRoomView";
 import { useBattleSocket, useEnterScope } from "../contexts/BattleSocketContext";
-import { usePlayerName } from "../hooks/usePlayerName";
+import { usePlayerName } from "@/app/games/_shared/battle-room/hooks/usePlayerName";
 import { battleErrorMessage } from "../lib/battleErrors";
-import { consumeReloadEntry } from "../lib/pageReload";
+import { consumeReloadEntry } from "@/app/games/_shared/battle-room/lib/pageReload";
 import { loadRoomSession } from "../lib/roomSession";
 import { RoomStage } from "./RoomStage";
 

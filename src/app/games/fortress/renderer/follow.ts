@@ -20,9 +20,9 @@ import { type ShellView, playbackEnd, shellsAt } from "./playback";
 
 export const TURN_ZOOM = 0.9;
 /** 조준 중 내 탱크와 가까운 적을 함께 담을 때 이보다 멀리 빼지 않는다(탱크가 너무 작아지지 않게) — 못 담으면 화면 밖 표시 */
-export const AIM_FRAME_MIN_ZOOM = 0.42;
+const AIM_FRAME_MIN_ZOOM = 0.42;
 /** 비행 계획 — 경로 전체가 이 배율 이상으로 들어가면 고정 화면, 아니면 이 배율로 가로만 따라간다 */
-export const FLIGHT_MIN_ZOOM = 0.34;
+const FLIGHT_MIN_ZOOM = 0.34;
 /** 착탄 지점에 머무는 시간(ms) */
 export const IMPACT_HOLD_MS = 700;
 /** 화면 가장자리 여백(px) */
@@ -136,7 +136,7 @@ export function planFlight(events: readonly MatchEvent[], view: ViewSize, insets
  * 비행 시작 때의 따라가기 기준 — 지금 카메라 자리를 계획 범위 안으로(처음부터 반대쪽으로 갔다 오지 않게), 단 출발점이 보이는 자리까지만
  * (앞 착탄 자리처럼 도착 쪽에 있던 카메라는 출발점이 보이는 쪽으로 한 번 돌아온다). 세로를 따라가면 지금 높이에서 시작
  */
-export function flightStart(plan: FlightPlan, camera: { cx: number; cy: number }): { cx: number; cy: number } {
+function flightStart(plan: FlightPlan, camera: { cx: number; cy: number }): { cx: number; cy: number } {
   const lo = Math.min(plan.cxFrom, plan.cxTo);
   const hi = Math.max(plan.cxFrom, plan.cxTo);
   let cx = plan.cxFrom;

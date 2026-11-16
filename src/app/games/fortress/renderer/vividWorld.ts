@@ -10,13 +10,9 @@
 import { type MapId, WIND_MAX } from "../engine";
 import type { BackdropOptions } from "./backdrop";
 import type { Camera, ViewSize } from "./camera";
+import { hash01 } from "./noise";
 
 const TILE_W = 1024;
-
-function hash01(i: number): number {
-  const s = Math.sin(i * 127.1 + 311.7) * 43758.5453;
-  return s - Math.floor(s);
-}
 
 /** shape — peak 뾰족한 산 · round 둥근 언덕 · mesa 평평한 윗면(협곡). fog — 대기 안개 세기(원경만 진하게, 가까운 층은 0 = 불투명 색면 + 윤곽선) */
 type Range = { fog: number; top: string; bottom: string; haze: string; base: number; cycles: [number, number, number]; amps: [number, number, number]; phase: number; shape: "peak" | "round" | "mesa"; rim: string; parallax: number; worldY: number };

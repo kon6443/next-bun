@@ -26,10 +26,17 @@ vi.mock('next/navigation', () => ({ useRouter: () => router }));
 const toast = vi.fn();
 vi.mock('react-hot-toast', () => ({ default: Object.assign((...a: unknown[]) => toast(...a), { success: vi.fn(), error: vi.fn() }) }));
 vi.mock('next-auth/react', () => ({ useSession: () => ({ data: null, status: 'unauthenticated' }) }));
-vi.mock('./RoomStage', () => ({ RoomStage: () => null }));
+// 방 안 단계에 넘기는 콜백(나가기·다른 곳으로 나가기)을 꺼내 본다
+const stage = vi.hoisted(() => ({ props: null as null | { onExit: () => void; onExitTo: (path: string) => void } }));
+vi.mock('./RoomStage', () => ({
+  RoomStage: (p: { onExit: () => void; onExitTo: (path: string) => void }) => {
+    stage.props = p;
+    return null;
+  },
+}));
 const reload = { value: false };
 // 문서당 한 번만 true인 실제 동작을 흉내 낸다
-vi.mock('../lib/pageReload', () => ({
+vi.mock('@/app/games/_shared/battle-room/lib/pageReload', () => ({
   consumeReloadEntry: () => {
     const value = reload.value;
     reload.value = false;
@@ -179,5 +186,40 @@ describe('BattleRoom 입장', () => {
     expect(screen.getByRole('button', { name: '입장' })).toBeEnabled();
     await submitForm();
     expect(joinRoom.mock.calls[1][0]).toEqual(expect.objectContaining({ playerToken: 'secret' }));
+  });
+});
+
+describe('BattleRoom 나가기 (공용 BattleRoomView)', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    router.push.mockReset();
+    ctx.leaveRoom.mockReset();
+    stage.props = null;
+    ctx.status = 'connected';
+    ctx.roomNotice = null;
+  });
+
+  // 방에 들어가 있는 상태 — 입장 폼 대신 방 안 단계(RoomStage)를 그린다
+  const renderInRoom = () => {
+    (ctx as { room: unknown }).room = { code: CODE };
+    render(<BattleRoom code={CODE} lockedHint={false} />);
+    (ctx as { room: unknown }).room = null;
+    if (!stage.props) throw new Error('방 안 단계를 그리지 않았다');
+    return stage.props;
+  };
+
+  it('나가기는 로비로 먼저 이동하고 방을 나간다', () => {
+    const props = renderInRoom();
+    act(() => props.onExit());
+    expect(router.push).toHaveBeenCalledWith('/games/tetris/battle');
+    expect(ctx.leaveRoom).toHaveBeenCalledTimes(1);
+  });
+
+  it('다른 곳으로 나가기(onExitTo)는 같은 흐름(먼저 이동·방 나가기)으로 준 경로에 간다', () => {
+    const props = renderInRoom();
+    act(() => props.onExitTo('/games/tetris'));
+    expect(router.push).toHaveBeenCalledWith('/games/tetris');
+    expect(router.push).not.toHaveBeenCalledWith('/games/tetris/battle');
+    expect(ctx.leaveRoom).toHaveBeenCalledTimes(1);
   });
 });

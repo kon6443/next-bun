@@ -8,13 +8,14 @@ import { type PerfSnapshot, snapshot } from "../lib/perfProbe";
 import type { ReplayData } from "../lib/replay";
 import { DEFAULT_TANK_SKIN, type TankSkin } from "../lib/tankSkins";
 import { useMyTankSkin } from "../hooks/useMyTankSkin";
-import { DEFAULT_LOOK, type Look, lookFromUrl, usesVivid } from "../lib/look";
-import { type Controller, FortressMatch } from "./FortressMatch";
+import { DEFAULT_LOOK, type Look, lookFromUrl } from "../lib/look";
+import { FortressMatch } from "./FortressMatch";
+import type { Controller } from "../lib/controllers";
 import { FortressReplay } from "./FortressReplay";
 import { FortressResult } from "./FortressResult";
-import { FortressResultVivid } from "./FortressResultVivid";
 import { CARD, EYEBROW, choiceClass } from "./fortressUi";
-import { SLOT_COLORS, TEAM_COLORS } from "../renderer/drawScene";
+import { SLOT_COLORS, TEAM_COLORS } from "../lib/slotColors";
+import { FORTRESS_HOME_PATH } from "../battle-ui/lib/roomLabels";
 
 /**
  * 포트리스 AI전·핫시트 (F2) — 설정 → 경기 → 결과(요약) → 다시 보기·다시하기. 미노출 경로(/games/fortress/play)
@@ -86,7 +87,7 @@ export default function FortressPrototype() {
   const [setup, setSetup] = useState<Setup>(DEFAULT_SETUP);
   const [screen, setScreen] = useState<Screen>({ kind: "setup" });
   const [perf, setPerf] = useState(false);
-  /** 경기 화면 그림(D-025 B·보충 5) — 주소의 ?look(그 탭에 기억), 없으면 기본 vivid. 처음 렌더는 서버와 같은 기본값 */
+  /** 경기 화면 그림 — 주소의 ?look(그 탭에 기억, glow면 후처리), 없으면 기본 vivid. 처음 렌더는 서버와 같은 기본값 */
   const [look, setLook] = useState<Look>(DEFAULT_LOOK);
   const { skin: mySkin, status: mySkinStatus } = useMyTankSkin();
   /** 내 장착 스킨을 불러오는 중에 시작한 경기 — 응답이 오면 그 경기(·결과·다시 보기)의 내 자리 스킨을 한 번 정한다 */
@@ -135,15 +136,10 @@ export default function FortressPrototype() {
   } else if (screen.kind === "result") {
     const { replay, controllers, skins } = screen;
     const onReplay = () => setScreen({ kind: "replay", replay, controllers, skins });
-    body =
-      !usesVivid(look) ? (
-        <FortressResult data={replay} controllers={controllers} onReplay={onReplay} onRematch={startMatch} onSetup={toSetup} />
-      ) : (
-        <FortressResultVivid data={replay} controllers={controllers} skins={skins} onReplay={onReplay} onRematch={startMatch} onSetup={toSetup} />
-      );
+    body = <FortressResult data={replay} controllers={controllers} skins={skins} onReplay={onReplay} onRematch={startMatch} onSetup={toSetup} />;
   } else if (screen.kind === "replay") {
     const { replay, controllers, skins } = screen;
-    body = <FortressReplay data={replay} controllers={controllers} skins={skins} look={look} onClose={() => setScreen({ kind: "result", replay, controllers, skins })} />;
+    body = <FortressReplay data={replay} controllers={controllers} skins={skins} onClose={() => setScreen({ kind: "result", replay, controllers, skins })} />;
   } else body = <SetupScreen setup={setup} onChange={setSetup} onStart={startMatch} />;
 
   return (
@@ -171,7 +167,7 @@ function SetupScreen({ setup, onChange, onStart }: { setup: Setup; onChange: (s:
         <header className={CARD}>
           <div className="flex items-center justify-between">
             <p className={EYEBROW}>FORTRESS</p>
-            <Link href="/games/fortress" className="flex min-h-11 items-center px-2 text-xs text-sky-300">
+            <Link href={FORTRESS_HOME_PATH} className="flex min-h-11 items-center px-2 text-xs text-sky-300">
               ← 포트리스
             </Link>
           </div>

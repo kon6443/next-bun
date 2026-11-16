@@ -110,7 +110,7 @@ export function recipeFor(cue: FortressCue): SoundRecipe {
 // ── 배경음 — 16스텝 반복. match = 경쾌한 행진(베이스 + 아르페지오), result = 느린 화음 ──
 
 export type MusicTrack = "match" | "result";
-export const MUSIC_STEPS = 16;
+const MUSIC_STEPS = 16;
 export const MUSIC_STEP_SECONDS: Record<MusicTrack, number> = { match: 0.16, result: 0.32 };
 
 const MATCH_BASS = [43, 43, 50, 43, 41, 41, 48, 41, 38, 38, 45, 38, 43, 43, 50, 47];

@@ -45,7 +45,7 @@ export function earnedText(points: FortressMatchPoints): { amount: string | null
 }
 
 /** 게스트 — 적립 조건 미달이면 "로그인했다면 +N P" 대신 그 사유(로그인했어도 0 P였다) */
-export const GUEST_INELIGIBLE_TEXT: Record<"turns" | "shots" | "resign", string> = {
+const GUEST_INELIGIBLE_TEXT: Record<"turns" | "shots" | "resign", string> = {
   turns: "6턴 전에 끝난 경기라 로그인했어도 포인트가 없었어요.",
   shots: "내 차례에 3번 이상 쏘지 않아 로그인했어도 포인트가 없었어요.",
   resign: "나가기(기권)한 경기라 로그인했어도 포인트가 없었어요.",

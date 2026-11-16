@@ -12,7 +12,7 @@ vi.mock("../renderer/terrainLayer", () => ({
   },
   paintAll: () => {},
 }));
-vi.mock("../renderer/drawScene", () => ({ SLOT_COLORS: ["#38bdf8"], drawScene: () => {}, tankDrawScale: () => 1.4 }));
+vi.mock("../renderer/drawScene", () => ({ drawScene: () => {}, tankDrawScale: () => 1.4 }));
 // 컨테이너 크기가 잡힌 캔버스 — 그리기가 바로 돈다
 vi.mock("../hooks/useFortressCanvas", () => ({
   useFortressCanvas: () => ({ containerRef: { current: null }, canvasRef: { current: null }, ctxRef: { current: {} }, viewRef: { current: { width: 300, height: 150 } } }),

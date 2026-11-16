@@ -6,6 +6,7 @@ import { Button, EmptyState, LoadingSpinnerSimple } from "@/app/teams/components
 import { type FortressMatchListItem, getFortressMatchList } from "@/services/fortressService";
 import { ApiError } from "@/types/api";
 import { FortressMatchRow } from "./FortressMatchRow";
+import { FORTRESS_HOME_PATH } from "../lib/roomLabels";
 
 const PAGE_SIZE = 10;
 
@@ -63,7 +64,7 @@ export function FortressMatchArchive() {
     <div className="h-full overflow-y-auto overscroll-contain" style={{ touchAction: "auto" }}>
       <div className="mx-auto w-full max-w-xl px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-[calc(0.75rem+env(safe-area-inset-top))]">
         <header className="flex items-center gap-3">
-          <Link href="/games/fortress" className="flex min-h-11 items-center rounded-xl border border-slate-700/60 bg-slate-900/70 px-3 text-xs text-slate-400 hover:text-slate-200">
+          <Link href={FORTRESS_HOME_PATH} className="flex min-h-11 items-center rounded-xl border border-slate-700/60 bg-slate-900/70 px-3 text-xs text-slate-400 hover:text-slate-200">
             ← 포트리스
           </Link>
           <h1 className="text-lg font-bold text-white">최근 경기</h1>

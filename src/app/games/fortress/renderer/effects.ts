@@ -5,13 +5,14 @@
 
 import type { Quality } from "./backdrop";
 import type { WeaponFx } from "./vivid";
+import { INK, hexToRgb, mixRgb } from "./color";
 
 /**
  * 시안 전용 종류 — chunk 외곽선 있는 흙·돌 조각(땅에 닿으면 한 번 튀고 멈춘다) · puff 툰 연기(짙은→옅은 회색, 바람에 흐른다)
  * dust 바닥을 따라 옆으로 퍼지는 흙먼지 · pop 3연발의 뒤따르는 작은 폭발 · glint 착탄 순간의 흰 섬광(빛무리 + 네 갈래 빛살)
  */
 type Particle = {
-  kind: "debris" | "spark" | "smoke" | "fire" | "ring" | "flash" | "chunk" | "puff" | "dust" | "pop" | "glint";
+  kind: "debris" | "spark" | "smoke" | "chunk" | "puff" | "dust" | "pop" | "glint";
   x: number;
   y: number;
   vx: number;
@@ -35,12 +36,8 @@ export type Effects = {
   particles: Particle[];
   /** 흔들림 세기(px, 화면) — 프레임마다 줄어든다 */
   shake: number;
-  /** 화면 섬광(0~1) — 큰 폭발(메가탄급)만 */
-  flash: number;
   quality: Quality;
   reducedMotion: boolean;
-  /** 시안 vivid·glow — 입자를 더 많이(불씨·파편 1.6배) */
-  rich?: boolean;
   /** 시안 — 화면 붉은 틴트(0~1, 메가탄) */
   tint?: number;
   /** 시안 — (x, y) 아래 지면 높이(없으면 −1). chunk가 땅에 떨어진다. 없으면 바닥 없음 */
@@ -51,7 +48,7 @@ const MAX_PARTICLES = 420;
 const DEBRIS_COLORS = ["#6f4c2a", "#8a6038", "#4d7c0f", "#5f4024"];
 
 export function createEffects(): Effects {
-  return { particles: [], shake: 0, flash: 0, quality: "high", reducedMotion: false };
+  return { particles: [], shake: 0, quality: "high", reducedMotion: false };
 }
 
 let seed = 1;
@@ -66,41 +63,12 @@ function push(fx: Effects, p: Particle) {
   fx.particles.push(p);
 }
 
+/** 입자 개수 — 기본 1.6배(툰 연출), 품질 low·움직임 줄이기면 줄인다 */
 function scaled(fx: Effects, n: number): number {
-  const k = (fx.quality === "low" ? 0.4 : 1) * (fx.reducedMotion ? 0.5 : 1) * (fx.rich ? 1.6 : 1);
+  const k = (fx.quality === "low" ? 0.4 : 1) * (fx.reducedMotion ? 0.5 : 1) * 1.6;
   return Math.max(1, Math.round(n * k));
 }
 
-/** 이 반지름 이상이면 화면 섬광까지(메가탄 90) */
-const SCREEN_FLASH_RADIUS = 80;
-
-/** 폭발 — 섬광·충격파 2겹·불꽃·불씨·흙 파편·연기, 반지름(무기 크기)에 비례. 큰 폭발은 화면 섬광 */
-export function spawnExplosion(fx: Effects, x: number, y: number, r: number): void {
-  push(fx, { kind: "flash", x, y, vx: 0, vy: 0, life: 220, max: 220, size: r * 2.4, color: "#fff7d6" });
-  push(fx, { kind: "ring", x, y, vx: 0, vy: 0, life: 460, max: 460, size: r * 2.6, color: "#fde68a" });
-  push(fx, { kind: "ring", x, y, vx: 0, vy: 0, life: 700, max: 700, size: r * 3.6, color: "#fde68a" });
-  if (r >= SCREEN_FLASH_RADIUS && !fx.reducedMotion) fx.flash = 1;
-  for (let i = scaled(fx, 18 + r * 0.7); i > 0; i--) {
-    const a = rnd() * Math.PI * 2;
-    const v = (120 + rnd() * 260) * (0.7 + r / 90);
-    push(fx, { kind: "spark", x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, life: 380 + rnd() * 300, max: 680, size: 1.5 + rnd() * 1.5, color: rnd() > 0.5 ? "#fbbf24" : "#fb923c" });
-  }
-  for (let i = scaled(fx, 12 + r * 0.5); i > 0; i--) {
-    const a = -Math.PI * (0.1 + rnd() * 0.8);
-    const v = 90 + rnd() * 230;
-    push(fx, { kind: "debris", x: x + (rnd() - 0.5) * r, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 900 + rnd() * 600, max: 1500, size: 2 + rnd() * 3, color: DEBRIS_COLORS[Math.floor(rnd() * DEBRIS_COLORS.length)] });
-  }
-  // 불덩이 — 짧게 부풀었다 꺼지는 주황 덩어리
-  for (let i = scaled(fx, 8 + r * 0.12); i > 0; i--) {
-    const a = rnd() * Math.PI * 2;
-    const d = rnd() * r * 0.5;
-    push(fx, { kind: "fire", x: x + Math.cos(a) * d, y: y + Math.sin(a) * d, vx: Math.cos(a) * 30, vy: Math.sin(a) * 30 - 40, life: 380 + rnd() * 260, max: 640, size: r * (0.25 + rnd() * 0.3), color: rnd() > 0.5 ? "251, 146, 60" : "250, 204, 21" });
-  }
-  for (let i = scaled(fx, 12 + r * 0.25); i > 0; i--) {
-    push(fx, { kind: "smoke", x: x + (rnd() - 0.5) * r, y: y - rnd() * r * 0.5, vx: (rnd() - 0.5) * 30, vy: -20 - rnd() * 30, life: 1200 + rnd() * 900, max: 2100, size: r * (0.35 + rnd() * 0.4), color: "71, 85, 105" });
-  }
-  if (!fx.reducedMotion) fx.shake = Math.min(14, fx.shake + 3 + r * 0.18);
-}
 
 /** 시안 폭발의 지형·무기 재료 — 파편·먼지 색은 맵 지면, 불 색은 무기 */
 export type BlastStyle = { kind: WeaponFx["kind"]; fire: WeaponFx["fire"]; debris: readonly string[]; dust: string };
@@ -262,8 +230,6 @@ export function updateEffects(fx: Effects, dtMs: number, wind: number): void {
     } else if (p.kind === "smoke") {
       p.vx += wind * 6 * dt;
       p.size += 6 * dt;
-    } else if (p.kind === "fire") {
-      p.size += 20 * dt;
     } else if (p.kind === "puff") {
       p.vx += wind * 10 * dt;
       p.vy *= Math.pow(0.55, dt);
@@ -278,7 +244,6 @@ export function updateEffects(fx: Effects, dtMs: number, wind: number): void {
   }
   fx.particles = alive;
   fx.shake = fx.shake < 0.3 ? 0 : fx.shake * Math.pow(0.0015, dt);
-  fx.flash = fx.flash < 0.02 ? 0 : fx.flash * Math.pow(0.002, dt);
   if (fx.tint) fx.tint = fx.tint < 0.02 ? 0 : fx.tint * Math.pow(0.04, dt);
 }
 
@@ -290,7 +255,7 @@ export function shakeOffset(fx: Effects, time: number): [number, number] {
 
 /**
  * 월드 좌표 변환이 걸린 ctx에 그린다 — 크기는 월드 px
- * grow(r) = 폭발 크기 보정 배율(멀리 볼 때 화면 최소 크기, drawScene의 blastDrawRadius) — 섬광·고리·불덩이에 곱한다
+ * grow(r) = 폭발 크기 보정 배율(멀리 볼 때 화면 최소 크기, drawScene의 blastDrawRadius) — 반짝임(glint)에 곱한다
  */
 export function drawEffects(ctx: CanvasRenderingContext2D, fx: Effects, zoom: number, grow: (r: number) => number = () => 1): void {
   drawToonPuffs(ctx, fx, zoom);
@@ -310,13 +275,7 @@ export function drawEffects(ctx: CanvasRenderingContext2D, fx: Effects, zoom: nu
       drawGlint(ctx, p, k, grow(p.size));
       continue;
     }
-    if (p.kind === "fire") {
-      const size = p.size * grow(p.size);
-      ctx.fillStyle = `rgba(${p.color}, ${0.6 * k})`;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (p.kind === "smoke") {
+    if (p.kind === "smoke") {
       ctx.fillStyle = `rgba(${p.color}, ${0.28 * k})`;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
@@ -335,23 +294,10 @@ export function drawEffects(ctx: CanvasRenderingContext2D, fx: Effects, zoom: nu
       ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
       ctx.stroke();
       ctx.globalAlpha = 1;
-    } else if (p.kind === "ring") {
-      const t = 1 - k;
-      ctx.strokeStyle = `rgba(253, 230, 138, ${0.7 * k})`;
-      ctx.lineWidth = (3 * k + 1) / Math.max(zoom, 0.5);
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size * grow(p.size) * (0.3 + 0.7 * t), 0, Math.PI * 2);
-      ctx.stroke();
-    } else {
-      ctx.fillStyle = `rgba(255, 247, 214, ${0.85 * k})`;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size * grow(p.size) * (1.2 - 0.4 * k), 0, Math.PI * 2);
-      ctx.fill();
     }
   }
 }
 
-const INK = "#160b1c";
 
 /** 툰 연기·먼지 — 덩이 크기(끝물에 줄어든다) */
 function puffRadius(p: Particle): number {
@@ -359,14 +305,6 @@ function puffRadius(p: Particle): number {
   const t = 1 - k;
   const grow = Math.min(1, t * 5);
   return p.size * (0.4 + 0.6 * grow) * (k < 0.3 ? k / 0.3 : 1);
-}
-
-/** 두 색 사이(#rrggbb) */
-function mix(a: string, b: string, t: number): string {
-  const pa = parseInt(a.slice(1), 16);
-  const pb = parseInt(b.slice(1), 16);
-  const ch = (sh: number) => Math.round(((pa >> sh) & 255) * (1 - t) + ((pb >> sh) & 255) * t);
-  return `rgb(${ch(16)}, ${ch(8)}, ${ch(0)})`;
 }
 
 /**
@@ -389,7 +327,7 @@ function drawToonPuffs(ctx: CanvasRenderingContext2D, fx: Effects, zoom: number)
   for (const p of list) {
     const r = puffRadius(p);
     const t = 1 - p.life / p.max;
-    ctx.fillStyle = p.kind === "puff" && p.color2 ? mix(p.color, p.color2, Math.min(1, t * 1.4)) : p.color;
+    ctx.fillStyle = p.kind === "puff" && p.color2 ? mixRgb(p.color, hexToRgb(p.color2), Math.min(1, t * 1.4)) : p.color;
     ctx.beginPath();
     ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
     ctx.fill();

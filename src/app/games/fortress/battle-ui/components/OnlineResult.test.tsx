@@ -50,7 +50,7 @@ const eligibleReplay: ReplayData = { engineVersion: 1, config, actions: Array.fr
 
 function view(props: Partial<Parameters<typeof OnlineResult>[0]> = {}) {
   const onReplay = vi.fn(async () => {});
-  render(<OnlineResult matchId={saved.matchId} replay={eligibleReplay} published={{ status: "waiting" }} ended={null} myPlayerId="a" isHost={false} roomStatus="RESULT" onReplay={onReplay} onRematch={() => {}} onExit={() => {}} {...props} />);
+  render(<OnlineResult matchId={saved.matchId} replay={eligibleReplay} published={{ status: "waiting" }} ended={null} myPlayerId="a" isHost={false} roomStatus="RESULT" onReplay={onReplay} onRematch={() => {}} onExit={() => {}} onHome={() => {}} {...props} />);
   return { onReplay };
 }
 
@@ -129,5 +129,12 @@ describe("방 안 결과 화면 (F6·F7)", () => {
     });
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("경기가 끝났어요");
     expect(screen.getByText(/순위를 받지 못했어요/)).toBeTruthy();
+  });
+
+  it("포트리스 홈 — 방 나가기와 같은 흐름(onHome)을 부른다", () => {
+    const onHome = vi.fn();
+    view({ onHome });
+    fireEvent.click(screen.getByRole("button", { name: "포트리스 홈" }));
+    expect(onHome).toHaveBeenCalledTimes(1);
   });
 });

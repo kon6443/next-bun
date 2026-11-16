@@ -1,7 +1,7 @@
 "use client";
 
 import { HomeLobbyChatCard } from "@/app/games/_shared/battle-room/lobby-chat/HomeLobbyChatCard";
-import { usePlayerName } from "@/app/games/tetris/battle-ui/hooks/usePlayerName";
+import { usePlayerName } from "@/app/games/_shared/battle-room/hooks/usePlayerName";
 import { FortressSocketProvider, useFortressSocket } from "../contexts/FortressSocketContext";
 import { battleErrorMessage } from "../lib/battleErrors";
 import { fortressHiddenSenders } from "../lib/lobbyChatHidden";

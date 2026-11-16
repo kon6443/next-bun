@@ -3,7 +3,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { RoomPlayer, RoomState } from "@/types/fortressSocket";
 import { NO_TEAM_COLOR, FortressRoomTanks, roomTankColor, skinText } from "./FortressRoomTanks";
-import { SLOT_COLORS, TEAM_COLORS } from "../../renderer/drawScene";
+import { SLOT_COLORS, TEAM_COLORS } from "../../lib/slotColors";
 
 beforeAll(() => {
   HTMLCanvasElement.prototype.getContext = (() => null) as unknown as HTMLCanvasElement["getContext"];

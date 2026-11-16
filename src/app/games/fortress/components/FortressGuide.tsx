@@ -1,6 +1,7 @@
 "use client";
 
 import { useDialog } from "@/app/hooks/useDialog";
+import { readStorage, writeStorage } from "@/app/games/_shared/lib/storage";
 import { useMediaQuery } from "@/app/games/_shared/hooks/useMediaQuery";
 import { Button } from "@/app/teams/components/Button";
 import { KEY_GUIDE, TOUCH_GUIDE } from "../lib/controlGuide";
@@ -10,19 +11,12 @@ import { EYEBROW } from "./fortressUi";
 const GUIDE_SEEN_KEY = "fortress:guide:v1";
 
 export function readGuideSeen(): boolean {
-  try {
-    return window.localStorage.getItem(GUIDE_SEEN_KEY) === "1";
-  } catch {
-    return false;
-  }
+  return readStorage("local", GUIDE_SEEN_KEY) === "1";
 }
 
+/** 저장 실패는 무시 — 다음 방문에 한 번 더 보인다 */
 export function markGuideSeen(): void {
-  try {
-    window.localStorage.setItem(GUIDE_SEEN_KEY, "1");
-  } catch {
-    // 저장 실패는 무시 — 다음 방문에 한 번 더 보인다
-  }
+  writeStorage("local", GUIDE_SEEN_KEY, "1");
 }
 
 /** 조작 안내 — 경기 첫 진입에 한 번, 이후엔 상단 ? 버튼으로. 키보드 기기는 키 표, 터치 기기는 버튼 표(TetrisPlay ControlGuide와 같은 모양) */

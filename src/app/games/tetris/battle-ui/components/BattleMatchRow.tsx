@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { BattleMatchListItem } from "@/services/tetrisBattleService";
 import { battleMatchPath } from "../lib/battleShare";
-import { formatRelativeTime } from "../lib/battleList";
+import { formatRelativeTime } from "@/app/games/_shared/lib/format";
 
 /** 최근 대전 한 줄 — 방 이름·인원·우승자·시각, 누르면 기록 페이지 (테트리스 홈 미리보기·전체 목록이 같이 쓴다) */
 export function BattleMatchRow({ item, now }: { item: BattleMatchListItem; now: number }) {
