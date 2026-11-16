@@ -21,14 +21,13 @@ import {
   Button,
   ButtonLink,
   SectionLabel,
-  TaskForm,
   ErrorAlert,
   SuccessAlert,
   Skeleton,
   SkeletonText,
   DateInfoInline,
-  type TaskFormData,
 } from '../../../components';
+import { TaskForm, type TaskFormData } from '../../../components/TaskForm';
 import { StatusDropdown } from '@/app/components/StatusDropdown';
 import { ConfirmModal } from '@/app/components/ConfirmModal';
 import { TaskTagChips } from '@/app/components/TagChip';
