@@ -52,3 +52,19 @@ export function estimateRank(scores: readonly number[], myScore: number, listIsC
   if (above >= scores.length && !listIsComplete) return null;
   return above + 1;
 }
+
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
+/** 끝난 시각 → "방금" · "5분 전" · "3시간 전" · "2일 전" · 7일 이상은 "10월 15일" (로컬 표시) */
+export function formatRelativeTime(iso: string, now: number = Date.now()): string {
+  const at = new Date(iso);
+  const diff = now - at.getTime();
+  if (!Number.isFinite(diff)) return '';
+  if (diff < MINUTE) return '방금';
+  if (diff < HOUR) return `${Math.floor(diff / MINUTE)}분 전`;
+  if (diff < DAY) return `${Math.floor(diff / HOUR)}시간 전`;
+  if (diff < 7 * DAY) return `${Math.floor(diff / DAY)}일 전`;
+  return `${at.getMonth() + 1}월 ${at.getDate()}일`;
+}

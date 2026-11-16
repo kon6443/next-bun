@@ -4,7 +4,7 @@ import { useState } from "react";
 import { BattleLobbyView, type LobbyChatSlotContext } from "@/app/games/_shared/battle-room/components/BattleLobbyView";
 import { LobbyChatPanelView } from "@/app/games/_shared/battle-room/lobby-chat/LobbyChatPanel";
 import { useLobbyChatCore } from "@/app/games/_shared/battle-room/lobby-chat/useLobbyChat";
-import { usePlayerName } from "@/app/games/tetris/battle-ui/hooks/usePlayerName";
+import { usePlayerName } from "@/app/games/_shared/battle-room/hooks/usePlayerName";
 import { type CreateRoomPayload, ROOM_MAP_IDS, ROOM_MODES, type RoomMapId, type RoomMode, type RoomSummary } from "@/types/fortressSocket";
 import { useEnterScope, useFortressSocket } from "../contexts/FortressSocketContext";
 import { battleErrorMessage } from "../lib/battleErrors";

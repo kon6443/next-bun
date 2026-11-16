@@ -36,7 +36,7 @@ vi.mock('./RoomStage', () => ({
 }));
 const reload = { value: false };
 // 문서당 한 번만 true인 실제 동작을 흉내 낸다
-vi.mock('../lib/pageReload', () => ({
+vi.mock('@/app/games/_shared/battle-room/lib/pageReload', () => ({
   consumeReloadEntry: () => {
     const value = reload.value;
     reload.value = false;

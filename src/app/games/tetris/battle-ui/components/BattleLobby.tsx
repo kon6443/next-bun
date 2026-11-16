@@ -3,7 +3,7 @@
 import { BattleLobbyView } from "@/app/games/_shared/battle-room/components/BattleLobbyView";
 import { ROOM_MAX_PLAYERS, ROOM_MIN_PLAYERS } from "@/types/tetrisBattleSocket";
 import { useBattleSocket, useEnterScope } from "../contexts/BattleSocketContext";
-import { usePlayerName } from "../hooks/usePlayerName";
+import { usePlayerName } from "@/app/games/_shared/battle-room/hooks/usePlayerName";
 import { battleErrorMessage } from "../lib/battleErrors";
 import { battleRoomPath } from "../lib/battleList";
 import { LobbyChatPanel } from "./LobbyChatPanel";

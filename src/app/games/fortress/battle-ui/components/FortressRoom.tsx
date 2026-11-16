@@ -1,8 +1,8 @@
 "use client";
 
 import { BattleRoomView } from "@/app/games/_shared/battle-room/components/BattleRoomView";
-import { consumeReloadEntry } from "@/app/games/tetris/battle-ui/lib/pageReload";
-import { usePlayerName } from "@/app/games/tetris/battle-ui/hooks/usePlayerName";
+import { consumeReloadEntry } from "@/app/games/_shared/battle-room/lib/pageReload";
+import { usePlayerName } from "@/app/games/_shared/battle-room/hooks/usePlayerName";
 import { useEnterScope, useFortressSocket } from "../contexts/FortressSocketContext";
 import { battleErrorMessage } from "../lib/battleErrors";
 import { FORTRESS_LOBBY_PATH } from "../lib/roomLabels";
