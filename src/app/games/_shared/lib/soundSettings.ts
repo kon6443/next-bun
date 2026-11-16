@@ -85,11 +85,6 @@ export function getSoundSettings(): SoundSettings {
   return current;
 }
 
-/** 소리가 하나라도 켜져 있나 — 소리 버튼 표시 */
-export function isAnySoundOn(settings: SoundSettings): boolean {
-  return settings.sfx || settings.music;
-}
-
 /** 일부만 바꿔 저장하고 구독자에게 바로(같은 호출 안에서) 알린다 — 저장이 막혀도 이번 방문 동안은 바뀐 값으로 동작한다 */
 export function saveSoundSettings(partial: Partial<SoundSettings>): SoundSettings {
   const next = normalizeSoundSettings({ ...getSoundSettings(), ...partial });

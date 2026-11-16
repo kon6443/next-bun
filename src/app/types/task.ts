@@ -40,21 +40,3 @@ export type TaskComment = {
   mdfdAt: Date | null;
   crtdAt: Date;
 };
-
-export type TaskDetail = {
-  taskId: number;
-  teamId: number;
-  taskName: string;
-  taskDescription: string | null;
-  taskStatus: number;
-  actStatus: number;
-  startAt: Date | null;
-  endAt: Date | null;
-  completedAt: Date | null;
-  crtdAt: Date;
-  crtdBy: number;
-  userName: string | null;
-  tags: TaskTag[];
-  comments: TaskComment[];
-};
-

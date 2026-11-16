@@ -4,5 +4,3 @@ import { createHiddenSendersStore } from '@/app/games/_shared/battle-room/lobby-
 const store = createHiddenSendersStore('tetris:lobbyChatHidden');
 
 export const tetrisHiddenSenders = store;
-export const loadHiddenSenders = store.load;
-export const saveHiddenSenders = store.save;

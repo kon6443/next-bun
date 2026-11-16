@@ -49,8 +49,6 @@ export const TeamSocketEvents = {
   ERROR: 'error',
 } as const;
 
-export type TeamSocketEvent = (typeof TeamSocketEvents)[keyof typeof TeamSocketEvents];
-
 // ===== 이벤트 페이로드 타입 =====
 
 /** 태스크 생성 이벤트 */
