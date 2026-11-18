@@ -11,6 +11,7 @@ import { TetrisCanvas } from "../../../components/TetrisCanvas";
 import { toBoardSkins } from "../../../lib/skins";
 import { ShareMenu } from "@/app/games/_shared/components/ShareMenu";
 import { useKakaoReady } from "@/app/games/_shared/hooks/useKakaoReady";
+import { useReplayKeys } from "@/app/games/_shared/hooks/useReplayKeys";
 import { buildShareContent } from "@/app/games/_shared/lib/shareSpec";
 import { ACTION_LABELS } from "../../../lib/controls";
 import { formatFrames, formatScore, formatViewCount } from "@/app/games/_shared/lib/format";
@@ -270,26 +271,19 @@ export default function ReplayPlayer({ scoreId }: { scoreId: number }) {
   }, [seek, totalFrames]);
 
   // 키보드: Space 재생/정지, ←/→ 5초 이동
-  useEffect(() => {
-    if (!data) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (shareOpenRef.current) return;
+  useReplayKeys(data !== null, {
+    togglePlay,
+    seekBy: (direction) => seek((stateRef.current?.frame ?? 0) + direction * SEEK_STEP_FRAMES),
+    skip: (e, key) => {
+      if (shareOpenRef.current) return true;
       // 대화상자(소리 설정 등) 안의 키는 그 대화상자 몫 — 음량 막대의 ←/→가 뒤의 재생을 옮기지 않게 (P8)
-      if (e.target instanceof Element && e.target.closest('[role="dialog"]')) return;
-      if (e.target instanceof HTMLInputElement && e.target.type !== "range") return;
-      if (e.code === "Space") {
-        // 포커스된 버튼(속도·처음부터 등)은 Space로 그 버튼이 눌리게 둔다
-        if (e.target instanceof HTMLButtonElement) return;
-        e.preventDefault();
-        togglePlay();
-      } else if (e.code === "ArrowLeft" || e.code === "ArrowRight") {
-        e.preventDefault();
-        seek((stateRef.current?.frame ?? 0) + (e.code === "ArrowLeft" ? -SEEK_STEP_FRAMES : SEEK_STEP_FRAMES));
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [data, seek, togglePlay]);
+      if (e.target instanceof Element && e.target.closest('[role="dialog"]')) return true;
+      if (e.target instanceof HTMLInputElement && e.target.type !== "range") return true;
+      // 포커스된 버튼(속도·처음부터 등)은 Space로 그 버튼이 눌리게 둔다 — ←/→는 버튼에서도 재생을 옮긴다(타임라인 막대도 ←/→가 5초 이동)
+      return key === "toggle" && e.target instanceof HTMLButtonElement;
+    },
+    arrowField: "code",
+  });
 
   if (load.status !== "ready") {
     return (

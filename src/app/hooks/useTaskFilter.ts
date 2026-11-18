@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useDeferredValue } from 'react';
 import type { Task, TeamTag } from '../types/task';
 import {
   applyAllFilters,
@@ -89,10 +89,14 @@ export function useTaskFilter(tasks: Task[], teamTags: readonly TeamTag[] | null
     setFilters(saved);
   }, []);
 
+  // 검색어는 지연값으로 거른다 — 입력칸(filters.searchQuery)은 키마다 바로 바뀌고, 무거운 필터·보드 다시 그리기는
+  // 타이핑이 잠깐 멈출 때 낮은 우선순위로(저사양 모바일 타이핑 지연 방지). 다른 필터는 즉시 반영
+  const deferredSearchQuery = useDeferredValue(filters.searchQuery);
+
   // 필터된 태스크
   const filteredTasks = useMemo(() => {
-    return applyAllFilters(tasks, filters.searchQuery, filters.assigneeId, filters.period, filters.status, filters.tagIds, teamTags);
-  }, [tasks, filters, teamTags]);
+    return applyAllFilters(tasks, deferredSearchQuery, filters.assigneeId, filters.period, filters.status, filters.tagIds, teamTags);
+  }, [tasks, deferredSearchQuery, filters.assigneeId, filters.period, filters.status, filters.tagIds, teamTags]);
 
   // 전체 통계
   const stats = useMemo(() => calculateTaskStats(tasks), [tasks]);

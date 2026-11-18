@@ -51,6 +51,7 @@ export default function GameCanvas({ map, fishPool }: GameCanvasProps) {
   const { setTarget, moveByDirection, updatePosition } = usePlayerMovement(map);
   const {
     fishingCtx,
+    fishingLive,
     startFishing,
     onBiteTap,
     onChallengeTap,
@@ -309,8 +310,7 @@ export default function GameCanvas({ map, fishPool }: GameCanvasProps) {
         nearbyPoint={nearbyPoint}
         currentFish={fishingCtx.currentFish}
         waitProgress={fishingCtx.waitProgress}
-        biteTimeLeft={fishingCtx.biteTimeLeft}
-        challengeGauge={fishingCtx.challengeGauge}
+        live={fishingLive}
         challengeZone={fishingCtx.challengeZone}
         inventoryCount={fishingCtx.inventory.length}
         onlineCount={socketCtx?.onlineCount ?? 0}

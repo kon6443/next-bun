@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from '../types/task';
 import { getDeadlineStatus, getDeadlineLabel, getArchiveDaysLeft, deadlineStyles, formatCompactDateTime } from '../utils/taskUtils';
@@ -22,7 +22,11 @@ type TaskCardProps = {
   onTagClick?: (tagId: number) => void;
 };
 
-export function TaskCard({ task, onStatusChange, teamId, isArchiveView, onRestore, onArchive, onTagClick }: TaskCardProps) {
+/**
+ * 칸반 카드 — memo: 보드가 다시 그려져도(필터 입력·다른 카드 변경·패널 열림) props가 같은 카드는 건너뛴다.
+ * 넘기는 콜백은 TeamBoard에서 안정적이어야 효과가 있다(handleStatusChange는 tasksRef로 최신 목록을 읽는다)
+ */
+export const TaskCard = memo(function TaskCard({ task, onStatusChange, teamId, isArchiveView, onRestore, onArchive, onTagClick }: TaskCardProps) {
   const { taskId, taskName, taskDescription, startAt, endAt, crtdAt, userName, crtdBy, taskStatus, tags } = task;
   const router = useRouter();
   const [isUpdating, setIsUpdating] = useState(false);
@@ -199,4 +203,4 @@ export function TaskCard({ task, onStatusChange, teamId, isArchiveView, onRestor
       />
     </>
   );
-}
+});
