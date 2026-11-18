@@ -29,7 +29,10 @@ interface FishingSocketContextValue {
   mapId: string;
   onlineUsers: FishingOnlineUserInfo[];
   onlineCount: number;
-  /** 다른 유저 위치 (userId → position + meta) */
+  /**
+   * 다른 유저 위치 (userId → position + meta) — 늘 같은 Map을 제자리에서 고친다(이동마다 새 Map을 만들면 컨텍스트를 쓰는 화면 전체가 다시 그려진다).
+   * 그리기 루프가 매 프레임 읽는다. 접속·퇴장으로 화면이 바뀌어야 하면 onlineUsers(state)를 본다
+   */
   otherPlayers: Map<number, OtherPlayer>;
   /** 위치 emit (throttle 적용됨) */
   emitMove: (x: number, y: number, direction: 'left' | 'right') => void;
@@ -92,7 +95,7 @@ export function FishingSocketProvider({ children, mapId }: FishingSocketProvider
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<FishingOnlineUserInfo[]>([]);
-  const [otherPlayers, setOtherPlayers] = useState<Map<number, OtherPlayer>>(new Map());
+  const [otherPlayers] = useState(() => new Map<number, OtherPlayer>());
 
   // Refs
   const socketRef = useRef<FishingSocket | null>(null);
@@ -200,11 +203,7 @@ export function FishingSocketProvider({ children, mapId }: FishingSocketProvider
     newSocket.on(FishingSocketEvents.USER_LEFT, (payload) => {
       if (payload.connectionCount === 0) {
         setOnlineUsers((prev) => prev.filter((u) => u.userId !== payload.userId));
-        setOtherPlayers((prev) => {
-          const next = new Map(prev);
-          next.delete(payload.userId);
-          return next;
-        });
+        otherPlayers.delete(payload.userId);
       } else {
         setOnlineUsers((prev) =>
           prev.map((u) =>
@@ -218,12 +217,11 @@ export function FishingSocketProvider({ children, mapId }: FishingSocketProvider
     newSocket.on(FishingSocketEvents.PLAYER_POSITIONS, (payload) => {
       const now = Date.now();
       const myId = currentUserIdRef.current;
-      setOtherPlayers((prev) => {
-        const next = new Map(prev);
+      {
         for (const [uid, data] of Object.entries(payload.positions)) {
           const userId = Number(uid);
           if (userId === myId) continue; // 본인 제외
-          next.set(userId, {
+          otherPlayers.set(userId, {
             userId,
             userName: data.userName,
             x: data.x,
@@ -236,46 +234,37 @@ export function FishingSocketProvider({ children, mapId }: FishingSocketProvider
             fishingState: data.fishingState,
           });
         }
-        return next;
-      });
+      }
     });
 
     // 다른 유저 위치 업데이트 (MOVE는 서버에서 본인 제외 broadcast이므로 필터 불필요)
     newSocket.on(FishingSocketEvents.PLAYER_MOVED, (payload) => {
-      setOtherPlayers((prev) => {
-        const next = new Map(prev);
-        const existing = next.get(payload.userId);
-        next.set(payload.userId, {
-          userId: payload.userId,
-          userName: payload.userName,
-          x: existing?.x ?? payload.x,
-          y: existing?.y ?? payload.y,
-          direction: existing?.direction ?? payload.direction,
-          targetX: payload.x,
-          targetY: payload.y,
-          targetDirection: payload.direction,
-          lastUpdate: payload.timestamp,
-          fishingState: existing?.fishingState,
-          pointId: existing?.pointId,
-        });
-        return next;
+      const existing = otherPlayers.get(payload.userId);
+      otherPlayers.set(payload.userId, {
+        userId: payload.userId,
+        userName: payload.userName,
+        x: existing?.x ?? payload.x,
+        y: existing?.y ?? payload.y,
+        direction: existing?.direction ?? payload.direction,
+        targetX: payload.x,
+        targetY: payload.y,
+        targetDirection: payload.direction,
+        lastUpdate: payload.timestamp,
+        fishingState: existing?.fishingState,
+        pointId: existing?.pointId,
       });
     });
 
     // 다른 유저 낚시 상태 변경
     newSocket.on(FishingSocketEvents.PLAYER_FISHING_STATE, (payload) => {
-      setOtherPlayers((prev) => {
-        const next = new Map(prev);
-        const existing = next.get(payload.userId);
-        if (existing) {
-          next.set(payload.userId, {
-            ...existing,
-            fishingState: payload.state,
-            pointId: payload.pointId,
-          });
-        }
-        return next;
-      });
+      const existing = otherPlayers.get(payload.userId);
+      if (existing) {
+        otherPlayers.set(payload.userId, {
+          ...existing,
+          fishingState: payload.state,
+          pointId: payload.pointId,
+        });
+      }
     });
 
     socketRef.current = newSocket;
@@ -322,9 +311,9 @@ export function FishingSocketProvider({ children, mapId }: FishingSocketProvider
       setSocket(null);
       setIsConnected(false);
       setOnlineUsers([]);
-      setOtherPlayers(new Map());
+      otherPlayers.clear();
     }
-  }, []);
+  }, [otherPlayers]);
 
   const reconnect = useCallback(() => {
     disconnectSocket();

@@ -22,24 +22,58 @@ export interface FishingContext {
   state: FishingState;
   currentFish: Fish | null;
   currentPoint: FishingPoint | null;
-  challengeGauge: number;
   challengeZone: [number, number];
   lastCatch: CaughtFish | null;
   inventory: CaughtFish[];
   waitProgress: number;
+}
+
+/**
+ * 매 프레임 바뀌는 값(입질 남은 시간·챌린지 게이지) — 상태(ctx)에 두면 낚시 화면 전체가 초당 60번 다시 그려진다.
+ * 작은 저장소에 두고 그 값을 그리는 HUD 조각만 구독한다(useSyncExternalStore)
+ */
+export interface FishingLiveValues {
+  /** 입질 남은 시간 비율 1→0 */
   biteTimeLeft: number;
+  /** 챌린지 게이지 0~1 */
+  challengeGauge: number;
+}
+
+export interface FishingLive {
+  get: () => FishingLiveValues;
+  subscribe: (listener: () => void) => () => void;
+}
+
+const INITIAL_LIVE: FishingLiveValues = { biteTimeLeft: 1, challengeGauge: 0 };
+
+function createFishingLive() {
+  let values = INITIAL_LIVE;
+  const listeners = new Set<() => void>();
+  return {
+    get: () => values,
+    set: (patch: Partial<FishingLiveValues>) => {
+      const next = { ...values, ...patch };
+      if (next.biteTimeLeft === values.biteTimeLeft && next.challengeGauge === values.challengeGauge) return;
+      values = next;
+      listeners.forEach((listener) => listener());
+    },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
 }
 
 const INITIAL_CONTEXT: FishingContext = {
   state: 'idle',
   currentFish: null,
   currentPoint: null,
-  challengeGauge: 0,
   challengeZone: CHALLENGE_DEFAULT_ZONE,
   lastCatch: null,
   inventory: [],
   waitProgress: 0,
-  biteTimeLeft: 1,
 };
 
 /** 난이도 기반 챌린지 성공 구간 생성 */
@@ -54,6 +88,14 @@ function createChallengeZone(difficulty: number): [number, number] {
 
 export function useFishingState(fishPool: Fish[]) {
   const [ctx, setCtx] = useState<FishingContext>(INITIAL_CONTEXT);
+  // 최신 상태 — 전환은 이것을 읽어 계산한 뒤 setCtx로 반영한다(updater 밖).
+  // updater 안에서 타이머 ref를 바꾸면 StrictMode 개발 모드의 이중 호출에 타이머가 두 배로 흐른다
+  const ctxRef = useRef(ctx);
+  const commit = useCallback((next: FishingContext) => {
+    ctxRef.current = next;
+    setCtx(next);
+  }, []);
+  const [live] = useState(createFishingLive);
 
   const waitTimerRef = useRef(0);
   const waitDurationRef = useRef(0);
@@ -67,115 +109,120 @@ export function useFishingState(fishPool: Fish[]) {
     waitDurationRef.current = generateWaitTime(fish);
     castTimerRef.current = 0;
 
-    setCtx((prev) => ({
-      ...prev,
+    commit({
+      ...ctxRef.current,
       state: 'casting',
       currentFish: fish,
       currentPoint: point,
       waitProgress: 0,
-    }));
-  }, [fishPool]);
+    });
+  }, [fishPool, commit]);
 
   const onBiteTap = useCallback(() => {
-    setCtx((prev) => {
-      if (prev.state !== 'bite') return prev;
+    const prev = ctxRef.current;
+    if (prev.state !== 'bite') return;
 
-      const diff = prev.currentFish?.difficulty ?? CHALLENGE_DEFAULT_DIFFICULTY;
-      gaugeDirectionRef.current = 1;
-
-      return {
-        ...prev,
-        state: 'challenge',
-        challengeGauge: 0,
-        challengeZone: createChallengeZone(diff),
-        biteTimeLeft: 1,
-      };
+    const diff = prev.currentFish?.difficulty ?? CHALLENGE_DEFAULT_DIFFICULTY;
+    gaugeDirectionRef.current = 1;
+    live.set({ challengeGauge: 0, biteTimeLeft: 1 });
+    commit({
+      ...prev,
+      state: 'challenge',
+      challengeZone: createChallengeZone(diff),
     });
-  }, []);
+  }, [commit, live]);
 
   const onChallengeTap = useCallback(() => {
-    setCtx((prev) => {
-      if (prev.state !== 'challenge' || !prev.currentFish || !prev.currentPoint) return prev;
+    const prev = ctxRef.current;
+    if (prev.state !== 'challenge' || !prev.currentFish || !prev.currentPoint) return;
 
-      const { challengeGauge, challengeZone } = prev;
-      const isHit = challengeGauge >= challengeZone[0] && challengeGauge <= challengeZone[1];
+    // 판정은 화면에 그린 값이 아니라 지금 게이지 값 그대로
+    const { challengeGauge } = live.get();
+    const { challengeZone } = prev;
+    const isHit = challengeGauge >= challengeZone[0] && challengeGauge <= challengeZone[1];
 
-      if (isHit) {
-        const caught = generateCaughtFish(prev.currentFish, prev.currentPoint.id);
-        return {
-          ...prev,
-          state: 'success',
-          lastCatch: caught,
-          inventory: [...prev.inventory, caught],
-        };
-      }
-      return { ...prev, state: 'fail', lastCatch: null };
-    });
-  }, []);
+    if (isHit) {
+      const caught = generateCaughtFish(prev.currentFish, prev.currentPoint.id);
+      commit({
+        ...prev,
+        state: 'success',
+        lastCatch: caught,
+        inventory: [...prev.inventory, caught],
+      });
+      return;
+    }
+    commit({ ...prev, state: 'fail', lastCatch: null });
+  }, [commit, live]);
 
   /** 낚시 종료 (성공/실패 확인, 대기 취소 모두 동일) */
   const resetFishing = useCallback(() => {
-    setCtx((prev) => ({
-      ...prev,
+    commit({
+      ...ctxRef.current,
       state: 'idle',
       currentFish: null,
       currentPoint: null,
-    }));
-  }, []);
-
-  /** 매 프레임 낚시 상태 업데이트 */
-  const updateFishing = useCallback((deltaTime: number) => {
-    setCtx((prev) => {
-      switch (prev.state) {
-        case 'casting': {
-          castTimerRef.current += deltaTime;
-          if (castTimerRef.current >= CASTING_DURATION) {
-            return { ...prev, state: 'waiting', waitProgress: 0 };
-          }
-          return prev;
-        }
-
-        case 'waiting': {
-          waitTimerRef.current += deltaTime;
-          const progress = Math.min(waitTimerRef.current / waitDurationRef.current, 1);
-          if (progress >= 1) {
-            biteTimerRef.current = 0;
-            return { ...prev, state: 'bite', waitProgress: 1, biteTimeLeft: 1 };
-          }
-          // 1% 미만의 변화는 무시하여 불필요한 리렌더 방지
-          const rounded = Math.round(progress * 100) / 100;
-          if (rounded === prev.waitProgress) return prev;
-          return { ...prev, waitProgress: rounded };
-        }
-
-        case 'bite': {
-          biteTimerRef.current += deltaTime;
-          const timeLeft = Math.max(0, 1 - biteTimerRef.current / BITE_TIME_LIMIT);
-          if (timeLeft <= 0) {
-            return { ...prev, state: 'fail', lastCatch: null, biteTimeLeft: 0 };
-          }
-          return { ...prev, biteTimeLeft: timeLeft };
-        }
-
-        case 'challenge': {
-          const diff = prev.currentFish?.difficulty ?? CHALLENGE_DEFAULT_DIFFICULTY;
-          const speed = CHALLENGE_SPEED_BASE + diff * CHALLENGE_SPEED_DIFF_MULT;
-          let gauge = prev.challengeGauge + gaugeDirectionRef.current * speed * deltaTime;
-
-          if (gauge >= 1) { gauge = 1; gaugeDirectionRef.current = -1; }
-          else if (gauge <= 0) { gauge = 0; gaugeDirectionRef.current = 1; }
-
-          return { ...prev, challengeGauge: gauge };
-        }
-
-        default:
-          return prev;
-      }
     });
-  }, []);
+  }, [commit]);
+
+  /** 매 프레임 낚시 상태 업데이트 — 상태 전환만 다시 그리고, 입질 시간·게이지는 live로 */
+  const updateFishing = useCallback((deltaTime: number) => {
+    const prev = ctxRef.current;
+    switch (prev.state) {
+      case 'casting': {
+        castTimerRef.current += deltaTime;
+        if (castTimerRef.current >= CASTING_DURATION) {
+          commit({ ...prev, state: 'waiting', waitProgress: 0 });
+        }
+        return;
+      }
+
+      case 'waiting': {
+        waitTimerRef.current += deltaTime;
+        const progress = Math.min(waitTimerRef.current / waitDurationRef.current, 1);
+        if (progress >= 1) {
+          biteTimerRef.current = 0;
+          live.set({ biteTimeLeft: 1 });
+          commit({ ...prev, state: 'bite', waitProgress: 1 });
+          return;
+        }
+        // 1% 미만의 변화는 무시하여 불필요한 리렌더 방지
+        const rounded = Math.round(progress * 100) / 100;
+        if (rounded === prev.waitProgress) return;
+        commit({ ...prev, waitProgress: rounded });
+        return;
+      }
+
+      case 'bite': {
+        biteTimerRef.current += deltaTime;
+        const timeLeft = Math.max(0, 1 - biteTimerRef.current / BITE_TIME_LIMIT);
+        live.set({ biteTimeLeft: timeLeft });
+        if (timeLeft <= 0) {
+          commit({ ...prev, state: 'fail', lastCatch: null });
+        }
+        return;
+      }
+
+      case 'challenge': {
+        const diff = prev.currentFish?.difficulty ?? CHALLENGE_DEFAULT_DIFFICULTY;
+        const speed = CHALLENGE_SPEED_BASE + diff * CHALLENGE_SPEED_DIFF_MULT;
+        let gauge = live.get().challengeGauge + gaugeDirectionRef.current * speed * deltaTime;
+
+        if (gauge >= 1) { gauge = 1; gaugeDirectionRef.current = -1; }
+        else if (gauge <= 0) { gauge = 0; gaugeDirectionRef.current = 1; }
+
+        live.set({ challengeGauge: gauge });
+        return;
+      }
+
+      default:
+        return;
+    }
+  }, [commit, live]);
 
   return {
     fishingCtx: ctx,
+    /** 입질 남은 시간·챌린지 게이지 — HUD가 구독한다 */
+    fishingLive: live as FishingLive,
     startFishing,
     onBiteTap,
     onChallengeTap,

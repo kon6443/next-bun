@@ -6,7 +6,7 @@ import { GamePad } from "@/app/games/_shared/components/GamePad";
 import { useMediaQuery } from "@/app/games/_shared/hooks/useMediaQuery";
 import type { AiLevel } from "../ai/chooseTurn";
 import { ANGLE_MAX, type Action, type MatchConfig, type MatchState, POWER_MAX, TANKS, type Tank, WEAPONS, applyAction, previewShot, stateHash } from "../engine";
-import { type MatchFeed, remainingMs } from "../battle-ui/lib/matchFeed";
+import type { MatchFeed } from "../battle-ui/lib/matchFeed";
 import { nearestEnemy, useBattleView } from "../hooks/useBattleView";
 import { slotColor } from "../lib/slotColors";
 import { AI_LABELS, type Controller, playerName } from "../lib/controllers";
@@ -36,6 +36,7 @@ import { AngleText, HoldButton, PlayerChip, TurnBanner } from "./matchParts";
 import { type Phase, currentTank, replayActions, startMatch } from "../lib/matchFlow";
 import { WindGauge } from "./WindGauge";
 import { PAD, fortressPadLayout, nextWeapon } from "./fortressPad";
+import { ChargeLive, TurnTimer, createChargeStore, useTurnGate } from "./matchLive";
 
 /**
  * 온라인 경기(F5) — 서버 권위 턴. 행동은 서버 피드(feed.actions) 순서로만 적용하고, 내 차례 입력은 submit으로 보낸다
@@ -65,6 +66,8 @@ const CHARGE_MS = 1600;
  * (화면 낭독기 두 번 탭·실수 탭이 파워 1 발사가 되지 않게, 충전 표시도 이 뒤부터)
  */
 const MIN_HOLD_MS = 250;
+/** 충전 표시를 시작하는 파워 — 탭과 구분되는 시간이 지난 뒤부터 */
+const CHARGE_VISIBLE = Math.round((MIN_HOLD_MS / CHARGE_MS) * 100);
 /** 포인터로 누른 뒤 이 안에 오는 click은 포인터가 이미 처리했다 */
 const POINTER_CLICK_MS = 1000;
 /** 포신 끌기 조준 — 포탑에서 이 거리(화면 px) 안을 눌러야 잡힌다, 이만큼 끌면 파워 최대 */
@@ -132,7 +135,14 @@ export function FortressMatch({
   const [power, setPower] = useState(60);
   const [move, setMove] = useState(0);
   const [weaponId, setWeaponId] = useState(0);
-  const [charge, setCharge] = useState<number | null>(null);
+  /** 충전 파워(0~100)는 작은 저장소에 — 프레임마다 바뀌어도 이 화면 전체를 다시 그리지 않고, 표시하는 부분(ChargeLive)만 다시 그린다 */
+  const [chargeStore] = useState(createChargeStore);
+  /** 0 충전 아님 · 1 누르는 중(탭과 구분되는 시간 전) · 2 충전 표시 중 — 이 전환에서만 다시 그린다 */
+  const [chargeStage, setChargeStage] = useState<0 | 1 | 2>(0);
+  const stopChargeView = useCallback(() => {
+    chargeStore.set(null);
+    setChargeStage(0);
+  }, [chargeStore]);
   const chargeStartRef = useRef(0);
   /** 충전 중(누른 채) — 상태보다 먼저 바뀐다. 패드를 키보드·보조기기로 누르면 누름·뗌이 같은 순간에 와서 상태(charge)로는 뗌을 못 알아본다 */
   const chargeActiveRef = useRef(false);
@@ -176,7 +186,7 @@ export function FortressMatch({
       stopRepeat();
       keyChargeRef.current = false;
       chargeActiveRef.current = false;
-      setCharge(null);
+      stopChargeView();
       const face = facingOf(last.angle, last.facing);
       facingRef.current = face;
       setFacingState(face);
@@ -194,7 +204,7 @@ export function FortressMatch({
       if (who === "human") setSubmitError(null);
       setPhaseBoth(who === "human" ? "aim" : who === "remote" ? "wait" : "think");
     },
-    [stopRepeat],
+    [stopRepeat, stopChargeView],
   );
 
   const controlsRef = useRef<HTMLDivElement>(null);
@@ -287,12 +297,12 @@ export function FortressMatch({
       // 스페이스를 누른 채 마우스로 쏘면 keyup이 리스너가 떨어진 뒤에 온다 — 키보드 충전 표시를 여기서 지운다
       keyChargeRef.current = false;
       chargeActiveRef.current = false;
-      setCharge(null);
+      stopChargeView();
       play(s, r.events, r.state, { weaponId: action.kind === "fire" ? action.weaponId : undefined });
       setPhaseBoth("play");
       return true;
     },
-    [stopRepeat, play],
+    [stopRepeat, stopChargeView, play],
   );
 
   /** 로컬 행동 확정 — 연출 중·경기 끝에는 받지 않는다(두 번 발사 방지) */
@@ -368,7 +378,7 @@ export function FortressMatch({
 
   // 이동·각도를 바꾸면 이동 뒤 위치를 엔진 previewShot으로(같은 이동 코드)
   /** 충전 표시는 탭과 구분되는 시간이 지난 뒤부터 */
-  const charging = charge !== null && charge >= Math.round((MIN_HOLD_MS / CHARGE_MS) * 100);
+  const charging = chargeStage === 2;
   // 이번 턴에 실제로 갈 수 있는 거리(비탈·벽·월드 끝) — 이동을 이 범위로 자른다
   const reach = useMemo(() => moveReach(state), [state]);
   const preview = useMemo(() => {
@@ -386,22 +396,15 @@ export function FortressMatch({
   const lastShot = current ? lastShotRef.current[current.slot] : null;
   aimRef.current =
     phase === "aim" && preview && current
-      ? { slot: current.slot, x: preview.x, y: preview.y, angle, power: charging ? (charge ?? power) : power, path: humanAim && charge === null ? path : null, lastImpact: humanAim ? (lastShot?.impact ?? null) : null, weaponId: humanAim ? weaponId : undefined, charging: charging || undefined }
+      ? { slot: current.slot, x: preview.x, y: preview.y, angle, power: charging ? (chargeStore.get() ?? power) : power, path: humanAim && chargeStage === 0 ? path : null, lastImpact: humanAim ? (lastShot?.impact ?? null) : null, weaponId: humanAim ? weaponId : undefined, charging: charging || undefined }
       : null;
 
   // ===== 온라인 턴 시각 — 시작 연출 잠금·남은 시간 =====
-  const [now, setNow] = useState(() => Date.now());
-  const isOnline = online !== undefined;
-  useEffect(() => {
-    if (!isOnline) return;
-    const id = window.setInterval(() => setNow(Date.now()), 250);
-    return () => window.clearInterval(id);
-  }, [isOnline]);
+  // 시작 연출이 끝났나·시간이 다 됐나만 여기서(바뀔 때만 다시 그린다) — 남은 초 표시는 TurnTimer가 따로 250ms마다
+  const { started, expired } = useTurnGate(online?.feed);
   const onlineTurn = online?.feed.turn ?? null;
-  const started = !online || now >= online.feed.startAt;
-  const timeLeft = online ? remainingMs(online.feed, now) : 0;
   // 서버 기준 내 차례이고 화면이 그 턴까지 따라왔을 때만(앞 행동 연출 중이면 아직)
-  const onlineReady = !online || (onlineTurn !== null && onlineTurn.slot === online.mySlot && onlineTurn.seq === appliedRef.current && started && timeLeft > 0);
+  const onlineReady = !online || (onlineTurn !== null && onlineTurn.slot === online.mySlot && onlineTurn.seq === appliedRef.current && started && !expired);
 
   // ===== 조준 입력 =====
   // 설정 시트가 열려 있으면 조준을 막는다(시트 뒤에서 키로 발사·이동하지 않게) — 혼자하기는 AI 차례도 멈춘다(위 think)
@@ -469,7 +472,7 @@ export function FortressMatch({
     stopRepeat();
     keyChargeRef.current = false;
     chargeActiveRef.current = false;
-    setCharge(null);
+    stopChargeView();
     setSubmitError(null);
     setPhaseBoth("submit");
     const id = ++submitIdRef.current;
@@ -496,31 +499,39 @@ export function FortressMatch({
     getFortressSound().play({ kind: "charge" });
     chargeStartRef.current = performance.now();
     chargeActiveRef.current = true;
-    setCharge(0);
+    chargeStore.set(0);
+    setChargeStage(1);
   };
+  const chargeOn = chargeStage !== 0;
   useEffect(() => {
-    if (charge === null) return;
+    if (!chargeOn) return;
     let raf = 0;
     const tick = () => {
       const elapsed = performance.now() - chargeStartRef.current;
-      setCharge(Math.min(100, Math.round((elapsed / CHARGE_MS) * 100)));
+      const value = Math.min(100, Math.round((elapsed / CHARGE_MS) * 100));
+      chargeStore.set(value);
+      if (value >= CHARGE_VISIBLE) {
+        // 표시 시작은 한 번만 다시 그린다(같은 값이면 React가 건너뛴다) — 그 뒤 전장 조준선 파워는 그리기 루프가 읽는 aimRef에 바로 쓴다
+        setChargeStage(2);
+        if (aimRef.current?.charging) aimRef.current = { ...aimRef.current, power: value };
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [charge === null]); // eslint-disable-line react-hooks/exhaustive-deps -- 충전 시작·끝에만 루프를 건다
+  }, [chargeOn, chargeStore]);
   /** 브라우저가 제스처로 가져가거나 창을 떠나는 등 취소되면 쏘지 않는다 */
   const cancelCharge = () => {
     keyChargeRef.current = false;
     chargeActiveRef.current = false;
-    setCharge(null);
+    stopChargeView();
   };
   const release = () => {
     keyChargeRef.current = false;
-    if (charge === null && !chargeActiveRef.current) return;
+    if (chargeStage === 0 && !chargeActiveRef.current) return;
     chargeActiveRef.current = false;
     const elapsed = performance.now() - chargeStartRef.current;
-    setCharge(null);
+    stopChargeView();
     if (elapsed < MIN_HOLD_MS) {
       fire(power);
       return;
@@ -545,7 +556,7 @@ export function FortressMatch({
       if (action.kind === "elevate") nudgeElevation(action.delta);
       else if (action.kind === "power") nudgePower(action.delta);
       else if (action.kind === "move") stepMove(action.dir);
-      else if (action.kind === "charge" && charge === null) {
+      else if (action.kind === "charge" && chargeStage === 0) {
         startCharge();
         keyChargeRef.current = true;
       }
@@ -564,9 +575,9 @@ export function FortressMatch({
     if (canAim) return;
     keyChargeRef.current = false;
     chargeActiveRef.current = false;
-    setCharge(null);
+    stopChargeView();
     stopRepeat();
-  }, [canAim, stopRepeat]);
+  }, [canAim, stopRepeat, stopChargeView]);
 
   // ===== 터치 패드(D-025 보충 2) — 십자 ◀▶ 이동·▲▼ 포신(누르는 동안 반복), 발사(짧게=맞춘 파워·길게=충전), 무기 바꾸기 =====
   const padHoldStart = (press: number) => {
@@ -626,7 +637,7 @@ export function FortressMatch({
         </div>
         <div className={compact ? "flex items-baseline gap-1" : undefined}>
           <dt className="text-slate-500">파워</dt>
-          <dd className={`font-bold text-white ${compact ? "text-sm" : "text-base"}`}>{charging ? charge : power}</dd>
+          <dd className={`font-bold text-white ${compact ? "text-sm" : "text-base"}`}>{charging ? <ChargeLive store={chargeStore}>{(c) => c ?? power}</ChargeLive> : power}</dd>
         </div>
         {/* min-w-0·truncate — 좁은 칸에서 긴 문구(이동 막힘 안내)가 칸을 밀어 옆 버튼과 겹치지 않고 말줄임으로(안내는 라이브 영역에도 있다) */}
         <div className={compact ? "flex min-w-0 items-center gap-1.5" : "min-w-0"}>
@@ -715,15 +726,7 @@ export function FortressMatch({
               </span>
             ) : null}
             {/* 온라인 턴 타이머 — 연출 중엔 숨기고, 시작 연출 동안은 "곧 시작". 5초 이하 경고 */}
-            {online && result.kind === "ongoing" && phase !== "play" && onlineTurn ? (
-              <span
-                className={`rounded-full border px-2.5 py-1 text-xs font-semibold tabular-nums ${!started ? "border-white/10 bg-slate-900/80 text-slate-300" : timeLeft <= TIMER_WARN_MS ? "border-rose-400/60 bg-rose-500/20 text-rose-100" : "border-white/10 bg-slate-900/80 text-slate-200"}`}
-                data-testid="fortress-timer"
-                data-hud="pill"
-              >
-                {!started ? `곧 시작 ${Math.ceil((online.feed.startAt - now) / 1000)}` : `⏱ ${Math.ceil(timeLeft / 1000)}초`}
-              </span>
-            ) : null}
+            {online && result.kind === "ongoing" && phase !== "play" && onlineTurn ? <TurnTimer feed={online.feed} warnMs={TIMER_WARN_MS} /> : null}
           </div>
           <WindGauge wind={state.wind} turnKey={state.turn.no} />
           <div className="flex justify-end">
@@ -804,22 +807,26 @@ export function FortressMatch({
               {controller === "human" ? (
                 <div className="flex items-center gap-2">
                   <div className="relative flex min-w-0 flex-1">
-                    <input
-                      type="range"
-                      min={1}
-                      max={POWER_MAX}
-                      value={charging ? (charge ?? power) : power}
-                      onChange={(e) => setPower(clampPower(Number(e.target.value)))}
-                      onPointerDown={(e) => {
-                        if (e.button === 0) e.currentTarget.setPointerCapture?.(e.pointerId);
-                      }}
-                      onPointerUp={(e) => e.currentTarget.blur()}
-                      onLostPointerCapture={(e) => e.currentTarget.blur()}
-                      aria-label="파워"
-                      aria-valuetext={`파워 ${power}${lastShot ? `, 지난 발 ${lastShot.power}` : ""}`}
-                      className="box-border h-11 min-w-0 max-w-full flex-1 accent-sky-400"
-                      data-testid="fortress-power"
-                    />
+                    <ChargeLive store={chargeStore}>
+                      {(c) => (
+                        <input
+                          type="range"
+                          min={1}
+                          max={POWER_MAX}
+                          value={charging ? (c ?? power) : power}
+                          onChange={(e) => setPower(clampPower(Number(e.target.value)))}
+                          onPointerDown={(e) => {
+                            if (e.button === 0) e.currentTarget.setPointerCapture?.(e.pointerId);
+                          }}
+                          onPointerUp={(e) => e.currentTarget.blur()}
+                          onLostPointerCapture={(e) => e.currentTarget.blur()}
+                          aria-label="파워"
+                          aria-valuetext={`파워 ${power}${lastShot ? `, 지난 발 ${lastShot.power}` : ""}`}
+                          className="box-border h-11 min-w-0 max-w-full flex-1 accent-sky-400"
+                          data-testid="fortress-power"
+                        />
+                      )}
+                    </ChargeLive>
                     {lastShot ? (
                       <span
                         className="pointer-events-none absolute top-1 bottom-1 w-0.5 -translate-x-1/2 rounded-full bg-amber-300/90"
@@ -830,7 +837,7 @@ export function FortressMatch({
                     ) : null}
                   </div>
                   <span className="w-8 shrink-0 text-right text-sm font-bold tabular-nums text-white" aria-hidden>
-                    {charging ? charge : power}
+                    {charging ? <ChargeLive store={chargeStore}>{(c) => c ?? power}</ChargeLive> : power}
                   </span>
                   <button type="button" onClick={pass} className="min-h-11 shrink-0 whitespace-nowrap rounded-lg px-2 text-[11px] text-slate-400 underline-offset-2">
                     넘기기
@@ -843,15 +850,19 @@ export function FortressMatch({
                 </p>
               )}
             </div>
-            <GamePad
-              // 차례·조준 가능 여부가 바뀌면 새로 마운트 — 앞 사람(또는 막히기 전)에 누르던 입력이 남아 다음 차례에 저절로 다시 눌리지 않게(언마운트가 모두 뗀다)
-              key={`${state.turn.no}:${canAim}`}
-              layout={fortressPadLayout({ tank: current, weaponId, power, charge: charging ? charge : null, facing, fireAria: `발사 ${power}, ${angleSpeech(angle, facing)}` })}
-              onHoldStart={padHoldStart}
-              onHoldEnd={padHoldEnd}
-              onInstant={padInstant}
-              active={canAim}
-            />
+            <ChargeLive store={chargeStore}>
+              {(c) => (
+                <GamePad
+                  // 차례·조준 가능 여부가 바뀌면 새로 마운트 — 앞 사람(또는 막히기 전)에 누르던 입력이 남아 다음 차례에 저절로 다시 눌리지 않게(언마운트가 모두 뗀다)
+                  key={`${state.turn.no}:${canAim}`}
+                  layout={fortressPadLayout({ tank: current, weaponId, power, charge: charging ? c : null, facing, fireAria: `발사 ${power}, ${angleSpeech(angle, facing)}` })}
+                  onHoldStart={padHoldStart}
+                  onHoldEnd={padHoldEnd}
+                  onInstant={padInstant}
+                  active={canAim}
+                />
+              )}
+            </ChargeLive>
           </div>
         ) : current && controller === "human" && result.kind === "ongoing" ? (
           <div
@@ -997,11 +1008,17 @@ export function FortressMatch({
                   data-charging={charging || undefined}
                 >
                   {/* 충전 막대 — 버튼 안을 왼쪽부터 채운다 */}
-                  <span className="absolute inset-y-0 left-0 bg-amber-300/45" style={{ width: `${charging ? charge : 0}%` }} aria-hidden />
-                  <span className="relative flex items-center justify-center gap-2">
-                    {charging ? `파워 ${charge}` : `발사 ${power}`}
-                    <Keycap>Space</Keycap>
-                  </span>
+                  <ChargeLive store={chargeStore}>
+                    {(c) => (
+                      <>
+                        <span className="absolute inset-y-0 left-0 bg-amber-300/45" style={{ width: `${charging ? (c ?? 0) : 0}%` }} aria-hidden />
+                        <span className="relative flex items-center justify-center gap-2">
+                          {charging ? `파워 ${c ?? 0}` : `발사 ${power}`}
+                          <Keycap>Space</Keycap>
+                        </span>
+                      </>
+                    )}
+                  </ChargeLive>
                 </button>
               </div>
             </div>
