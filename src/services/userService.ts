@@ -1,5 +1,5 @@
 import fetchServiceInstance from './FetchService';
-import { ApiError, type ApiErrorResponse, createApiError } from '@/types/api';
+import { type ApiErrorRules, statusCodeMap, throwApiError } from './apiError';
 import type { SkinPoints } from '@/types/game';
 
 type UpdateUserRequest = {
@@ -17,35 +17,11 @@ type UpdateUserResponse = {
   message: string;
 };
 
-async function handleApiError(response: Response, defaultMessage: string): Promise<never> {
-  let errorData: ApiErrorResponse | null = null;
+/** 실패 응답 → ApiError — 규칙은 공용 apiError.ts. 이 서비스는 상태별 문구 없이 기본 문구 하나만 받는다 */
+const ERROR_RULES: ApiErrorRules = { statusCodes: statusCodeMap() };
 
-  try {
-    const text = await response.text();
-    if (text) {
-      errorData = JSON.parse(text) as ApiErrorResponse;
-    }
-  } catch {
-    // JSON 파싱 실패
-  }
-
-  if (errorData?.code) {
-    throw createApiError(errorData, response.status);
-  }
-
-  const defaultCodeMap: Record<number, string> = {
-    400: 'BAD_REQUEST',
-    401: 'UNAUTHORIZED',
-    403: 'FORBIDDEN',
-    404: 'NOT_FOUND',
-    500: 'INTERNAL_SERVER_ERROR',
-  };
-
-  throw new ApiError(
-    defaultCodeMap[response.status] || 'UNKNOWN_ERROR',
-    errorData?.message || defaultMessage,
-    response.status,
-  );
+function handleApiError(response: Response, defaultMessage: string): Promise<never> {
+  return throwApiError(response, { default: defaultMessage }, ERROR_RULES);
 }
 
 /**

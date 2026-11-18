@@ -1,5 +1,6 @@
 import fetchServiceInstance from './FetchService';
-import { ApiError, type ApiErrorResponse, type ApiResponse, createApiError } from '@/types/api';
+import type { ApiErrorResponse, ApiResponse } from '@/types/api';
+import { type ApiErrorRules, type ErrorMessageMap, statusCodeMap, throwApiError, timeoutSignal } from './apiError';
 import type {
   GameBoard,
   SessionBoard,
@@ -24,54 +25,11 @@ import type {
 
 // ==================== 공통 에러 처리 ====================
 
-type ErrorMessageMap = {
-  404?: string;
-  409?: string;
-  413?: string;
-  422?: string;
-  429?: string;
-  503?: string;
-  default: string;
-};
+/** 실패 응답 → ApiError — 규칙은 공용 apiError.ts, 이 서비스의 차이는 아래 규칙 */
+const ERROR_RULES: ApiErrorRules = { statusCodes: statusCodeMap(409, 413, 422, 429, 503) };
 
-/**
- * API 응답 에러를 ApiError로 던진다 (teamService.ts의 handleApiError와 같은 규칙)
- * 백엔드 code가 있으면 그 code로, 없으면 상태 코드 기반 code와 폴백 메시지로 던진다
- */
-async function handleApiError(response: Response, errorMessages: ErrorMessageMap): Promise<never> {
-  let errorData: ApiErrorResponse | null = null;
-
-  try {
-    const text = await response.text();
-    if (text) {
-      errorData = JSON.parse(text) as ApiErrorResponse;
-    }
-  } catch {
-    // 본문 읽기·JSON 파싱 실패 — 상태 코드 기반으로 던진다
-  }
-
-  if (errorData?.code) {
-    throw createApiError(errorData, response.status);
-  }
-
-  const defaultCodeMap: Record<number, string> = {
-    400: 'BAD_REQUEST',
-    401: 'UNAUTHORIZED',
-    403: 'FORBIDDEN',
-    404: 'NOT_FOUND',
-    409: 'CONFLICT',
-    413: 'PAYLOAD_TOO_LARGE',
-    422: 'VALIDATION_ERROR',
-    429: 'TOO_MANY_REQUESTS',
-    500: 'INTERNAL_SERVER_ERROR',
-    503: 'SERVICE_UNAVAILABLE',
-  };
-
-  throw new ApiError(
-    defaultCodeMap[response.status] || 'UNKNOWN_ERROR',
-    errorData?.message || errorMessages[response.status as keyof ErrorMessageMap] || errorMessages.default,
-    response.status,
-  );
+function handleApiError(response: Response, errorMessages: ErrorMessageMap): Promise<never> {
+  return throwApiError(response, errorMessages, ERROR_RULES);
 }
 
 const TOO_MANY = '요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.';
@@ -90,11 +48,6 @@ export const SUBMIT_TIMEOUT_MS = 30_000;
 export const REPLAY_TIMEOUT_MS = 15_000;
 /** 랭킹·보드 목록 — 응답이 멈추면 skeleton·예상 순위 "…"에 머물지 않고 기존 오류·다시 시도로 (games-polish FE-03) */
 export const RANKING_TIMEOUT_MS = 10_000;
-
-/** AbortSignal.timeout이 없는 오래된 브라우저에서는 상한 없이 */
-function timeoutSignal(ms: number): AbortSignal | undefined {
-  return typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(ms) : undefined;
-}
 
 /**
  * 선택 인증 호출 — 토큰이 있으면 싣고, 없으면 비로그인으로 보낸다

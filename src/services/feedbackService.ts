@@ -1,5 +1,6 @@
 import fetchServiceInstance from './FetchService';
-import { ApiError, type ApiErrorResponse, type ApiResponse, createApiError } from '@/types/api';
+import type { ApiResponse } from '@/types/api';
+import { type ApiErrorRules, type ErrorMessageMap, statusCodeMap, throwApiError } from './apiError';
 import type {
   CreateFeedbackRequest,
   FeedbackDetail,
@@ -9,47 +10,11 @@ import type {
 
 // ==================== 공통 에러 처리 ====================
 
-type ErrorMessageMap = {
-  404?: string;
-  429?: string;
-  default: string;
-};
+/** 실패 응답 → ApiError — 규칙은 공용 apiError.ts, 이 서비스의 차이는 아래 규칙 */
+const ERROR_RULES: ApiErrorRules = { statusCodes: statusCodeMap(422, 429) };
 
-/**
- * API 응답 에러를 ApiError로 던진다 (teamService.ts의 handleApiError와 같은 규칙)
- * 백엔드 code가 있으면 그 code로, 없으면 상태 코드 기반 code와 폴백 메시지로 던진다
- */
-async function handleApiError(response: Response, errorMessages: ErrorMessageMap): Promise<never> {
-  let errorData: ApiErrorResponse | null = null;
-
-  try {
-    const text = await response.text();
-    if (text) {
-      errorData = JSON.parse(text) as ApiErrorResponse;
-    }
-  } catch {
-    // 본문 읽기·JSON 파싱 실패 — 상태 코드 기반으로 던진다
-  }
-
-  if (errorData?.code) {
-    throw createApiError(errorData, response.status);
-  }
-
-  const defaultCodeMap: Record<number, string> = {
-    400: 'BAD_REQUEST',
-    401: 'UNAUTHORIZED',
-    403: 'FORBIDDEN',
-    404: 'NOT_FOUND',
-    422: 'VALIDATION_ERROR',
-    429: 'TOO_MANY_REQUESTS',
-    500: 'INTERNAL_SERVER_ERROR',
-  };
-
-  throw new ApiError(
-    defaultCodeMap[response.status] || 'UNKNOWN_ERROR',
-    errorData?.message || errorMessages[response.status as keyof ErrorMessageMap] || errorMessages.default,
-    response.status,
-  );
+function handleApiError(response: Response, errorMessages: ErrorMessageMap): Promise<never> {
+  return throwApiError(response, errorMessages, ERROR_RULES);
 }
 
 // ==================== API ====================
