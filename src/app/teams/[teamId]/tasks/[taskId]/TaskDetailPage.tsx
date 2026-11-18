@@ -13,6 +13,7 @@ import {
   updateTaskStatus,
   updateTaskActiveStatus,
   type TaskDetailResponse,
+  type TaskCommentResponse,
 } from '@/services/teamService';
 import type { TaskComment } from '@/app/types/task';
 import { buildTaskDatetime, parseTaskDatetime, DEFAULT_START_TIME, DEFAULT_END_TIME } from '@/app/utils/dateUtils';
@@ -53,6 +54,15 @@ type TaskDetailPageProps = {
   teamId: string;
   taskId: string;
 };
+
+/** 상세 조회의 댓글(날짜는 JSON 문자열) → 화면 댓글(Date). 작성·수정 응답은 댓글 엔티티라 작성자 이름(userName)이 없어 이 변환으로 붙이지 않는다 */
+function toTaskComment(comment: TaskCommentResponse): TaskComment {
+  return {
+    ...comment,
+    crtdAt: new Date(comment.crtdAt),
+    mdfdAt: comment.mdfdAt ? new Date(comment.mdfdAt) : null,
+  };
+}
 
 export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) {
   const { data: session, status: sessionStatus } = useSession();
@@ -257,9 +267,12 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
   // 상세 조회 순번 — 더 늦게 시작한 조회가 있으면 먼저 시작한 조회의 응답은 반영하지 않는다(TeamBoard taskFetchSeqRef와 같은 방식).
   // 댓글 작성 직후 조회와 재입장 조회가 겹칠 때 늦게 온 옛 응답이 새 응답을 덮는 것을 막는다
   const detailFetchSeqRef = useRef(0);
+  // 마지막으로 끝난 최신 조회의 순번 — detailFetchSeqRef와 다르면 아직 응답을 기다리는 조회가 있다
+  const detailFetchSettledSeqRef = useRef(0);
   useEffect(() => () => {
-    // 태스크가 바뀌거나 언마운트되면 진행 중인 응답을 모두 버린다
+    // 태스크가 바뀌거나 언마운트되면 진행 중인 응답을 모두 버린다 — 버린 조회는 기다리는 조회가 아니다(떠난 뒤 댓글 응답이 재조회를 부르지 않게)
     detailFetchSeqRef.current += 1;
+    detailFetchSettledSeqRef.current = detailFetchSeqRef.current;
   }, [teamIdNum, taskIdNum]);
 
   const fetchTaskDetail = useCallback(
@@ -296,11 +309,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
           startAt: response.data.startAt ? new Date(response.data.startAt) : null,
           endAt: response.data.endAt ? new Date(response.data.endAt) : null,
           crtdAt: new Date(response.data.crtdAt),
-          comments: response.data.comments.map(comment => ({
-            ...comment,
-            crtdAt: new Date(comment.crtdAt),
-            mdfdAt: comment.mdfdAt ? new Date(comment.mdfdAt) : null,
-          })),
+          comments: response.data.comments.map(toTaskComment),
         };
 
         setTaskDetail(taskData);
@@ -313,6 +322,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
       } finally {
         // 로딩은 가장 늦게 시작한 조회가 끝낼 때 내린다 — 첫 조회(로딩 표시)를 조용한 재조회가 앞질러도 로딩이 남지 않게
         if (seq === detailFetchSeqRef.current) {
+          detailFetchSettledSeqRef.current = seq;
           setIsLoading(false);
         }
       }
@@ -323,6 +333,14 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
   useEffect(() => {
     fetchTaskDetail();
   }, [fetchTaskDetail]);
+
+  // 댓글을 응답으로 반영한 뒤 호출 — 그 전에 출발한 조회(재입장·상태 변경 뒤)가 아직 오고 있으면 그 응답은 내 변경 전 상세라
+  // 반영을 덮는다(본인 이벤트는 self-filter라 다시 채워지지 않는다). 새 조회로 순번을 넘겨 옛 응답을 버리고, 조회가 없으면 다시 받지 않는다
+  const refetchIfDetailInFlight = () => {
+    if (detailFetchSettledSeqRef.current !== detailFetchSeqRef.current) {
+      void fetchTaskDetail(false);
+    }
+  };
 
   // 소켓이 끊겼다 다시 방에 들어오면 끊긴 동안 놓친 변경을 메우려 조용히 재조회한다 (마운트 이후 재입장만)
   const roomJoinBaselineRef = useRef(roomJoinCount);
@@ -407,6 +425,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
         session.user.accessToken,
       );
 
+      // 작성은 상세를 다시 받는다 — 작성 응답은 댓글 엔티티라 작성자 이름(팀 닉네임)이 없고 crtdAt도 빠질 수 있다(메인 계약 확인)
       setNewComment('');
       setError(null);
       setSuccessMessage('댓글이 작성되었습니다.');
@@ -439,7 +458,7 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
 
     setIsUpdatingComment(true);
     try {
-      await updateTaskComment(
+      const { data: updated } = await updateTaskComment(
         teamIdNum,
         taskIdNum,
         commentId,
@@ -447,9 +466,23 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
         session.user.accessToken,
       );
 
+      // 상세를 다시 받지 않고 그 댓글의 내용·수정 시각만 응답으로 덮는다 — 수정 응답은 댓글 엔티티라 작성자 이름(팀 닉네임)이 없으니
+      // 이름·작성 시각은 지금 항목 그대로 둔다(다른 사람 수정 소켓 반영과 같은 방식)
+      const mdfdAt = updated.mdfdAt ? new Date(updated.mdfdAt) : new Date();
+      setTaskDetail(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          comments: prev.comments.map(c =>
+            c.commentId === commentId ? { ...c, commentContent: updated.commentContent, mdfdAt } : c,
+          ),
+        };
+      });
+      refetchIfDetailInFlight();
+      // 앞서 실패해 떠 있던 배너를 내린다(예전엔 성공 뒤 재조회가 내렸다)
+      setError(null);
       setEditingCommentId(null);
       setEditingContent('');
-      await fetchTaskDetail(false);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '댓글 수정에 실패했습니다.';
       setError(errorMessage);
@@ -466,8 +499,15 @@ export default function TaskDetailPage({ teamId, taskId }: TaskDetailPageProps) 
     setError(null);
     try {
       await deleteTaskComment(teamIdNum, taskIdNum, commentId, session.user.accessToken);
-      // fetchTaskDetail 은 실패를 내부에서 setError 로 처리하고 throw 하지 않는다
-      await fetchTaskDetail(false);
+      // 소프트 삭제 — 다시 받지 않고 그 댓글을 삭제됨(status 0)으로 표시한다(다른 사람 삭제 소켓 반영과 같은 모양)
+      setTaskDetail(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          comments: prev.comments.map(c => (c.commentId === commentId ? { ...c, status: 0 } : c)),
+        };
+      });
+      refetchIfDetailInFlight();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '댓글 삭제에 실패했습니다.';
       setError(errorMessage);

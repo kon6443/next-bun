@@ -42,6 +42,7 @@ import { SettingsPanel } from "./SettingsPanel";
 import { TowerRing, ringSpan } from "./TowerRing";
 import { TUTORIAL_TARGET_SIZE, TutorialOverlay } from "./TutorialOverlay";
 import { WaveBar } from "./WaveBar";
+import { prefersReducedMotion } from "@/app/games/_shared/lib/motion";
 
 /**
  * 플레이 화면 (defense DESIGN §F1~§F9b) — 캔버스(엔진 렌더) 위에 DOM 슬롯 버튼·링 메뉴·HUD
@@ -256,12 +257,6 @@ export function nearestSlotInDirection(slots: readonly { x: number; y: number }[
     }
   }
   return best;
-}
-
-
-/** OS 동작 줄이기 — 화면 흔들림을 끈다 */
-function prefersReducedMotion(): boolean {
-  return typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
 export function PlaySession({ stage, mode, title, campaign, onRankedOver, rankedResult, banner, resumeFields, exitMessage, boardKey, seed, restore, intro, notice, exitHref, onRetry }: SessionProps) {

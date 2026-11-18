@@ -1,6 +1,8 @@
 'use client';
 
+import { useSyncExternalStore } from 'react';
 import type { FishingState, FishingPoint } from '../types/game';
+import type { FishingLive } from '../hooks/useFishingState';
 import type { Fish } from '../types/fish';
 import { GRADE_COLORS, GRADE_NAMES } from '../config/constants';
 
@@ -10,8 +12,8 @@ interface FishingHUDProps {
   nearbyPoint: FishingPoint | null;
   currentFish: Fish | null;
   waitProgress: number;
-  biteTimeLeft: number;
-  challengeGauge: number;
+  /** 입질 남은 시간·챌린지 게이지 — 매 프레임 바뀌어 그 값을 그리는 조각만 구독한다 */
+  live: FishingLive;
   challengeZone: [number, number];
   inventoryCount: number;
   onlineCount: number;
@@ -30,8 +32,7 @@ export default function FishingHUD({
   nearbyPoint,
   currentFish,
   waitProgress,
-  biteTimeLeft,
-  challengeGauge,
+  live,
   challengeZone,
   inventoryCount,
   onlineCount,
@@ -70,12 +71,12 @@ export default function FishingHUD({
         <WaitingIndicator progress={waitProgress} onCancel={onCancel} />
       )}
       {fishingState === 'bite' && (
-        <BiteButton biteTimeLeft={biteTimeLeft} onTap={onBiteTap} />
+        <BiteButton live={live} onTap={onBiteTap} />
       )}
       {fishingState === 'challenge' && (
         <ChallengeUI
           fish={currentFish}
-          gauge={challengeGauge}
+          live={live}
           zone={challengeZone}
           onTap={onChallengeTap}
         />
@@ -203,7 +204,12 @@ function WaitingIndicator({ progress, onCancel }: { progress: number; onCancel: 
   );
 }
 
-function BiteButton({ biteTimeLeft, onTap }: { biteTimeLeft: number; onTap: () => void }) {
+function useLiveValues(live: FishingLive) {
+  return useSyncExternalStore(live.subscribe, live.get, live.get);
+}
+
+function BiteButton({ live, onTap }: { live: FishingLive; onTap: () => void }) {
+  const { biteTimeLeft } = useLiveValues(live);
   // 시간에 따른 긴박감: 여유(>50%) → 주의(20~50%) → 위급(<20%)
   const urgent = biteTimeLeft < 0.2;
   const warning = biteTimeLeft < 0.5;
@@ -240,15 +246,16 @@ function BiteButton({ biteTimeLeft, onTap }: { biteTimeLeft: number; onTap: () =
 
 function ChallengeUI({
   fish,
-  gauge,
+  live,
   zone,
   onTap,
 }: {
   fish: Fish | null;
-  gauge: number;
+  live: FishingLive;
   zone: [number, number];
   onTap: () => void;
 }) {
+  const { challengeGauge: gauge } = useLiveValues(live);
   const inZone = gauge >= zone[0] && gauge <= zone[1];
 
   return (

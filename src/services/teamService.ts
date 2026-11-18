@@ -1,73 +1,20 @@
 import fetchServiceInstance from './FetchService';
-import { ApiError, ApiErrorResponse, createApiError } from '@/types/api';
+import { type ApiErrorRules, type ErrorMessageMap, statusCodeMap, throwApiError } from './apiError';
 import type { TaskTag, TeamTag } from '@/app/types/task';
 import { normalizeTaskTags } from '@/app/utils/tagUtils';
 
 // ==================== 공통 에러 처리 ====================
 
-type ErrorMessageMap = {
-  401?: string;
-  403?: string;
-  404?: string;
-  400?: string;
-  409?: string;
-  default: string;
+/** 실패 응답 → ApiError — 규칙은 공용 apiError.ts, 이 서비스의 차이는 아래 규칙 */
+const ERROR_RULES: ApiErrorRules = {
+  statusCodes: statusCodeMap(),
+  // 팀 API만 — JSON이 아닌 본문은 그대로 메시지로, 상태별 문구가 없으면 기본 문구 뒤에 ": 상태"
+  textBodyAsMessage: true,
+  statusInFallback: true,
 };
 
-/**
- * API 응답 에러를 처리하는 공통 핸들러
- * 에러 코드 기반으로 세밀한 에러 처리 가능
- * 
- * @param response - fetch Response 객체
- * @param errorMessages - 상태 코드별 폴백 에러 메시지 (code가 없을 때 사용)
- * @throws ApiError - 에러 코드와 메시지를 포함한 ApiError
- */
-async function handleApiError(response: Response, errorMessages: ErrorMessageMap): Promise<never> {
-  let errorData: ApiErrorResponse | null = null;
-  
-  // 응답 본문에서 에러 정보 추출
-  try {
-    const errorText = await response.text();
-    if (errorText) {
-      try {
-        errorData = JSON.parse(errorText) as ApiErrorResponse;
-      } catch {
-        // JSON 파싱 실패 시 텍스트 그대로 사용
-        throw new ApiError(
-          'UNKNOWN_ERROR',
-          errorText || errorMessages.default,
-          response.status,
-        );
-      }
-    }
-  } catch (err) {
-    if (err instanceof ApiError) throw err;
-    // 응답 본문 읽기 실패
-  }
-
-  // 에러 코드가 있으면 ApiError 생성
-  if (errorData?.code) {
-    throw createApiError(errorData, response.status);
-  }
-
-  // 에러 코드가 없으면 HTTP 상태 코드 기반 에러 생성
-  const statusMessage = errorMessages[response.status as keyof ErrorMessageMap];
-  const message = errorData?.message || statusMessage || `${errorMessages.default}: ${response.status}`;
-  
-  // HTTP 상태 코드를 기본 에러 코드로 매핑
-  const defaultCodeMap: Record<number, string> = {
-    400: 'BAD_REQUEST',
-    401: 'UNAUTHORIZED',
-    403: 'FORBIDDEN',
-    404: 'NOT_FOUND',
-    500: 'INTERNAL_SERVER_ERROR',
-  };
-  
-  throw new ApiError(
-    defaultCodeMap[response.status] || 'UNKNOWN_ERROR',
-    message,
-    response.status,
-  );
+function handleApiError(response: Response, errorMessages: ErrorMessageMap): Promise<never> {
+  return throwApiError(response, errorMessages, ERROR_RULES);
 }
 
 /** ISO 문자열 → Date. 비었거나 해석할 수 없으면 null */

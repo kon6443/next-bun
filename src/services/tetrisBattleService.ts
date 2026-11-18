@@ -1,5 +1,6 @@
 import fetchServiceInstance from './FetchService';
-import { ApiError, type ApiErrorResponse, type ApiResponse, createApiError } from '@/types/api';
+import type { ApiResponse } from '@/types/api';
+import { type ApiErrorRules, type ErrorMessageMap, statusCodeMap, throwApiError, timeoutSignal } from './apiError';
 import type { BattleReplayInput } from '@/app/games/tetris/battle-engine';
 
 /**
@@ -9,55 +10,11 @@ import type { BattleReplayInput } from '@/app/games/tetris/battle-engine';
 
 // ==================== 공통 에러 처리 ====================
 
-type ErrorMessageMap = {
-  403?: string;
-  404?: string;
-  409?: string;
-  410?: string;
-  413?: string;
-  429?: string;
-  default: string;
-};
+/** 실패 응답 → ApiError — 규칙은 공용 apiError.ts, 이 서비스의 차이는 아래 규칙 */
+const ERROR_RULES: ApiErrorRules = { statusCodes: statusCodeMap(409, 410, 413, 422, 429, 503) };
 
-/**
- * API 응답 에러를 ApiError로 던진다 (gameService.ts의 handleApiError와 같은 규칙)
- * 백엔드 code가 있으면 그 code로, 없으면 상태 코드 기반 code와 폴백 메시지로 던진다
- */
-async function handleApiError(response: Response, errorMessages: ErrorMessageMap): Promise<never> {
-  let errorData: ApiErrorResponse | null = null;
-
-  try {
-    const text = await response.text();
-    if (text) {
-      errorData = JSON.parse(text) as ApiErrorResponse;
-    }
-  } catch {
-    // 본문 읽기·JSON 파싱 실패 — 상태 코드 기반으로 던진다
-  }
-
-  if (errorData?.code) {
-    throw createApiError(errorData, response.status);
-  }
-
-  const defaultCodeMap: Record<number, string> = {
-    400: 'BAD_REQUEST',
-    401: 'UNAUTHORIZED',
-    403: 'FORBIDDEN',
-    404: 'NOT_FOUND',
-    409: 'CONFLICT',
-    410: 'GONE',
-    413: 'PAYLOAD_TOO_LARGE',
-    422: 'VALIDATION_ERROR',
-    429: 'TOO_MANY_REQUESTS',
-    500: 'INTERNAL_SERVER_ERROR',
-    503: 'SERVICE_UNAVAILABLE',
-  };
-
-  throw new ApiError(
-    defaultCodeMap[response.status] || 'UNKNOWN_ERROR',
-    errorData?.message || errorMessages[response.status as keyof ErrorMessageMap] || errorMessages.default,
-    response.status,
-  );
+function handleApiError(response: Response, errorMessages: ErrorMessageMap): Promise<never> {
+  return throwApiError(response, errorMessages, ERROR_RULES);
 }
 
 /** 백엔드 short 스로틀 창(1000ms) + 경계 오차 여유 */
@@ -70,14 +27,10 @@ const RETRY_AFTER_UNAUTHORIZED_MS = 1100;
 export const SUBMIT_TIMEOUT_MS = 30_000;
 export const LOAD_TIMEOUT_MS = 15_000;
 
-/** AbortSignal.timeout이 없는 오래된 브라우저에서는 상한 없이 */
-function timeoutSignal(ms: number): AbortSignal | undefined {
-  return typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(ms) : undefined;
-}
-
 /**
- * 선택 인증 호출 — 만료·잘못된 토큰은 백엔드가 401로 막으므로 토큰 없이 1회 재시도한다 (gameService.ts와 같은 방식)
- * 제출 인증은 본문의 playerToken이라 로그인 토큰이 없어도 된다
+ * 선택 인증 호출 — 만료·잘못된 토큰은 백엔드가 401로 막으므로 토큰 없이 1회 재시도한다
+ * 제출 인증은 본문의 playerToken이라 로그인 토큰이 없어도 된다.
+ * gameService.ts의 같은 이름 함수와 다르다 — 점수 제출은 401이면 익명으로 다시 내지 않는다(로그인 사용자 기록이 익명으로 남지 않게, 83865cd)
  */
 async function fetchWithOptionalAuth(args: { method: 'POST'; endpoint: string; body?: unknown }, accessToken?: string): Promise<Response> {
   // 재시도마다 새 상한 — 첫 요청의 시간을 이어 쓰지 않는다

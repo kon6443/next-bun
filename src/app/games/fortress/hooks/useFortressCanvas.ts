@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { ViewSize } from "../renderer/camera";
+import { watchDevicePixelRatio } from "@/app/games/_shared/lib/watchDpr";
 
 const DPR_CAP = 2;
 
@@ -41,21 +42,10 @@ export function useFortressCanvas(onResize: (view: ViewSize) => void) {
     layout();
     const observer = new ResizeObserver(layout);
     observer.observe(container);
-    // DPR만 바뀌면(모니터 이동·확대 비율) 크기 변화가 없다 — 현재 DPR 질의가 풀리면 다시 맞춘다
-    let media: MediaQueryList | null = null;
-    const onDpr = () => {
-      layout();
-      watch();
-    };
-    const watch = () => {
-      media?.removeEventListener("change", onDpr);
-      media = typeof window.matchMedia === "function" ? window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`) : null;
-      media?.addEventListener("change", onDpr);
-    };
-    watch();
+    const stopDpr = watchDevicePixelRatio(layout);
     return () => {
       observer.disconnect();
-      media?.removeEventListener("change", onDpr);
+      stopDpr();
     };
   }, []);
 

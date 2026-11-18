@@ -3,12 +3,12 @@
  * 저장소 읽기·쓰기는 try/catch (막혀 있어도 게임은 동작). 같은 탭의 여러 화면이 바로 같은 값을 보도록 구독을 둔다
  */
 
+import { reducedMotionQuery } from '@/app/games/_shared/lib/motion';
+
 export const REDUCED_EFFECTS_KEY = 'tetris:reducedEffects';
 
 /** auto = 기기 설정을 따름 */
 export type ReducedEffectsPref = 'auto' | 'on' | 'off';
-
-const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
 const listeners = new Set<() => void>();
 /** 저장소가 막힌 환경에서도 이번 방문 동안은 바꾼 값을 유지한다 */
@@ -49,7 +49,8 @@ let motionQuery: MediaQueryList | null = null;
 function getMotionQuery(): MediaQueryList | null {
   if (motionQuery) return motionQuery;
   try {
-    motionQuery = window.matchMedia(REDUCED_MOTION_QUERY);
+    // 구독(add/removeEventListener)이 같은 객체여야 해서 한 번 만든 것을 계속 쓴다
+    motionQuery = reducedMotionQuery();
   } catch {
     motionQuery = null;
   }

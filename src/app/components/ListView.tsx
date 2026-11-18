@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, type ReactNode } from 'react';
+import { memo, useCallback, useState, useMemo, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task } from '../types/task';
 import { deadlineStyles, formatDateWithYear, getTaskDeadlineInfo } from '../utils/taskUtils';
@@ -109,19 +109,14 @@ export function ListView({ tasks, teamId, isArchiveView, onRestore, initialSort,
     );
   };
 
-  const handleRowClick = (taskId: number) => {
-    markTaskOpenedFromBoard(teamId, taskId);
-    router.push(`/teams/${teamId}/tasks/${taskId}`);
-  };
-
-  // 키보드로 행 열기 (Enter 또는 Space). 행 안의 버튼(복원 등)에서 올라온 키는 무시한다
-  const handleRowKeyDown = (e: React.KeyboardEvent, taskId: number) => {
-    if (e.target !== e.currentTarget) return;
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      handleRowClick(taskId);
-    }
-  };
+  // 행은 memo라 여는 함수가 렌더마다 새로 만들어지면 효과가 없다
+  const handleOpenTask = useCallback(
+    (taskId: number) => {
+      markTaskOpenedFromBoard(teamId, taskId);
+      router.push(`/teams/${teamId}/tasks/${taskId}`);
+    },
+    [teamId, router],
+  );
 
   // 정렬 가능한 헤더 — 키보드로 정렬할 수 있게 버튼을 두고, 현재 정렬 상태를 aria-sort 로 알린다
   const renderSortableHeader = (columnKey: SortKey, label: string) => (
@@ -168,70 +163,16 @@ export function ListView({ tasks, teamId, isArchiveView, onRestore, initialSort,
             </tr>
           </thead>
           <tbody>
-            {sortedTasks.map(task => {
-                const statusMeta = getStatusMeta(task.taskStatus);
-                const { status: deadlineStatus, label: deadlineLabel, showAlert: showDeadlineAlert } = getTaskDeadlineInfo(task);
-
-                return (
-                  <tr
-                    key={task.taskId}
-                    className={`cursor-pointer border-b border-white/5 transition hover:bg-white/5 focus:outline-none focus:bg-white/10 focus:ring-2 focus:ring-inset focus:ring-sky-500/50 ${deadlineStyles[deadlineStatus].bg}`}
-                    onClick={() => handleRowClick(task.taskId)}
-                    onKeyDown={(e) => handleRowKeyDown(e, task.taskId)}
-                    tabIndex={0}
-                  >
-                    <td className="px-4 py-3">
-                      <div className="max-w-[200px]">
-                        <p className="truncate text-sm font-medium text-slate-200">{task.taskName}</p>
-                        <TaskTagChips tags={task.tags} max={2} className="mt-1" onTagClick={onTagClick} />
-                        {task.taskDescription && (
-                          <p className="mt-0.5 truncate text-xs text-slate-400">{task.taskDescription}</p>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-block rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusMeta.badgeClassName}`}>
-                        {statusMeta.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-400">
-                      {task.userName || `사용자 ${task.crtdBy}`}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-400">
-                      {formatDateWithYear(task.startAt)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-sm ${deadlineStyles[deadlineStatus].text}`}>
-                          {formatDateWithYear(task.endAt)}
-                        </span>
-                        {showDeadlineAlert && (
-                          <span className={`rounded border px-1.5 py-0.5 text-[11px] font-semibold ${deadlineStyles[deadlineStatus].badge}`}>
-                            {deadlineLabel}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-400">
-                      {formatDateWithYear(task.crtdAt)}
-                    </td>
-                    {showRestore && onRestore && (
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onRestore(task.taskId);
-                          }}
-                          type="button"
-                          className="inline-flex min-h-[44px] items-center px-2.5 py-1 rounded-lg text-xs font-medium transition bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
-                        >
-                          복원
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
+            {sortedTasks.map(task => (
+              <ListViewRow
+                key={task.taskId}
+                task={task}
+                showRestore={showRestore}
+                onRestore={onRestore}
+                onTagClick={onTagClick}
+                onOpen={handleOpenTask}
+              />
+            ))}
           </tbody>
         </table>
       </div>
@@ -244,3 +185,85 @@ export function ListView({ tasks, teamId, isArchiveView, onRestore, initialSort,
     </div>
   );
 }
+
+type ListViewRowProps = {
+  task: Task;
+  showRestore: boolean;
+  onRestore?: (taskId: number) => Promise<void>;
+  onTagClick?: (tagId: number) => void;
+  onOpen: (taskId: number) => void;
+};
+
+/** 목록 행 — memo: 정렬·필터 입력 등으로 목록이 다시 그려져도 props가 같은 행은 건너뛴다 */
+const ListViewRow = memo(function ListViewRow({ task, showRestore, onRestore, onTagClick, onOpen }: ListViewRowProps) {
+  // 키보드로 행 열기 (Enter 또는 Space). 행 안의 버튼(복원 등)에서 올라온 키는 무시한다
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onOpen(task.taskId);
+    }
+  };
+
+  const statusMeta = getStatusMeta(task.taskStatus);
+  const { status: deadlineStatus, label: deadlineLabel, showAlert: showDeadlineAlert } = getTaskDeadlineInfo(task);
+
+  return (
+    <tr
+      className={`cursor-pointer border-b border-white/5 transition hover:bg-white/5 focus:outline-none focus:bg-white/10 focus:ring-2 focus:ring-inset focus:ring-sky-500/50 ${deadlineStyles[deadlineStatus].bg}`}
+      onClick={() => onOpen(task.taskId)}
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+    >
+      <td className="px-4 py-3">
+        <div className="max-w-[200px]">
+          <p className="truncate text-sm font-medium text-slate-200">{task.taskName}</p>
+          <TaskTagChips tags={task.tags} max={2} className="mt-1" onTagClick={onTagClick} />
+          {task.taskDescription && (
+            <p className="mt-0.5 truncate text-xs text-slate-400">{task.taskDescription}</p>
+          )}
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        <span className={`inline-block rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusMeta.badgeClassName}`}>
+          {statusMeta.label}
+        </span>
+      </td>
+      <td className="px-4 py-3 text-sm text-slate-400">
+        {task.userName || `사용자 ${task.crtdBy}`}
+      </td>
+      <td className="px-4 py-3 text-sm text-slate-400">
+        {formatDateWithYear(task.startAt)}
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-2">
+          <span className={`text-sm ${deadlineStyles[deadlineStatus].text}`}>
+            {formatDateWithYear(task.endAt)}
+          </span>
+          {showDeadlineAlert && (
+            <span className={`rounded border px-1.5 py-0.5 text-[11px] font-semibold ${deadlineStyles[deadlineStatus].badge}`}>
+              {deadlineLabel}
+            </span>
+          )}
+        </div>
+      </td>
+      <td className="px-4 py-3 text-sm text-slate-400">
+        {formatDateWithYear(task.crtdAt)}
+      </td>
+      {showRestore && onRestore && (
+        <td className="px-4 py-3">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onRestore(task.taskId);
+            }}
+            type="button"
+            className="inline-flex min-h-[44px] items-center px-2.5 py-1 rounded-lg text-xs font-medium transition bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+          >
+            복원
+          </button>
+        </td>
+      )}
+    </tr>
+  );
+});
