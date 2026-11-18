@@ -328,6 +328,12 @@ export function CalendarView({ tasks, teamId, initialMonth, onMonthChange }: Cal
   }, [tasks]);
 
   // 단일 데이 태스크를 날짜별로 그룹화
+  // 주별 멀티 데이 막대 — 렌더 안에서 주마다 다시 계산하지 않게(달·태스크가 같으면 그대로)
+  const taskBarsByWeek = useMemo(
+    () => weeks.map(weekDates => getTaskBarsForWeek(weekDates, multiDayTasks)),
+    [weeks, multiDayTasks],
+  );
+
   const singleDayTasksByDate = useMemo(() => {
     const map = new Map<string, Task[]>();
 
@@ -441,7 +447,7 @@ export function CalendarView({ tasks, teamId, initialMonth, onMonthChange }: Cal
       {/* 캘린더 그리드 - 주 단위 렌더링 */}
       <div>
         {weeks.map((weekDates, weekIdx) => {
-          const taskBars = getTaskBarsForWeek(weekDates, multiDayTasks);
+          const taskBars = taskBarsByWeek[weekIdx];
           const maxRow = taskBars.length > 0 ? Math.max(...taskBars.map(b => b.row)) + 1 : 0;
           // 멀티 데이 슬롯 높이: 최소 0, 최대 2줄 (더 많으면 날짜별 +N개 표시)
           const displayRows = Math.min(maxRow, CALENDAR_VISIBLE_ROWS);

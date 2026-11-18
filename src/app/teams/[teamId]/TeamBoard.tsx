@@ -16,7 +16,7 @@ import { DropdownMenu } from './components/DropdownMenu';
 import type { Task } from '../../types/task';
 import { useTaskFilter, useTelegramLink, useDiscordLink, useTeamInvite, useTeamSocketEvents, useSafeNavigation, useLatestFlag } from '../../hooks';
 import { useMyTeamNickname } from '../../hooks/useMyTeamNickname';
-import { useTeamSocketContext, useTeamChatContext, useTeamTagsContext } from './contexts';
+import { useTeamSocketContext, useTeamChatOpen, useTeamChatUnreadCount, useTeamTagsContext } from './contexts';
 import {
   getTeamTasks,
   updateTaskStatus,
@@ -239,7 +239,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
 
   // ===== WebSocket (Context에서 관리) =====
   const { socket, onlineUsers, roomJoinCount } = useTeamSocketContext();
-  const { isChatOpen, openChat, closeChat, myUnreadCount } = useTeamChatContext();
+  // 열림 상태만 구독 — 메시지·읽음·안읽음 변화로 보드 전체가 다시 그려지지 않게(안읽음 배지는 TeamChatButton이 따로 구독)
+  const { isChatOpen, openChat, closeChat } = useTeamChatOpen();
 
   // 채팅 상태는 레이아웃에 있으므로, 보드를 떠나면 패널을 닫는다 (안 보이는 채팅이 계속 읽음 처리되지 않도록)
   useEffect(() => closeChat, [closeChat]);
@@ -828,7 +829,8 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       let currentTask: Task | undefined;
       let currentColumn: ColumnKey | undefined;
 
-      for (const [columnKey, columnTasks] of Object.entries(tasks) as [ColumnKey, Task[]][]) {
+      // 최신 목록은 ref로 읽는다 — tasks를 deps에 두면 카드 하나만 바뀌어도 이 콜백이 새로 만들어져 memo 카드가 전부 다시 그려진다
+      for (const [columnKey, columnTasks] of Object.entries(tasksRef.current) as [ColumnKey, Task[]][]) {
         const found = columnTasks.find(t => t.taskId === taskId);
         if (found) {
           currentTask = found;
@@ -895,7 +897,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
         });
       }
     },
-    [session?.user?.accessToken, tasks, teamIdNum],
+    [session?.user?.accessToken, teamIdNum],
   );
 
   // 역할 변경 모달 열기
@@ -1068,13 +1070,7 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
                 )}
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                <IconButton
-                  icon={CommentIcon}
-                  label="팀 채팅"
-                  variant="outlined"
-                  onClick={openChat}
-                  badge={myUnreadCount}
-                />
+                <TeamChatButton onClick={openChat} />
                 <IconButton
                   icon={PlusIcon}
                   label="새 카드 작성"
@@ -1248,4 +1244,10 @@ export default function TeamBoard({ teamId }: TeamBoardProps) {
       {!isOnlineModalOpen && !isNicknameDialogOpen && !isChatOpen && <FAB href={`/teams/${teamId}/tasks/new`} label="새 카드 작성" />}
     </>
   );
+}
+
+/** 팀 채팅 버튼 — 안읽음 배지만 따로 구독해, 안읽음이 바뀌어도 보드 전체가 아니라 이 버튼만 다시 그린다 */
+function TeamChatButton({ onClick }: { onClick: () => void }) {
+  const myUnreadCount = useTeamChatUnreadCount();
+  return <IconButton icon={CommentIcon} label="팀 채팅" variant="outlined" onClick={onClick} badge={myUnreadCount} />;
 }

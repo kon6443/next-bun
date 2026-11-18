@@ -87,6 +87,20 @@ interface TeamChatContextValue {
 
 const TeamChatContext = createContext<TeamChatContextValue | null>(null);
 
+/**
+ * 채팅 패널 열림 상태만 — 메시지·읽음이 바뀌어도 값이 그대로라 보드(TeamBoard)가 채팅마다 다시 그려지지 않는다
+ * (전체 값을 구독하면 남의 메시지·읽음 이벤트마다 보드 카드 전체가 다시 그려졌다)
+ */
+interface TeamChatOpenContextValue {
+  isChatOpen: boolean;
+  openChat: () => void;
+  closeChat: () => void;
+}
+
+const TeamChatOpenContext = createContext<TeamChatOpenContextValue | null>(null);
+/** 내 안읽음 수만 — 채팅 버튼 배지처럼 작은 구독자용 */
+const TeamChatUnreadContext = createContext<number | null>(null);
+
 interface ResyncOptions {
   /** false면 read-state만 다시 조회하고 목록은 교체하지 않는다 (기본 true — 재참가·탭 복귀) */
   replaceList?: boolean;
@@ -633,7 +647,18 @@ export function TeamChatProvider({ children, teamId }: TeamChatProviderProps) {
     ],
   );
 
-  return <TeamChatContext.Provider value={value}>{children}</TeamChatContext.Provider>;
+  const openValue = useMemo<TeamChatOpenContextValue>(
+    () => ({ isChatOpen, openChat, closeChat }),
+    [isChatOpen, openChat, closeChat],
+  );
+
+  return (
+    <TeamChatOpenContext.Provider value={openValue}>
+      <TeamChatUnreadContext.Provider value={myUnreadCount}>
+        <TeamChatContext.Provider value={value}>{children}</TeamChatContext.Provider>
+      </TeamChatUnreadContext.Provider>
+    </TeamChatOpenContext.Provider>
+  );
 }
 
 /**
@@ -645,4 +670,22 @@ export function useTeamChatContext(): TeamChatContextValue {
     throw new Error('useTeamChatContext must be used within a TeamChatProvider (teams/[teamId] layout).');
   }
   return context;
+}
+
+/** 채팅 패널 열림·열기·닫기만 구독 — 메시지·읽음 변화로는 다시 그려지지 않는다 */
+export function useTeamChatOpen(): TeamChatOpenContextValue {
+  const context = useContext(TeamChatOpenContext);
+  if (!context) {
+    throw new Error('useTeamChatOpen must be used within a TeamChatProvider (teams/[teamId] layout).');
+  }
+  return context;
+}
+
+/** 내 안읽음 수만 구독 */
+export function useTeamChatUnreadCount(): number {
+  const count = useContext(TeamChatUnreadContext);
+  if (count === null) {
+    throw new Error('useTeamChatUnreadCount must be used within a TeamChatProvider (teams/[teamId] layout).');
+  }
+  return count;
 }
