@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { type ReactNode, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useReplayKeys } from "@/app/games/_shared/hooks/useReplayKeys";
 import { formatFrames } from "@/app/games/_shared/lib/format";
 import { HighlightMarks, HighlightNav } from "@/app/games/_shared/components/HighlightRail";
 import type { HighlightKindSpec } from "@/app/games/_shared/lib/highlights";
@@ -234,22 +235,13 @@ export function ReplayPlayer({ replay, title, subtitle, subtitleStat, exitHref, 
     setPlaying((p) => !p);
   }, [seek, totalTicks]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
-      // 버튼·링크·막대에 포커스가 있으면 그 요소의 키(Space = 누르기, ←/→ = 막대 이동)
-      if (e.target instanceof Element && e.target.closest("input,textarea,select,button,a,[role=dialog]")) return;
-      if (e.code === "Space") {
-        e.preventDefault();
-        togglePlay();
-      } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-        e.preventDefault();
-        seek(cursorRef.current!.state.tick + (e.key === "ArrowLeft" ? -1 : 1) * SEEK_STEP_SECONDS * tps);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [togglePlay, seek, tps]);
+  useReplayKeys(true, {
+    togglePlay,
+    seekBy: (direction) => seek(cursorRef.current!.state.tick + direction * SEEK_STEP_SECONDS * tps),
+    // 조합키·자동 반복은 받지 않는다. 버튼·링크·막대에 포커스가 있으면 그 요소의 키(Space = 누르기, ←/→ = 막대 이동)
+    skip: (e) => e.metaKey || e.ctrlKey || e.altKey || e.repeat || (e.target instanceof Element && e.target.closest("input,textarea,select,button,a,[role=dialog]") !== null),
+    arrowField: "key",
+  });
 
   const state = cursorRef.current.state;
   // 오디오는 사용자가 멈출 때만 쉰다 — 끝에 닿아 멈춘 것은 그대로 두어 마지막 소리(누수·폭발)가 끝까지 나게(플레이와 같은 규칙)

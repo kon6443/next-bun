@@ -7,6 +7,7 @@ import { type GarbageGauge, computeLayout, drawGame } from "../lib/renderer";
 import { type QualityMonitor, createQualityMonitor, sampleDraw } from "../lib/renderQuality";
 import { type BoardSkins, DEFAULT_BOARD_SKINS } from "../lib/skins";
 import { useReducedEffects } from "../hooks/useReducedEffects";
+import { watchDevicePixelRatio } from "@/app/games/_shared/lib/watchDpr";
 
 /** 백버퍼 배율 상한(포트리스·디펜스와 같은 값) — 스프라이트는 ctx 변환에서 배율을 읽어(renderer currentDpr) 캐시 키도 따라 바뀐다 */
 const DPR_CAP = 2;
@@ -120,19 +121,7 @@ export function TetrisCanvas({ stateRef, drawRef, effectsRef, garbageRef, skins 
     resize();
     const observer = new ResizeObserver(resize);
     observer.observe(container);
-    // 모니터를 옮기거나 확대 비율이 바뀌어 DPR만 바뀌면 크기 변화가 없다 — 현재 DPR 해상도 질의가 풀리면 다시 맞추고 새 DPR로 다시 건다
-    // (디펜스 useDefenseCanvas와 같은 방식, games-polish FE-19)
-    let media: MediaQueryList | null = null;
-    const watchDpr = () => {
-      media?.removeEventListener("change", onDpr);
-      media = typeof window.matchMedia === "function" ? window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`) : null;
-      media?.addEventListener("change", onDpr);
-    };
-    const onDpr = () => {
-      resize();
-      watchDpr();
-    };
-    watchDpr();
+    const stopDpr = watchDevicePixelRatio(resize);
     // 표본은 부모 루프가 매 화면 프레임(rAF) 부르는 이 함수의 호출 간격 — 실제로 그린 프레임에서만 쓴다
     // (그린 간격을 재면 0.5배속 재생처럼 엔진 프레임이 드문 화면을 느린 기기로 오판한다. 멈춘 화면은 그리지 않아 표본이 없다)
     let lastFrameAt = 0;
@@ -148,7 +137,7 @@ export function TetrisCanvas({ stateRef, drawRef, effectsRef, garbageRef, skins 
     return () => {
       redrawRef.current = null;
       observer.disconnect();
-      media?.removeEventListener("change", onDpr);
+      stopDpr();
       if (drawRef.current === onAnimationFrame) drawRef.current = null;
     };
   }, [stateRef, drawRef, effectsRef, garbageRef]);

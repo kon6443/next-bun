@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { drawMapLayer } from "../renderer/mapLayer";
 import type { RenderMap } from "../renderer/renderView";
 import { type Viewport, backingSize, fitViewport } from "../renderer/viewport";
+import { watchDevicePixelRatio } from "@/app/games/_shared/lib/watchDpr";
 
 /**
  * 캔버스 2장(bg 정적 맵 / fg 매 프레임) 관리 — 컨테이너 크기·DPR 상한이 바뀌면 백버퍼를 맞추고 bg를 다시 그린다 (§F10)
@@ -58,21 +59,10 @@ export function useDefenseCanvas(map: RenderMap, dprCap: number) {
     if (!container) return;
     const observer = new ResizeObserver(layout);
     observer.observe(container);
-    // 모니터를 옮기거나 확대 비율이 바뀌어 DPR만 바뀌면 크기 변화가 없다 — 현재 DPR 해상도 질의가 풀리면 다시 맞추고 새 DPR로 다시 건다
-    let media: MediaQueryList | null = null;
-    const watchDpr = () => {
-      media?.removeEventListener("change", onDpr);
-      media = typeof window.matchMedia === "function" ? window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`) : null;
-      media?.addEventListener("change", onDpr);
-    };
-    const onDpr = () => {
-      layout();
-      watchDpr();
-    };
-    watchDpr();
+    const stopDpr = watchDevicePixelRatio(layout);
     return () => {
       observer.disconnect();
-      media?.removeEventListener("change", onDpr);
+      stopDpr();
     };
   }, [layout]);
 
